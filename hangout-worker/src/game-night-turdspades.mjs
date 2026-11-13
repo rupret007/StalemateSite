@@ -1,5 +1,5 @@
 import { TurdSpadesMatch, SPADES_SEATS, TURDSPADES_MATCH_VERSION } from '../arcade/games/turdspades-match.js';
-import { RANK_VALUES, pickNilCoverCard, shouldBidNil } from '../arcade/games/turdspades-engine.js';
+import { RANK_VALUES, pickNilCoverCard, suggestSpadesBid } from '../arcade/games/turdspades-engine.js';
 import { createGameNightTable } from './game-night-table.mjs';
 
 const rules = {
@@ -20,18 +20,7 @@ const rank = card => RANK_VALUES[card.rank];
 
 // Use the standalone game's high-card estimates and Nil policy.
 function computerBid(hand) {
-    if (shouldBidNil(hand)) return 0;
-    let estimate = 0, spades = 0;
-    for (const card of hand) {
-        const value = rank(card);
-        if (card.suit === 'S') {
-            spades++;
-            estimate += value === 14 ? 1 : value === 13 ? 0.8 : value >= 11 ? 0.5 : 0;
-        } else estimate += value === 14 ? 0.75 : value === 13 ? 0.45 : value === 12 ? 0.25 : 0;
-    }
-    if (spades >= 5) estimate += 0.9;
-    if (spades >= 6) estimate += 0.7;
-    return Math.max(1, Math.min(9, Math.round(estimate)));
+    return suggestSpadesBid(hand);
 }
 
 function beats(card, winner, lead) {

@@ -1,4 +1,5 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { suggestSpadesBid } from '/play/games/turdspades-engine.js';
 
 const seats = ['south', 'west', 'north', 'east'];
 const names = { south: 'South', west: 'West', north: 'North', east: 'East' };
@@ -27,7 +28,7 @@ const markup = `
     <ul class="spades-trick" aria-label="Bids and trick cards" data-spades-trick></ul>
     <div class="arcade-card-actions" data-spades-bid hidden>
         <label for="spades-bid">Your bid</label><select id="spades-bid"></select>
-        <button class="btn btn--small" type="button" data-spades-action="bid">Lock bid</button>
+        <button class="btn btn--small" type="button" data-spades-action="bid">Bid for me</button>
     </div>
     <p class="small arcade-card-hand-label" data-spades-hand-label></p>
     <div class="arcade-card-hand" role="group" aria-label="Your hand" data-spades-hand></div>
@@ -59,6 +60,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
     const actions = [...panel.querySelectorAll('[data-spades-action]')];
     let scope = null, model = null, canOpen = false, partnersSupported = false, connection = 'connecting', connectionError;
     let pending = false, timer, confirmation = '';
+    let suggestedBidKey = '', bidEdited = false, applyingBid = false;
 
     function clearPending() { clearTimeout(timer); pending = false; }
     function closeConfirmation() { confirmation = ''; if (confirm.open) confirm.close(); }
@@ -143,6 +145,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         bid.append(option);
     }
     bid.value = '3';
+    bid.addEventListener('change', () => { if (!applyingBid) bidEdited = true; });
 
     function showHand(cards) {
         const old = new Map([...hand.children].map(button => [button.dataset.spadesCard, button]));
@@ -198,9 +201,19 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 return `${teams[team]} ${signed}${nil.length ? ' · ' + nil.join(', ') : ''}`;
             }).join(' / ');
         } else if (match) {
-            const turn = seat === match.turn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
-            message = `Round ${match.round} · ${turn}`;
-            if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
+            const yourTurn = seat === match.turn;
+            if (paired && match.phase === 'bid' && yourTurn && seat === 'west') {
+                message = 'You and a computer partner vs the host and a computer · tap Bid for me';
+            } else if (paired && match.phase === 'bid' && yourTurn && seat === 'south') {
+                message = 'You and a computer partner vs your friend and a computer · tap Bid for me';
+            } else if (paired && match.phase === 'bid' && seat === 'west') {
+                message = 'Waiting for the host to bid';
+            } else {
+                const turn = yourTurn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
+                message = `Round ${match.round} · ${turn}`;
+                if (yourTurn && match.phase === 'play' && !match.trick.length && !match.lastTrick.length) message += ' · tap a card';
+                if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
+            }
         }
         if (status.textContent !== message) status.textContent = message;
         main.hidden = !command;
@@ -219,6 +232,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         for (let team = 0; team < 2; team++) {
             $(`[data-spades-score="${team}"]`).textContent = `${teams[team]} · ${match.scores[team]}/${match.target} · ${match.bags[team]} bags`;
         }
+        $('.arcade-card-score').hidden = paired && match.phase !== 'round-end' && match.lastTrick.length !== 4;
+        $('[data-spades-trick]').hidden = paired && match.phase === 'bid';
         const shown = match.trick.length ? match.trick : match.lastTrick;
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
@@ -230,6 +245,21 @@ export function mountArcadeTurdSpades(container, onMatch) {
             row.dataset.red = String(!!entry && 'HD'.includes(entry.suit));
         });
         $('[data-spades-bid]').hidden = !match.canBid;
+        if (match.canBid) {
+            const bidKey = `${model.id}:${match.revision}`;
+            if (bidKey !== suggestedBidKey) {
+                suggestedBidKey = bidKey;
+                bidEdited = false;
+            }
+            if (!bidEdited) {
+                const suggestion = String(suggestSpadesBid(match.hand));
+                if (bid.value !== suggestion) {
+                    applyingBid = true;
+                    bid.value = suggestion;
+                    applyingBid = false;
+                }
+            }
+        }
         bid.disabled = connection !== 'ready' || pending;
         $('[data-spades-hand-label]').textContent = seat
             ? `Your hand · ${match.hand.length} cards${match.phase === 'play' && match.spadesBroken ? ' · Spades broken' : ''}`

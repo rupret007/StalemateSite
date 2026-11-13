@@ -83,6 +83,22 @@ export function shouldBidNil(hand) {
   );
 }
 
+/** Same high-card estimate the computer uses. Nil stays 0; every other bid is 1–9. */
+export function suggestSpadesBid(hand) {
+  if (shouldBidNil(hand)) return 0;
+  let estimate = 0, spades = 0;
+  for (const card of hand) {
+    const value = RANK_VALUES[card.rank];
+    if (card.suit === 'S') {
+      spades++;
+      estimate += value === 14 ? 1 : value === 13 ? 0.8 : value >= 11 ? 0.5 : 0;
+    } else estimate += value === 14 ? 0.75 : value === 13 ? 0.45 : value === 12 ? 0.25 : 0;
+  }
+  if (spades >= 5) estimate += 0.9;
+  if (spades >= 6) estimate += 0.7;
+  return Math.max(1, Math.min(9, Math.round(estimate)));
+}
+
 /**
  * Score one partnership's round, including individual Nil contracts.
  * Nil tricks still count toward the partnership contract and can become bags.
