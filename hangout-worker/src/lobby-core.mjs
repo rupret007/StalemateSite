@@ -553,6 +553,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const host = membersOf(room).find(peer => peer.betaSid === guest.host && !peer.safetyOnly && isOp(peer, room));
         return host ? { room, host } : null;
     }
+    function fourGuestSeat(guest) {
+        const room = ch(guest?.room);
+        const game = room?.four;
+        if (!guest || !room || room.keepRef !== guest.ref || roomKind(room) !== 'game' || !room.modes.i || net.shield || roomsBroken) return false;
+        if (!game || game.id !== guest.match || game.guest || fourFinished(game)) return false;
+        const host = conns.get(game.host);
+        return !!(host && host.betaSid === guest.host && !host.safetyOnly && isOp(host, room) && room.members.has(host.id));
+    }
     function approveArcade(id) {
         const c = conns.get(id);
         if (!c || c.safetyOnly) return { ok: false };
@@ -1155,7 +1163,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function command(c, where, name, args, roomInstance, messageResult, frame, typedMention) {
-        if (c.gameGuest && !['part', 'leave', 'quit', 'exit', 'bye', 'me', 'help', 'h', '?', 'block', 'unblock', 'ignore', 'unignore'].includes(name)) {
+        if (c.gameGuest && !['part', 'leave', 'quit', 'exit', 'bye', 'me', 'help', 'h', '?', 'block', 'unblock', 'ignore', 'unignore'].includes(name)
+            && !(name === 'four' && c.gameGuest.game === 'four')) {
             return bot(c, 'This invitation is for playing and chatting in your Game Night room.', 'error');
         }
         if (!limited(c, 'command', 10, 1, true)) return;
@@ -2657,7 +2666,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return controlledRun(message, [...args, true], safetyMessage(args[1]));
         }, flushPresence,
         transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
-        arcadeActor, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: name => {
+        arcadeActor, fourGuestSeat, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: name => {
             const room = ch(name);
             return room && roomKind(room) === 'game' ? room.keepRef : null;
         }, approveArcade: id => execute(approveArcade, [id]),
