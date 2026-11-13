@@ -27,6 +27,9 @@ const webJamShare = process.argv.includes('--webjam-share');
 const siteGuest = process.argv.find(arg => arg.startsWith('--site-guest='))?.slice('--site-guest='.length);
 const relay = process.argv.includes('--relay');
 const roomGrants = process.argv.includes('--room-grants');
+const webJamGuest = process.argv.find(arg => arg.startsWith('--webjam-guest='))?.slice('--webjam-guest='.length);
+assert.ok(webJamGuest === undefined || browserName && roomGrants && ['stalemate', 'rad-dad'].includes(webJamGuest),
+    'choose --room-grants, a browser and a WebJam guest brand');
 const rollback = process.argv.includes('--rollback');
 const rollbackRef = process.argv.find(arg => arg.startsWith('--rollback-ref='))?.slice(15);
 const mixedRef = process.argv.find(arg => arg.startsWith('--mixed-ref='))?.slice('--mixed-ref='.length);
@@ -137,7 +140,7 @@ function upgrade(cookie, { protocol, ticket }, path = '/beta/arcade-match') {
 const pause = () => new Promise(resolve => setTimeout(resolve, 600));
 
 async function verifyRoomGrants() {
-    const host = await guest('FixtureHost', 'stalemate', '192.0.2.11');
+    const host = await guest('FixtureHost', webJamGuest || 'stalemate', '192.0.2.11');
     host.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
     const { ch } = await host.lobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'private game room');
     const response = await upgrade(host.cookie, await grant(host, ch.keepRef));
@@ -153,24 +156,35 @@ async function verifyRoomGrants() {
     const redeem = (secret, attempt, cookie = '', ip = '192.0.2.12') => call(path + '/redeem', cookie,
         { value: secret, attempt, age13: true }, ip);
 
-    const expiring = value();
-    const expiry = await register([expiring]);
-    assert.equal(expiry.status, 200, await expiry.clone().text());
-    const { until } = await expiry.json();
-    await match.wait(frame => frame.state?.waiting && !frame.state.hasOpenSeat, 'reserved seat');
-    await new Promise(resolve => setTimeout(resolve, Math.max(0, until - Date.now()) + 50));
-    assert.equal((await redeem(expiring, value())).status, 410);
-    const expirySync = match.frames.length;
-    match.send({ version: 1, action: 'sync' });
-    await match.wait(frame => frame.state?.id === state.id && frame.state.waiting && frame.state.hasOpenSeat,
-        'expired hold leaves the original table waiting', expirySync);
-    console.log('PASS expired grant leaves the original table waiting with its seat available.');
+    if (!webJamGuest) {
+        const expiring = value();
+        const expiry = await register([expiring]);
+        assert.equal(expiry.status, 200, await expiry.clone().text());
+        const { until } = await expiry.json();
+        await match.wait(frame => frame.state?.waiting && !frame.state.hasOpenSeat, 'reserved seat');
+        await new Promise(resolve => setTimeout(resolve, Math.max(0, until - Date.now()) + 50));
+        assert.equal((await redeem(expiring, value())).status, 410);
+        const expirySync = match.frames.length;
+        match.send({ version: 1, action: 'sync' });
+        await match.wait(frame => frame.state?.id === state.id && frame.state.waiting && frame.state.hasOpenSeat,
+            'expired hold leaves the original table waiting', expirySync);
+        console.log('PASS expired grant leaves the original table waiting with its seat available.');
+    }
 
     const seated = value(), standby = value(), attempt = value();
     const registered = await register([seated, standby]);
     assert.equal(registered.status, 200, await registered.clone().text());
     const { granted, standby: waiting } = await registered.json();
     assert.deepEqual([granted, waiting], [1, 1]);
+
+    if (webJamGuest) {
+        try { await verifyWebJamGuestBrowser(match, state.id, seated, standby, value()); }
+        finally {
+            match.socket.close(1000, 'fixture complete');
+            host.lobby.socket.close(1000, 'fixture complete');
+        }
+        return;
+    }
 
     assert.equal((await redeem(seated, value(), host.cookie)).status, 403);
     console.log('PASS a host receives 403 and the guest can still use the grant.');
@@ -212,6 +226,90 @@ async function verifyRoomGrants() {
     assert.ok(!excess.headers.has('Set-Cookie'));
     console.log('PASS the standby guest receives 409 after the granted guest joins the exact table.');
     for (const session of [guestMatch, guestLobby, match, host.lobby]) session.socket.close(1000, 'fixture complete');
+}
+
+async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavailable) {
+    const { chromium, webkit } = await import('playwright');
+    const { expect } = await import('@playwright/test');
+    const browserOrigin = (await mf.ready).origin;
+    const browser = await { chromium, webkit }[browserName].launch();
+    const entryPath = '/beta/game-night/webjam-guest';
+    const redeemPath = '/beta/game-night/room-grant/redeem';
+    if (evidence) await mkdir(evidence, { recursive: true });
+    const capture = async (page, step) => {
+        if (evidence) await page.screenshot({ path: join(evidence, webJamGuest + '-' + browserName + '-' + step + '.png') });
+    };
+    const open = async (value, phone = true) => {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true, hasTouch: phone, reducedMotion: 'reduce',
+            viewport: phone ? { width: 390, height: 844 } : { width: 1440, height: 900 } });
+        const page = await context.newPage();
+        try { await page.goto(browserOrigin + entryPath + '#grant=' + value); }
+        catch { throw new Error('Could not open the synthetic WebJam handoff'); }
+        await expect(page.getByRole('button', { name: 'Join game' })).toBeVisible();
+        assert.equal(new URL(page.url()).hash, '', 'the grant is scrubbed before confirmation');
+        return page;
+    };
+
+    try {
+        const page = await open(seated);
+        const attempts = [];
+        page.on('request', request => {
+            if (new URL(request.url()).pathname === redeemPath) attempts.push(request.postDataJSON().attempt);
+        });
+        await page.reload();
+        const joinGame = page.getByRole('button', { name: 'Join game' });
+        await expect(joinGame).toBeVisible();
+        await expect(page.getByRole('textbox')).toHaveCount(0);
+        assert.equal(attempts.length, 0, 'loading and refreshing require an explicit join');
+        assert.equal((await page.context().cookies()).length, 0, 'no access before consent');
+        await capture(page, 'join');
+        let firstStatus;
+        await page.route(url => url.pathname === redeemPath, async route => {
+            const response = await route.fetch();
+            firstStatus = response.status();
+            await response.dispose();
+            await route.abort();
+        }, { times: 1 });
+        await joinGame.tap();
+        await expect(page.locator('[data-guest-status]')).toHaveText('Couldn’t join just now. Try again.');
+        assert.equal(firstStatus, 200, 'the server accepted before the response was lost');
+        await capture(page, 'interrupted');
+        await page.context().clearCookies();
+        await page.reload({ waitUntil: 'commit' });
+        await expect(page.locator('[data-chess-status]')).toContainText('You’re Black');
+        assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'recovery uses the original attempt');
+        assert.ok(await page.evaluate(() => !history.state?.webJamGameNightInvite), 'the seated page has no grant in history state');
+        await match.wait(frame => frame.state?.id === matchId && frame.state?.match, 'WebJam guest enters the exact Chess match');
+        match.send({ version: 1, action: 'move', id: matchId, revision: 0, move: 'e2e4' });
+        await expect(page.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+        for (const square of ['d7', 'd5']) {
+            const target = page.locator('[data-square="' + square + '"]');
+            await target.scrollIntoViewIfNeeded();
+            const box = await target.boundingBox();
+            assert.ok(box && box.width > 22 && box.height > 22, 'the phone square is tappable');
+            await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        }
+        await match.wait(frame => frame.state?.match?.moves?.[1] === 'd7d5', 'WebJam guest confirms the first move');
+        assert.equal((await page.context().request.get(browserOrigin + '/beta/state')).status(), 401, 'guest access stays scoped');
+        await capture(page, 'first-move');
+
+        const waiting = await open(standby, false);
+        await waiting.getByRole('button', { name: 'Join game' }).click();
+        await expect(waiting.locator('[data-guest-status]')).toHaveText(/This table is full/);
+        await expect(waiting.getByRole('button', { name: 'Join game' })).toBeHidden();
+        assert.equal((await waiting.context().cookies()).length, 0, 'standby receives no access');
+        await capture(waiting, 'standby');
+
+        const stale = await open(unavailable, false);
+        await stale.getByRole('button', { name: 'Join game' }).click();
+        await expect(stale.locator('[data-guest-status]')).toHaveText('This invite is no longer available. Ask your host for a new one.');
+        await expect(stale.getByRole('button', { name: 'Join game' })).toBeHidden();
+        assert.equal((await stale.context().cookies()).length, 0, 'expired grant receives no access');
+        await capture(stale, 'expired');
+        console.log('PASS synthetic WebJam handoff: consent, recovery, exact seat, first move, standby and invalid/expired grant handling.');
+    } finally {
+        await browser.close();
+    }
 }
 
 async function serveAsset(request) {
@@ -1139,6 +1237,8 @@ try {
             process.once('SIGINT', resolve);
             process.once('SIGTERM', resolve);
         });
+    } else if (webJamGuest) {
+        await verifyRoomGrants();
     } else if (browserName) {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;
