@@ -77,6 +77,44 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await expect(page.locator('#status')).toBeFocused();
         expect(await page.evaluate(() => window.captureRequests)).toBe(0);
     });
+
+    test(`an admitted listener gets a fresh-invite path after a connection drops at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.addInitScript(() => {
+            window.captureRequests = 0;
+            navigator.mediaDevices.getUserMedia = async () => {
+                window.captureRequests++;
+                throw new Error('The listener did not request capture');
+            };
+        });
+        await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
+        await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+            import { JOIN_SIGNAL } from './errors.js';
+            export class WebJoinSession {
+                constructor(options) { this.options = options; }
+                async join() {
+                    this.authorized = true;
+                    window.dropMusicConnection = () => {
+                        this.close();
+                        this.options.onError(new Error(JOIN_SIGNAL.ICE_DISCONNECTED), true);
+                    };
+                }
+                close() { this.authorized = false; }
+            }` }));
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        await page.getByRole('button', { name: 'Join to listen' }).press('Enter');
+        await expect(page.getByRole('button', { name: 'Leave session' })).toBeFocused();
+        await page.evaluate(() => window.dropMusicConnection());
+        const status = page.locator('#status');
+        await expect(status).toBeFocused();
+        await expect(status).toHaveAccessibleDescription(/return to your Jam room to accept it/i);
+        await expect(page.locator('#error-hint')).toBeInViewport();
+        for (const id of ['listen', 'join', 'prejoin', 'retry', 'leave']) await expect(page.locator(`#${id}`)).toBeHidden();
+        expect(await page.evaluate(() => window.captureRequests)).toBe(0);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        await page.screenshot({ path: testInfo.outputPath(`listen-connection-dropped-${width}x${height}.png`) });
+    });
 }
 
 test('choosing to listen stops a pending microphone check before playback resumes', async ({ page, baseURL }) => {
