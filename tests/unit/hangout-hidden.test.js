@@ -32,6 +32,17 @@ describe('hidden hangout room', () => {
             if (rel === 'robots.txt' || rel === 'scripts/package-pages.cjs' || rel === 'scripts/hangout-relay-dev.mjs') continue;
             if (rel === 'scripts/preview-hangout.cjs' || rel === 'hangout-internal/HANGOUT_IRC_PREVIEW.md') continue;
             const text = readFileSync(file, 'utf8');
+            // The home-screen door is the one public page allowed to name the
+            // existing Hang Out and Game Night pages. It is noindex and is not
+            // linked from the band homepage. Every other public file stays quiet.
+            if (rel === 'hangout/index.html') {
+                expect(text, rel).toContain(`href="../r/${SLUG}/"`);
+                expect(text, rel).toContain(`href="../r/${SLUG}/lobby/?game-night=1"`);
+                expect(text, rel).toContain('href="../join/"');
+                expect(text, rel).toContain('noindex');
+                expect(text, rel).not.toMatch(/hang ?out room|data-hangout/i);
+                continue;
+            }
             expect(text, rel).not.toContain(SLUG);
             expect(text, rel).not.toMatch(/href=["'][^"']*\/?r\/[0-9a-f]{8,}/i);
             expect(text, rel).not.toMatch(/hang ?out room|data-hangout/i);

@@ -39,7 +39,17 @@ const FILES = [
     'assets/mark.svg',
     'assets/og.png',
     'assets/og.svg',
-    'assets/torn.svg'
+    'assets/torn.svg',
+    'manifest.json',
+    'sw.js',
+    'assets/hangout-app/webjam-mark.svg',
+    'assets/hangout-app/AppIcon-1024.png',
+    'assets/hangout-app/icon_512x512.png',
+    'assets/hangout-app/apple-touch-icon.png',
+    'assets/hangout-app/icon-192.png',
+    'assets/hangout-app/icon-512.png',
+    'assets/hangout-app/icon-maskable-192.png',
+    'assets/hangout-app/icon-maskable-512.png'
 ];
 
 function emptyDir(dir) {
@@ -69,7 +79,7 @@ function copyHangoutRoomRuntime() {
     }
 }
 
-const DIRS = ['play', 'qr', 'tap', 'events', 'join'];
+const DIRS = ['play', 'qr', 'tap', 'events', 'join', 'hangout'];
 // Internal notes stay in the repository and out of the Pages artifact. GitHub
 // still reports Pages source.path as "/" for this workflow build, so a new
 // file under docs/ would look published. Do not add these directories here.

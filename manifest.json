@@ -1,0 +1,44 @@
+{
+  "id": "hangout/",
+  "name": "Hang Out",
+  "short_name": "Hang Out",
+  "description": "Hang Out, Game Night, and WebJam.",
+  "start_url": "hangout/",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#171410",
+  "theme_color": "#171410",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "assets/hangout-app/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/hangout-app/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/hangout-app/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/hangout-app/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/hangout-app/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

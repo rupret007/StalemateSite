@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <script>
+        (function () {
+            var path = location.pathname || '/';
+            if (path.endsWith('/') || !/\/hangout$/.test(path)) return;
+            location.replace(path + '/' + location.search + location.hash);
+        }());
+    </script>
+    <title>Hang Out</title>
+    <meta name="description" content="Hang Out, Game Night, and WebJam. One home screen icon.">
+    <meta name="theme-color" content="#171410">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Hang Out">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="manifest" href="../manifest.json">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/hangout-app/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="../assets/hangout-app/icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="../assets/hangout-app/webjam-mark.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&amp;family=Source+Sans+3:wght@400;600;700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="home.css">
+</head>
+<body>
+    <a class="skip" href="#choices">Skip to choices</a>
+    <div class="sheet">
+        <header class="mast">
+            <img class="brand-mark" src="../assets/hangout-app/webjam-mark.svg" alt="" width="72" height="72">
+            <p class="eyebrow">One home screen icon</p>
+            <h1>Hang Out</h1>
+            <p class="lede">Draw together, play a table, or join a jam.</p>
+        </header>
+        <div class="checker" aria-hidden="true"></div>
+        <aside id="add-home" class="install" data-install-card hidden></aside>
+        <noscript>
+            <aside class="install" role="region" aria-label="Add Hang Out to your home screen">
+                <h2>Add Hang Out to your home screen</h2>
+                <p class="install__hint">Tap Share, then Add to Home Screen.</p>
+                <p class="install__hint">On Android, open the browser menu and choose Install app.</p>
+            </aside>
+        </noscript>
+        <main id="choices">
+            <h2 class="sr-only">Choose where to go</h2>
+            <div class="choices">
+                <a class="choice" href="../r/45662413410ed051/">
+                    <span class="choice__name">Hang Out</span>
+                    <span class="choice__detail">Draw, watch, and talk.</span>
+                </a>
+                <a class="choice" href="../r/45662413410ed051/lobby/?game-night=1">
+                    <span class="choice__name">Game Night</span>
+                    <span class="choice__detail">Play a game with friends.</span>
+                </a>
+                <a class="choice" href="../join/">
+                    <span class="choice__name">WebJam</span>
+                    <span class="choice__detail">Join a music session.</span>
+                </a>
+            </div>
+        </main>
+    </div>
+    <script type="module" src="boot.mjs"></script>
+</body>
+</html>
