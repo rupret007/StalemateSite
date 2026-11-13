@@ -299,7 +299,9 @@ for (const { delayed, width, height, hostSite, guestSite } of [
             await guest.waitForFunction(() => typeof window.releaseMusicAcceptance === 'function');
             await guest.clock.fastForward(10_000);
             await expect(guestStatus).toContainText('Hang Out hasn’t confirmed your Music invitation');
-            await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
+            const dismiss = panel.getByRole('button', { name: 'Dismiss', exact: true });
+            await expect(dismiss).toBeFocused();
+            await expect(dismiss).toHaveAccessibleDescription('Hang Out hasn’t confirmed your Music invitation. Wait here or ask the host to send a fresh one.');
             await expect(panel.getByRole('button', { name: 'Open WebJam in browser' })).toBeHidden();
             expect(await guest.evaluate(() => window.musicReplies)).toBe(1);
             await guest.evaluate(() => window.releaseMusicAcceptance());
