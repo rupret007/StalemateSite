@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 for (const [width, height] of [[390, 844], [1440, 900]]) {
-    test(`a browser invite leads straight to listening without capture at ${width}px`, async ({ page, baseURL }, testInfo) => {
+    test(`a browser guest can listen, retry and leave without capture at ${width}px`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
         await page.addInitScript(() => {
             window.captureRequests = 0;
@@ -12,11 +12,15 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         });
         await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
         await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+            let attempts = 0;
             export class WebJoinSession {
                 constructor({ stream }) {
                     if (stream) throw new Error('Unexpected capture stream');
                 }
-                async join() { this.authorized = true; }
+                async join() {
+                    if (++attempts === 1) throw new DOMException('Interrupted', 'AbortError');
+                    this.authorized = true;
+                }
                 close() {}
             }` }));
         const expires = Math.floor(Date.now() / 1000) + 300;
@@ -28,6 +32,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
         await page.screenshot({ path: testInfo.outputPath(`listen-ready-${width}x${height}.png`) });
         await listen.press('Enter');
+        await expect(page.locator('#error-hint')).toHaveText('Check your connection, then select Retry to listen again.');
+        const retry = page.getByRole('button', { name: 'Retry', exact: true });
+        await expect(retry).toBeFocused();
+        await expect(retry).toBeInViewport();
+        await page.screenshot({ path: testInfo.outputPath(`listen-retry-${width}x${height}.png`) });
+        await retry.press('Enter');
         await expect(page.locator('#status')).toHaveText('Connected. You’re listening with your microphone off.');
         const leave = page.getByRole('button', { name: 'Leave session' });
         await expect(leave).toBeFocused();
