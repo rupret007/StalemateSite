@@ -34,6 +34,20 @@ test('the nickname gate explains why Join is disabled while the lobby loads', as
     }
 });
 
+test('a failed lobby module offers a keyboard-accessible reload', async ({ page, baseURL }) => {
+    await page.route(url => url.pathname === ROOT + 'lobby.js', route => route.abort(), { times: 1 });
+    const relay = hangoutRelayWsBase(baseURL, `nickname-reload-${randomUUID()}`);
+    await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+    const join = page.locator('[data-enter]');
+    const reload = page.getByRole('link', { name: 'Reload Hang Out' });
+    await expect(join).toBeDisabled();
+    await expect(join).toHaveAccessibleDescription('Hang Out couldn’t load. Reload the page to try again.');
+    await expect(reload).toBeVisible();
+    await reload.press('Enter');
+    await expect(join).toBeEnabled();
+    await expect(reload).toBeHidden();
+});
+
 for (const { width, status } of [{ width: 375, status: 401 }, { width: 390, status: 401 }, { width: 390, status: 503 }]) {
     test(`a refused initial upgrade shows truthful private-entry recovery for HTTP ${status} at ${width}px`, async ({ browser, baseURL }, testInfo) => {
         const context = await browser.newContext({ viewport: { width, height: 844 } });

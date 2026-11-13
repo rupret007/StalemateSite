@@ -138,6 +138,7 @@
             <div>
                 <button class="btn btn--big" type="button" data-enter aria-describedby="gate-status" disabled>I’m 13+ and I agree · Let me in ↗</button>
                 <p class="status" id="gate-status" data-gate-status role="status">Getting Hang Out ready…</p>
+                <a class="btn btn--ghost" data-lobby-reload href="" hidden>Reload Hang Out</a>
             </div>
             <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; site moderators can remove abusive content. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
             <details class="entry-details"><summary>How session scrollback works</summary><p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p></details>
@@ -475,6 +476,7 @@
     <script src="discovery-core.js"></script>
     <script src="lobby-room.js"></script>
     <script src="qr-lite.js"></script>
-    <script type="module" src="lobby.js"></script>
+    <script src="lobby-startup.js"></script>
+    <script type="module" src="lobby.js" data-lobby-module></script>
 </body>
 </html>
