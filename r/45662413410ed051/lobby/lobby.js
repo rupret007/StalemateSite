@@ -1288,6 +1288,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 resetPendingReports();
                 if (app.pendingChannel && $('[data-channel-dialog]').open) {
                     $('[data-channel-error]').textContent = m.text;
+                    const field = $('[data-channel-name]');
+                    if (document.activeElement === field) $('[data-channel-field]')?.scrollIntoView({ block: 'center' });
                     app.pendingChannel = '';
                 } else if (!failedGameJoin && !fourInviteFailed) toast(m.text);
             }

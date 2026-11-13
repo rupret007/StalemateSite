@@ -21,10 +21,12 @@
         <h3 id="channel-dialog-title">Your own #channel</h3>
         <p>Anyone can host. Join an existing channel, or create one and become its @ host.</p>
         <form data-channel-form>
-            <label class="channel-label" for="channel-name">Channel name</label>
-            <input id="channel-name" data-channel-name maxlength="31" autocomplete="off" spellcheck="false" placeholder="#night-owls" aria-describedby="channel-name-hint channel-name-error" required>
+            <div data-channel-field>
+                <label class="channel-label" for="channel-name">Channel name</label>
+                <input id="channel-name" data-channel-name maxlength="31" autocomplete="off" spellcheck="false" placeholder="#night-owls" aria-describedby="channel-name-hint channel-name-error" required>
+                <p class="status" id="channel-name-error" data-channel-error role="status"></p>
+            </div>
             <p class="small" id="channel-name-hint">2–30 letters, numbers or dashes. You can also type /join #night-owls in chat.</p>
-            <p class="status" id="channel-name-error" data-channel-error role="status"></p>
             <div class="sheet-buttons"><button class="btn" type="submit">Join / create</button><button class="btn btn--ghost" type="button" data-channel-cancel>Cancel</button></div>
         </form>
         <p class="small">Give another member @ with /op nick before you leave. Rooms close after 10 minutes empty.</p>

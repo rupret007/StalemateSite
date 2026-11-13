@@ -232,6 +232,14 @@ test('phone room creation keeps the name and shows a server rejection inside the
         await expect(page.locator('[data-channel-name]')).toHaveValue('#another-chat');
         await expect(page.locator('[data-channel-error]')).toBeInViewport();
         await expect(page.locator('[data-channel-cancel]')).toBeInViewport();
+        await page.setViewportSize({ width: 320, height: 232 });
+        const field = page.locator('[data-channel-name]');
+        await field.press('Enter');
+        await expect(field).toHaveAccessibleDescription(/One new room per 10 minutes/);
+        await expect(field).toBeFocused();
+        await expect(field).toBeInViewport({ ratio: 1 });
+        await expect(page.locator('[data-channel-error]')).toBeInViewport({ ratio: 1 });
+        await page.setViewportSize({ width: 375, height: 667 });
         await page.click('[data-channel-cancel]');
         await expect(page.locator('[data-start="chat"]')).toBeFocused();
         await page.click('[data-start="chat"]');
