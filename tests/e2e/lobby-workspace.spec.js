@@ -10,6 +10,18 @@ async function enter(page, baseURL) {
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
 }
 
+test('chat shortcuts explain what they do and can send from the keyboard', async ({ page, baseURL }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await enter(page, baseURL);
+    const actions = page.locator('[data-quick]');
+    const horns = actions.getByRole('button', { name: 'Send rock horns and SHRED' });
+    await expect(horns).toBeVisible();
+    await expect(actions.getByRole('button', { name: 'Send happy little tree' })).toBeVisible();
+    await expect(actions.getByRole('button', { name: 'Help with chat commands' })).toBeVisible();
+    await horns.press('Enter');
+    await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('🤘 SHRED');
+});
+
 for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 812], [390, 844]]) {
     test(`workspace fills ${width}x${height} and keeps the composer visible`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
