@@ -151,7 +151,7 @@ if (!webJoinEntry) {
     }
     $('#owner').href = '/lobby-owner/login?entry-return=1';
     lobby.addEventListener('click', rememberEntry);
-    if (__GAME_NIGHT_GUESTS__ && GAME_NIGHT_QUERY && !game && !params.has('game-night') &&
+    if (__GAME_NIGHT_OPEN__ && GAME_NIGHT_QUERY && !game && !params.has('game-night') &&
         (source === 'rad-dad' || source === 'stalemate')) {
         const arcade = $('#band-game-night');
         arcade.href = '${ROOT}lobby/?entry-return=1&' + GAME_NIGHT_QUERY;
@@ -366,7 +366,7 @@ async function betaRequest(request, env, deps = {}) {
         return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript');
     }
     if (url.pathname === '/beta/client.js') return reply(CLIENT
-        .replace('__GAME_NIGHT_GUESTS__', () => String(gameGuestEnabled(env)))
+        .replace('__GAME_NIGHT_OPEN__', () => String(env.HANGOUT_OPEN !== '0'))
         .replace('__ENTRY_SITES__', () => JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))), 200, 'text/javascript');
     if (url.pathname === '/beta/entry-sites.mjs') {
         // Only this public, credential-free display registry is available before

@@ -118,22 +118,23 @@ describe('entry context through the private beta shell', () => {
             } finally { dom.window.close(); }
         }
     });
-    it.each(['rad-dad', 'stalemate'])('offers Game Night from the private arcade handoff for %s', async source => {
+    it.each(['rad-dad', 'stalemate'])('offers admitted Game Night without external guest links for %s', async source => {
         const address = `https://beta.example/beta/?via=${source}`;
-        const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });
-        const enabled = await shell(address, config);
-        const disabled = await shell(address);
+        const config = env();
+        const open = await shell(address, config);
+        const paused = await shell(address, env({ HANGOUT_OPEN: '0' }));
         const explicit = await shell(address + '&game-night=1', config);
         try {
-            expect(enabled.window.document.querySelector('#band-games').hidden).toBe(false);
-            expect(click(enabled, '#band-game-night').href).toBe(`https://beta.example${root}lobby/?entry-return=1&game-night=1`);
-            expect(entryFunctions.readEntryHandoff(enabled.window.sessionStorage.getItem(entryFunctions.ENTRY_HANDOFF_KEY)))
+            expect(open.window.document.querySelector('#band-games').hidden).toBe(false);
+            expect(click(open, '#band-game-night').href).toBe(`https://beta.example${root}lobby/?entry-return=1&game-night=1`);
+            expect(entryFunctions.readEntryHandoff(open.window.sessionStorage.getItem(entryFunctions.ENTRY_HANDOFF_KEY)))
                 .toEqual({ source, share: true });
-            expect(click(enabled, '#inside .button').href).toBe(`https://beta.example${root}lobby/?entry-return=1`);
-            expect(disabled.window.document.querySelector('#band-games').hidden).toBe(true);
+            expect(click(open, '#inside .button').href).toBe(`https://beta.example${root}lobby/?entry-return=1`);
+            expect(paused.window.document.querySelector('#band-games').hidden).toBe(true);
             expect(explicit.window.document.querySelector('#band-games').hidden).toBe(true);
+            expect((await betaFetch(new Request('https://beta.example/beta/game-night/guest'), config)).status).toBe(404);
         } finally {
-            for (const dom of [enabled, disabled, explicit]) dom.window.close();
+            for (const dom of [open, paused, explicit]) dom.window.close();
         }
     });
     it('uses the same bounded handoff for owner sign-in while a direct visit erases stale attribution', async () => {
