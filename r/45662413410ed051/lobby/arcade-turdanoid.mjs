@@ -96,7 +96,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         $('.brick-race-help').textContent = 'Drag to move. Tap the stuck ball or press Launch.';
     }
     const paint = createPainter(board.querySelector('canvas'));
-    let scope, model, canOpen, connection, connectionError, visual, wall, receivedAt, raf = 0, pending, pointer,
+    let scope, model, canOpen, connection, connectionError, hostLeft = false, visual, wall, receivedAt, raf = 0, pending, pointer,
         desiredAim = null, lastAim = -Infinity, lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, redraw = true;
     const inputBufferLimit = 8;
     let launchPointer = null, desiredAxis = null, keyboardActive = false, pointerStart = null;
@@ -133,6 +133,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         },
         onState({ state, canOpen: host }) {
             if (state && (state.game !== 'turdanoid' || state.version !== 1)) return;
+            const hadGame = !!model;
             const reconnecting = connection !== 'ready';
             const changed = state?.id !== model?.id || state?.seat !== model?.seat;
             const reveal = state?.match && (!model?.match || changed);
@@ -143,6 +144,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
             } else if (state?.match) flights = flights.filter(flight => flight.sequence > state.match.runner.sequence);
             model = state;
             canOpen = host;
+            if (model || canOpen) hostLeft = false;
+            else if (hadGame) hostLeft = true;
             receivedAt = performance.now();
             connection = 'ready';
             connectionError = undefined;
@@ -174,6 +177,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
 
     function send(action) {
         if (action === 'retry') { client.start(scope); return; }
+        if (action === 'stay') { hostLeft = false; render(); return; }
+        if (action === 'watch') { board.focus(); return; }
         if (connection !== 'ready' || pending || !client.send({ action, id: model?.id })) return;
         put(error, '');
         pending = setTimeout(() => client.start(scope), 4000);
@@ -260,19 +265,34 @@ export function mountArcadeTurdanoid(container, onMatch) {
             message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
             if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect race'; }
         } else if (connection !== 'ready') {
-            if (match) message = match.result ? 'Reconnecting to the race…' : 'Reconnecting · race clock keeps running';
+            if (match) message = seat && !match.result ? 'Reconnecting to your seat.' : 'Reconnecting to the race…';
         } else if (!model) {
-            message = 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.';
-            if (canOpen) { action = 'open'; label = 'Open Turdanoid race'; }
+            if (hostLeft && !canOpen) {
+                message = 'The host left. This race is over.';
+                action = 'stay';
+                label = 'Stay for the next race';
+            } else {
+                message = 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.';
+                if (canOpen) { action = 'open'; label = 'Open Turdanoid race'; }
+            }
         } else if (model?.waiting) {
             message = seat ? 'Waiting for a second player.' : 'An opponent is ready.';
             if (!seat) { action = 'join'; label = 'Join Turdanoid race'; }
         } else if (result) {
-            message = result.winner === null ? 'Draw' : seat ? (result.winner === seat ? 'You win' : 'Rival wins')
-                : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
-            message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
-            if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
-            if (seat && seat === model.rematch) message += ' · Rematch requested';
+            const reason = { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
+            if (!seat) {
+                message = (result.winner === null ? 'Draw' : result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins') + '. You’re up if they rematch.';
+                action = 'watch';
+                label = 'Watch for the next race';
+            } else {
+                message = (result.winner === null ? 'Draw' : result.winner === seat ? 'You win' : 'Rival wins') + ' · ' + reason;
+                if (seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
+                if (seat === model.rematch) message += ' · Rematch requested';
+            }
+        } else if (match && !seat) {
+            message = 'Table full. You’re up next game.';
+            action = 'watch';
+            label = 'Watch this race';
         } else if (match) message = match.wall.name;
         put(status, message);
         main.hidden = !action;
