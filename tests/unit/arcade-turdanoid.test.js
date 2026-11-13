@@ -124,11 +124,24 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.hint.hidden).toBe(true);
         expect(view.launch.hidden).toBe(true);
     });
+
+    it('tells a touch player to drag and tap instead of using arrow keys and Space', () => {
+        const touch = mount({ coarse: true });
+        expect(touch.help.textContent).toBe('Drag to move. Tap the stuck ball or press Launch.');
+        expect(touch.help.textContent).not.toMatch(/arrow keys|Space/);
+        const keys = mount({ coarse: false });
+        expect(keys.help.textContent).toBe('Drag or use the arrow keys to move. Tap the stuck ball, press Launch, or press Space.');
+    });
 });
 
-function mount() {
+function mount({ coarse = true } = {}) {
     client.sent.length = 0;
-    const media = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
+    document.body.replaceChildren();
+    const media = query => ({
+        matches: query === '(pointer: coarse)' ? coarse : true,
+        addEventListener() {},
+        removeEventListener() {}
+    });
     window.matchMedia = media;
     globalThis.matchMedia = media;
     HTMLCanvasElement.prototype.getContext = () => canvasStub();
@@ -148,6 +161,7 @@ function mount() {
     return {
         board,
         hint: container.querySelector('[data-brick-launch-wait]'),
+        help: container.querySelector('.brick-race-help'),
         launch: container.querySelector('[data-brick-serve]'),
         table: container.querySelector('[data-brick-match]'),
         publish(now, seat = 'b') {

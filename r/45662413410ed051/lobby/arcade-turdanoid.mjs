@@ -92,6 +92,9 @@ export function mountArcadeTurdanoid(container, onMatch) {
     const table = $('[data-brick-match]'), board = $('[data-brick-board]'), status = $('[data-brick-status]'),
         error = $('[data-brick-error]'), main = $('[data-brick-main]'), leave = $('[data-brick-leave]'),
         launch = $('[data-brick-serve]'), confirm = $('[data-brick-confirm]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
+    if (matchMedia('(pointer: coarse)').matches) {
+        $('.brick-race-help').textContent = 'Drag to move. Tap the stuck ball or press Launch.';
+    }
     const paint = createPainter(board.querySelector('canvas'));
     let scope, model, canOpen, connection, connectionError, visual, wall, receivedAt, raf = 0, pending, pointer,
         desiredAim = null, lastAim = -Infinity, lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, redraw = true;
