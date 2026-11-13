@@ -250,7 +250,18 @@ async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0', pro
 async function gameInvitation(request, env, path, body) {
     if (path === 'leave') {
         const session = await betaSession(request, env, Date.now(), { gameGuest: true, allowRevoked: true });
-        if (session && body.sessionRef === await gameGuestSessionRef(session.access.sid)) await disconnect(env, session);
+        if (session && body.sessionRef === await gameGuestSessionRef(session.access.sid)) {
+            await disconnect(env, session);
+            const scope = gameGuestScope(session.access.gameGuest);
+            if (scope) {
+                const released = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(
+                    `https://lobby${GAME_INVITATION_PATH}/release`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ body: { scope, sid: session.access.sid } })
+                    });
+                if (!released.ok) throw new BetaSessionUnavailable('Your invitation could not be closed. Please try again.');
+            }
+        }
         return json({ ok: true });
     }
     if (!gameGuestEnabled(env) || !['issue', 'details', 'accept'].includes(path)) return json({ error: 'Game invitations are unavailable.' }, 404);

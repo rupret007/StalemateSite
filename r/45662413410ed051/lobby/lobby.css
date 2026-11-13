@@ -613,6 +613,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
 [data-game-guest-connecting] h1 {
   margin: 24px 0; font: 700 clamp(2.6rem, 9vw, 4.5rem)/1 system-ui, sans-serif; letter-spacing: -.06em;
 }
+[data-game-guest-connecting] .btn { min-height: 44px; }
 @media (max-width: 480px) { [data-game-guest-connecting].gate { padding: 24px 16px; } }
 .sheet-buttons .btn { font-size: 12px; }
 [data-call-report-reason] { display: block; width: 100%; margin: 6px 0 12px; padding: 8px;
