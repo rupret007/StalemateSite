@@ -597,6 +597,7 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 [data-game-invite-link-status]:empty { display: none; }
 .game-guest [data-pane=rooms], .game-guest [data-show=rooms], .game-guest .chat .startroom,
 .game-guest .pmtoggle:has([data-pm-off]), .game-guest [data-game-arcade] { display: none !important; }
+.game-guest .game-night > .game-call { display: none; }
 .game-guest:not(.game-guest-four) [data-four] { display: none !important; }
 .game-guest-four .game-night:has(.four-match[open]) { max-height: none; }
 body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: none; }
