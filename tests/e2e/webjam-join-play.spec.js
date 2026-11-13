@@ -12,6 +12,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         });
         await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
         await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+            import { JOIN_SIGNAL } from './errors.js';
             let attempts = 0;
             export class WebJoinSession {
                 constructor({ stream }) {
@@ -19,6 +20,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
                 }
                 async join() {
                     if (++attempts === 1) throw new DOMException('Interrupted', 'AbortError');
+                    if (attempts === 2) throw new Error(JOIN_SIGNAL.HOST_NO_ANSWER);
                     this.authorized = true;
                 }
                 close() {}
@@ -39,6 +41,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await expect(retry).toHaveAccessibleDescription('Check your connection, then select Retry to listen again.');
         await expect(retry).toBeInViewport();
         await page.screenshot({ path: testInfo.outputPath(`listen-retry-${width}x${height}.png`) });
+        await retry.press('Enter');
+        await expect(retry).toBeFocused();
+        await expect(retry).toHaveAccessibleDescription('Ask your host to keep the Music session open in WebJam and allow browser guests. Then select Retry.');
+        await expect(retry).toBeInViewport();
+        await expect(page.getByRole('button', { name: 'Check microphone' })).toBeHidden();
+        await page.screenshot({ path: testInfo.outputPath(`listen-host-timeout-${width}x${height}.png`) });
         await retry.press('Enter');
         await expect(page.locator('#status')).toHaveText('Connected. You’re listening with your microphone off.');
         const leave = page.getByRole('button', { name: 'Leave session' });
