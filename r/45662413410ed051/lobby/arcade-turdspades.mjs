@@ -11,6 +11,7 @@ const errors = {
     'illegal-card': 'Follow the led suit if you can. Lead spades after they’re broken or when you hold only spades.',
     'wrong-turn': 'Wait for your turn.',
     'invalid-bid': 'Choose a bid from 0 to 13.',
+    unavailable: 'The table couldn’t confirm that action. Try again.',
     'storage-unavailable': 'The move was not confirmed. Try again.'
 };
 const markup = `
