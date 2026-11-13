@@ -138,7 +138,7 @@ const entrySites = createEntrySiteRegistry(__ENTRY_SITES__);
 const $ = s => document.querySelector(s);
 const webJoinEntry = document.body.hasAttribute('data-web-join-entry');
 const inside = $('#inside'), logout = $('#logout'), retryLeave = $('#retry-leave');
-const code = $('#code'), codeError = $('#code-error');
+const code = $('#code'), codeError = $('#code-error'), retry = $('#retry');
 if (!webJoinEntry) {
     const params = new URLSearchParams(location.search);
     const source = entrySourceFromParams(params, entrySites);
@@ -235,14 +235,18 @@ function validState(value) {
         && typeof value.emailConfigured === 'boolean' && typeof value.staffConfigured === 'boolean'
         && (value.kind !== 'staff' || ['owner', 'band', 'moderator'].includes(value.role));
 }
-async function draw() {
+async function draw({ refocusInvitation = false } = {}) {
     if (leavingUnconfirmed) return;
     const attempt = begin('check');
     if (!attempt) return;
     try {
         const response = await accessRequest('/beta/state');
         if (attempt !== currentAttempt) return;
-        if (response.status === 401) return finish(attempt, 'invitation', 'A private invitation is required.');
+        if (response.status === 401) {
+            finish(attempt, 'invitation', 'A private invitation is required.');
+            if (refocusInvitation && [document.body, retry].includes(document.activeElement)) code.focus();
+            return;
+        }
         if (response.status === 403) return finish(attempt, 'denied', 'Access was denied. Check the house rules or contact the community owner.');
         if (!response.ok) return finish(attempt, 'unavailable', unavailable);
         const identity = response.value;
@@ -289,7 +293,7 @@ code.addEventListener('input', () => {
 });
 $('#unlock').addEventListener('submit', event => { event.preventDefault(); unlock(code.value); });
 logout?.addEventListener('submit', event => { event.preventDefault(); leave(); });
-$('#retry').addEventListener('click', draw);
+retry.addEventListener('click', () => draw({ refocusInvitation: true }));
 retryLeave?.addEventListener('click', leave);
 if (webJoinEntry) {
     // The music capability belongs to the audio client. Leave it in the tab's

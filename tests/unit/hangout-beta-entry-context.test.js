@@ -398,8 +398,10 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
             const code = doc.querySelector('#code');
             await vi.waitFor(() => expect(retry.hidden).toBe(false));
             expect(location.hash).toBe('');
+            retry.focus();
             retry.click();
             await vi.waitFor(() => expect(doc.querySelector('#login').hidden).toBe(false));
+            expect(doc.activeElement).toBe(code);
             expect(code.value).toBe(fixtureCode);
             expect(calls.map(call => call.method)).toEqual(['POST', 'GET']);
             doc.querySelector('#unlock button').click();
@@ -408,6 +410,28 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
             expect(location.hash).toBe('');
             expect(calls.map(call => call.method)).toEqual(['POST', 'GET', 'POST', 'GET']);
         } finally { dom.window.close(); }
+    });
+
+    it('leaves focus where the guest moved it while the retry was pending', async () => {
+        let release;
+        const pending = new Promise(resolve => { release = resolve; });
+        const { dom } = await portal((path, options, count) =>
+            count === 1 ? new Response(null, { status: 503 }) : pending);
+        try {
+            const doc = dom.window.document;
+            const retry = doc.querySelector('#retry');
+            await vi.waitFor(() => expect(retry.hidden).toBe(false));
+            retry.focus();
+            retry.click();
+            const privacy = doc.querySelector('a[href="/beta/privacy"]');
+            privacy.focus();
+            release(new Response(null, { status: 401 }));
+            await vi.waitFor(() => expect(doc.querySelector('#login').hidden).toBe(false));
+            expect(doc.activeElement).toBe(privacy);
+        } finally {
+            release(new Response(null, { status: 401 }));
+            dom.window.close();
+        }
     });
 
     it('returns focus to a rejected private invitation code and lets the guest correct it', async () => {
