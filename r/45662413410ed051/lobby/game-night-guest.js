@@ -8,6 +8,18 @@ const code = restored?.code ?? new URLSearchParams(location.hash.slice(1)).get('
 const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
 const confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
 const hasInvitation = typeof code === 'string' && code.length > 0 && code.length <= 250;
+let inviteExpired = false;
+
+function showExpiredInvite() {
+    inviteExpired = true;
+    status.textContent = 'This invite expired.';
+    retry.textContent = 'Ask my host for a new invite';
+    retry.hidden = false;
+    invite.hidden = true;
+    join.disabled = false;
+    clearInvitation();
+    if (document.activeElement === document.body) retry.focus({ preventScroll: true });
+}
 
 function retainInvitation(confirmedGame) {
     // A refresh can use this history entry, without putting the link back in the address.
@@ -48,9 +60,13 @@ async function describe() {
         invite.hidden = false;
         if (document.activeElement === document.body) join.focus({ preventScroll: true });
     } catch (error) {
-        status.textContent = error.status === 410 ? error.message : 'Couldn’t check the invitation. Try again.';
-        retry.hidden = error.status === 410;
-        if (error.status === 410) clearInvitation();
+        if (error.status === 410) showExpiredInvite();
+        else {
+            inviteExpired = false;
+            retry.textContent = 'Try again';
+            status.textContent = 'Couldn’t check the invitation. Try again.';
+            retry.hidden = false;
+        }
     }
 }
 
@@ -64,10 +80,8 @@ async function accept() {
         location.replace(next);
     } catch (error) {
         status.textContent = [410, 429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
-        if (error.status === 410) {
-            clearInvitation();
-            invite.hidden = true;
-        } else if (invite.hidden) {
+        if (error.status === 410) showExpiredInvite();
+        else if (invite.hidden) {
             retry.hidden = false;
             if (document.activeElement === document.body) retry.focus({ preventScroll: true });
         } else {
@@ -82,7 +96,10 @@ join.addEventListener('click', () => {
     void accept();
 });
 
-retry.addEventListener('click', () => void (confirmedGame ? accept() : describe()));
+retry.addEventListener('click', () => {
+    if (inviteExpired) return;
+    void (confirmedGame ? accept() : describe());
+});
 if (hasInvitation && confirmedGame) {
     // Resume only an accept attempt already confirmed by this guest.
     gameTitle.textContent = confirmedGame;
