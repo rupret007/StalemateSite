@@ -2623,7 +2623,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const targetNow = arcadeInviteTarget();
             if (room !== currentGameNight() || targetNow?.match !== target.match || targetNow.game !== target.game) {
                 resetGuestLink();
-                guestLinkStatus.textContent = 'The table changed. Open a game with a free seat first.';
+                createGuestLink.hidden = true;
+                guestLinkStatus.textContent = 'The table changed. Close this dialog and invite from a game with a free seat.';
                 return;
             }
             guestLinkStatus.textContent = error.name === 'TimeoutError'
