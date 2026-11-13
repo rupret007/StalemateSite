@@ -17,7 +17,8 @@ const digest = async value => Array.from(new Uint8Array(await crypto.subtle.dige
     byte => byte.toString(16).padStart(2, '0')).join('');
 export const gameGuestSessionRef = sid => digest('game-guest-session:' + sid);
 const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-const unavailable = () => reply({ error: 'This invite is no longer available. Ask your host for a new one.' }, 410);
+export const GAME_INVITE_UNAVAILABLE = 'This invite is no longer available. Ask your host for a new one.';
+const unavailable = () => reply({ error: GAME_INVITE_UNAVAILABLE }, 410);
 
 // Four lives on the Game Night room. The other tables use the arcade transport.
 async function waitingGuestSeat(lobby, roomScope, game, match, hostSid) {
