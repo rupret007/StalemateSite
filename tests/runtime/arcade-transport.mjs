@@ -476,10 +476,34 @@ async function verifyWebJamChess() {
             await expect(reserve).toBeVisible();
             assert.equal(registrations, 0, 'opening a room and match does not reserve a guest seat');
             await capture(host, 'confirm-host');
+            const webJoin = await host.context().newPage();
+            await webJoin.goto(browserOrigin + '/join/');
+            const offerCard = await webJoin.evaluate(async raw => {
+                const { bindGameOfferChannel } = await import('/join/game-offer.js');
+                const channel = new EventTarget();
+                channel.label = 'webjoin-game-offer';
+                channel.ordered = true;
+                bindGameOfferChannel(channel, {
+                    authorized: () => true,
+                    openWindow(href) {
+                        const destination = new URL(href);
+                        window.fixtureChessDestination = destination.pathname + destination.hash;
+                    }
+                });
+                channel.dispatchEvent(new MessageEvent('message', {
+                    data: JSON.stringify({ game: 'chess', hostName: 'Your host', value: raw })
+                }));
+                return document.querySelector('#game-offer')?.hidden === false;
+            }, value);
+            assert.ok(offerCard, 'the private package mounts the WebJam offer card');
+            await webJoin.getByRole('button', { name: 'Join game', exact: true }).click();
+            const handoff = await webJoin.evaluate(() => window.fixtureChessDestination);
+            assert.ok(handoff?.startsWith('/beta/game-night/webjam-guest#grant='), 'the packaged card opens the private guest route');
+            await webJoin.close();
             const guest = await browser.newContext({ ignoreHTTPSErrors: true, hasTouch: true, reducedMotion: 'reduce',
                 viewport: { width: 390, height: 844 } });
             const page = await guest.newPage();
-            try { await page.goto(browserOrigin + '/beta/game-night/webjam-guest#grant=' + value + '&wait=1'); }
+            try { await page.goto(browserOrigin + handoff); }
             catch { throw new Error('Could not open the guest handoff'); }
             const joinGame = page.getByRole('button', { name: 'Join game' });
             await expect(joinGame).toBeVisible();

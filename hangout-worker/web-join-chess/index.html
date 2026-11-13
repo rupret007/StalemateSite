@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://webjam-turn-credentials.jeffstory007.workers.dev; media-src 'self' blob:; base-uri 'none'; form-action 'none'">
+  <title>Web Join · WebJam</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">WebJam</p>
+    <h1>Join a WebJam session</h1>
+    <div class="join-card">
+      <p id="status" role="status" tabindex="-1" aria-describedby="error-hint">Open the invite link from your host.</p>
+      <p id="error-hint" class="error-hint" hidden></p>
+      <section id="prejoin" hidden aria-labelledby="prejoin-heading">
+        <h2 id="prejoin-heading">Check your audio</h2>
+        <div class="mic-actions">
+          <button type="button" id="check-mic">Check microphone</button>
+          <button type="button" id="skip-check" class="skip-check">Skip check</button>
+        </div>
+        <p id="mic-error" class="mic-error" role="alert"></p>
+        <button type="button" id="mic-retry" class="secondary" hidden>Try again</button>
+        <div id="mic-picker" class="mic-picker" hidden>
+          <label for="mic-device">Microphone</label>
+          <select id="mic-device"><option value="">Browser default</option></select>
+        </div>
+        <p id="mic-source" role="status" hidden></p>
+        <div id="mic-meter" class="mic-meter" role="meter" aria-label="Microphone level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="mic-meter-fill" class="mic-meter-fill"></div>
+        </div>
+        <p id="mic-progress" role="status" tabindex="-1"></p>
+        <p id="mic-heard" class="mic-heard" role="status" hidden>Microphone detected.</p>
+        <label class="headphones"><input id="headphones" type="checkbox"> I’m wearing headphones to prevent echo.</label>
+        <p id="join-guidance" class="join-guidance">Check your microphone first.</p>
+      </section>
+      <div class="actions"><button id="join" aria-describedby="join-guidance" disabled>Join with microphone</button><button id="retry" hidden>Retry</button><button id="leave" hidden>Leave session</button></div>
+      <p id="audio-quality" role="status"></p>
+      <section id="game-offer" hidden aria-live="polite" aria-label="Game offer"></section>
+      <div id="access-window" class="access-window" hidden>
+        <p id="access-time" role="timer" aria-live="off"></p>
+        <p class="access-note">The host may end the session sooner. To continue after access ends, ask for a fresh invite.</p>
+        <p id="access-warning" role="status" hidden></p>
+      </div>
+      <p id="connection-route" hidden></p>
+    </div>
+    <details>
+      <summary>Audio details</summary>
+      <p>Browser audio usually has more delay than the desktop app (roughly 60–120 ms). For tight rehearsals, use the WebJam app.</p>
+      <p id="latency">Listening delay is estimated after you connect.</p>
+      <p id="warnings"></p>
+      <p>On iPhone and iPad, keep this page visible while you listen or play along. Safari may add playback delay.</p>
+    </details>
+    <audio id="host-audio" autoplay playsinline></audio>
+    <p class="privacy">Join only with an invite from someone you trust. WebJam encrypts connection setup.</p>
+  </main>
+</body>
+</html>
