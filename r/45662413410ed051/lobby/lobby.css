@@ -348,6 +348,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .arcade-spades [data-spades-table][data-phase="bid"] :is(.spades-trick, .arcade-card-hand-label) {
     margin-block: 2px;
   }
+  .arcade-spades [data-spades-table][data-phase="bid"] :is(.arcade-card-score, .arcade-card-hand-label) {
+    display: none;
+  }
 }
 @media (max-width: 355px) {
   .arcade-spades .arcade-card-hand { grid-template-columns: repeat(6, minmax(0, 1fr)); }
