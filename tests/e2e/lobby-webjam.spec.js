@@ -202,7 +202,9 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         const other = await f.join('OtherGuest');
         const guestStatus = await expectExposedInviteStatus(guest, '[data-music-invite-status]');
         await guest.locator('[data-text]').focus();
-        await host.click('[data-show="rooms"]');
+        if (width <= 900) {
+            await host.locator('.phonetabs').getByRole('button', { name: /Rooms/ }).click();
+        }
         await host.click('[data-start="jam"]');
         await expect(host.locator('[data-jam]')).toBeVisible();
         await expect(host.locator('[data-chat-context]')).toHaveText(/^#jam-/);
