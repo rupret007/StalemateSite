@@ -303,6 +303,26 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         if (phone) await page.touchscreen.tap(x, y);
         else await page.mouse.click(x, y);
     }
+    async function interruptFirstInviteRead(page) {
+        const requests = [];
+        let status;
+        await page.route('**/beta/game-night/invitation/details', async route => {
+            const response = await route.fetch();
+            status = response.status();
+            await route.fulfill({ status, contentType: 'application/json', body: '{"game":' });
+            await response.dispose();
+        }, { times: 1 });
+        page.on('request', request => {
+            if (new URL(request.url()).pathname === '/beta/game-night/invitation/details') {
+                requests.push(request.postDataJSON().code);
+            }
+        });
+        return () => {
+            assert.equal(status, 200, 'the first read reached the invitation endpoint');
+            assert.equal(requests.length, 2, 'the interrupted read was retried once');
+            assert.ok(requests.every(code => code === requests[0]), 'the retry uses the original invitation');
+        };
+    }
     async function verifyFirstVisit(host) {
         for (const phone of [true, false]) {
             const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
@@ -321,8 +341,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 });
                 assert.equal(unconfirmed.status(), 400, 'the guest must confirm the age and house rules');
                 assert.equal((await context.cookies()).length, 0, 'an unconfirmed invitation grants no access');
+                const checkDetails = phone ? await interruptFirstInviteRead(guest) : null;
                 await openGameNightLink(guest, link);
                 await expect(guest.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
+                checkDetails?.();
+                assert.equal((await context.cookies()).length, 0, 'checking the invitation grants no access');
                 await expect(guest.getByText('LinkHost invited you to play.')).toBeVisible();
                 await expect(guest.getByRole('textbox')).toHaveCount(0);
                 await expect(guest.getByRole('button')).toHaveCount(1);
@@ -735,8 +758,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         attempts.push(request.postDataJSON().attempt);
                 });
                 const gameTitle = friend.getByRole('heading', { name: 'Royal Flush Chess' });
+                const checkDetails = phone ? await interruptFirstInviteRead(friend) : null;
                 await tapGameNightLink(friend, link, phone);
                 await expect(gameTitle).toBeVisible();
+                checkDetails?.();
                 assert.equal(new URL(friend.url()).hash, '', 'the invitation stays out of the address');
                 await friend.reload();
                 await expect(gameTitle).toBeVisible();

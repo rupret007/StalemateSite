@@ -30,10 +30,11 @@ async function request(action, data, retryConnection = false) {
         });
         return { response, value: response.ok ? await response.json() : null };
     };
+    const canRetry = action === 'details' || retryConnection;
     const { response, value } = await send().catch(error => {
-        if (!retryConnection || !['TypeError', 'SyntaxError', 'TimeoutError'].includes(error?.name)) throw error;
-        // The server may already have accepted. Reuse the same confirmation.
-        status.textContent = 'Reconnecting to confirm your seat…';
+        if (!canRetry || !['TypeError', 'SyntaxError', 'TimeoutError'].includes(error?.name)) throw error;
+        // The read is safe to repeat. For a confirmation, reuse the same attempt.
+        status.textContent = action === 'details' ? 'Reconnecting to check your invitation…' : 'Reconnecting to confirm your seat…';
         return send();
     });
     if (!response.ok) {
