@@ -63,7 +63,7 @@ const GAME_GUEST_ENTRANCE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Game Night invitation</title><link rel="stylesheet" href="/beta/style.css"><script type="module" src="${GAME_GUEST_PATH}.js"></script></head>
 <body><main class="game-invitation"><p class="eyebrow">PRIVATE GAME NIGHT</p><h1 data-guest-game>Game Night</h1>
-<p class="lede" data-guest-inviter hidden></p><p data-guest-status role="status">Checking your invitation…</p>
+<p class="lede" data-guest-inviter hidden></p><p id="game-invitation-status" data-guest-status role="status">Checking your invitation…</p>
 <section data-guest-invite aria-label="Accept the invitation" hidden>
 <p id="guest-agreement">By joining, you confirm you’re 13+ and agree to the house rules.</p>
 <button type="button" aria-describedby="guest-agreement" data-guest-join>Join game</button>
@@ -366,8 +366,16 @@ async function betaRequest(request, env, deps = {}) {
             return reply('Game invitations are unavailable.', 404);
         }
         if (webJamGuest || url.pathname === GAME_GUEST_PATH) {
-            const page = webJamGuest ? GAME_GUEST_ENTRANCE.replace('<main ', '<main data-webjam-guest ') : GAME_GUEST_ENTRANCE;
-            return reply(request.method === 'HEAD' ? null : page, 200, 'text/html; charset=utf-8');
+            if (request.method === 'HEAD') return reply(null, 200, 'text/html; charset=utf-8');
+            let page = GAME_GUEST_ENTRANCE;
+            if (webJamGuest) {
+                page = page.replace('<main ', '<main data-webjam-guest ');
+                const session = await betaSession(request, env);
+                if (session) {
+                    page = page.replace('</main>', `<a class="button" href="${LOBBY_PAGE}?webjam-return=1" data-guest-return hidden>Return to room</a></main>`);
+                }
+            }
+            return reply(page, 200, 'text/html; charset=utf-8');
         }
         const asset = await env.ASSETS.fetch(new Request(`${url.origin}${LOBBY_PAGE}game-night-guest.js`));
         return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript');
@@ -554,11 +562,12 @@ async function betaRequest(request, env, deps = {}) {
         .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/gi, '').replace(/<script[^>]*goatcounter[^>]*><\/script>/gi, '')
         .replace(/<b data-contact>[\s\S]*?<\/b>/, contactHtml)
         .replace('<head>', `<head><script src="/beta/bootstrap.js${guest ? GAME_GUEST_QUERY : ''}"></script>`);
+    const webJamReturn = !guest && assetPath === LOBBY_PAGE && gameRoomGrantsEnabled(env) && url.search === '?webjam-return=1';
     const content = guest && assetPath === LOBBY_PAGE ? page
         .replace('<main class="gate" data-gate>', '<main class="gate" data-gate hidden>')
         .replace('<main class="gate" data-game-guest-connecting hidden>', '<main class="gate" data-game-guest-connecting>')
         .replace('<h1 data-game-guest-title>Game Night</h1>', `<h1 data-game-guest-title>${gameNightLabels[guest.game]}</h1>`)
-        : page;
+        : webJamReturn ? page.replace('<body>', '<body data-webjam-return>') : page;
     return reply(content, asset.status, 'text/html; charset=utf-8');
 }
 export async function betaFetch(request, env, deps = {}) {

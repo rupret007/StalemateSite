@@ -238,19 +238,36 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
     const capture = async (page, step) => {
         if (evidence) await page.screenshot({ path: join(evidence, webJamGuest + '-' + browserName + '-' + step + '.png') });
     };
-    const open = async (value, phone = true) => {
+    const open = async (value, phone = true, admitted = false) => {
         const context = await browser.newContext({ ignoreHTTPSErrors: true, hasTouch: phone, reducedMotion: 'reduce',
             viewport: phone ? { width: 390, height: 844 } : { width: 1440, height: 900 } });
         const page = await context.newPage();
+        let originalRoom;
+        if (admitted) {
+            const response = await context.request.post(browserOrigin + '/beta/unlock', {
+                headers: { Origin: browserOrigin }, data: { key: invite }
+            });
+            assert.equal(response.status(), 200, 'the fixture guest already has community access');
+            await response.dispose();
+            await page.goto(browserOrigin + '/r/45662413410ed051/lobby/');
+            await page.getByLabel('Your nick').fill(phone ? 'ReturnPhone' : 'ReturnDesktop');
+            await page.locator('[data-enter]').click();
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+            if (phone) await page.locator('.phonetabs [data-show="rooms"]').tap();
+            await page.locator('[data-start="jam"]').click();
+            await expect(page.locator('[data-jam]')).toBeVisible();
+            originalRoom = await page.evaluate(() => window.__lobby.active);
+            assert.ok(/^#jam-/.test(originalRoom), 'fixture begins in a WebJam room');
+        }
         try { await page.goto(browserOrigin + entryPath + '#grant=' + value); }
         catch { throw new Error('Could not open the synthetic WebJam handoff'); }
         await expect(page.getByRole('button', { name: 'Join game' })).toBeVisible();
         assert.equal(new URL(page.url()).hash, '', 'the grant is scrubbed before confirmation');
-        return page;
+        return { page, originalRoom };
     };
 
     try {
-        const page = await open(seated);
+        const { page } = await open(seated);
         const attempts = [];
         page.on('request', request => {
             if (new URL(request.url()).pathname === redeemPath) attempts.push(request.postDataJSON().attempt);
@@ -292,20 +309,40 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         assert.equal((await page.context().request.get(browserOrigin + '/beta/state')).status(), 401, 'guest access stays scoped');
         await capture(page, 'first-move');
 
-        const waiting = await open(standby, false);
+        const { page: waiting } = await open(standby, false);
         await waiting.getByRole('button', { name: 'Join game' }).click();
         await expect(waiting.locator('[data-guest-status]')).toHaveText(/This table is full/);
         await expect(waiting.getByRole('button', { name: 'Join game' })).toBeHidden();
         assert.equal((await waiting.context().cookies()).length, 0, 'standby receives no access');
         await capture(waiting, 'standby');
 
-        const stale = await open(unavailable, false);
+        const { page: stale } = await open(unavailable, false);
         await stale.getByRole('button', { name: 'Join game' }).click();
         await expect(stale.locator('[data-guest-status]')).toHaveText(/has expired/);
         await expect(stale.getByRole('button', { name: 'Join game' })).toBeHidden();
         assert.equal((await stale.context().cookies()).length, 0, 'expired grant receives no access');
+        await expect(stale.getByRole('link', { name: 'Return to room' })).toHaveCount(0);
         await capture(stale, 'expired');
-        console.log('PASS synthetic WebJam handoff: consent, recovery, exact seat, first move, standby and invalid/expired grant handling.');
+
+        for (const [value, step] of [[standby, 'standby'], [unavailable, 'expired']]) {
+            const { page: member, originalRoom } = await open(value, step === 'expired', true);
+            const back = member.getByRole('link', { name: 'Return to room' });
+            await expect(back).toBeHidden();
+            await member.getByRole('button', { name: 'Join game' }).click();
+            await expect(back).toBeVisible();
+            await expect(back).toHaveAttribute('href', '/r/45662413410ed051/lobby/?webjam-return=1');
+            assert.ok((await back.boundingBox()).height >= 44, 'the return action is phone sized');
+            await capture(member, 'member-' + step);
+            await back.click();
+            await expect(member.locator('[data-connection]')).toHaveText('Connected');
+            await expect.poll(() => member.evaluate(room => window.__lobby.active === room, originalRoom),
+                { message: 'one Return action reopens the same WebJam room' }).toBe(true);
+            if (!await member.locator('[data-jam]').isVisible()) {
+                await member.locator('.phonetabs [data-show="rooms"]').tap();
+            }
+            await expect(member.locator('[data-jam]')).toBeVisible();
+        }
+        console.log('PASS synthetic WebJam handoff: consent, recovery, exact seat, first move, and room return after full or expired offers.');
     } finally {
         await browser.close();
     }

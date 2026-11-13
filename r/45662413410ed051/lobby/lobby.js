@@ -516,6 +516,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     // an invited guest back. They share the same offer and return controls.
     const jamRoomName = name => typeof name === 'string' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(name);
     const offerRoomName = name => jamRoomName(name) || gameNightSupported && gameNightRoomName(name);
+    let webJamReturn = null;
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -1137,6 +1138,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
+            if (c.name === '#stalemate' && webJamReturn) {
+                const requestedReturn = webJamReturn;
+                webJamReturn = null;
+                if (gameReturn?.room === requestedReturn.room && gameReturn.ref === requestedReturn.ref) {
+                    $('[data-game-offer-join]').click();
+                }
+            }
             if (gameGuest?.game === 'four' && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginFourInvitation(c);
             if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
             followPendingRoomJoin();
@@ -3062,6 +3070,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 } else void connect('');
             });
             void connect('');
+        }
+    }
+    if (betaShell && !gameGuest && document.body.hasAttribute('data-webjam-return')) {
+        const savedRoom = readGameReturn();
+        if (savedRoom && jamRoomName(savedRoom.room)) {
+            webJamReturn = savedRoom;
+            if (nickInput.value.trim()) $('[data-enter]').click();
         }
     }
     function scheduleToastDismiss() {
