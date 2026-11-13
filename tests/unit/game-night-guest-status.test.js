@@ -18,7 +18,7 @@ async function load(status, body) {
 describe('expired Game Night invite', () => {
     it('tells the guest to ask the host for a new invite', async () => {
         await load(410, { error: 'This invitation has expired, was used, or the game is no longer waiting for a guest. Ask your host for a new invite.' });
-        expect(document.querySelector('[data-guest-status]').textContent).toBe('Ask your host for a new invite.');
+        expect(document.querySelector('[data-guest-status]').textContent).toBe('This invite expired. Ask your host for a new invite.');
         expect(document.querySelector('[data-guest-retry]').hidden).toBe(true);
         expect(document.querySelector('[data-guest-invite]').hidden).toBe(true);
     });

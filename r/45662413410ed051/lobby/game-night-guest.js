@@ -31,8 +31,9 @@ async function request(action, data) {
     return value;
 }
 
+// An expired invite cannot be retried from this page, so no button is offered.
 function showExpiredInvite() {
-    status.textContent = 'Ask your host for a new invite.';
+    status.textContent = 'This invite expired. Ask your host for a new invite.';
     retry.hidden = true;
     invite.hidden = true;
     clearInvitation();
