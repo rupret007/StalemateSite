@@ -18,7 +18,7 @@ const reasonText = {
 };
 const markup = `
 <summary>Royal Flush Chess</summary>
-<p class="small arcade-chess-status" data-chess-status role="status"></p>
+<p class="small arcade-chess-status" data-chess-status role="status" tabindex="-1"></p>
 <p class="small arcade-chess-feedback" data-chess-error role="status"></p>
 <button type="button" class="btn btn--small" data-chess-primary hidden></button>
 <div class="arcade-chess-playing" data-chess-playing hidden>
@@ -70,7 +70,7 @@ export function mountArcadeChess(container, onMatch) {
     const actions = [...panel.querySelectorAll('[data-action]')];
     const squares = new Map();
     let scope, pendingTimer, clockTimer;
-    let pending = false, canOpen = false, connection = 'connecting', connectionError;
+    let pending = false, canOpen = false, connection = 'connecting', connectionError, matchEnded = false;
     let model = null, chess = null, board = null, selected = null, focused = 'e2';
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
     const client = createGameNightMatchClient({
@@ -128,6 +128,7 @@ export function mountArcadeChess(container, onMatch) {
     }
 
     function stop() {
+        matchEnded = false;
         client.stop();
         clearInterval(clockTimer); clockTimer = null;
         clearPending(); closeChoice();
@@ -137,6 +138,7 @@ export function mountArcadeChess(container, onMatch) {
     }
 
     function applyState(frame) {
+        const hadGame = !!model;
         const prior = model?.match, next = frame.state?.match;
         const enteringBoard = next && next.id !== prior?.id;
         if (model?.id !== frame.state?.id || prior?.revision !== next?.revision) {
@@ -145,6 +147,8 @@ export function mountArcadeChess(container, onMatch) {
         clearPending();
         if (next?.fen !== prior?.fen || !chess) chess = next ? new Chess(next.fen) : null;
         model = frame.state; canOpen = frame.canOpen === true;
+        if (model || canOpen) matchEnded = false;
+        else if (hadGame) matchEnded = true;
         receivedAt = performance.now(); deadlineSynced = false;
         connection = 'ready'; connectionError = undefined;
         if (!clockTimer) clockTimer = setInterval(drawClocks, 200);
@@ -261,18 +265,31 @@ export function mountArcadeChess(container, onMatch) {
             status.textContent = match ? 'Reconnecting to Chess… The clocks keep running.'
                 : connection === 'reconnecting' ? 'Reconnecting to Chess…' : 'Connecting to Chess…';
         } else if (!model) {
-            status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a match.';
-            if (canOpen) button('Open Chess match', 'open');
+            if (matchEnded && !canOpen) {
+                status.textContent = 'This match ended. Wait here for the next game.';
+                button('Stay for the next game', 'stay');
+            } else {
+                status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a match.';
+                if (canOpen) button('Open Chess match', 'open');
+            }
         } else if (model.waiting) {
             status.textContent = seated ? 'You’re White · Waiting for an opponent.' : 'Black is open. Join to play.';
             button(seated ? 'Close waiting match' : 'Join as Black', seated ? 'leave' : 'join');
         } else if (match?.result) {
-            status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
-            if (seated && model.rematch !== model.seat) button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');
-            if (seated && model.rematch) status.textContent += model.rematch === model.seat
-                ? ' · Rematch requested. Waiting for your opponent.' : ' · Your opponent requested a rematch.';
+            if (!seated) {
+                status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'}. You can watch the next match.`;
+                button('Watch for the next game', 'watch');
+            } else {
+                status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
+                if (model.rematch !== model.seat) button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');
+                if (model.rematch) status.textContent += model.rematch === model.seat
+                    ? ' · Rematch requested. Waiting for your opponent.' : ' · Your opponent requested a rematch.';
+            }
+        } else if (!seated) {
+            status.textContent = 'Table full. You’re watching.';
+            button('Watch this game', 'watch');
         } else {
-            const who = seated ? `You’re ${colorName(model.seat)}` : 'Watching';
+            const who = `You’re ${colorName(model.seat)}`;
             status.textContent = `${who} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
         }
         for (const control of actions) {
@@ -298,6 +315,8 @@ export function mountArcadeChess(container, onMatch) {
 
     primary.addEventListener('click', () => {
         if (primary.dataset.command === 'retry') client.start(scope);
+        else if (primary.dataset.command === 'stay') { matchEnded = false; draw(); status.focus(); }
+        else if (primary.dataset.command === 'watch') boardHost.querySelector('[tabindex="0"]')?.focus();
         else if (primary.dataset.command) send(primary.dataset.command);
     });
     for (const control of actions) control.addEventListener('click', () => {
