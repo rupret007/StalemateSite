@@ -1883,6 +1883,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const joining = musicInvite?.state === 'joining';
         const unconfirmed = musicInvite?.state === 'unconfirmed';
         const current = currentJam();
+        const hadFocus = panel.contains(document.activeElement);
         panel.hidden = !musicInvite || (accepted && (current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance));
         if (current && !amOp(current) && !current.jam?.web && !current.jam?.desktop && !current.jam?.invitation)
             $('[data-jam-actions]').hidden = accepted && !panel.hidden;
@@ -1893,7 +1894,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             : musicInvite.sendFailed ? 'Couldn’t send your reply. Check your connection and try again.'
             : `${musicInvite.from} invited you to join Music in ${musicInvite.room}.`;
         updateOfferStatus($('[data-music-invite-status]'), $('[data-music-invite-message]'), message);
-        if (panel.hidden) return;
+        if (panel.hidden) {
+            if (hadFocus) focusChannelTab(app.active);
+            return;
+        }
         dismiss.textContent = ended || unconfirmed ? 'Dismiss' : 'Not now';
         if ((ended || unconfirmed) && document.activeElement === action) dismiss.focus();
         action.hidden = ended || unconfirmed;

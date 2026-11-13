@@ -363,6 +363,11 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         await accept.click();
         await expect(audio).toBeVisible();
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await audio.focus();
+        const lobbyTab = guest.locator('[data-tabs] [data-channel-key="#stalemate"]');
+        await lobbyTab.dispatchEvent('click');
+        await expect(panel).toBeHidden();
+        await expect(lobbyTab).toBeFocused();
         expect(f.external).toEqual([]);
     } finally { await f.close(); }
 });
