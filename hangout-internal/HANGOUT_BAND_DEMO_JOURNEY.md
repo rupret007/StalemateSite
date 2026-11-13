@@ -37,15 +37,15 @@ the same lobby and can see each other in **People**.
 | Build | Host | Guest |
 | --- | --- | --- |
 | Last verified private site, `8d76db40` | Choose **Invite bandmate to room** if shown. If the room shows **Invite guest** under host controls, select the guest there. Once both people are in the Jam room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it in the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** once the host has shared the Music invite. |
-| One-tap Music candidate, private fixture | Choose **Invite bandmate to Music**, select the guest's name, and confirm the invitation in WebJam. Wait for Hang Out to show that it was sent. | Choose **Accept and join**. If the audio check remains available in the room, choose **Open audio check**. The browser joins the Jam room and opens the audio check without exchanging a link. |
+| Selected-guest Music candidate, private fixture | Choose **Invite bandmate to Music**, select the guest, and confirm in WebJam. Wait for Hang Out to show the invitation was sent. | Choose **Accept and join**, then **Open WebJam in browser**. Choose **Join to listen** to keep the microphone off, or follow the microphone check to play. |
 
-Use the `8d76db40` instructions for the staged rehearsal. The local
-`c770d43` website restore and `58c269b` desktop source passed one-tap
-invitation and recovery through native confirmation in Chromium and WebKit.
-The Windows Chrome generated-audio and mixer-loss checks used the earlier
-website tree `5553434` and browser source `90331ff`. The `58c269b` Apple
-Silicon package is archived for local testing. Both rehearsal shortcuts
-point to `c6eecdc`.
+Use the `8d76db40` instructions for the staged rehearsal. Both Mac
+shortcuts point to `c6eecdc`. The current candidate pairs website
+`b6e80b3` with desktop source `72e5e28`. Chromium and WebKit fixtures
+passed the selected-guest invitation and recovery through native Qt
+confirmation. The Apple Silicon `72e5e28` test package is archived and
+reached the startup dialog. The packaged macOS handoff and live audio
+remain open. Earlier Windows Chrome checks used generated audio.
 
 ## Audio check, recovery and ending the session
 
