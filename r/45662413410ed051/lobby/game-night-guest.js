@@ -37,7 +37,7 @@ async function describe() {
         status.textContent = 'Open the Game Night invitation your host sent you.';
         return;
     }
-    status.textContent = 'Checking your invitation…';
+    status.textContent = 'Checking…';
     try {
         const { game, host } = await request('details');
         const inviter = document.querySelector('[data-guest-inviter]');
@@ -57,7 +57,7 @@ async function describe() {
 async function accept() {
     retry.hidden = true;
     join.disabled = true;
-    status.textContent = 'Joining the game…';
+    status.textContent = 'Joining…';
     try {
         const { next } = await request('accept', { age13: true, attempt });
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');

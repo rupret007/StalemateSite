@@ -2,10 +2,10 @@ const requestErrors = { 401: 'sign-in', 403: 'room', 404: 'disabled', 429: 'rate
 const socketErrors = { 4403: 'room', 4409: 'room', 4429: 'rate-limited' };
 
 export const matchConnectionErrors = Object.freeze({
-    'sign-in': 'Sign in to the private beta again, then return to this room.',
-    'room': 'Return to your Game Night room and try again.',
-    'disabled': 'This game is unavailable in this room right now.',
-    'rate-limited': 'This match reached a connection or activity limit. Try again later.'
+    'sign-in': 'Sign in, then return to this room.',
+    'room': 'Return to the room.',
+    'disabled': 'This game is unavailable.',
+    'rate-limited': 'Try again later.'
 });
 
 // A match connection can be replaced without changing room, chat or call.
