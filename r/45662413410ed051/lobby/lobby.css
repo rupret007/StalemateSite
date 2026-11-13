@@ -355,7 +355,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 [data-spades-table][data-phase="bid"] .spades-trick b { display: none; }
 .spades-trick [data-active="true"] { border-color: var(--lime); }
 .spades-trick [data-red="true"] b { color: #ffa6aa; }
-.arcade-spades [data-spades-bid] select { padding: 4px; min-height: 38px; }
+.arcade-spades [data-spades-bid] select { padding: 4px; min-height: 44px; }
 @media (max-width: 900px) {
   .game-night :is(.arcade-eights, .arcade-rummy, .arcade-spades, .arcade-jack) :is(.btn, select) {
     min-width: 44px;

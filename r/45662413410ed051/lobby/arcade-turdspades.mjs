@@ -198,7 +198,15 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 return `${teams[team]} ${signed}${nil.length ? ' · ' + nil.join(', ') : ''}`;
             }).join(' / ');
         } else if (match) {
-            const turn = seat === match.turn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
+            let turn = seat === match.turn ? 'Your play' : `${nameFor(match.turn)} to play`;
+            if (match.phase === 'bid') {
+                const locked = seat ? match.bids[seat] : null;
+                if (match.canBid) turn = 'Your bid. How many tricks will you win?';
+                else if (locked !== null) {
+                    const count = locked === 0 ? 'Nil (0 tricks)' : `${locked} ${locked === 1 ? 'trick' : 'tricks'}`;
+                    turn = `Bid locked: ${count}. Waiting for ${nameFor(match.turn)}.`;
+                } else turn = `${nameFor(match.turn)} to bid`;
+            }
             message = `Round ${match.round} · ${turn}`;
             if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
         }

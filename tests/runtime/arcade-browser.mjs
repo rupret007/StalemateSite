@@ -468,9 +468,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await captureArcadeInvite(friend, phone, 'spades-01-guest-accept');
             await friend.getByRole('button', { name: 'Join game', exact: true }).tap();
             await expect(table(friend)).toHaveAttribute('data-mode', 'partners');
-            await expect(status(friend)).toHaveText('Round 1 · Your bid');
+            await expect(status(friend)).toHaveText('Round 1 · Your bid. How many tricks will you win?');
             for (const player of [host, friend]) await expect(cards(player)).toHaveCount(13);
+            const bid = friend.getByLabel('Your bid');
+            assert.ok((await bid.boundingBox()).height >= 44, 'phone-sized bid selector');
+            await bid.selectOption('0');
             await friend.getByRole('button', { name: 'Lock bid' }).tap();
+            await expect(status(friend)).toHaveText('Round 1 · Bid locked: Nil (0 tricks). Waiting for South.');
             await host.getByRole('button', { name: 'Lock bid' }).click();
             await expect(table(host)).toHaveAttribute('data-phase', 'play');
             await expect(friend.locator('[data-spades-trick]')).toContainText('North (CPU)');
@@ -1386,7 +1390,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(scores(page)).toHaveText(scored);
         }
         await host.getByRole('button', { name: 'Next round' }).click();
-        await expect(status(players[2])).toHaveText('Round 2 · Your bid');
+        await expect(status(players[2])).toHaveText('Round 2 · Your bid. How many tricks will you win?');
         for (const page of players) {
             await expect(cards(page)).toHaveCount(13);
             await expect(scores(page)).toHaveText(scored);
