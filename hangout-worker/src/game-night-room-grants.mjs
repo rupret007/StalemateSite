@@ -10,6 +10,8 @@
 // reservation change and supplied grant rows atomically. A matching hashed
 // attempt can recover a lost reply while the claim window is still open.
 
+import { GAME_INVITE_UNAVAILABLE } from './game-night-invitations.mjs';
+
 export const ROOM_GRANT_PREFIX = 'game-night-room-grant:';
 export const GRANT_TTL = 2 * 60_000;
 export const CLAIM_WINDOW = 60_000;
@@ -20,7 +22,7 @@ export const ROWS_PER_ROOM = 32;
 const LIST_PAGE = 400;
 
 // Same copy and status as game-night-invitations.mjs `unavailable()`.
-export const EXPIRED_COPY = 'This invitation has expired, was used, or the game is no longer waiting for a guest. Ask your host for a new invite.';
+export const EXPIRED_COPY = GAME_INVITE_UNAVAILABLE;
 export const TABLE_FULL_COPY = "Table full, you're up next game";
 const REGISTER_COPY = 'Open a game table with an available seat before seating your room.';
 const HOST_COPY = 'You are hosting this table and already have a seat.';

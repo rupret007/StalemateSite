@@ -31,7 +31,7 @@ const markup = `
         <button type="button" class="btn btn--small btn--ghost" data-action="offer-draw">Offer draw</button>
         <button type="button" class="btn btn--small" data-action="accept-draw" hidden>Accept draw</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="decline-draw" hidden>Decline draw</button>
-        <button type="button" class="btn btn--small btn--ghost" data-action="claim-draw">Claim draw</button>
+        <button type="button" class="btn btn--small btn--ghost" data-action="claim-draw" hidden>Claim draw</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="resign">Resign</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="leave">Leave match</button>
     </div>
@@ -73,6 +73,7 @@ export function mountArcadeChess(container, onMatch) {
     let pending = false, canOpen = false, connection = 'connecting', connectionError, matchEnded = false;
     let model = null, chess = null, board = null, selected = null, focused = 'e2';
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
+    let drawClaims;
     const client = createGameNightMatchClient({
         onMatch,
         prefix: '/beta/arcade',
@@ -133,7 +134,7 @@ export function mountArcadeChess(container, onMatch) {
         clearInterval(clockTimer); clockTimer = null;
         clearPending(); closeChoice();
         connection = 'connecting'; connectionError = undefined;
-        model = null; chess = null; selected = null; canOpen = false;
+        model = null; chess = null; selected = null; canOpen = false; drawClaims = undefined;
         board?.cancel();
     }
 
@@ -292,25 +293,40 @@ export function mountArcadeChess(container, onMatch) {
             const who = `You’re ${colorName(model.seat)}`;
             status.textContent = `${who} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
         }
+        const active = seated && match && !match.result;
+        const offer = active && match.drawOffer && match.drawOffer !== model.seat;
+        const canClaim = active && model.seat === match.turn && availableDrawClaims(match).length > 0;
         for (const control of actions) {
-            const active = seated && match && !match.result;
-            const offer = active && match.drawOffer && match.drawOffer !== model.seat;
             const action = control.dataset.action;
             control.disabled = pending || connection !== 'ready';
             control.hidden = action === 'leave' ? !seated
                 : action === 'accept-draw' || action === 'decline-draw' ? !offer
-                    : !active || action === 'offer-draw' && !!match.drawOffer || action === 'claim-draw' && model.seat !== match.turn;
+                    : !active || action === 'offer-draw' && !!match.drawOffer || action === 'claim-draw' && !canClaim;
         }
         if (match && panel.open) { drawBoard(); drawClocks(); }
     }
 
+    function availableDrawClaims(match) {
+        // The shared match starts from the standard position. Seven plies
+        // is the earliest point at which an intended move can repeat it a third time.
+        if (match.moves.length < 7) return [];
+        const key = match.id + ':' + match.moves.length;
+        if (drawClaims?.key !== key) {
+            const full = new Chess();
+            for (const move of match.moves) full.move(move);
+            const current = claimReason(full);
+            const entries = current ? [{ reason: current }] : intendedClaims(full);
+            drawClaims = { key, entries };
+        }
+        return drawClaims.entries;
+    }
+
     function chooseClaim() {
-        const full = new Chess();
-        for (const move of model.match.moves) full.move(move);
-        const current = claimReason(full);
-        const entries = current ? [[current, () => send('claim-draw')]]
-            : intendedClaims(full).map(option => [`${option.san} · ${option.reason}`, () => send('claim-draw', { move: option.move })]);
-        showChoice('Claim a draw', entries.length ? 'Select a claim to send to the server.' : 'There is no claim available from this position.', entries);
+        if (!isTurn()) return;
+        const entries = availableDrawClaims(model.match).map(({ reason, move, san }) => move
+            ? [`${san} · ${reason}`, () => send('claim-draw', { move })]
+            : [reason, () => send('claim-draw')]);
+        if (entries.length) showChoice('Claim a draw', 'Select a claim to send to the server.', entries);
     }
 
     primary.addEventListener('click', () => {

@@ -1,4 +1,5 @@
 import { gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { DEMO_INVITE_TTL } from './beta-auth.mjs';
 import { arcadeRoomRequest } from './game-night-sockets.mjs';
 
 export const GAME_GUEST_PATH = '/beta/game-night/guest';
@@ -16,7 +17,8 @@ const digest = async value => Array.from(new Uint8Array(await crypto.subtle.dige
     byte => byte.toString(16).padStart(2, '0')).join('');
 export const gameGuestSessionRef = sid => digest('game-guest-session:' + sid);
 const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-const unavailable = () => reply({ error: 'This invitation has expired, was used, or the game is no longer waiting for a guest. Ask your host for a new invite.' }, 410);
+export const GAME_INVITE_UNAVAILABLE = 'This invite is no longer available. Ask your host for a new one.';
+const unavailable = () => reply({ error: GAME_INVITE_UNAVAILABLE }, 410);
 
 async function waitingGuestSeat(lobby, roomScope, game, match, hostSid) {
     if (!lobby.arcadeAvailable(game)) return false;
@@ -61,11 +63,11 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         if (expired.length) await storage.delete(expired);
         const hostCount = [...rows.values()].filter(record => record.until > now && record.scope.host === host.betaSid && !record.redeemer).length;
         if (rows.size - expired.length >= LINK_CAP || hostCount >= LINK_CAP_PER_HOST) {
-            return reply({ error: 'Game invitation allowance reached. Try again in a few minutes.' }, 429);
+            return reply({ error: 'Too many invitations are active. Use an existing invitation or try again later.' }, 429);
         }
         const code = randomCode();
-        const until = now + LINK_TTL;
-        await storage.put(STORAGE_PREFIX + await digest(code), { scope: guest, until, version: host.betaInviteVersion });
+        const until = now + (session.demo === true ? DEMO_INVITE_TTL : LINK_TTL);
+        await storage.put(STORAGE_PREFIX + await digest(code), { scope: guest, until, version: host.betaInviteVersion, ...(session.demo === true ? { demo: true } : {}) });
         return reply({ code, until });
     }
 
@@ -92,7 +94,7 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         return reply({ game: gameNightLabels[scope.game], host: binding.nick });
     }
     const sid = crypto.randomUUID();
-    const exp = now + GUEST_TTL;
+    const exp = record.demo ? Math.min(now + GUEST_TTL, record.until) : now + GUEST_TTL;
     const accepted = { ...record, sid, exp, redeemer: attempt };
     if (!await table.reserveGuestSeat(scope, sid, now + CLAIM_TTL, key, accepted)) return unavailable();
     return reply({ scope, sid, exp });

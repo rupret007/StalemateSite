@@ -1,3 +1,4 @@
+import { makeDemoInvite } from '../../hangout-worker/src/beta-auth.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
@@ -425,6 +426,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                await expect(guest.getByRole('button', { name: 'Claim draw', exact: true })).toBeHidden();
                 await captureArcadeInvite(guest, viewport, 'first-visit-02-seated');
                 const leaveMatch = guest.getByRole('button', { name: 'Leave match', exact: true });
                 await expectUncoveredControl(leaveMatch);
@@ -445,7 +447,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
                 const reused = await context.newPage();
                 await openGameNightLink(reused, link);
-                await expect(reused.getByRole('status')).toContainText('was used');
+                await expect(reused.getByRole('status')).toHaveText('This invite is no longer available. Ask your host for a new one.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
@@ -705,6 +707,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await enterFromShell(player, 'LinkGuest', true);
             await expectRefusal();
             console.log('Passed Chromium kicked guest cannot reuse the old Game Night link.');
+        } else if (!media) {
+            const panel = player.locator('details.arcade-chess');
+            await panel.locator('summary').tap();
+            await expect(panel).not.toHaveAttribute('open', '');
+            await player.reload();
+            await player.locator('[data-enter]').click();
+            await expect(player.locator('[data-connection]')).toHaveText('Connected');
+            const returnToSeat = player.getByRole('button', { name: 'Back to my seat', exact: true });
+            await expectUncoveredControl(returnToSeat);
+            await returnToSeat.tap();
+            await expect(panel.locator('summary')).toBeFocused();
+            await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+            await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+            await tapSquare(player, 'd7');
+            await tapSquare(player, 'd5');
+            await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeVisible();
+            console.log(`Passed ${engine} phone seat recovery after closing the game panel and reloading.`);
         }
         console.log(`Passed ${engine} protected Game Night launch, invite-only room link, stale instance refusal, shared Chess move and chat.`);
     }
@@ -784,9 +803,19 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await online.click();
                 assert.equal(new URL(host.url()).pathname, '/beta/');
                 await expect(host.getByLabel('Invitation code')).toBeVisible();
-                await host.getByLabel('Invitation code').fill(invitation);
-                await host.getByRole('button', { name: 'Enter the community' }).click();
+                const demoUrl = new URL(host.url());
+                demoUrl.search = new URLSearchParams({ 'game-night': '1', via: source });
+                demoUrl.hash = new URLSearchParams({ invite: await makeDemoInvite(options.demoSigningKey, '1', Date.now() - 72 * 60 * 60_000) });
+                await host.goto('about:blank');
+                await host.goto(demoUrl.href);
+                await expect(host.getByRole('status').first()).toContainText('Ask your host for a new one.');
+                assert.equal(new URL(host.url()).hash, '');
+                assert.equal((await host.context().cookies()).length, 0);
+                demoUrl.hash = new URLSearchParams({ invite: await makeDemoInvite(options.demoSigningKey, '1') });
+                await host.goto('about:blank');
+                await host.goto(demoUrl.href);
                 await expect(host.getByRole('link', { name: /Enter Game Night/ })).toHaveCount(1);
+                assert.equal(new URL(host.url()).hash, '');
                 await captureArcadeInvite(host, viewport, step('01-game-night-entry'));
                 await enterFromShell(host, radDad ? 'RadDadHost' : 'PreviewHost', true);
                 await expect(host.locator('[data-entry-label]').first()).toHaveText(`via ${brand}`);
@@ -795,6 +824,26 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     'Games', 'Royal Flush Chess', 'Crappy Eights', 'TurdRummy', 'TurdSpades', 'Crapjack 21',
                     'Turdtris Sprint', 'Turdomania Duel', 'Turd Rush Race', 'Turdanoid Brick Race'
                 ]);
+                const privateArcade = host.getByRole('button', { name: `Open ${brand} Arcade`, exact: true });
+                const roomUrl = host.url();
+                const tabs = host.context().pages().length;
+                await expect(host.locator('[data-game-arcade-external]')).not.toHaveAttribute('href', /./);
+                await expectUncoveredControl(privateArcade);
+                if (phone) await privateArcade.tap();
+                else await privateArcade.click();
+                const gamePicker = host.getByRole('combobox', { name: 'Switch game' });
+                await expect(gamePicker).toBeFocused();
+                await host.keyboard.press('Escape');
+                assert.equal(host.url(), roomUrl);
+                assert.equal(host.context().pages().length, tabs);
+                const closed = new URL('/beta/game-night/guest', origin);
+                closed.hash = 'invite=invalid-local-fixture';
+                await friend.goto(closed.href);
+                const unavailable = friend.locator('[data-guest-status]');
+                await expect(unavailable).toHaveText('This invite is no longer available. Ask your host for a new one.');
+                await expect(unavailable).toBeFocused();
+                await expect(friend.getByRole('button', { name: 'Join game', exact: true })).toBeHidden();
+                assert.equal(new URL(friend.url()).hash, '');
                 const invitePlayers = host.getByRole('button', { name: 'Invite players', exact: true });
                 await invitePlayers.click();
                 const invitePicker = host.locator('[data-invite-dialog]');
@@ -1028,6 +1077,28 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await white.getByRole('button', { name: 'Accept rematch' }).click();
         await expect(black.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
         console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
+    }
+    async function verifyChessDrawClaim(white, black) {
+        const claim = page => page.getByRole('button', { name: 'Claim draw', exact: true });
+        await expect(claim(white)).toBeHidden();
+        for (const [page, from, to] of [
+            [white, 'g1', 'f3'], [black, 'g8', 'f6'], [white, 'f3', 'g1'], [black, 'f6', 'g8'],
+            [white, 'g1', 'f3'], [black, 'g8', 'f6'], [white, 'f3', 'g1']
+        ]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            for (const square of [from, to]) {
+                if (page === black) await tapSquare(page, square);
+                else await page.locator(`[data-square="${square}"]`).press('Enter');
+            }
+        }
+        await expect(claim(white)).toBeHidden();
+        await claim(black).tap();
+        await black.getByRole('button', { name: 'Ng8 · Threefold repetition', exact: true }).tap();
+        for (const page of [white, black]) {
+            await expect(page.locator('[data-chess-status]')).toHaveText('Draw · Threefold repetition');
+            await expect(claim(page)).toBeHidden();
+        }
+        console.log(`Passed ${engine} Chess draw claim visibility and phone repetition claim.`);
     }
     async function joinCalls(a, b) {
         for (const page of [a, b]) {
@@ -2391,7 +2462,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
         await a.getByRole('button', { name: /Game Night/ }).click();
         await inviteToGame(a, b, 'ChessGuest');
-        await expect(b.getByRole('link', { name: 'Open Rad Dad Arcade' })).toHaveAttribute('href', 'https://raddadband.com/play/');
+        await expect(b.getByRole('button', { name: 'Open Rad Dad Arcade', exact: true })).toBeVisible();
+        await expect(b.locator('[data-game-arcade-external]')).not.toHaveAttribute('href', /./);
         for (const page of [a, b]) await page.locator('.arcade-chess summary').click();
         await a.getByRole('button', { name: 'Open Chess match' }).click();
         await b.getByRole('button', { name: 'Join as Black' }).click();
@@ -2452,6 +2524,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await fit(b, 'phone-tall');
         await b.setViewportSize({ width: 375, height: 667 });
         await playChessCheckmate(a, b);
+        await verifyChessDrawClaim(a, b);
         await playEights(a, b);
         await playRummy(a, b);
         const spectator = await playSpades(a, b);
