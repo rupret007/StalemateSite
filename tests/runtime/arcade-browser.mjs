@@ -741,7 +741,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         await route.close({ code: 1011, reason: 'fixture reconnect failed before welcome' });
                         return;
                     }
-                    route.connectToServer();
+                    const server = route.connectToServer();
+                    if (opening === 2) server.onMessage(() => {});
                 });
                 const attempts = [];
                 const acceptPath = '/beta/game-night/invitation/accept';
@@ -798,6 +799,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         await expect.poll(() => sockets.length).toBe(2);
                         await captureArcadeInvite(friend, viewport, step('04-connection-interrupted'));
                     } finally { releaseReconnect(); }
+                    // The second reconnect opens, but never delivers its welcome.
+                    await expect.poll(() => sockets.length, { timeout: 30_000 }).toBe(4);
                     await expect(friend.locator('[data-connection]')).toHaveText('Connected');
                     await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                     await expect(friend.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();

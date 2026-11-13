@@ -64,6 +64,12 @@ jobs:
           node tests/runtime/arcade-transport.mjs --browser=chromium --media
           node tests/runtime/arcade-transport.mjs --browser=webkit
 
+      - name: Verify Game Night guest welcome timeout recovery
+        timeout-minutes: 3
+        run: |
+          node tests/runtime/arcade-transport.mjs --browser=chromium --site-guest=stalemate
+          node tests/runtime/arcade-transport.mjs --browser=webkit --site-guest=stalemate
+
       - name: Build the shared-community entry toolkit
         shell: bash
         run: |
