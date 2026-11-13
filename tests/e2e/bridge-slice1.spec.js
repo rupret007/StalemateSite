@@ -69,19 +69,14 @@ test.describe('worker module grant cases (real module, real Chess table, in-proc
     });
 });
 
-function collectWaitingIds(page) {
-    const ids = [];
+function relayMatchFrames(page) {
     page.on('websocket', socket => {
         socket.on('framereceived', event => {
             const payload = Buffer.isBuffer(event.payload) ? event.payload.toString('utf8') : String(event.payload);
             if (!payload.includes('match-state')) return;
-            try {
-                const frame = JSON.parse(payload);
-                if (frame?.t === 'match-state' && frame.state?.waiting && typeof frame.state.id === 'string') ids.push(frame.state.id);
-            } catch { /* not a match frame */ }
+            page.evaluate(frame => window.__bridgeRecordWaitingMatch?.(frame), payload).catch(() => {});
         });
     });
-    return ids;
 }
 
 async function postJson(page, path, body) {
@@ -102,24 +97,29 @@ async function gameScope(page) {
         const app = window.__lobby;
         const game = [...(app?.chans?.values() || [])].find(room => room.kind === 'game' && room.keepRef && room.name);
         if (!game || !app.selfId) return null;
-        return { actor: app.selfId, room: game.name, ref: game.keepRef };
+        const ids = window.__bridgeWaitingMatchIds || [];
+        const mark = window.__bridgeMatchMark;
+        const match = Number.isInteger(mark) ? ids.slice(mark).at(-1) : undefined;
+        return { actor: app.selfId, room: game.name, ref: game.keepRef, ...(typeof match === 'string' ? { match } : {}) };
     });
 }
 
-async function openFreshChess(host, ids) {
-    const { showChess, seatHost } = await import('./support/bridge-lobby.mjs');
+async function openFreshChess(host) {
+    const { showChess, seatHost, bindOpenMatchSockets, markFreshWaitingMatch } = await import('./support/bridge-lobby.mjs');
     await showChess(host);
     const close = host.getByRole('button', { name: 'Close waiting match' });
     if (await close.isVisible()) {
         await close.click();
         await expect(host.getByRole('button', { name: 'Open Chess match' })).toBeVisible();
     }
-    const before = ids.length;
+    await expect(host.getByRole('button', { name: 'Open Chess match' })).toBeVisible();
+    await bindOpenMatchSockets(host);
+    await markFreshWaitingMatch(host);
     await seatHost(host);
-    await expect.poll(() => ids.length).toBeGreaterThan(before);
+    await expect.poll(async () => (await gameScope(host))?.match || '').not.toBe('');
     const scope = await gameScope(host);
-    expect(scope?.room && scope.ref && scope.actor).toBeTruthy();
-    return { ...scope, match: ids.at(-1) };
+    expect(scope?.room && scope.ref && scope.actor && scope.match).toBeTruthy();
+    return scope;
 }
 
 async function registerGrants(host, scope, values) {
@@ -147,18 +147,18 @@ test.describe('live room-grant routes', () => {
     let desktop;
     let host;
     let origin;
-    let waitingIds;
 
     test.beforeAll(async () => {
         const ready = await fetch('http://localhost:8792/ready');
         origin = (await ready.text()).trim();
         if (!/^https:\/\/[^/\s]+$/.test(origin)) throw new Error('The local preview did not publish an origin.');
         desktop = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader'] });
-        const { contextOptions, enterLobby, openGameNight } = await import('./support/bridge-lobby.mjs');
+        const { contextOptions, enterLobby, openGameNight, installWaitingMatchTap } = await import('./support/bridge-lobby.mjs');
         const context = await desktop.newContext(contextOptions(origin, { viewport: { width: 1440, height: 900 } }));
         host = await context.newPage();
         host.setDefaultTimeout(20000);
-        waitingIds = collectWaitingIds(host);
+        await host.addInitScript(installWaitingMatchTap);
+        relayMatchFrames(host);
         const invitation = process.env.BRIDGE_PREVIEW_INVITATION;
         if (!invitation || invitation.length < 32) throw new Error('The local preview invitation was not passed to the test process.');
         await enterLobby(host, invitation, 'GrantHost');
@@ -171,7 +171,7 @@ test.describe('live room-grant routes', () => {
     });
 
     test('live route: reused grant returns 410', async () => {
-        const scope = await openFreshChess(host, waitingIds);
+        const scope = await openFreshChess(host);
         const value = secret();
         const attempt = secret();
         await registerGrants(host, scope, [value]);
@@ -190,7 +190,7 @@ test.describe('live room-grant routes', () => {
     });
 
     test('live route: a host session cannot redeem a grant', async () => {
-        const scope = await openFreshChess(host, waitingIds);
+        const scope = await openFreshChess(host);
         const value = secret();
         await registerGrants(host, scope, [value]);
         const hostTry = await redeem(host, value, secret());
@@ -205,7 +205,7 @@ test.describe('live room-grant routes', () => {
     });
 
     test('live route: an expired grant leaves the host table waiting', async () => {
-        const scope = await openFreshChess(host, waitingIds);
+        const scope = await openFreshChess(host);
         const value = secret();
         const issued = await registerGrants(host, scope, [value]);
         expect(issued.until).toBeGreaterThan(Date.now());
@@ -223,7 +223,7 @@ test.describe('live room-grant routes', () => {
     });
 
     test('live route: the extra person sees the table-full line', async () => {
-        const scope = await openFreshChess(host, waitingIds);
+        const scope = await openFreshChess(host);
         const first = secret();
         const extra = secret();
         expect(await registerGrants(host, scope, [first, extra])).toMatchObject({ granted: 1, standby: 1 });

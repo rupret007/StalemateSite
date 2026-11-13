@@ -101,3 +101,87 @@ export async function leaveGame(page) {
     await page.locator('[data-leave]').click();
     await expect(page.locator('[data-game-night]')).toBeHidden();
 }
+
+// The Chess match id is not stored on the lobby channel. It arrives as a
+// match-state frame on the arcade socket. Playwright's websocket hook does
+// not attach to a socket that is already open, so also watch those.
+export function installWaitingMatchTap() {
+    window.__bridgeWaitingMatchIds = window.__bridgeWaitingMatchIds || [];
+    window.__bridgeRecordWaitingMatch = data => {
+        if (typeof data !== 'string' || !data.includes('match-state')) return;
+        let frame;
+        try { frame = JSON.parse(data); } catch { return; }
+        const state = frame?.t === 'match-state' && frame.version === 1 ? frame.state : null;
+        const id = state?.waiting === true && state.game === 'chess' && typeof state.id === 'string' ? state.id : '';
+        if (!/^[a-zA-Z0-9-]{5,80}$/.test(id)) return;
+        const ids = window.__bridgeWaitingMatchIds;
+        if (!ids.includes(id)) ids.push(id);
+    };
+    const watch = socket => {
+        if (!socket || socket.__bridgeMatchWatched) return;
+        socket.__bridgeMatchWatched = true;
+        socket.addEventListener('message', event => window.__bridgeRecordWaitingMatch?.(event.data));
+    };
+    window.__bridgeWatchMatchSocket = watch;
+    if (window.__bridgeMatchTapInstalled) return;
+    window.__bridgeMatchTapInstalled = true;
+    const NativeWebSocket = window.WebSocket;
+    function BridgeWebSocket(url, protocols) {
+        const socket = arguments.length < 2 ? new NativeWebSocket(url) : new NativeWebSocket(url, protocols);
+        watch(socket);
+        return socket;
+    }
+    BridgeWebSocket.prototype = NativeWebSocket.prototype;
+    for (const name of ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED']) BridgeWebSocket[name] = NativeWebSocket[name];
+    window.WebSocket = BridgeWebSocket;
+}
+
+export async function bindOpenMatchSockets(page) {
+    await page.evaluate(installWaitingMatchTap);
+    const client = await page.context().newCDPSession(page);
+    const contexts = [];
+    client.on('Runtime.executionContextCreated', event => {
+        const context = event.context;
+        if (context?.auxData?.isDefault && !context.name) contexts.push(context.id);
+    });
+    try {
+        await client.send('Runtime.enable');
+        if (!contexts.length) throw new Error('No page context was available to read the open Chess match socket.');
+        for (const contextId of contexts) {
+            const proto = await client.send('Runtime.evaluate', {
+                expression: 'WebSocket.prototype',
+                contextId,
+                objectGroup: 'bridge-match-watch'
+            });
+            const prototypeId = proto.result?.objectId;
+            if (!prototypeId) continue;
+            const queried = await client.send('Runtime.queryObjects', { prototypeObjectId: prototypeId });
+            const listId = queried.objects?.objectId;
+            if (!listId) continue;
+            await client.send('Runtime.callFunctionOn', {
+                objectId: listId,
+                functionDeclaration: `function () {
+                    const watch = window.__bridgeWatchMatchSocket;
+                    if (typeof watch !== 'function') return 0;
+                    let added = 0;
+                    for (const socket of this) {
+                        if (socket && !socket.__bridgeMatchWatched) added += 1;
+                        watch(socket);
+                    }
+                    return added;
+                }`,
+                returnByValue: true
+            });
+            await client.send('Runtime.releaseObject', { objectId: listId }).catch(() => {});
+        }
+    } finally {
+        await client.send('Runtime.releaseObjectGroup', { objectGroup: 'bridge-match-watch' }).catch(() => {});
+        await client.detach().catch(() => {});
+    }
+}
+
+export function markFreshWaitingMatch(page) {
+    return page.evaluate(() => {
+        window.__bridgeMatchMark = (window.__bridgeWaitingMatchIds || []).length;
+    });
+}
