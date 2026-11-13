@@ -453,7 +453,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
                 const reused = await context.newPage();
                 await openGameNightLink(reused, link);
-                await expect(reused.getByRole('status')).toContainText('was used');
+                await expect(reused.getByRole('status')).toHaveText('This invite is no longer available. Ask your host for a new one.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
