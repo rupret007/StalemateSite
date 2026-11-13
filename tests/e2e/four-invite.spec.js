@@ -32,7 +32,7 @@ async function enterHost(page, nick) {
 async function openFour(page) {
     await page.getByRole('combobox', { name: 'Switch game' }).selectOption('four');
     await page.getByRole('button', { name: 'Open a match' }).click();
-    await page.locator('[data-four-status]').filter({ hasText: /Waiting for someone/ }).waitFor({ timeout: 15000 });
+    await page.locator('[data-four-status]').filter({ hasText: /Invite a friend|Waiting for another player/ }).waitFor({ timeout: 15000 });
 }
 
 test('a phone guest joins an open Four seat from one invite tap and drops a piece', async ({ browser }) => {
@@ -89,6 +89,21 @@ test('a phone guest joins an open Four seat from one invite tap and drops a piec
         await guest.locator('[data-four-columns] button').nth(1).tap();
         await expect(guest.locator('[data-four-status]')).toContainText(/column 2/);
         expect(Date.now() - opened).toBeLessThan(30000);
+        for (let row = 0; row < 2; row++) {
+            await host.getByRole('button', { name: 'Drop in column 1' }).click();
+            await guest.getByRole('button', { name: 'Drop in column 2' }).tap();
+        }
+        await host.getByRole('button', { name: 'Drop in column 1' }).click();
+        const rematch = guest.getByRole('button', { name: 'Request rematch' });
+        await expect(rematch).toBeInViewport();
+        await rematch.tap();
+        await expect(guest.locator('[data-four-status]')).toContainText('Waiting for the other player');
+        await host.getByRole('button', { name: 'Accept rematch' }).click();
+        await expect(guest.locator('[data-four-status]')).toHaveText('X to play.');
+        await expect(guest.locator('[data-four-table] [data-mark="X"], [data-four-table] [data-mark="O"]')).toHaveCount(0);
+        await host.getByRole('button', { name: 'Leave match' }).click();
+        await expect(guest.locator('[data-four-status]')).toHaveText('The host left. This match is over. Ask your host for a new invite.');
+        await expect(guest.getByRole('button', { name: 'Open a match' })).toBeHidden();
     } finally {
         await hostContext.close();
         await guestContext.close();

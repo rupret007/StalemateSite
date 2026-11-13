@@ -580,9 +580,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
     const chanView = (chan, viewer) => ({ name: chan.name, kind: roomKind(chan), title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, keepRef: chan.keepRef, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), mediaBlocked: mediaBlocked(chan, viewer), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null,
         ...(roomKind(chan) === 'game' ? { gameCall: chan.gameCall?.url || '', four: chan.four || null } : {}) });
-    const updateFour = (chan, game) => {
+    const updateFour = (chan, game, ended = '') => {
         chan.four = game;
-        cast(chan, { t: 'four', ch: chan.name, roomInstance: chan.keepRef, game });
+        cast(chan, { t: 'four', ch: chan.name, roomInstance: chan.keepRef, game, ...(ended ? { ended } : {}) });
     };
     const sendChan = (chan, { presence = false } = {}) => {
         if (chan.gameCall) {
@@ -921,7 +921,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!chan || !chan.members.has(c.id)) return;
         chan.members.delete(c.id);
         c.channels.delete(chan.name);
-        if (chan.four && [chan.four.host, chan.four.guest].includes(c.id)) updateFour(chan, null);
+        if (chan.four && [chan.four.host, chan.four.guest].includes(c.id)) {
+            const role = chan.four.host === c.id ? 'host' : 'guest';
+            updateFour(chan, null, quitting ? role + '-disconnected' : role + '-left');
+        }
         if (![...c.channels].some(name => !['lobby', 'chat', 'jam'].includes(ch(name)?.kind))) participationMedia.delete(c.id);
         c.cams.delete(lc(chan.name));
         event(chan, quitting ? `${nickOf(c)} has quit (${why || 'Quit'})` : `${nickOf(c)} has left ${chan.name}${why ? ` (${why})` : ''}`);
@@ -1875,13 +1878,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             chan.gameCall = { url, by: c.id };
             return sendChan(chan);
         },
-        four(c, chan, [action, gameId = '', revision, column], instance) {
+        four(c, chan, [action, gameId = '', revision, column, round], instance) {
             if (roomKind(chan) !== 'game' || !chan.members.has(c.id) || instance !== chan.keepRef)
                 return bot(c, 'Open your current Game Night room to play.', 'error');
             const game = chan.four;
             const seat = game?.host === c.id ? 'X' : game?.guest === c.id ? 'O' : '';
             if (gameId !== (game?.id || '')) return bot(c, 'The match changed. Use the current board.', 'error');
-            if (action === 'leave' && seat) return updateFour(chan, null);
+            if (action === 'leave' && seat) return updateFour(chan, null, seat === 'X' ? 'host-left' : 'guest-left');
             if (net.shield || budgetLevel() !== 'ok' || net.lock === 'readonly' || chan.modes.Q
                 || Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) > now()
                 || chan.modes.m && !hosts(c, chan) && !chan.voice.has(c.dev))
@@ -1889,6 +1892,20 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (action === 'open' && isOp(c, chan) && (!game || fourFinished(game))) {
                 requireParticipation(c, 'publicArtifact');
                 return updateFour(chan, openFour(crypto.randomUUID(), c.id));
+            }
+            const sameRound = game?.round ? round === String(game.round) : !round;
+            if (action === 'rematch' && game?.guest && seat && sameRound && fourFinished(game)) {
+                const host = conns.get(game.host), guest = conns.get(game.guest);
+                if (!host || !guest || !chan.members.has(host.id) || !chan.members.has(guest.id)
+                    || host.blocks.has(guest.dev) || guest.blocks.has(host.dev))
+                    return bot(c, 'The other player is unavailable for a rematch.', 'error');
+                requireParticipation(c, 'publicArtifact');
+                if (!game.rematch) return updateFour(chan, { ...game, rematch: seat });
+                if (game.rematch !== seat) {
+                    const next = openFour(game.id, game.host);
+                    return updateFour(chan, { ...next, guest: game.guest, round: (game.round || 0) + 1 });
+                }
+                return;
             }
             if (action === 'join' && game && !seat && !game.guest) {
                 const host = conns.get(game.host);
@@ -1898,6 +1915,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 return updateFour(chan, { ...game, guest: c.id });
             }
             if (action === 'drop' && game && seat === fourMark(game.moves) && revision === String(game.moves)
+                && sameRound
                 && /^[1-7]$/.test(column || '')) {
                 const next = dropFour(game, Number(column) - 1);
                 if (next) {
