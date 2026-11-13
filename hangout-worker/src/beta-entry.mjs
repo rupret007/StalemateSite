@@ -138,7 +138,7 @@ const entrySites = createEntrySiteRegistry(__ENTRY_SITES__);
 const $ = s => document.querySelector(s);
 const webJoinEntry = document.body.hasAttribute('data-web-join-entry');
 const inside = $('#inside'), logout = $('#logout'), retryLeave = $('#retry-leave');
-const code = $('#code'), codeError = $('#code-error');
+const code = $('#code'), codeError = $('#code-error'), retry = $('#retry');
 if (!webJoinEntry) {
     const params = new URLSearchParams(location.search);
     const source = entrySourceFromParams(params, entrySites);
@@ -174,6 +174,7 @@ function render(phase, message, identity) {
     $('#unlock').setAttribute('aria-busy', String(operation === 'unlock'));
     logout?.setAttribute('aria-busy', String(operation === 'logout'));
     if (phase !== 'ready') return;
+    code.value = '';
     if (webJoinEntry) { location.reload(); return; }
     const roles = { owner: 'owner', band: 'band', moderator: 'moderator' };
     $('#identity').textContent = identity.kind === 'staff' ? 'Signed in as ' + roles[identity.role] + '.'
@@ -194,8 +195,11 @@ function begin(kind) {
 function finish(attempt, phase, message, identity) {
     if (attempt !== currentAttempt) return;
     const retryCode = operation === 'unlock' && phase === 'invitation';
+    const refocusLeave = phase === 'leave-unconfirmed' &&
+        [document.body, retryLeave, logout?.querySelector('button')].includes(document.activeElement);
     operation = '';
     render(phase, retryCode && codeError ? '' : message, identity);
+    if (refocusLeave) retryLeave?.focus();
     if (retryCode) {
         if (codeError) codeError.textContent = message;
         code.setAttribute('aria-invalid', 'true');
@@ -235,14 +239,18 @@ function validState(value) {
         && typeof value.emailConfigured === 'boolean' && typeof value.staffConfigured === 'boolean'
         && (value.kind !== 'staff' || ['owner', 'band', 'moderator'].includes(value.role));
 }
-async function draw() {
+async function draw({ refocusInvitation = false } = {}) {
     if (leavingUnconfirmed) return;
     const attempt = begin('check');
     if (!attempt) return;
     try {
         const response = await accessRequest('/beta/state');
         if (attempt !== currentAttempt) return;
-        if (response.status === 401) return finish(attempt, 'invitation', 'A private invitation is required.');
+        if (response.status === 401) {
+            finish(attempt, 'invitation', 'A private invitation is required.');
+            if (refocusInvitation && [document.body, retry, retryLeave, logout?.querySelector('button')].includes(document.activeElement)) code.focus();
+            return;
+        }
         if (response.status === 403) return finish(attempt, 'denied', 'Access was denied. Check the house rules or contact the community owner.');
         if (!response.ok) return finish(attempt, 'unavailable', unavailable);
         const identity = response.value;
@@ -279,7 +287,7 @@ async function leave() {
         }
         leavingUnconfirmed = false;
         operation = '';
-        await draw();
+        await draw({ refocusInvitation: true });
     } catch { finish(attempt, 'leave-unconfirmed', 'Leaving was not confirmed. Connections may still be closing. Choose Retry leaving.'); }
 }
 code.addEventListener('input', () => {
@@ -289,7 +297,7 @@ code.addEventListener('input', () => {
 });
 $('#unlock').addEventListener('submit', event => { event.preventDefault(); unlock(code.value); });
 logout?.addEventListener('submit', event => { event.preventDefault(); leave(); });
-$('#retry').addEventListener('click', draw);
+retry.addEventListener('click', () => draw({ refocusInvitation: true }));
 retryLeave?.addEventListener('click', leave);
 if (webJoinEntry) {
     // The music capability belongs to the audio client. Leave it in the tab's
