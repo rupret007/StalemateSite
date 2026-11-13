@@ -596,6 +596,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function verifyGameNightEntry() {
         const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
         await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+        if (!mixed) {
+            await host.getByRole('button', { name: 'Invite players', exact: true }).click();
+            const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
+            await expect(dialog.getByRole('button', { name: 'Choose a game', exact: true })).toBeFocused();
+            await host.keyboard.press('Enter');
+            await expect(dialog).toBeHidden();
+            const picker = host.getByRole('combobox', { name: 'Switch game' });
+            await expect(picker).toBeFocused();
+            await expect(picker).toBeInViewport();
+        }
         await verifyArcadeInvites(host);
         if (!mixed) {
             await verifyFirstVisit(host);
