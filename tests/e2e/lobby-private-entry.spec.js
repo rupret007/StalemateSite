@@ -99,25 +99,42 @@ test('an open connection without a welcome times out and the guest can retry', a
     expect(attempts).toBe(2);
 });
 
-test('a reserved nickname returns keyboard focus to the field for correction', async ({ page, baseURL, browserName }) => {
-    await page.setViewportSize({ width: browserName === 'chromium' ? 375 : 390, height: 844 });
-    await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
-    const relay = hangoutRelayWsBase(baseURL, `nickname-recovery-${randomUUID()}`);
-    await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
-    const nickname = page.getByRole('textbox', { name: 'Your nick' });
-    await nickname.fill('Stalemate');
-    await page.locator('[data-enter]').press('Enter');
-    const error = page.locator('#nickname-error');
-    await expect(error).toHaveText('That nick is reserved.');
-    await expect(error).toBeInViewport({ ratio: 1 });
-    await expect(nickname).toBeInViewport({ ratio: 1 });
-    await expect(nickname).toHaveValue('Stalemate');
-    await expect(nickname).toBeFocused();
-    await expect(nickname).toHaveAttribute('aria-invalid', 'true');
-    await expect(nickname).toHaveAccessibleDescription('That nick is reserved.');
-    await nickname.fill('ReadyGuest');
-    await expect(error).toBeEmpty();
-    await expect(nickname).not.toHaveAttribute('aria-invalid', 'true');
-    await nickname.press('Enter');
-    await expect(page.locator('[data-connection]')).toHaveText('Connected');
-});
+for (const cached of [false, true]) {
+    test(`a reserved nickname returns keyboard focus for correction with ${cached ? 'cached' : 'current'} lobby markup`, async ({ page, baseURL, browserName }) => {
+        await page.setViewportSize({ width: browserName === 'chromium' ? 375 : 390, height: 844 });
+        await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
+        if (cached) {
+            // The prior lobby shell had the same nickname field without this status.
+            await page.addInitScript(() => {
+                const observer = new MutationObserver(() => {
+                    const status = document.getElementById('nickname-error');
+                    if (!status) return;
+                    status.remove();
+                    observer.disconnect();
+                });
+                observer.observe(document, { childList: true, subtree: true });
+            });
+        }
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        const relay = hangoutRelayWsBase(baseURL, `nickname-recovery-${randomUUID()}`);
+        await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        const nickname = page.getByRole('textbox', { name: 'Your nick' });
+        await nickname.fill('Stalemate');
+        await page.locator('[data-enter]').press('Enter');
+        const error = page.locator('#nickname-error');
+        await expect(error).toHaveText('That nick is reserved.');
+        await expect(error).toBeInViewport({ ratio: 1 });
+        await expect(nickname).toBeInViewport({ ratio: 1 });
+        await expect(nickname).toHaveValue('Stalemate');
+        await expect(nickname).toBeFocused();
+        await expect(nickname).toHaveAttribute('aria-invalid', 'true');
+        await expect(nickname).toHaveAccessibleDescription('That nick is reserved.');
+        await nickname.fill('ReadyGuest');
+        await expect(error).toBeEmpty();
+        await expect(nickname).not.toHaveAttribute('aria-invalid', 'true');
+        await nickname.press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        expect(errors).toEqual([]);
+    });
+}
