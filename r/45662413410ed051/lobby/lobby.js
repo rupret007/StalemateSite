@@ -1803,11 +1803,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             timer: setTimeout(() => finishArcadeInvitation('The seat could not be confirmed. Ask the host for a fresh game invitation.'), 15000) };
     }
     function finishArcadeInvitation(message) {
-        clearTimeout(arcadeInvitation?.timer);
+        const invite = arcadeInvitation;
+        clearTimeout(invite?.timer);
         arcadeInvitation = null;
         if (message) {
             if (gameGuest && !gameGuestSeated) gateStatus(message);
-            else toast(message);
+            else if (invite && !gameGuest && currentGameNight()?.keepRef === invite.ref) {
+                toast(message, [['Return to lobby', () => {
+                    const room = currentGameNight();
+                    if (room?.name === invite.room && room.keepRef === invite.ref) cmd('part', [room.name]);
+                }]]);
+            } else toast(message);
         }
     }
     function arcadeMatchState(game, table, scope, state, sendMatch) {
