@@ -1868,7 +1868,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const invite = arcadeInvitation;
         if (!invite || invite.game !== 'four' || room?.name !== invite.room || room.keepRef !== invite.ref) return;
         const game = room.four;
-        if (!game) return;
+        if (!game) {
+            return finishArcadeInvitation('This Four in a Row match ended. Ask your host to open a new match and send a fresh invitation.');
+        }
         if (game.guest === app.selfId && game.id === gameGuest.match) {
             revealFourGuest();
             return finishArcadeInvitation();

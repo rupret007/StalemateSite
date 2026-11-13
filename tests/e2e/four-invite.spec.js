@@ -89,6 +89,13 @@ test('a phone guest joins an open Four seat from one invite tap and drops a piec
         await guest.locator('[data-four-columns] button').nth(1).tap();
         await expect(guest.locator('[data-four-status]')).toContainText(/column 2/);
         expect(Date.now() - opened).toBeLessThan(30000);
+
+        await guest.reload({ waitUntil: 'domcontentloaded' });
+        await expect(guest.locator('[data-game-guest-connecting] [role=status]')).toHaveText(
+            'This Four in a Row match ended. Ask your host to open a new match and send a fresh invitation.'
+        );
+        await expect(guest.locator('[data-game-guest-retry]')).toBeHidden();
+        await expect(host.getByRole('button', { name: 'Open a match' })).toBeVisible();
     } finally {
         await hostContext.close();
         await guestContext.close();
