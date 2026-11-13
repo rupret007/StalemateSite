@@ -298,6 +298,10 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
         if (delayed) {
             await expect(guestStatus).toContainText('Waiting for Hang Out to confirm');
+            const pendingDismiss = panel.getByRole('button', { name: 'Not now', exact: true });
+            await expect(pendingDismiss).toHaveAttribute('aria-disabled', 'true');
+            await pendingDismiss.press('Enter');
+            await expect(guestStatus).toContainText('Waiting for Hang Out to confirm');
             await panel.getByRole('button', { name: 'Joining…' }).press('Enter');
             await guest.waitForFunction(() => typeof window.releaseMusicAcceptance === 'function');
             await guest.clock.fastForward(10_000);
@@ -315,7 +319,7 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         const audio = panel.getByRole('button', { name: 'Open WebJam in browser' });
         await expect(audio).toHaveAccessibleDescription(acceptedGuidance);
-        await expect(delayed ? panel.getByRole('button', { name: 'Not now', exact: true }) : audio).toBeFocused();
+        await expect(delayed ? panel.getByRole('button', { name: 'Dismiss', exact: true }) : audio).toBeFocused();
         await expect(guest.locator('[data-jam-actions]')).toBeHidden();
         if (!delayed) await guest.screenshot({ path: testInfo.outputPath(`accepted-in-jam-${width}x${height}.png`) });
         await audio.press('Enter');
