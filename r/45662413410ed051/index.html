@@ -33,7 +33,8 @@
         <img src="../../assets/mark.svg" alt="" width="40" height="40">
         <div>
             <h1>Hang Out</h1>
-            <p class="tag">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p>
+            <p class="tag">Pick a name. Pull up a chair.</p>
+            <p class="tag small">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p>
         </div>
         <a class="show-link lobby-link" href="lobby/">← #stalemate lobby</a>
         <a class="show-link" data-next-show data-starts-at="2026-10-24T16:45:00-05:00" href="../../#home">Next show: Sat Oct 24 · Los Amigo’s, Plano →</a>
@@ -41,10 +42,10 @@
 
     <section class="gate" data-gate>
         <div class="gate-card">
-            <h2 data-gate-title>Start a room</h2>
+            <h2 data-gate-title>Open</h2>
             <p data-gate-copy>Make a private room, copy the invite, text it to your people. No accounts, no app.</p>
             <label>Your name <span class="namebox"><input data-name maxlength="24" placeholder="Type a nickname… or roll one →" autocomplete="nickname"><button class="btn btn--ghost dice" type="button" data-dice aria-label="Make me a random fun nickname">🎲 Make me a name</button></span></label>
-            <button class="btn btn--big" data-enter type="button">Start a room</button>
+            <button class="btn btn--big" data-enter type="button">Open</button>
             <button class="btn btn--ghost" data-check-btn type="button">Test my camera (optional)</button>
             <div class="check" data-check hidden>
                 <video data-check-video autoplay playsinline muted></video>
@@ -59,7 +60,7 @@
     <main class="room" data-room hidden>
         <div class="bar">
             <span class="peers" data-peers>Just you</span>
-            <button class="btn" data-copy type="button">Copy invite link</button>
+            <button class="btn" data-copy type="button">Copy</button>
             <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">Paint along with Bob</button>
             <button class="btn btn--ghost" data-private-report type="button" hidden>Report a problem to staff</button>
             <span class="status" data-status role="status"></span>
@@ -104,7 +105,7 @@
                 <div class="swatches bob-palette" data-bob-palette role="group" aria-label="Bob Ross palette"></div>
                 <label>Brush <input type="range" min="2" max="44" value="6" data-size></label>
                 <div class="brushes" data-bob-brushes role="group" aria-label="Bob brushes"></div>
-                <button class="btn btn--ghost host-only" type="button" data-clear>Wipe it</button>
+                <button class="btn btn--ghost host-only" type="button" data-clear>Clear</button>
                 <button class="btn btn--ghost" type="button" data-save>Save PNG</button>
             </div>
         </section>
@@ -141,7 +142,7 @@
             <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>
             <ol class="log" data-log aria-live="polite"></ol>
             <form class="say" data-say>
-                <input data-text maxlength="400" placeholder="Say something dumb" aria-label="Message">
+                <input data-text maxlength="400" placeholder="Say something" aria-label="Message">
                 <button class="btn" type="submit">Send</button>
             </form>
         </section>
