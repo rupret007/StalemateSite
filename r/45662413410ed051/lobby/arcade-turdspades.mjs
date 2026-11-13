@@ -243,6 +243,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
                     message = `Round ${match.round} · ${turn}`;
                     if (yourTurn && match.phase === 'play' && !match.trick.length && !match.lastTrick.length) message += ' · tap a card';
                     if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
+                    if (!paired) {
+                        message += ` · You’re ${nameFor(seat)}`;
+                        if (yourTurn && match.phase === 'bid') message += ' · choose a bid, then tap Bid for me';
+                    }
                 }
             }
         }
@@ -269,7 +273,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
             const called = match.bids[position];
-            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${called === null ? '—' : called || 'Nil'}`;
+            const calledBid = called === null ? '—' : called || 'Nil';
+            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${!paired && called !== null ? 'bid ' : ''}${calledBid}`;
             card.textContent = entry ? face(entry) : '—';
             card.setAttribute('aria-label', entry ? cardLabel(entry) : 'No card played');
             row.dataset.active = String(!match.result && match.phase !== 'round-end' && match.turn === position);

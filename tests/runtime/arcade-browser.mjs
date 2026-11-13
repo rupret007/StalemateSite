@@ -1501,7 +1501,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(scores(page)).toHaveText(scored);
         }
         await host.getByRole('button', { name: 'Next round' }).click();
-        await expect(status(players[2])).toHaveText('Round 2 · Your bid');
+        await expect(status(players[2])).toHaveText(/Round 2 · Your bid · You’re North · choose a bid/);
         for (const page of players) {
             await expect(cards(page)).toHaveCount(13);
             await expect(scores(page)).toHaveText(scored);
@@ -1580,7 +1580,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(b.getByLabel('Your bid')).toHaveValue('0');
         }
         for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Bid for me' }).click();
-        await expect(a.locator('[data-spades-trick]')).toContainText('West · Nil');
+        await expect(a.locator('[data-spades-trick]')).toContainText('West · bid Nil');
         const lead = b.locator('[data-spades-card]:enabled').first();
         await verifyCardLandscape(b, 'TurdSpades', lead, b.locator('[data-spades-action="resign"]'));
         await lead.scrollIntoViewIfNeeded();
