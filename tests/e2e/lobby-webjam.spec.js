@@ -296,8 +296,11 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         }
         await acceptReply.press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await expect(guest.locator('[data-jam-actions]')).toBeHidden();
         if (delayed) {
             await expect(guestStatus).toContainText('Waiting for Hang Out to confirm');
+            await expect(guest.locator('[data-jam-web]')).toBeHidden();
+            await guest.screenshot({ path: testInfo.outputPath('music-invite-joining-390x844.png') });
             const pendingDismiss = panel.getByRole('button', { name: 'Not now', exact: true });
             await expect(pendingDismiss).toHaveAttribute('aria-disabled', 'true');
             await pendingDismiss.press('Enter');

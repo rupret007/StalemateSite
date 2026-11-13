@@ -1903,8 +1903,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const current = currentJam();
         const hadFocus = panel.contains(document.activeElement);
         panel.hidden = !musicInvite || (accepted && (current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance));
-        if (current && !amOp(current) && !current.jam?.web && !current.jam?.desktop && !current.jam?.invitation)
-            $('[data-jam-actions]').hidden = accepted && !panel.hidden;
+        if (current && !amOp(current) && !current.jam?.web && !current.jam?.desktop && !current.jam?.invitation) {
+            const targetsCurrentRoom = current.name === musicInvite?.room && current.keepRef === musicInvite.instance;
+            // An active personal invitation already provides the relevant join
+            // action. Keep the room-wide controls available for published links.
+            $('[data-jam-actions]').hidden = targetsCurrentRoom && !ended && !panel.hidden;
+        }
         const message = panel.hidden ? '' : ended ? 'This music invitation ended. Ask the host for a fresh one.'
             : accepted ? 'You’re in the Jam room. WebJam opens in a new tab. Come back to this tab to chat.'
             : unconfirmed ? 'Hang Out hasn’t confirmed your Music invitation. Wait here or ask the host to send a fresh one.'
