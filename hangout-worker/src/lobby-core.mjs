@@ -582,8 +582,36 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         ...(roomKind(chan) === 'game' ? { gameCall: chan.gameCall?.url || '', four: chan.four || null } : {}) });
     const updateFour = (chan, game) => {
         chan.four = game;
+        if (!game) chan.fourHolds = null;
         cast(chan, { t: 'four', ch: chan.name, roomInstance: chan.keepRef, game });
     };
+    const FOUR_SEAT_HOLD_MS = 75_000;
+    const sameFourPlayer = (hold, c) => hold.dev === c.dev && hold.betaSid === (c.betaSid || '');
+    function rememberFourSeat(chan, c) {
+        const role = chan.four?.host === c.id ? 'host' : chan.four?.guest === c.id ? 'guest' : '';
+        if (!role) return false;
+        const holds = (chan.fourHolds || []).filter(hold => hold.role !== role);
+        holds.push({ role, id: c.id, dev: c.dev, betaSid: c.betaSid || '', until: now() + FOUR_SEAT_HOLD_MS });
+        chan.fourHolds = holds;
+        return true;
+    }
+    function releaseExpiredFour(chan) {
+        if (!chan?.fourHolds?.length || !chan.four) return;
+        const due = chan.fourHolds.some(hold => hold.until <= now()
+            && (hold.role === 'host' ? chan.four.host === hold.id : chan.four.guest === hold.id));
+        chan.fourHolds = chan.fourHolds.filter(hold => hold.until > now());
+        if (!chan.fourHolds.length) chan.fourHolds = null;
+        if (due) updateFour(chan, null);
+    }
+    function claimFourSeat(chan, c) {
+        if (!chan?.four || !chan.fourHolds?.length) return;
+        const hold = chan.fourHolds.find(item => item.until > now() && sameFourPlayer(item, c)
+            && (item.role === 'host' ? chan.four.host === item.id : chan.four.guest === item.id));
+        if (!hold) return;
+        chan.fourHolds = chan.fourHolds.filter(item => item !== hold);
+        if (!chan.fourHolds.length) chan.fourHolds = null;
+        updateFour(chan, hold.role === 'host' ? { ...chan.four, host: c.id } : { ...chan.four, guest: c.id });
+    }
     const sendChan = (chan, { presence = false } = {}) => {
         if (chan.gameCall) {
             const host = conns.get(chan.gameCall.by);
@@ -921,7 +949,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!chan || !chan.members.has(c.id)) return;
         chan.members.delete(c.id);
         c.channels.delete(chan.name);
-        if (chan.four && [chan.four.host, chan.four.guest].includes(c.id)) updateFour(chan, null);
+        if (chan.four && [chan.four.host, chan.four.guest].includes(c.id)) {
+            // A dropped socket can reload into the same seat. Leaving the room or the table still ends it.
+            if (!(quitting && rememberFourSeat(chan, c))) updateFour(chan, null);
+        }
         if (![...c.channels].some(name => !['lobby', 'chat', 'jam'].includes(ch(name)?.kind))) participationMedia.delete(c.id);
         c.cams.delete(lc(chan.name));
         event(chan, quitting ? `${nickOf(c)} has quit (${why || 'Quit'})` : `${nickOf(c)} has left ${chan.name}${why ? ` (${why})` : ''}`);
@@ -951,6 +982,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             bump(net.stats.rooms, (label.endsWith(chan.title) ? label : `${label} · ${chan.title}`).slice(0, 60));
         }
         c.channels.add(chan.name);
+        releaseExpiredFour(chan);
+        claimFourSeat(chan, c);
         const act = actSnapshot(chan);
         if (act?.video) {
             if (!participationAllows(c, 'receiveMedia') || !participationAllows(c, 'externalProvider')) act.video = null;
@@ -1878,6 +1911,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         four(c, chan, [action, gameId = '', revision, column], instance) {
             if (roomKind(chan) !== 'game' || !chan.members.has(c.id) || instance !== chan.keepRef)
                 return bot(c, 'Open your current Game Night room to play.', 'error');
+            releaseExpiredFour(chan);
             const game = chan.four;
             const seat = game?.host === c.id ? 'X' : game?.guest === c.id ? 'O' : '';
             if (gameId !== (game?.id || '')) return bot(c, 'The match changed. Use the current board.', 'error');
@@ -2538,6 +2572,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (on) for (const room of channels.values()) {
             room.gameCall = null;
             room.four = null;
+            room.fourHolds = null;
             if (room.kind !== 'lobby') { room.modes.C = false; camsOff(room, by); }
         }
         else for (const room of channels.values()) if (room.kind !== 'lobby' && room.kind !== 'chat') room.modes.C = true;
@@ -2561,6 +2596,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         for (const [d, until] of Object.entries(net.mutes)) if (until <= t) delete net.mutes[d];
         net.bans = net.bans.filter((b) => !b.until || b.until > t);
         for (const room of [...channels.values()]) {
+            releaseExpiredFour(room);
             for (const [key, until] of Object.entries(room.kicks)) if (until <= t) delete room.kicks[key];
             if (room.kind === 'lobby') continue;
             if (room.transfer?.until <= t) room.transfer = null;

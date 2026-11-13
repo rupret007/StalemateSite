@@ -1020,7 +1020,7 @@ describe('Game Night', () => {
         play(host, ['drop', id, '0', '4']);
         expect(state(host).moves).toBe(0);
         L.disconnect(observer.id);
-        expect(state(guest)).toBeNull();
+        expect(state(guest)).toMatchObject({ guest: observer.id });
     });
 
     it('only accepts HTTPS Discord invites and server channel links', () => {
