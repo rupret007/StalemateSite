@@ -101,7 +101,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function sendGameInvite(host, nick) {
         await host.getByRole('button', { name: 'Invite players' }).click();
         const dialog = host.locator('[data-invite-dialog]');
-        await dialog.getByLabel('Choose a current person').selectOption({ label: nick });
+        // Mixed-version fixtures exercise both the previous and current label.
+        await dialog.getByRole('combobox').selectOption({ label: nick });
         await dialog.getByRole('button', { name: 'Invite selected person' }).click();
     }
     async function inviteToGame(host, guest, nick) {
