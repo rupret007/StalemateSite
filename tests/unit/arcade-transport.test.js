@@ -132,6 +132,42 @@ describe('Game Night match transport', () => {
         expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
     });
 
+    it('holds a seated player’s match when the room socket drops, then cleans it up', async () => {
+        const f = fixture(), { id } = await f.start();
+        expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
+        await f.transport.revoke({ room, ref }, 'seat-black');
+        expect(f.board(f.a)).toMatchObject({ id, seat: 'w' });
+        expect((await f.storage.get(ARCADE_TAG + ':' + ref)).seatHolds).toEqual([{ subject: 'seat-black', until: 76_000 }]);
+        f.advance(74_999);
+        f.b.readyState = 3;
+        await f.transport.maintain();
+        expect(await f.storage.get(ARCADE_TAG + ':' + ref)).toBeTruthy();
+        f.advance(1);
+        await f.transport.maintain();
+        expect(await f.storage.get(ARCADE_TAG + ':' + ref)).toBeUndefined();
+    });
+
+    it('gives the seat back when the same player returns during the hold', async () => {
+        const f = fixture();
+        await f.start();
+        await f.transport.revoke({ room, ref }, 'seat-black');
+        await f.send(f.b, 'sync');
+        f.b.readyState = 3;
+        f.advance(90_000);
+        await f.transport.maintain();
+        expect(f.board(f.a)).toMatchObject({ seat: 'w' });
+        expect((await f.storage.get(ARCADE_TAG + ':' + ref)).seatHolds).toBeUndefined();
+        expect(f.board(f.a).match).toBeTruthy();
+    });
+
+    it('still ends the match when a seated player leaves on purpose', async () => {
+        const f = fixture(), { id } = await f.start();
+        await f.transport.revoke({ room, ref }, 'seat-black');
+        await f.send(f.a, 'leave', { id });
+        expect(await f.storage.get(ARCADE_TAG + ':' + ref)).toBeUndefined();
+        expect(f.board(f.a)).toBeNull();
+    });
+
     it('expires a room grant before opening a socket', async () => {
         const f = fixture(), session = { betaSid: sid, betaInviteVersion: 1 };
         const response = await f.transport.issue({ actor, room, ref }, session);
@@ -139,5 +175,46 @@ describe('Game Night match transport', () => {
         expect(response.status).toBe(200);
         f.advance(expiresInMs);
         expect((await f.transport.upgrade(`${protocol}, ${ticket}`, session)).status).toBe(403);
+    });
+
+    it('releases only the held Spades seat after the grace window', async () => {
+        const records = new Map(), actors = new Map(), connections = [];
+        let now = 1000;
+        const storage = {
+            get: vi.fn(async key => structuredClone(records.get(key))),
+            put: vi.fn(async (key, value) => {
+                for (const [name, record] of typeof key === 'string' ? [[key, value]] : Object.entries(key)) records.set(name, structuredClone(record));
+            }),
+            delete: vi.fn(async key => { records.delete(key); }),
+            list: vi.fn(async ({ prefix = '' } = {}) => new Map([...records].filter(([key]) => key.startsWith(prefix))))
+        };
+        const tag = ARCADE_TAG + ':turdspades';
+        function player(id, betaSid, canOpen) {
+            actors.set(id, { betaSid, betaInviteVersion: 1, canPlay: true, canOpen, canJoin: subject => subject !== betaSid, canSee: () => true });
+            let attachment = { actor: id, betaSid, betaInviteVersion: 1, room, ref, kind: tag };
+            const socket = { frames: [], readyState: 1, serializeAttachment: data => { attachment = data; },
+                deserializeAttachment: () => attachment, send(value) { this.frames.push(JSON.parse(value)); }, close: vi.fn() };
+            connections.push(socket);
+            return socket;
+        }
+        const host = player(actor, sid, true), west = player(guest, 'seat-west', false);
+        const transport = createArcadeTransport({ name: 'turdspades', state: { storage, getWebSockets: () => connections },
+            now: () => now, uuid: () => 'c8eb7f10-e113-418f-9900-7e23f4072497',
+            current: scope => actors.get(scope.actor), active: async () => true, approve: async () => true,
+            charge: async () => true, allowed: () => true });
+        const send = (socket, action, fields = {}) => transport.receive(socket, JSON.stringify({ version: 1, action, ...fields }));
+        const board = socket => socket.frames.findLast(frame => frame.t === 'match-state')?.state;
+        await send(host, 'open');
+        const { id } = board(west);
+        await send(west, 'join', { id, seat: 'west' });
+        expect(board(west)).toMatchObject({ waiting: true, seat: 'west' });
+        await transport.revoke({ room, ref }, 'seat-west');
+        expect(board(host)).toMatchObject({ waiting: true, seat: 'south' });
+        expect(board(host).occupied).toContain('west');
+        west.readyState = 3;
+        now += 75_000;
+        await transport.maintain();
+        expect(board(host).occupied).not.toContain('west');
+        expect(board(host)).toMatchObject({ id, waiting: true, seat: 'south' });
     });
 });
