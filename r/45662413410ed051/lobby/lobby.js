@@ -572,7 +572,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (c.actSnap.strokes.length > 400) c.actSnap.strokes.splice(0, c.actSnap.strokes.length - 400);
     }
     const nickInput = $('[data-nick]');
-    const nicknameError = $('#nickname-error');
+    let nicknameError = $('#nickname-error');
+    if (!nicknameError) {
+        // A tab can load the current script with the previous lobby shell.
+        nicknameError = document.createElement('p');
+        nicknameError.id = 'nickname-error';
+        nicknameError.className = 'status';
+        nicknameError.setAttribute('role', 'status');
+        nickInput.closest('label').after(nicknameError);
+    }
     nickInput.value = nickInput.value || readRemembered('hangout-nick') || ''; // blank by default; remembered on this device
     function clearNicknameError() {
         if (!nickInput.hasAttribute('aria-invalid')) return;
