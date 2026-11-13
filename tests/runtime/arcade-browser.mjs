@@ -593,6 +593,28 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             } finally { await host.context().close(); }
         }
     }
+    async function verifyFourRefresh(host) {
+        const desktop = { width: 1440, height: 900 }, phone = { width: 390, height: 844 };
+        const context = await browser.newContext({ viewport: phone, hasTouch: true, ignoreHTTPSErrors: true });
+        try {
+            await host.getByRole('combobox', { name: 'Switch game' }).selectOption('four');
+            await host.getByRole('button', { name: 'Open a match', exact: true }).click();
+            const link = await shareGameNightLink(host, desktop, 'four-refresh-share');
+            const friend = await context.newPage();
+            await tapGameNightLink(friend, link, true);
+            await expect(friend.getByRole('heading', { name: 'Four in a Row', exact: true })).toBeVisible();
+            await friend.getByRole('button', { name: 'Join game', exact: true }).tap();
+            await expect(friend.locator('[data-four-columns] button')).toHaveCount(7);
+            await friend.reload();
+            await expect(friend.locator('[data-game-guest-connecting] [role=status]')).toHaveText(
+                'This Four in a Row match ended. Ask your host to open a new match and send a fresh invitation.'
+            );
+            await expect(friend.locator('[data-game-guest-retry]')).toBeHidden();
+            await expect(host.getByRole('button', { name: 'Open a match', exact: true })).toBeVisible();
+            await captureArcadeInvite(friend, phone, 'four-refresh-ended');
+            console.log(`Passed ${engine} phone Four in a Row refresh and ended-match recovery.`);
+        } finally { await context.close(); }
+    }
     async function verifyGameNightEntry() {
         const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
         await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
@@ -601,6 +623,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await verifyFirstVisit(host);
             await verifyGuestJoinRetry(host);
             await verifySpadesPartners(host);
+            await verifyFourRefresh(host);
         }
         await host.getByRole('button', { name: 'Room address' }).click();
         const share = host.getByRole('dialog', { name: 'Game Night room address' });
