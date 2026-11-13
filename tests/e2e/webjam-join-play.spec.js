@@ -107,6 +107,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await expect(page.getByRole('button', { name: 'Leave session' })).toBeFocused();
         await page.evaluate(() => window.dropMusicConnection());
         const status = page.locator('#status');
+        await expect(status).toHaveText('Your WebJam connection dropped.');
         await expect(status).toBeFocused();
         await expect(status).toHaveAccessibleDescription(/return to your Jam room to accept it/i);
         await expect(page.locator('#error-hint')).toBeInViewport();
