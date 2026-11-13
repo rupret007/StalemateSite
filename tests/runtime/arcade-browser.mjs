@@ -2302,6 +2302,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
+        if (options.webJamShare) {
+            await verifyWebJamShare();
+            assert.deepEqual(errors, []);
+            console.log('Passed prepared Game Night invitation and trusted WebJam share.');
+            return;
+        }
         if (options.siteGuest) {
             await verifyBrandGuestEntry(options.siteGuest);
             assert.deepEqual(errors, []);
@@ -2459,7 +2465,6 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-connection]')).toHaveText('Connected');
         await expect(b.locator('[data-game-night]')).toBeHidden();
         await verifyGameNightEntry();
-        await verifyWebJamShare();
         await verifyPrivateSiteEntry();
         assert.deepEqual(errors, []);
         console.log(`Passed ${engine} ${entrances ? 'both generated arcade entry links' : 'protected entry with both brand contexts'}, invitation, keyboard/touch Chess, room chat, draw and rematch.`);
