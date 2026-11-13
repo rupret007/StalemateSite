@@ -293,6 +293,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
     align-items: start;
   }
   .game-night:has(.arcade-card-table[open]) > .arcade-card-table[open] { grid-area: cards; margin: 0; }
+  .game-night:has(.arcade-card-table[open]) > .game-heading { grid-area: heading; }
+  .game-night:has(.arcade-card-table[open]) > .game-actions { grid-area: actions; }
+  .game-night:has(.arcade-card-table[open]) > .game-call { grid-area: call; }
   .game-night:has(.arcade-card-table[open]) > .arcade-chess { grid-area: chess; }
   .game-night:has(.arcade-card-table[open]) > .arcade-eights:not([open]) { grid-area: eights; }
   .game-night:has(.arcade-card-table[open]) > .arcade-rummy:not([open]) { grid-area: rummy; }

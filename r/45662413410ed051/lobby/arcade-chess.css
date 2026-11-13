@@ -71,7 +71,7 @@
 @media (min-width: 901px) {
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) {
         display: grid;
-        grid-template: "chess heading" auto "chess actions" auto "chess other" auto "chess eights" auto "chess rummy" auto "chess spades" auto "chess jack" auto "chess tris" auto "chess mania" auto "chess rush" auto "chess brick" auto "chess call" 1fr /
+        grid-template: "chess heading" auto "chess actions" auto "chess eights" auto "chess rummy" auto "chess spades" auto "chess jack" auto "chess tris" auto "chess mania" auto "chess rush" auto "chess brick" auto "chess call" 1fr /
             minmax(0, 30rem) minmax(0, 1fr);
         gap: .6rem 1rem;
         align-items: start;
@@ -118,6 +118,7 @@
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) {
         display: flex;
         flex-direction: column;
+        max-height: 74dvh;
         gap: .5rem;
         padding: 6px 10px;
     }
