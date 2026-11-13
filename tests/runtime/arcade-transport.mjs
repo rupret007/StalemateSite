@@ -476,20 +476,25 @@ async function verifyWebJamChess() {
             await expect(reserve).toBeVisible();
             assert.equal(registrations, 0, 'opening a room and match does not reserve a guest seat');
             await capture(host, 'confirm-host');
-            await reserve.click();
-            await expect(host.locator('[data-webjam-host-seat-status]')).toHaveText('Chess seat reserved. Your guest can join now.');
-            await expect(reserve).toBeHidden();
-            assert.equal(registrations, 1, 'one host action registers one seat');
             const guest = await browser.newContext({ ignoreHTTPSErrors: true, hasTouch: true, reducedMotion: 'reduce',
                 viewport: { width: 390, height: 844 } });
             const page = await guest.newPage();
-            try { await page.goto(browserOrigin + '/beta/game-night/webjam-guest#grant=' + value); }
+            try { await page.goto(browserOrigin + '/beta/game-night/webjam-guest#grant=' + value + '&wait=1'); }
             catch { throw new Error('Could not open the guest handoff'); }
             const joinGame = page.getByRole('button', { name: 'Join game' });
             await expect(joinGame).toBeVisible();
             await capture(page, 'accept-host-grant');
             const started = performance.now();
             await joinGame.tap();
+            await expect(page.locator('[data-guest-status]')).toHaveText('Waiting for your host to reserve your Chess seat…');
+            assert.equal((await guest.cookies()).length, 0, 'a waiting guest receives no access');
+            await capture(page, 'waiting-for-host');
+            await page.reload();
+            await expect(page.locator('[data-guest-status]')).toHaveText('Waiting for your host to reserve your Chess seat…');
+            await reserve.click();
+            await expect(host.locator('[data-webjam-host-seat-status]')).toHaveText('Chess seat reserved. Your guest can join now.');
+            await expect(reserve).toBeHidden();
+            assert.equal(registrations, 1, 'one host action registers one seat');
             await expect(page.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
             assert.ok(await page.evaluate(room => window.__lobby.active === room, hostRoom.room), 'the guest plays in the exact host room');
             for (const [player, squares] of [[host, ['e2', 'e4']], [page, ['d7', 'd5']]]) {
@@ -508,7 +513,7 @@ async function verifyWebJamChess() {
             const firstMove = Math.round(performance.now() - started);
             assert.ok(firstMove < 30_000, 'first confirmed move is within 30 seconds in the fixture');
             await capture(page, 'first-host-grant-move');
-            console.log('PASS host confirmation reserves one exact Chess seat; first guest move in ' + firstMove + ' ms.');
+            console.log('PASS one early tap and reload reach the exact Chess seat; first guest move in ' + firstMove + ' ms.');
             return;
         }
         const standby = await open('RoomChessStandby', true);

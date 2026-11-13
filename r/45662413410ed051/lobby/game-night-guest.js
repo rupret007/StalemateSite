@@ -7,14 +7,17 @@ const returnToRoom = document.querySelector('[data-guest-return]');
 const webJam = document.querySelector('[data-webjam-guest]') !== null;
 const historyKey = webJam ? 'webJamGameNightInvite' : 'gameNightInvite';
 const restored = !location.hash && !location.search ? history.state?.[historyKey] : null;
-const code = restored?.code ?? new URLSearchParams(location.hash.slice(1)).get(webJam ? 'grant' : 'invite');
+const fragment = new URLSearchParams(location.hash.slice(1));
+const code = restored?.code ?? fragment.get(webJam ? 'grant' : 'invite');
+// Only WebJam's pre-reservation offer requests waiting. A refresh keeps the original deadline.
+let waitUntil = webJam ? restored?.waitUntil ?? (fragment.get('wait') === '1' ? -1 : 0) : 0;
 const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
 const confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
 const hasInvitation = typeof code === 'string' && (webJam ? /^[A-Za-z0-9_-]{32,128}$/.test(code) : code.length > 0 && code.length <= 250);
 
 function retainInvitation(confirmedGame) {
     // A refresh can use this history entry, without putting the link back in the address.
-    history.replaceState({ [historyKey]: { code, attempt, confirmedGame } }, '', location.pathname);
+    history.replaceState({ [historyKey]: { code, attempt, confirmedGame, waitUntil } }, '', location.pathname);
 }
 
 function clearInvitation() {
@@ -34,6 +37,19 @@ async function request(action, data) {
     const value = await response.json();
     if (!response.ok) throw Object.assign(new Error(value.error), { status: response.status, tableFull: value.tableFull === true });
     return value;
+}
+
+async function acceptInvitation() {
+    const body = { age13: true, attempt };
+    for (;;) {
+        try { return await request('accept', body); }
+        catch (error) {
+            const remaining = waitUntil - Date.now();
+            if (!webJam || error.status !== 410 || remaining <= 0) throw error;
+            status.textContent = 'Waiting for your host to reserve your Chess seat…';
+            await new Promise(resolve => setTimeout(resolve, Math.min(2000, remaining)));
+        }
+    }
 }
 
 async function describe() {
@@ -71,8 +87,9 @@ async function accept() {
     join.disabled = true;
     status.textContent = 'Joining the game…';
     try {
-        const { next } = await request('accept', { age13: true, attempt });
+        const { next } = await acceptInvitation();
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
+        if (webJam) clearInvitation();
         location.replace(next);
     } catch (error) {
         const tableFull = webJam && error.status === 409 && error.tableFull;
@@ -104,6 +121,7 @@ async function accept() {
 }
 
 join.addEventListener('click', () => {
+    if (waitUntil === -1) waitUntil = Date.now() + 25_000;
     retainInvitation(gameTitle.textContent);
     void accept();
 });
