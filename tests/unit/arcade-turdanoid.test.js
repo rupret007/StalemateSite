@@ -130,7 +130,7 @@ describe('Turdanoid brick race phone friction', () => {
         expect(touch.help.textContent).toBe('Drag to move. Tap the stuck ball or press Launch.');
         expect(touch.help.textContent).not.toMatch(/arrow keys|Space/);
         const keys = mount({ coarse: false });
-        expect(keys.help.textContent).toBe('Drag or use the arrow keys to move. Tap the stuck ball, press Launch, or press Space.');
+        expect(keys.help.textContent).toBe('Drag or use the arrow keys to move. Tap the stuck ball or press Launch.');
     });
 });
 

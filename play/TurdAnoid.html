@@ -302,7 +302,7 @@
     <div id="powers"></div>
     <div id="toast"></div>
     <div class="arc-hint" id="arcHint" hidden aria-hidden="true">Drag to move · tap to launch</div>
-    <button id="mobileLaunch">TAP TO LAUNCH 💩</button>
+    <button id="mobileLaunch">Launch</button>
     <div id="coachOverlay" role="dialog" aria-labelledby="coachTitle" aria-modal="true">
       <div id="coachCard">
         <div id="coachStep">1 / 3</div>
@@ -323,7 +323,7 @@
         <span>← → Space</span>
       </div>
       <div class="suite-hud-settings title-difficulty-wrap" id="suite-difficulty-mount"></div>
-      <button id="btnStart" disabled>Loading game…</button>
+      <button id="btnStart" disabled>Loading…</button>
       <div class="menu-secondary">
         <button id="btnBoss" type="button" disabled>Boss Flush</button>
         <button id="btnHowTo" disabled>How To Play</button>
@@ -341,9 +341,9 @@
         <span>Space / tap — launch &amp; fire</span>
         <span>P / Esc — resume</span>
       </div>
-      <button id="btnResume">RESUME</button>
+      <button id="btnResume">Resume</button>
       <div class="menu-secondary">
-        <button id="btnQuit">QUIT TO MENU</button>
+        <button id="btnQuit">Leave</button>
       </div>
     </div>
 
@@ -357,7 +357,7 @@
         <article class="how-card"><h3>Catch</h3><p>19 power-ups. Stack laser, fire, multiball, and the weird ones.</p></article>
         <article class="how-card"><h3>Survive</h3><p>Drop the ball, lose a life. Run out and you're flushed.</p></article>
       </div>
-      <button id="btnHowBack">BACK</button>
+      <button id="btnHowBack">Back</button>
     </div>
 
     <div class="overlay tally-overlay" id="clearTally" role="dialog" aria-labelledby="clearTallyTitle" aria-modal="true" tabindex="-1" inert>
@@ -383,9 +383,9 @@
         <div class="stat"><span class="l">Time</span><span class="v" id="endTime">0:00</span></div>
       </div>
       <p class="suite-progress-result" id="progressResult" role="status" hidden></p>
-      <button id="btnRestart">PLAY AGAIN</button>
+      <button id="btnRestart">Rematch</button>
       <div class="menu-secondary">
-        <button id="btnEndQuit">MAIN MENU</button>
+        <button id="btnEndQuit">Leave</button>
       </div>
     </div>
     </div>
@@ -3758,7 +3758,7 @@ pickTitleQuip();
 updateSideStats();
 lastTime = performance.now();
 requestAnimationFrame(loop);
-$('btnStart').textContent = titleMode === 'boss' ? 'BOSS FLUSH' : 'START FLUSHING';
+$('btnStart').textContent = 'Open';
 $('btnBoss').textContent = titleMode === 'boss' ? 'Classic Flush' : 'Boss Flush';
 for (const id of ['btnStart', 'btnBoss', 'btnHowTo']) $(id).disabled = false;
 window.SuiteLoading?.ready();
