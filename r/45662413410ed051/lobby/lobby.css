@@ -803,6 +803,10 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .conversation-starters button, .quiet-action { font-size: 11px; }
   .quick button { font-size: 12px; }
 }
+@media (max-width: 480px) and (min-height: 621px) {
+  .conversation-starters { flex-wrap: wrap; overflow: visible; }
+  .conversation-starters button { max-width: 100%; white-space: normal; }
+}
 /* Small phones and landscape windows keep the composer ahead of welcome copy. */
 @media (max-height: 620px) and (max-width: 900px) {
   .titlebar { min-height: 52px; padding: 8px 12px; }

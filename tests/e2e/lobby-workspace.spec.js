@@ -44,6 +44,13 @@ for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 812
             expect(buffer.height).toBeGreaterThan(height * 0.35);
         } else {
             expect(await page.locator('[data-text]').evaluate(el => getComputedStyle(el).fontSize)).toBe('16px');
+            const starters = page.locator('.conversation-starters');
+            for (const name of ['Say hello', 'What are you making?', 'Find a collaborator']) {
+                await expect(starters.getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 });
+            }
+            expect(await starters.evaluate(el => el.scrollWidth)).toBeLessThanOrEqual(
+                await starters.evaluate(el => el.clientWidth)
+            );
         }
         await page.screenshot({ path: testInfo.outputPath(`workspace-${width}x${height}.png`), animations: 'disabled' });
     });

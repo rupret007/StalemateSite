@@ -225,6 +225,9 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         const musicButton = host.getByRole('button', { name: 'Invite bandmate to Music' });
         async function returnInvite(href) {
             await musicButton.click();
+            await expect(host.getByRole('dialog', { name: 'Invite a guest' })).toHaveAccessibleDescription(
+                `Invite someone to play or listen in ${room}. They choose whether to join.`
+            );
             await host.getByRole('button', { name: 'Invite ChosenGuest', exact: true }).click();
             const request = await host.evaluate(() => window.musicRequest);
             expect(request).toMatch(/^[a-f0-9]{32}$/);
@@ -593,6 +596,11 @@ test('an open invite picker updates availability without moving keyboard focus',
         await guest.close();
         await expect(host.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
         await expect(host.locator('[data-invite-empty]')).toBeVisible();
+        await expect(host.locator('[data-invite-empty]')).toContainText('They’ll appear here when they’re online.');
+        await f.join('BackOnline', false, 'stalemate');
+        await expect(list.getByRole('button', { name: 'Invite BackOnline', exact: true })).toBeVisible();
+        await expect(host.locator('[data-invite-empty]')).toBeHidden();
+        await expect(host.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
     } finally { await f.close(); }
 });
 

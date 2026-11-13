@@ -3094,6 +3094,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const current = store(app.active);
         if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
         jamInviteOpener = opener ? { button: opener, room: current, music } : null;
+        $('[data-invite-purpose]').textContent = music ? 'Invite someone to play or listen in' : 'Invite someone to';
         inviteContext = current; inviteInstance = current.keepRef; invitePeople.clear(); $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
         $('[data-game-invite-error]').textContent = '';
         const isGame = current.kind === 'game';
