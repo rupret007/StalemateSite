@@ -71,6 +71,7 @@ export function createGameNightTable({
             const seat = this.seat(subject);
             return {
                 version, game: name, id: this.#id, seat, waiting: !this.#match,
+                hasOpenSeat: !this.#match && this.#occupied().length < sides.length,
                 match: this.#match ? project(this.#match, seat, now) : null, ...this.#rematchView(),
                 ...(!twoSeats || mode ? { occupied: this.#occupied() } : {}), ...(mode ? { mode } : {}),
                 ...(manualStart ? { canStart: !this.#match && seat === first && this.#occupied().length >= minSeats } : {})

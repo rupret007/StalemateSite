@@ -393,6 +393,9 @@ async function verifyJack(white, black, north, east, spectator, ref) {
         send(links[seat], 'join', { seat });
         await watch.wait(frame => frame.state?.occupied.length === index + 2, 'Crapjack seats');
     }
+    const full = (await watch.wait(frame => frame.state?.occupied.length === 4, 'Crapjack full table')).state;
+    assert.equal(full.waiting, true, 'the host still starts the round');
+    assert.equal(full.hasOpenSeat, false, 'a full waiting table cannot admit another player');
     send(links.two, 'start');
     await links.two.wait(frame => frame.reason === 'start-unavailable', 'only the host can start');
     send(host, 'start');
