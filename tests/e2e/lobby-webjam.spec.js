@@ -386,8 +386,11 @@ test('the host can cancel an unconfirmed Music invitation and retry with another
 
         await choose('FirstGuest');
         await host.clock.fastForward(90_000);
-        await expect(host.locator('[data-toast]')).toContainText('WebJam did not return an invitation.');
-        await expect(status).toBeEmpty();
+        await expect(status).toContainText('WebJam did not return an invitation.');
+        await host.clock.fastForward(5_000);
+        await expect(status).toBeVisible();
+        await expect(status).toContainText('End browser invite in WebJam');
+        await expect(status).toContainText('Use the same browser profile for Hang Out and the return tab');
         await expect(cancel).toBeHidden();
         await expect(invite).toBeEnabled();
     } finally { await f.close(); }
