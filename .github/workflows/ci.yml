@@ -75,6 +75,13 @@ jobs:
           node tests/runtime/arcade-transport.mjs --room-grants --browser=chromium --webjam-guest=stalemate
           node tests/runtime/arcade-transport.mjs --room-grants --browser=webkit --webjam-guest=rad-dad
 
+      - name: Exercise Chess within a private WebJam room
+        timeout-minutes: 2
+        run: |
+          node tests/runtime/arcade-transport.mjs --browser=chromium --webjam-chess=stalemate
+          node tests/runtime/arcade-transport.mjs --room-grants --browser=chromium --webjam-chess=stalemate
+          node tests/runtime/arcade-transport.mjs --room-grants --browser=webkit --webjam-chess=rad-dad
+
       - name: Build the shared-community entry toolkit
         shell: bash
         run: |

@@ -526,10 +526,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     // Only current connection IDs are disclosed to the affected recipient.
     // Device block references remain private session preferences.
     const roomKind = (chan) => gameNight && chan.kind === 'chat' && gameNightRoomName(chan.name) ? 'game' : chan.kind;
-    function arcadeActor({ actor, room, ref }) {
+    const privateWebJam = chan => chan?.kind === 'jam' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(chan.name);
+    function arcadeActor({ actor, room, ref }, allowWebJamChess = false) {
         const c = conns.get(actor), chan = ch(room);
         if (!c?.nick || c.safetyOnly || !c.betaSid || !chan?.members.has(c.id) || chan.keepRef !== ref ||
-            roomKind(chan) !== 'game' || !chan.modes.i || net.shield || net.lock === 'closed' || roomsBroken) return null;
+            (roomKind(chan) !== 'game' && !(allowWebJamChess && privateWebJam(chan))) || !chan.modes.i || net.shield || net.lock === 'closed' || roomsBroken) return null;
         const peers = subject => membersOf(chan).filter(peer => peer.betaSid === subject);
         const canSee = subject => {
             if (subject === c.betaSid) return true;
@@ -2666,9 +2667,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return controlledRun(message, [...args, true], safetyMessage(args[1]));
         }, flushPresence,
         transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
-        arcadeActor, fourGuestSeat, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: name => {
+        arcadeActor, fourGuestSeat, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: (name, allowWebJamChess = false) => {
             const room = ch(name);
-            return room && roomKind(room) === 'game' ? room.keepRef : null;
+            return room && (roomKind(room) === 'game' || (allowWebJamChess && privateWebJam(room))) ? room.keepRef : null;
         }, approveArcade: id => execute(approveArcade, [id]),
         approveGameMedia: (scope, ...args) => execute(approveGameMedia, [scope.actor, scope, ...args]),
         completePrivateReportAction: (...args) => execute(completePrivateReportAction, args, true), tick: (...args) => execute(tick, args, false),
