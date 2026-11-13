@@ -418,6 +418,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                await expect(guest.getByRole('button', { name: 'Claim draw', exact: true })).toBeHidden();
                 await captureArcadeInvite(guest, viewport, 'first-visit-02-seated');
                 const leaveMatch = guest.getByRole('button', { name: 'Leave match', exact: true });
                 await expectUncoveredControl(leaveMatch);
@@ -998,6 +999,28 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await white.getByRole('button', { name: 'Accept rematch' }).click();
         await expect(black.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
         console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
+    }
+    async function verifyChessDrawClaim(white, black) {
+        const claim = page => page.getByRole('button', { name: 'Claim draw', exact: true });
+        await expect(claim(white)).toBeHidden();
+        for (const [page, from, to] of [
+            [white, 'g1', 'f3'], [black, 'g8', 'f6'], [white, 'f3', 'g1'], [black, 'f6', 'g8'],
+            [white, 'g1', 'f3'], [black, 'g8', 'f6'], [white, 'f3', 'g1']
+        ]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            for (const square of [from, to]) {
+                if (page === black) await tapSquare(page, square);
+                else await page.locator(`[data-square="${square}"]`).press('Enter');
+            }
+        }
+        await expect(claim(white)).toBeHidden();
+        await claim(black).tap();
+        await black.getByRole('button', { name: 'Ng8 · Threefold repetition', exact: true }).tap();
+        for (const page of [white, black]) {
+            await expect(page.locator('[data-chess-status]')).toHaveText('Draw · Threefold repetition');
+            await expect(claim(page)).toBeHidden();
+        }
+        console.log(`Passed ${engine} Chess draw claim visibility and phone repetition claim.`);
     }
     async function joinCalls(a, b) {
         for (const page of [a, b]) {
@@ -2400,6 +2423,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await fit(b, 'phone-tall');
         await b.setViewportSize({ width: 375, height: 667 });
         await playChessCheckmate(a, b);
+        await verifyChessDrawClaim(a, b);
         await playEights(a, b);
         await playRummy(a, b);
         const spectator = await playSpades(a, b);
