@@ -1,4 +1,4 @@
-import { gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { gameNightInvite, gameNightLabels, gameNightRoomName, webJamRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { arcadeRoomRequest } from './game-night-sockets.mjs';
 
 export const GAME_GUEST_PATH = '/beta/game-night/guest';
@@ -29,9 +29,11 @@ export function gameGuestEnabled(env) {
     return env.HANGOUT_BETA_MODE === 'protected' && env.HANGOUT_OPEN !== '0' && env.HANGOUT_GAME_NIGHT_GUESTS === '1';
 }
 
-export function gameGuestScope(value) {
+export function gameGuestScope(value, allowWebJamChess = false) {
     const game = gameNightInvite(value?.game, value?.match);
-    if (!game || !gameNightRoomName(value.room) || !codePattern.test(value.ref || '') || !sidPattern.test(value.host || '')
+    const validRoom = gameNightRoomName(value?.room) ||
+        (allowWebJamChess && game?.game === 'chess' && webJamRoomName(value?.room));
+    if (!game || !validRoom || !codePattern.test(value.ref || '') || !sidPattern.test(value.host || '')
         || !Number.isInteger(value.nameSeed) || value.nameSeed < 0 || value.nameSeed > 0xffffffff) return null;
     return { ...game, room: value.room, ref: value.ref, host: value.host, nameSeed: value.nameSeed };
 }
@@ -39,7 +41,7 @@ export function gameGuestScope(value) {
 // Called within the lobby's serialized event path. Only the Worker sends a trusted session for issuance.
 export async function gameInvitationRequest(lobby, operation, body, session) {
     if (operation === 'release') {
-        const scope = gameGuestScope(body.scope);
+        const scope = gameGuestScope(body.scope, true);
         if (!scope || !sidPattern.test(body.sid || '')) return reply({ ok: false }, 400);
         if (scope.game !== 'four') await lobby.arcade.get(scope.game).releaseGuestClaim(scope, body.sid);
         return reply({ ok: true });

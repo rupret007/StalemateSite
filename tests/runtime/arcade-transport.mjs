@@ -30,6 +30,8 @@ const webJamChess = process.argv.find(arg => arg.startsWith('--webjam-chess='))?
 assert.ok(webJamChess === undefined || browserName && ['stalemate', 'rad-dad'].includes(webJamChess),
     'choose a browser and a WebJam Chess brand');
 const webJamGuest = process.argv.find(arg => arg.startsWith('--webjam-guest='))?.slice('--webjam-guest='.length);
+const sameWebJamRoom = process.argv.includes('--same-webjam-room');
+assert.ok(!sameWebJamRoom || webJamGuest, 'the same-room grant proof needs a browser guest');
 assert.ok(webJamGuest === undefined || browserName && roomGrants && ['stalemate', 'rad-dad'].includes(webJamGuest),
     'choose --room-grants, a browser and a WebJam guest brand');
 const rollback = process.argv.includes('--rollback');
@@ -143,9 +145,13 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 600));
 
 async function verifyRoomGrants() {
     const host = await guest('FixtureHost', webJamGuest || 'stalemate', '192.0.2.11');
-    host.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
-    const { ch } = await host.lobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'private game room');
-    const response = await upgrade(host.cookie, await grant(host, ch.keepRef));
+    const targetRoom = sameWebJamRoom ? '#jam-grant-fixture' : room;
+    host.lobby.send({ t: 'cmd', name: 'join', args: [targetRoom], ch: '#stalemate' });
+    const { ch } = await host.lobby.wait(frame => frame.t === 'join' && frame.ch.name === targetRoom, 'private game room');
+    const scope = { actor: host.id, room: targetRoom, ref: ch.keepRef };
+    const ticketResponse = await call('/beta/arcade-ticket', host.cookie, scope);
+    assert.equal(ticketResponse.status, 200, 'host can open Chess in the exact room');
+    const response = await upgrade(host.cookie, await ticketResponse.json());
     assert.equal(response.status, 101);
     const match = observe(response.webSocket);
     await match.wait(frame => frame.t === 'match-ready', 'host match upgrade');
@@ -153,7 +159,7 @@ async function verifyRoomGrants() {
     const { state } = await match.wait(frame => frame.state?.waiting, 'open Chess table');
     const value = () => randomBytes(32).toString('base64url');
     const path = '/beta/game-night/room-grant';
-    const register = values => call(path + '/register', host.cookie, { actor: host.id, room, ref: ch.keepRef,
+    const register = values => call(path + '/register', host.cookie, { ...scope,
         game: 'chess', match: state.id, hashes: values.map(secret => createHash('sha256').update(secret).digest('hex')) });
     const redeem = (secret, attempt, cookie = '', ip = '192.0.2.12') => call(path + '/redeem', cookie,
         { value: secret, attempt, age13: true }, ip);
@@ -180,7 +186,13 @@ async function verifyRoomGrants() {
     assert.deepEqual([granted, waiting], [1, 1]);
 
     if (webJamGuest) {
-        try { await verifyWebJamGuestBrowser(match, state.id, seated, standby, value()); }
+        if (sameWebJamRoom) {
+            assert.equal((await redeem(seated, value(), host.cookie)).status, 403, 'the WebJam host cannot consume the guest seat');
+            const desktop = 'webjam://join?v=1#k=abcdef0123';
+            host.lobby.send({ t: 'cmd', name: 'jamlink', args: [desktop], ch: targetRoom });
+            await host.lobby.wait(frame => frame.t === 'chan' && frame.ch.jam?.desktop === desktop, 'host audio invite remains in room');
+        }
+        try { await verifyWebJamGuestBrowser(match, state.id, seated, standby, value(), targetRoom, host.lobby); }
         finally {
             match.socket.close(1000, 'fixture complete');
             host.lobby.socket.close(1000, 'fixture complete');
@@ -230,7 +242,7 @@ async function verifyRoomGrants() {
     for (const session of [guestMatch, guestLobby, match, host.lobby]) session.socket.close(1000, 'fixture complete');
 }
 
-async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavailable) {
+async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavailable, targetRoom, hostLobby) {
     const { chromium, webkit } = await import('playwright');
     const { expect } = await import('@playwright/test');
     const browserOrigin = (await mf.ready).origin;
@@ -296,6 +308,18 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         await page.context().clearCookies();
         await page.reload({ waitUntil: 'commit' });
         await expect(page.locator('[data-chess-status]')).toContainText('You’re Black');
+        if (sameWebJamRoom) {
+            assert.ok(await page.evaluate(roomName => {
+                const { active, chans } = window.__lobby;
+                return active === roomName && chans.get(roomName)?.jam === null && chans.size === 1;
+            }, targetRoom), 'scoped guest opens only the original room without its audio invitation');
+            await expect(page.locator('[data-jam]')).toBeHidden();
+            const offGame = await page.evaluate(async () =>
+                (await fetch('/beta/arcade-turdtris-ticket?game-guest=1', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+                })).status);
+            assert.equal(offGame, 403, 'the grant cannot open a different game');
+        }
         assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'recovery uses the original attempt');
         assert.ok(await page.evaluate(() => !history.state?.webJamGameNightInvite), 'the seated page has no grant in history state');
         await match.wait(frame => frame.state?.id === matchId && frame.state?.match, 'WebJam guest enters the exact Chess match');
@@ -310,6 +334,28 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         }
         await match.wait(frame => frame.state?.match?.moves?.[1] === 'd7d5', 'WebJam guest confirms the first move');
         assert.equal((await page.context().request.get(browserOrigin + '/beta/state')).status(), 401, 'guest access stays scoped');
+        if (sameWebJamRoom) {
+            const update = 'webjam://join?v=1#k=def0123456';
+            const projection = await page.evaluateHandle(roomName => {
+                const outcome = { received: false, redacted: false };
+                const socket = window.__lobby.ws;
+                const read = event => {
+                    const frame = JSON.parse(event.data);
+                    if (frame.t === 'chan' && frame.ch.name === roomName) {
+                        socket.removeEventListener('message', read);
+                        outcome.received = true;
+                        outcome.redacted = frame.ch.jam === null;
+                    }
+                };
+                socket.addEventListener('message', read, { signal: AbortSignal.timeout(5000) });
+                return outcome;
+            }, targetRoom);
+            hostLobby.send({ t: 'cmd', name: 'jamlink', args: [update], ch: targetRoom });
+            await hostLobby.wait(frame => frame.t === 'chan' && frame.ch.jam?.desktop === update, 'host receives the updated audio invite');
+            await expect.poll(() => projection.evaluate(outcome => outcome)).toEqual({ received: true, redacted: true });
+            await projection.dispose();
+            await expect(page.locator('[data-jam]')).toBeHidden();
+        }
         await capture(page, 'first-move');
 
         const { page: waiting } = await open(standby, false);
