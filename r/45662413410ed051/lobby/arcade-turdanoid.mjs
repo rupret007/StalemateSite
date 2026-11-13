@@ -266,8 +266,9 @@ export function mountArcadeTurdanoid(container, onMatch) {
             message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
             if (seat && seat === model.rematch) message += ' · Rematch requested';
-        } else if (match) message = match.wall.name;
-        put(status, message);
+        } else if (match) message = seat ? null : match.wall.name;
+        // The frame loop owns the active player's cue so a sync cannot reannounce it.
+        if (message !== null) put(status, message);
         main.hidden = !action;
         main.dataset.command = action;
         put(main, label);
