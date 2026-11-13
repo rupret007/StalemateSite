@@ -13,9 +13,13 @@ function fixture() {
     let now = 1000;
     const storage = {
         get: vi.fn(async key => structuredClone(records.get(key))),
-        put: vi.fn(async (key, value) => { records.set(key, structuredClone(value)); }),
+        put: vi.fn(async (key, value) => {
+            for (const [name, record] of typeof key === 'string' ? [[key, value]] : Object.entries(key)) {
+                records.set(name, structuredClone(record));
+            }
+        }),
         delete: vi.fn(async key => { records.delete(key); }),
-        list: vi.fn(async () => new Map(records))
+        list: vi.fn(async ({ prefix = '' } = {}) => new Map([...records].filter(([key]) => key.startsWith(prefix))))
     };
     function player(id, betaSid, canOpen) {
         const binding = { betaSid, betaInviteVersion: 1, canPlay: true, canOpen,
@@ -70,6 +74,62 @@ describe('Game Night match transport', () => {
         await f.send(f.a, 'move', move);
         expect(f.storage.put.mock.calls).toHaveLength(writes);
         expect(f.a.close).toHaveBeenCalledWith(4403, 'room membership ended');
+    });
+
+    it('commits the accepted invitation with the reserved capacity and admits its guest', async () => {
+        const f = fixture();
+        await f.send(f.a, 'open');
+        const { id } = f.board(f.b);
+        const scope = { room, ref, host: sid, match: id };
+        const acceptance = { sid: 'invited-guest' };
+        f.storage.put.mockRejectedValueOnce(Error('fixture failure'));
+        await expect(f.transport.reserveGuestSeat(scope, acceptance.sid, 61000, 'invite', acceptance)).rejects.toThrow('fixture failure');
+        expect(await f.storage.get('invite')).toBeUndefined();
+        expect(await f.transport.hasGuestSeat(scope, id, sid)).toBe(true);
+        expect(await f.transport.reserveGuestSeat(scope, acceptance.sid, 61000, 'invite', acceptance)).toBe(true);
+        expect(await f.storage.get('invite')).toEqual(acceptance);
+        expect(await f.transport.hasGuestSeat(scope, id, sid)).toBe(false);
+        await f.send(f.b, 'join', { id });
+        expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
+        f.actors.get(guest).betaSid = acceptance.sid;
+        f.b.serializeAttachment({ ...f.b.deserializeAttachment(), betaSid: acceptance.sid });
+        await f.send(f.b, 'join', { id });
+        expect(f.board(f.b)).toMatchObject({ seat: 'b', waiting: false });
+        expect((await f.storage.get(ARCADE_TAG + ':' + ref)).claims).toBeUndefined();
+    });
+
+    it('extends an accepted seat once when the invited guest reaches the exact match', async () => {
+        const f = fixture();
+        await f.send(f.a, 'open');
+        const { id } = f.board(f.b);
+        const scope = { room, ref, host: sid, match: id };
+        const guestBinding = f.actors.get(guest);
+        guestBinding.gameGuest = { ...scope, game: 'chess' };
+        await f.transport.reserveGuestSeat(scope, guestBinding.betaSid, 61000, 'invite', {});
+        const saved = () => f.storage.get(ARCADE_TAG + ':' + ref);
+        f.advance(59000);
+        await f.send(f.b, 'sync');
+        expect((await saved()).claims).toEqual([{ sid: guestBinding.betaSid, until: 120000, connected: true }]);
+        f.advance(59000);
+        f.b.serializeAttachment({ ...f.b.deserializeAttachment(), synced: false });
+        await f.send(f.b, 'sync');
+        expect((await saved()).claims[0].until).toBe(120000);
+        await f.send(f.b, 'join', { id });
+        expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
+        expect((await saved()).claims).toBeUndefined();
+    });
+
+    it('releases an unused seat after its deadline while keeping the host table', async () => {
+        const f = fixture();
+        await f.send(f.a, 'open');
+        const { id } = f.board(f.b);
+        const scope = { room, ref, host: sid, match: id };
+        expect(await f.transport.reserveGuestSeat(scope, 'invited-guest', 61000, 'invite', {})).toBe(true);
+        f.advance(60000);
+        await f.transport.maintain();
+        expect(f.board(f.a)).toMatchObject({ id, waiting: true, hasOpenSeat: true });
+        await f.send(f.b, 'join', { id });
+        expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
     });
 
     it('expires a room grant before opening a socket', async () => {

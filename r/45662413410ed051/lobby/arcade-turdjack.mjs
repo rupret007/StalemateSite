@@ -225,6 +225,9 @@ export function mountArcadeTurdJack(container, onMatch) {
                         : match.active === seat ? 'Your turn' : seatName(match.active) + ' to play';
             message = `Round ${match.round} · ${prompt}`;
         }
+        if (connection === 'ready' && model?.waiting && canOpen && model.pendingGuestMs) {
+            message = `${occupied.length}/4 seated. An invited player is connecting…`;
+        }
         if (status.textContent !== message) status.textContent = message;
         main.hidden = !action;
         main.dataset.command = action;
