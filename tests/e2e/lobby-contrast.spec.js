@@ -104,6 +104,15 @@ for (const width of [375, 390, 1280]) test(`active lobby text and authored field
             fields: ['[data-say]'], placeholders: ['[data-text]']
         });
         await page.screenshot({ path: testInfo.outputPath(`chat-${width}.png`), fullPage: true });
+        if (width < 1024) await page.click('nav [data-show="people"]');
+        const ownNick = '[data-nicks] .nick[data-self="true"]';
+        const peerNick = '[data-nicks] .nick[data-self="false"]';
+        await expect(page.locator(ownNick)).toHaveText('ContrastVisitor');
+        await expect(page.locator(ownNick)).toBeDisabled();
+        await expect(page.locator(peerNick)).toHaveText('ContrastPeer');
+        await expect(page.locator(peerNick)).toBeEnabled();
+        await check(page, testInfo, 'people', { text: [peerNick], disabledLabels: [ownNick] });
+        await page.screenshot({ path: testInfo.outputPath(`people-${width}.png`), fullPage: true });
         if (width < 1024) await page.click('nav [data-show="rooms"]');
         await check(page, testInfo, 'discovery', { text: ['.channel-home b', '.channel-home span', '.creation-hint'], fields: ['[data-room-filter]', '[data-room-search]'], placeholders: ['[data-room-search]'] });
         await page.click('[data-start="chat"]'); await expect(page.locator('[data-channel-dialog]')).toBeVisible();
