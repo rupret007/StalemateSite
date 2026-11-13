@@ -530,7 +530,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     const nickInput = $('[data-nick]');
     nickInput.value = nickInput.value || readRemembered('hangout-nick') || ''; // blank by default; remembered on this device
+    function clearNicknameError() {
+        if (!nickInput.hasAttribute('aria-invalid')) return;
+        nickInput.removeAttribute('aria-invalid');
+        nickInput.removeAttribute('aria-describedby');
+        gateStatus('');
+    }
+    nickInput.addEventListener('input', clearNicknameError);
     $('[data-reroll]').addEventListener('click', (e) => {
+        clearNicknameError();
         const r = window.StaleNames.roll();
         nickInput.value = r.name;
         e.currentTarget.textContent = '🎲 Roll again';
@@ -539,6 +547,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     });
 
     const gateStatus = (t) => { $('[data-gate-status]').textContent = t; };
+    function showNicknameError(text) {
+        gateStatus(text);
+        nickInput.setAttribute('aria-invalid', 'true');
+        nickInput.setAttribute('aria-describedby', 'gate-status');
+        nickInput.focus();
+    }
     if (!previewKey) {
         $('[data-gate-copy]').textContent = 'Not open yet. The band is still building this one.';
         $('[data-enter]').hidden = true;
@@ -586,8 +600,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
 
     $('[data-enter]').addEventListener('click', async () => {
         const nick = nickInput.value.trim();
-        if (!/^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/.test(nick)) { nickInput.focus(); return gateStatus('Type a nick (3-20 letters or numbers, start with a letter), or tap 🎲 for a fun one.'); }
+        if (!/^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/.test(nick)) return showNicknameError('Type a nick (3-20 letters or numbers, start with a letter), or tap 🎲 for a fun one.');
         if (!relayBase) return gateStatus('The chat server isn’t switched on yet.');
+        clearNicknameError();
         gateStatus('Getting you in…');
         connect(nickInput.value.trim());
     });
@@ -983,7 +998,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 ...(m.features?.compactLobbyRoster === 1 ? { compactLobbyRoster: 1 } : {}) }); break;
         case 'person-preferences': acknowledgePersonPreferences(m); break;
         case 'entry-source': entrySharing.acknowledge(m); break;
-        case 'nick-error': setConnection('offline'); gateStatus(m.text); $('[data-gate]').hidden = false; $('[data-app]').hidden = true; break;
+        case 'nick-error':
+            setConnection('offline');
+            $('[data-gate]').hidden = false;
+            $('[data-app]').hidden = true;
+            showNicknameError(m.text);
+            break;
         case 'welcome': {
             if (!app.me || app.resetSession || app.verified !== (m.verified === true)) clearMessageRecovery();
             if (sharingControls) { $('.chat').insertBefore($('[data-sharing-controls]'), $('[data-lobby-welcome]')); $('[data-sharing-leave]').disabled = false; }
