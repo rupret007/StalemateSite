@@ -46,6 +46,7 @@ async function acceptInvitation() {
         catch (error) {
             const remaining = waitUntil - Date.now();
             if (!webJam || error.status !== 410 || remaining <= 0) throw error;
+            join.textContent = 'Waiting for host…';
             status.textContent = 'Waiting for your host to reserve your Chess seat…';
             await new Promise(resolve => setTimeout(resolve, Math.min(2000, remaining)));
         }
@@ -60,6 +61,8 @@ async function describe() {
         return;
     }
     if (webJam) {
+        gameTitle.textContent = 'Royal Flush Chess';
+        join.textContent = 'Join game';
         status.textContent = 'You were invited from WebJam.';
         invite.hidden = false;
         if (document.activeElement === document.body || document.activeElement === retry) join.focus({ preventScroll: true });
@@ -85,6 +88,7 @@ async function describe() {
 async function accept() {
     retry.hidden = true;
     join.disabled = true;
+    if (webJam) join.textContent = 'Joining…';
     status.textContent = 'Joining the game…';
     try {
         const { next } = await acceptInvitation();
@@ -99,6 +103,9 @@ async function accept() {
             ? 'This table is full. Return to your room for the next game.'
             : 'This table is full. Ask your host for a new invite when a seat opens.';
         else if (closed || [429, 503].includes(error.status)) status.textContent = error.message;
+        if (webJam && waitUntil > 0 && error.status === 410) {
+            status.textContent = 'Your Chess seat wasn’t confirmed. Ask your host for a new WebJam invite.';
+        }
         if (closed) {
             clearInvitation();
             invite.hidden = true;
@@ -115,6 +122,7 @@ async function accept() {
             if (document.activeElement === document.body) retry.focus({ preventScroll: true });
         } else {
             join.disabled = false;
+            if (webJam) join.textContent = 'Join game';
             if (document.activeElement === document.body) join.focus({ preventScroll: true });
         }
     }
@@ -130,6 +138,7 @@ retry.addEventListener('click', () => void (confirmedGame ? accept() : describe(
 if (hasInvitation && confirmedGame) {
     // Resume only an accept attempt already confirmed by this guest.
     gameTitle.textContent = confirmedGame;
+    if (webJam) invite.hidden = false;
     void accept();
 } else {
     void describe();
