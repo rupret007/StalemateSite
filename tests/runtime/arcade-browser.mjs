@@ -278,6 +278,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await newGuest.click();
             const deliver = host.getByRole('button', { name: useClipboard ? 'Copy invite' : 'Share invite' });
             await expect(deliver).toBeFocused();
+            await expect(host.locator('[data-game-invite-link-status]')).toContainText('Link expires');
             await captureArcadeInvite(host, viewport, step);
             await deliver.click();
             if (useClipboard) {
