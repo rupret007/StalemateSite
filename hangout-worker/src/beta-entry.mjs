@@ -43,7 +43,7 @@ const LOBBY_ENTRANCE = `<!doctype html>
 </main>
 </body>
 </html>`;
-const invitationForm = label => `<form id="unlock"><label>Invitation code<input id="code" type="password" autocomplete="off" required></label><button>${label}</button></form>`;
+const invitationForm = label => `<form id="unlock"><div class="invitation-field"><label>Invitation code<input id="code" type="password" autocomplete="off" required></label><p id="code-error"></p></div><button>${label}</button></form>`;
 const MUSIC_RETURN_ENTRANCE = `<!doctype html>
 <html lang="en">
 <head>
@@ -138,7 +138,7 @@ const entrySites = createEntrySiteRegistry(__ENTRY_SITES__);
 const $ = s => document.querySelector(s);
 const webJoinEntry = document.body.hasAttribute('data-web-join-entry');
 const inside = $('#inside'), logout = $('#logout'), retryLeave = $('#retry-leave');
-const code = $('#code');
+const code = $('#code'), codeError = $('#code-error');
 if (!webJoinEntry) {
     const params = new URLSearchParams(location.search);
     const source = entrySourceFromParams(params, entrySites);
@@ -195,16 +195,19 @@ function finish(attempt, phase, message, identity) {
     if (attempt !== currentAttempt) return;
     const retryCode = operation === 'unlock' && phase === 'invitation';
     operation = '';
-    render(phase, message, identity);
+    render(phase, retryCode && codeError ? '' : message, identity);
     if (retryCode) {
+        if (codeError) codeError.textContent = message;
         code.setAttribute('aria-invalid', 'true');
-        code.setAttribute('aria-describedby', 'status');
-        code.focus();
+        code.setAttribute('aria-describedby', codeError ? 'code-error' : 'status');
+        code.focus({ preventScroll: Boolean(codeError) });
+        codeError?.parentElement.scrollIntoView?.({ block: 'center' });
     }
 }
 function clearCodeError() {
     code.removeAttribute('aria-invalid');
     code.removeAttribute('aria-describedby');
+    if (codeError) codeError.textContent = '';
 }
 async function accessRequest(path, options = {}) {
     const controller = new AbortController();
@@ -282,7 +285,7 @@ async function leave() {
 code.addEventListener('input', () => {
     if (!code.hasAttribute('aria-invalid')) return;
     clearCodeError();
-    $('#status').textContent = '';
+    if (!codeError) $('#status').textContent = '';
 });
 $('#unlock').addEventListener('submit', event => { event.preventDefault(); unlock(code.value); });
 logout?.addEventListener('submit', event => { event.preventDefault(); leave(); });
@@ -377,7 +380,8 @@ async function betaRequest(request, env, deps = {}) {
         .replace('Stalemate · Private community beta', 'Hang Out · Private community beta')
         .replace('STALEMATE / INVITATION ONLY', 'HANG OUT / INVITATION ONLY')
         .replace('<script defer src="/beta/client.js">', '<script type="module" src="/beta/client.js">'), 200, 'text/html; charset=utf-8');
-    if (url.pathname === '/beta/style.css') return reply(STYLE + GAME_GUEST_STYLE, 200, 'text/css');
+    if (url.pathname === '/beta/style.css') return reply(STYLE + GAME_GUEST_STYLE +
+        '#code-error{color:#e5c181;font-size:.875rem;margin:-4px 0 12px}#code-error:empty{display:none}', 200, 'text/css');
     if (url.pathname === GAME_GUEST_PATH || url.pathname === GAME_GUEST_PATH + '.js') {
         if (!gameGuestEnabled(env) || !['GET', 'HEAD'].includes(request.method)) return reply('Game invitations are unavailable.', 404);
         if (url.pathname === GAME_GUEST_PATH) return reply(request.method === 'HEAD' ? null : GAME_GUEST_ENTRANCE, 200, 'text/html; charset=utf-8');
