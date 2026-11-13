@@ -635,6 +635,7 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
             // The served client must fence it even if aborting fetch is ineffective.
             doc.querySelector('#logout').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
             await vi.waitFor(() => expect(doc.querySelector('#retry-leave').hidden).toBe(false));
+            expect(doc.activeElement).toBe(doc.querySelector('#retry-leave'));
             expect(doc.querySelector('#status').textContent).toMatch(/Leaving was not confirmed/);
             expect(doc.querySelector('#status').textContent).not.toContain('private closing fixture detail');
             expect(doc.querySelector('#login').hidden).toBe(true);
@@ -648,6 +649,7 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
             for (const key of hintKeys) expect(window.sessionStorage.getItem(key)).toBe('existing optional hint');
             releaseLeave(Response.json({ ok: true }));
             await vi.waitFor(() => expect(doc.querySelector('#status').textContent).toBe('A private invitation is required.'));
+            expect(doc.activeElement).toBe(doc.querySelector('#code'));
             for (const key of hintKeys) expect(window.sessionStorage.getItem(key)).toBeNull();
             releaseRead(Response.json({ kind: 'staff', role: 'owner', emailConfigured: true, staffConfigured: true }));
             await window.fetch.mock.results[0].value;

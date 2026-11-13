@@ -195,8 +195,11 @@ function begin(kind) {
 function finish(attempt, phase, message, identity) {
     if (attempt !== currentAttempt) return;
     const retryCode = operation === 'unlock' && phase === 'invitation';
+    const refocusLeave = phase === 'leave-unconfirmed' &&
+        [document.body, retryLeave, logout?.querySelector('button')].includes(document.activeElement);
     operation = '';
     render(phase, retryCode && codeError ? '' : message, identity);
+    if (refocusLeave) retryLeave?.focus();
     if (retryCode) {
         if (codeError) codeError.textContent = message;
         code.setAttribute('aria-invalid', 'true');
@@ -245,7 +248,7 @@ async function draw({ refocusInvitation = false } = {}) {
         if (attempt !== currentAttempt) return;
         if (response.status === 401) {
             finish(attempt, 'invitation', 'A private invitation is required.');
-            if (refocusInvitation && [document.body, retry].includes(document.activeElement)) code.focus();
+            if (refocusInvitation && [document.body, retry, retryLeave, logout?.querySelector('button')].includes(document.activeElement)) code.focus();
             return;
         }
         if (response.status === 403) return finish(attempt, 'denied', 'Access was denied. Check the house rules or contact the community owner.');
@@ -284,7 +287,7 @@ async function leave() {
         }
         leavingUnconfirmed = false;
         operation = '';
-        await draw();
+        await draw({ refocusInvitation: true });
     } catch { finish(attempt, 'leave-unconfirmed', 'Leaving was not confirmed. Connections may still be closing. Choose Retry leaving.'); }
 }
 code.addEventListener('input', () => {
