@@ -317,6 +317,7 @@ export function mountArcadeTurdomania(container, onMatch) {
         client.start(scope);
     });
     return {
+        panel,
         isOpen: () => panel.open,
         open() {
             if (!scope) return;
