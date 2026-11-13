@@ -50,8 +50,8 @@ const FRESH_INVITE_HINT = "Ask your host to send a new browser invite. If you jo
 
 /** @typedef {{ kind: string, headline: string, hint: string, showRetry: boolean, needsFreshInvite: boolean }} JoinFailureView */
 
-/** @param {unknown} error @returns {JoinFailureView} */
-export function mapJoinError(error) {
+/** @param {unknown} error @param {{ listenOnly?: boolean }} [options] @returns {JoinFailureView} */
+export function mapJoinError(error, { listenOnly = false } = {}) {
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (message === JOIN_SIGNAL.MICROPHONE_ENDED) {
     return {
@@ -84,7 +84,7 @@ export function mapJoinError(error) {
     return {
       kind: "host_offline",
       headline: "Your host is not ready for Web Join yet.",
-      hint: "Make sure the WebJam app is hosting, Web Join is allowed, and your host copied a fresh invite. Then tap Retry.",
+      hint: "Ask your host to keep the Music session open in WebJam and allow browser guests. Then select Retry.",
       showRetry: true,
       needsFreshInvite: false,
     };
@@ -108,15 +108,12 @@ export function mapJoinError(error) {
     };
   }
   if (NETWORK_SIGNALS.has(message)) {
-    const relayFailed = message === JOIN_SIGNAL.ICE_CONNECTION_FAILED || message === JOIN_SIGNAL.ICE_DISCONNECTED;
     return {
       kind: "network_blocked",
-      headline: relayFailed
-        ? "WebJam could not reach your host, even through the free relay."
-        : "This network blocked the direct connection to your host.",
-      hint: relayFailed
-        ? "Try another network or a phone hotspot, then tap Retry. Web Join will request fresh relay credentials."
-        : "WebJam is trying the free relay next. If joining still fails, try another network or a phone hotspot, then tap Retry.",
+      headline: message === JOIN_SIGNAL.ICE_DISCONNECTED
+        ? "Your WebJam connection dropped."
+        : "WebJam couldn’t connect to your host.",
+      hint: "Check your connection, then select Retry. If it still fails, try another network.",
       showRetry: true,
       needsFreshInvite: false,
     };
@@ -151,8 +148,10 @@ export function mapJoinError(error) {
   if (message === JOIN_SIGNAL.JOIN_INTERRUPTED || error instanceof Error && error.name === "AbortError") {
     return {
       kind: "interrupted",
-      headline: JOIN_SIGNAL.JOIN_INTERRUPTED,
-      hint: "Stay on this page, keep headphones on, and tap Retry when you are ready.",
+      headline: listenOnly ? "Web Join was interrupted." : JOIN_SIGNAL.JOIN_INTERRUPTED,
+      hint: listenOnly
+        ? "Check your connection, then select Retry to listen again."
+        : "Stay on this page, keep headphones on, and tap Retry when you are ready.",
       showRetry: true,
       needsFreshInvite: false,
     };
@@ -177,7 +176,7 @@ function mapExpired(message) {
     headline: turnOnly ? "The free relay session timed out." : inviteHeadline,
     hint: turnOnly
       ? "Ask your host for a new invite if Retry does not connect. Retry fetches fresh relay credentials when the link is still good."
-      : "Ask your host for a new Web Join link and open it to join.",
+      : FRESH_INVITE_HINT,
     showRetry: turnOnly,
     needsFreshInvite: !turnOnly,
   };

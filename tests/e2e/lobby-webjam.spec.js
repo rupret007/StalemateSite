@@ -41,7 +41,7 @@ test('two visitors can copy an unchanged app invite, with a fallback when clipbo
         await expect.poll(() => guest.evaluate((expected) => __lobby.chans.get(__lobby.active).jam.invitation === expected, INVITE)).toBe(true);
         await expect(guest.locator('[data-jam-desktop]')).toBeHidden();
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
-        await expect(guest.locator('[data-jam]')).toContainText('Windows and Linux require pasting private invites');
+        await expect(guest.locator('[data-jam-help]')).toContainText('On supported Windows and Linux builds, paste the full invitation into Join in the app.');
         await guest.click('[data-jam-copy]');
         expect(await guest.evaluate(() => window.copiedInvite)).toBe(INVITE);
         await guest.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Clipboard blocked'); }; });
@@ -188,22 +188,28 @@ async function expectExposedInviteStatus(page, selector) {
     return status;
 }
 
-for (const delayed of [false, true]) test(delayed
+for (const { delayed, width, height, hostSite, guestSite } of [
+    { delayed: false, width: 390, height: 844, hostSite: 'stalemate', guestSite: 'rad-dad' },
+    { delayed: true, width: 390, height: 844, hostSite: 'stalemate', guestSite: 'rad-dad' },
+    { delayed: false, width: 1440, height: 900, hostSite: 'rad-dad', guestSite: 'stalemate' },
+]) test(delayed
     ? 'a guest can recover a failed Music reply and a slow join confirmation'
-    : 'only the selected guest can accept a music invitation and open the audio check', async ({ browser, baseURL }) => {
-    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 }, true);
+    : `only the selected guest can accept a Music invitation and listen at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width, height }, true);
     try {
-        const host = await f.join('MusicHost');
-        const guest = await f.join('ChosenGuest');
+        const host = await f.join('MusicHost', false, hostSite);
+        const guest = await f.join('ChosenGuest', false, guestSite);
         const other = await f.join('OtherGuest');
         const guestStatus = await expectExposedInviteStatus(guest, '[data-music-invite-status]');
         await guest.locator('[data-text]').focus();
-        await host.click('[data-show="rooms"]');
+        if (width <= 900) {
+            await host.locator('.phonetabs').getByRole('button', { name: /Rooms/ }).click();
+        }
         await host.click('[data-start="jam"]');
         await expect(host.locator('[data-jam]')).toBeVisible();
         await expect(host.locator('[data-chat-context]')).toHaveText(/^#jam-/);
         const room = await host.locator('[data-chat-context]').textContent();
-        const invite = `https://webjam.example/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${Math.floor(Date.now() / 1000) + 120}`;
+        const invite = `https://webjam.example/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${Math.floor(Date.now() / 1000) + 120}`;
         // Intercept the system app launch. The real lobby still binds the
         // browser callback to the selected live guest and publishes it.
         await host.evaluate(() => {
@@ -219,6 +225,9 @@ for (const delayed of [false, true]) test(delayed
         const musicButton = host.getByRole('button', { name: 'Invite bandmate to Music' });
         async function returnInvite(href) {
             await musicButton.click();
+            await expect(host.getByRole('dialog', { name: 'Invite a guest' })).toHaveAccessibleDescription(
+                `Invite someone to play or listen in ${room}. They choose whether to join.`
+            );
             await host.getByRole('button', { name: 'Invite ChosenGuest', exact: true }).click();
             const request = await host.evaluate(() => window.musicRequest);
             expect(request).toMatch(/^[a-f0-9]{32}$/);
@@ -243,8 +252,8 @@ for (const delayed of [false, true]) test(delayed
         await expect(outcome).toHaveText('Music invitation sent to ChosenGuest. Waiting for a reply.');
         await expect(host.locator('[data-toast]')).toBeHidden();
         await expect(musicButton).toBeEnabled();
-        await expect(panel).toContainText('MusicHost invited you to play');
-        await expect(guestStatus).toHaveText(`MusicHost invited you to play in ${room}.`);
+        await expect(panel).toContainText('MusicHost invited you to join Music');
+        await expect(guestStatus).toHaveText(`MusicHost invited you to join Music in ${room}.`);
         await expect(guest.locator('[data-text]')).toBeFocused();
         await expect(other.locator('[data-music-invite]')).toBeHidden();
         await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
@@ -254,6 +263,10 @@ for (const delayed of [false, true]) test(delayed
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         expect(await returnInvite(invite)).toBe(true);
         const acceptReply = panel.getByRole('button', { name: 'Accept and join' });
+        if (!delayed) {
+            await expect(acceptReply).toBeInViewport();
+            await guest.screenshot({ path: testInfo.outputPath(`music-invite-${width}x${height}.png`) });
+        }
         if (delayed) {
             await guest.clock.install();
             await guest.evaluate(() => {
@@ -289,21 +302,62 @@ for (const delayed of [false, true]) test(delayed
             await guest.waitForFunction(() => typeof window.releaseMusicAcceptance === 'function');
             await guest.clock.fastForward(10_000);
             await expect(guestStatus).toContainText('Hang Out hasn’t confirmed your Music invitation');
-            await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
-            await expect(panel.getByRole('button', { name: 'Open audio check' })).toBeHidden();
+            const dismiss = panel.getByRole('button', { name: 'Dismiss', exact: true });
+            await expect(dismiss).toBeFocused();
+            await expect(dismiss).toHaveAccessibleDescription('Hang Out hasn’t confirmed your Music invitation. Wait here or ask the host to send a fresh one.');
+            await expect(panel.getByRole('button', { name: 'Open WebJam in browser' })).toBeHidden();
             expect(await guest.evaluate(() => window.musicReplies)).toBe(1);
             await guest.evaluate(() => window.releaseMusicAcceptance());
         }
-        await expect(guestStatus).toHaveText('You’re in the Jam room. Open the audio check when you’re ready.');
+        const acceptedGuidance = 'You’re in the Jam room. WebJam opens in a new tab. Come back to this tab to chat.';
+        await expect(guestStatus).toHaveText(acceptedGuidance);
         await expect(outcome).toHaveText('ChosenGuest accepted and joined the Jam room.');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
-        const audio = panel.getByRole('button', { name: 'Open audio check' });
+        const audio = panel.getByRole('button', { name: 'Open WebJam in browser' });
+        await expect(audio).toHaveAccessibleDescription(acceptedGuidance);
         await expect(delayed ? panel.getByRole('button', { name: 'Not now', exact: true }) : audio).toBeFocused();
         await expect(guest.locator('[data-jam-actions]')).toBeHidden();
+        if (!delayed) await guest.screenshot({ path: testInfo.outputPath(`accepted-in-jam-${width}x${height}.png`) });
         await audio.press('Enter');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([[invite, '_blank', 'noopener,noreferrer']]);
         expect(await guest.evaluate(() => window.audioRequests)).toBe(0);
         expect(await guest.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain(invite);
+        if (!delayed) {
+            // The relay fixture allows webjam.example. Follow the exact opened
+            // path and fragment on loopback so no provider sees the invite.
+            const opened = new URL(await guest.evaluate(() => window.browserOpens[0][0]));
+            const listener = await guest.context().newPage();
+            try {
+                await listener.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+                    export class WebJoinSession {
+                        constructor({ stream }) {
+                            if (stream) throw new Error('Listener unexpectedly has a capture stream');
+                        }
+                        async join() { this.authorized = true; }
+                        close() {}
+                    }` }));
+                await listener.goto(opened.pathname + opened.hash);
+                const listen = listener.getByRole('button', { name: 'Join to listen' });
+                await expect(listen).toBeInViewport();
+                await expect(listen).toHaveAccessibleDescription('Your microphone stays off.');
+                await listener.screenshot({ path: testInfo.outputPath(`listen-ready-${width}x${height}.png`) });
+                await listen.press('Enter');
+                await expect(listener.locator('#status')).toHaveText('Connected. You’re listening with your microphone off.');
+                const leave = listener.getByRole('button', { name: 'Leave session' });
+                await expect(leave).toBeFocused();
+                await listener.screenshot({ path: testInfo.outputPath(`listening-${width}x${height}.png`) });
+                await leave.press('Enter');
+                const listenerStatus = listener.locator('#status');
+                await expect(listenerStatus).toHaveText('You left the session.');
+                await expect(listenerStatus).toBeFocused();
+                await expect(listenerStatus).toHaveAccessibleDescription(/return to your Jam room to accept it/i);
+                await listener.screenshot({ path: testInfo.outputPath(`listen-left-${width}x${height}.png`) });
+                expect(await listener.evaluate(() => ({ capture: window.audioRequests, copy: window.copiedInvite })))
+                    .toEqual({ capture: 0, copy: '' });
+                expect(await guest.evaluate(() => window.copiedInvite)).toBe('');
+                await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+            } finally { await listener.close(); }
+        }
         // A guest already in this Jam room can still receive a Music invitation.
         await host.getByRole('button', { name: 'Invite bandmate to room' }).click();
         await expect(host.getByRole('button', { name: /Invite ChosenGuest/ })).toHaveCount(0);
@@ -314,6 +368,11 @@ for (const delayed of [false, true]) test(delayed
         await accept.click();
         await expect(audio).toBeVisible();
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await audio.focus();
+        const lobbyTab = guest.locator('[data-tabs] [data-channel-key="#stalemate"]');
+        await lobbyTab.dispatchEvent('click');
+        await expect(panel).toBeHidden();
+        await expect(lobbyTab).toBeFocused();
         expect(f.external).toEqual([]);
     } finally { await f.close(); }
 });
@@ -375,7 +434,7 @@ test('the host can cancel an unconfirmed Music invitation and retry with another
                 channel.close();
             }
         }, { retiredRequest, request, href });
-        await expect(second.locator('[data-music-invite]')).toContainText('MusicHost invited you to play');
+        await expect(second.locator('[data-music-invite]')).toContainText('MusicHost invited you to join Music');
         await expect(first.locator('[data-music-invite]')).toBeHidden();
         await expect(cancel).toBeHidden();
         await expect(status).toHaveText('Waiting for Hang Out to confirm delivery…');
@@ -537,6 +596,11 @@ test('an open invite picker updates availability without moving keyboard focus',
         await guest.close();
         await expect(host.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
         await expect(host.locator('[data-invite-empty]')).toBeVisible();
+        await expect(host.locator('[data-invite-empty]')).toContainText('They’ll appear here when they’re online.');
+        await f.join('BackOnline', false, 'stalemate');
+        await expect(list.getByRole('button', { name: 'Invite BackOnline', exact: true })).toBeVisible();
+        await expect(host.locator('[data-invite-empty]')).toBeHidden();
+        await expect(host.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
     } finally { await f.close(); }
 });
 
@@ -763,7 +827,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(guest.locator('[data-jam-web]')).toBeEnabled();
         await expect(host.getByRole('button', { name: 'Copy desktop invite', exact: true })).toBeVisible();
         await expect(host.getByRole('button', { name: 'Copy browser invite', exact: true })).toBeVisible();
-        await expect(guest.locator('[data-jam-web]')).toHaveAttribute('title', /headphones and audio consent/);
+        await expect(guest.locator('[data-jam-web]')).toHaveAttribute('title', /listen or join with a microphone/);
         await expect(guest.locator('[data-jam-wait]')).toBeHidden();
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         await guest.click('[data-jam-copy]');
@@ -798,7 +862,10 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         const help = guest.locator('[data-jam-help]'), summary = help.locator('summary');
         await summary.focus(); await summary.press('Enter');
         await expect(help).toHaveAttribute('open'); await expect(summary).toBeFocused();
-        await expect(help).toContainText('click Copy browser invite. Wait for Link copied, then paste the link above and choose Share with room.');
+        await expect(help).toContainText('Open WebJam in browser');
+        await expect(help).toContainText('WebJam opens in a new tab. Come back to this tab to chat.');
+        await expect(help).toContainText('Invite bandmate to Music');
+        await expect(help).toContainText('click Copy browser invite in WebJam. Wait for Link copied, then paste the link in Hang Out and choose Share with room.');
         await expect(help).toContainText('Sharing an invite does not turn on your microphone');
         await expect(help.locator('p').first()).toBeInViewport({ ratio: 0.5, timeout: 1000 });
         expect(await summary.evaluate(element => {

@@ -35,14 +35,15 @@ export async function gatherAnswerSDP(pc, signal, { timeout = 15000, allowReview
 }
 export class WebJoinSession {
   constructor({ origin, invite, stream, audioContext, onStatus = () => {}, onTrack = () => {}, onLatency = () => {}, onRoute = () => {}, onError = () => {} }) {
-    Object.assign(this, { invite, stream, audioContext, onStatus, onTrack, onLatency, onRoute, onError });
+    Object.assign(this, { invite, stream: stream || null, audioContext, onStatus, onTrack, onLatency, onRoute, onError });
+    this.listenOnly = !this.stream;
     this.controller = new AbortController();
     this.mailbox = new Mailbox(origin, invite, { signal: this.controller.signal });
     this.authorized = false; this.quotaBytes = SESSION_BYTES; this.previousBytes = 0;
     this.accessExpiresAt = null;
     this.route = null;
     this._jitterAdaptation = { targetMs: 20, lastChangeAt: 0 };
-    this.stream.getAudioTracks().forEach((track) => { track.enabled = false; });
+    this.stream?.getAudioTracks().forEach((track) => { track.enabled = false; });
   }
   async join() {
     const signal = this.controller.signal;
@@ -68,7 +69,7 @@ export class WebJoinSession {
       if (["failed", "closed"].includes(pc.connectionState) && !signal.aborted) {
         this.fail(new Error(this.authorized ? JOIN_SIGNAL.SESSION_ENDED : JOIN_SIGNAL.ICE_CONNECTION_FAILED));
       }
-      if (pc.connectionState === "disconnected") this.disconnectTimer ??= setTimeout(() => this.fail(new Error("The network connection timed out.")), 10000);
+      if (pc.connectionState === "disconnected") this.disconnectTimer ??= setTimeout(() => this.fail(new Error(JOIN_SIGNAL.ICE_DISCONNECTED)), 10000);
       if (pc.connectionState === "connected") { clearTimeout(this.disconnectTimer); this.disconnectTimer = null; }
     });
     let answer;
@@ -99,7 +100,12 @@ export class WebJoinSession {
     // Observe early channel errors while gathering/sending the answer.
     enrolled.catch(() => {});
     await pc.setRemoteDescription({ type: "offer", sdp: remoteSDP });
-    pc.addTrack(this.stream.getAudioTracks()[0], this.stream);
+    if (this.stream?.getAudioTracks().length) pc.addTrack(this.stream.getAudioTracks()[0], this.stream);
+    else {
+      const audio = pc.getTransceivers().find((item) => item.receiver.track.kind === "audio");
+      if (!audio) throw new Error("The host did not offer session audio.");
+      audio.direction = "recvonly";
+    }
     const description = await pc.createAnswer();
     await pc.setLocalDescription({ type: "answer", sdp: musicSdp(description.sdp) });
     // An older host rejects these addresses in an answer. Its authenticated
@@ -113,7 +119,7 @@ export class WebJoinSession {
       await Promise.race([enrolled, stopped, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Host authentication timed out. Ask for a new invite.")), 30000); })]);
     } finally { clearTimeout(timer); }
     if (signal.aborted) throw new DOMException("Stopped", "AbortError");
-    this.stream.getAudioTracks().forEach((track) => { track.enabled = true; });
+    this.stream?.getAudioTracks().forEach((track) => { track.enabled = true; });
     if (this.pendingStream) this.onTrack(this.pendingStream);
     this.pendingStream = null;
     this.onStatus("Connected — Web Join, higher delay (about 60–120 ms).");
@@ -152,14 +158,19 @@ export class WebJoinSession {
     } catch (error) { this.fail(error); }
     finally { clearTimeout(timer); this.statsPending = false; }
   }
-  fail(error) { if (this.controller.signal.aborted) return; this.close(); this.onError(error); }
+  fail(error) {
+    if (this.controller.signal.aborted) return;
+    const wasAuthorized = this.authorized;
+    this.close();
+    this.onError(error, wasAuthorized);
+  }
   close() {
     if (this.controller.signal.aborted) return;
     this.accessExpiresAt = null;
     this.controller.abort();
     clearInterval(this.statsTimer); clearTimeout(this.expiryTimer); clearTimeout(this.disconnectTimer);
     this.channel?.close(); this.pc?.close();
-    this.stream.getTracks().forEach((track) => track.stop());
+    this.stream?.getTracks().forEach((track) => track.stop());
     this.pendingStream = null; this._inboundReceiver = null; this.authorized = false;
   }
 }

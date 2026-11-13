@@ -10,6 +10,18 @@ async function enter(page, baseURL) {
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
 }
 
+test('chat shortcuts explain what they do and can send from the keyboard', async ({ page, baseURL }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await enter(page, baseURL);
+    const actions = page.locator('[data-quick]');
+    const horns = actions.getByRole('button', { name: 'Send rock horns and SHRED' });
+    await expect(horns).toBeVisible();
+    await expect(actions.getByRole('button', { name: 'Send happy little tree' })).toBeVisible();
+    await expect(actions.getByRole('button', { name: 'Help with chat commands' })).toBeVisible();
+    await horns.press('Enter');
+    await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('🤘 SHRED');
+});
+
 for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 812], [390, 844]]) {
     test(`workspace fills ${width}x${height} and keeps the composer visible`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
@@ -32,6 +44,13 @@ for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 812
             expect(buffer.height).toBeGreaterThan(height * 0.35);
         } else {
             expect(await page.locator('[data-text]').evaluate(el => getComputedStyle(el).fontSize)).toBe('16px');
+            const starters = page.locator('.conversation-starters');
+            for (const name of ['Say hello', 'What are you making?', 'Find a collaborator']) {
+                await expect(starters.getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 });
+            }
+            expect(await starters.evaluate(el => el.scrollWidth)).toBeLessThanOrEqual(
+                await starters.evaluate(el => el.clientWidth)
+            );
         }
         await page.screenshot({ path: testInfo.outputPath(`workspace-${width}x${height}.png`), animations: 'disabled' });
     });

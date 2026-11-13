@@ -220,7 +220,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .nick { display: block; width: 100%; min-height: 39px; padding: 7px 6px; border: 0; background: transparent; font: 11px/1.6 var(--mono); text-align: left; overflow-wrap: anywhere; }
 .nick::before { content: '·'; color: var(--muted); padding-right: 7px; }
 .nick[data-self=true]::after { content: 'you'; padding: 2px 4px; margin-left: 6px; font: 8px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; }
-.nick:hover { background: var(--raised); }
+.nick:disabled { opacity: 1; cursor: inherit; }
+.nick:enabled:hover { background: var(--raised); }
 .pmtoggle { display: flex; align-items: center; gap: 7px; min-height: 44px; padding-top: 14px; margin-top: 15px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .pmtoggle input { width: 15px; height: 15px; min-height: 0; margin: 0; accent-color: var(--lime); }
 .people-help { font-size: 11px; line-height: 1.9; margin: 12px 0; }
@@ -793,6 +794,15 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .topic { font-size: 12px; }
   .conversation-starters button, .quiet-action { font-size: 11px; }
   .quick button { font-size: 12px; }
+}
+@media (max-width: 480px) and (min-height: 621px) {
+  .conversation-starters { flex-wrap: wrap; overflow: visible; }
+  .conversation-starters button { max-width: 100%; white-space: normal; }
+}
+@media (max-width: 480px) and (min-height: 451px) and (max-height: 740px) {
+  /* A return offer takes its own row. Save room for the composer while it is open. */
+  .irc:has(.game-offer:not([hidden])) .lobby-welcome p { display: none; }
+  .irc:has(.game-offer:not([hidden])) .buffer { min-height: 24px; }
 }
 /* Small phones and landscape windows keep the composer ahead of welcome copy. */
 @media (max-height: 620px) and (max-width: 900px) {

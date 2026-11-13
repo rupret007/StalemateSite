@@ -62,10 +62,10 @@
     </dialog>
     <dialog class="sheet" data-invite-dialog aria-labelledby="invite-dialog-title" aria-describedby="invite-dialog-intro">
         <h3 id="invite-dialog-title">Invite a guest</h3>
-        <p id="invite-dialog-intro">Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
+        <p id="invite-dialog-intro"><span data-invite-purpose>Invite someone to</span> <b data-invite-room></b>. They choose whether to join.</p>
         <div data-invite-quick hidden>
             <div class="sheet-buttons invite-people" data-invite-people role="group" aria-label="Online guests"></div>
-            <p data-invite-empty hidden>No one else is available to invite. Ask your bandmate to enter Hang Out, then open this list again.</p>
+            <p data-invite-empty role="status" hidden>No one else is available to invite. Ask your bandmate to enter Hang Out. They’ll appear here when they’re online.</p>
             <p class="status" data-invite-quick-error role="status" aria-atomic="true"></p>
             <button class="btn btn--ghost" type="button" data-invite-quick-cancel>Cancel</button>
         </div>
@@ -315,7 +315,7 @@
             </section>
             <div class="jam" data-jam hidden role="region" aria-labelledby="jam-title">
                 <h3 class="jam-title" id="jam-title">Live music with WebJam</h3>
-                <p class="small jam-note">Browser audio: headphones required; higher delay.</p>
+                <p class="small jam-note">Listen with your mic off. Wear headphones when joining with a mic.</p>
                 <button class="btn btn--ghost jam-room-invite" type="button" data-jam-invite-room aria-haspopup="dialog" hidden>Invite bandmate to room</button>
                 <p class="small room-invite-status" data-room-invite-status role="status" aria-atomic="true"></p>
                 <button class="btn btn--ghost jam-room-invite" type="button" data-jam-invite-music aria-haspopup="dialog" hidden>Invite bandmate to Music</button>
@@ -356,9 +356,11 @@
                 <p class="small jam-platform" data-jam-platform>A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.</p>
                 <details class="jam-setup" data-jam-help>
                     <summary>Setup &amp; invitation help</summary>
-                    <p>Use the beta app supplied by your host; the public download may reject this invitation. WebJam connects through a desktop host using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.</p>
-                    <p>On a computer, copy the invite, open WebJam, choose Join, and paste it there. Opening the app directly is supported on Mac; Windows and Linux require pasting private invites. Phones can use this room’s chat while music runs on a computer.</p>
-                    <p>Hosting a browser guest: in WebJam’s Music room, click <strong>Copy browser invite</strong>. Wait for <strong>Link copied</strong>, then paste the link above and choose <strong>Share with room</strong>. Keep the Music session open. For desktop guests, paste the entire Copy Invite message instead. Sharing an invite does not turn on your microphone.</p>
+                    <p><strong>Joining in your browser?</strong> Accept the Music invitation, then choose <strong>Open WebJam in browser</strong>. If your host shares a link with the room, choose <strong>Join in browser</strong>. WebJam opens in a new tab. Come back to this tab to chat. On the join page, listen with your mic off or check your microphone and join with headphones. Browser audio usually has more delay than the desktop app.</p>
+                    <p><strong>Hosting from a Mac?</strong> Start a Music session in the WebJam beta app. When <strong>Invite bandmate to Music</strong> appears in this room, choose your guest and confirm the invitation in WebJam. Keep your Music session open.</p>
+                    <p>To share manually, click <strong>Copy browser invite</strong> in WebJam. Wait for <strong>Link copied</strong>, then paste the link in Hang Out and choose <strong>Share with room</strong>. Sharing an invite does not turn on your microphone.</p>
+                    <p>For guests using the desktop beta app, share the entire desktop invitation. On Mac, they can open it in WebJam. On supported Windows and Linux builds, paste the full invitation into <strong>Join</strong> in the app.</p>
+                    <p>WebJam connects through a desktop host using Jamulus. Use wired Ethernet when available. Delay and dropouts depend on your devices and network. The public app download may reject a private beta invitation.</p>
                     <p>Invites may expire or admit one guest; ask the host for a fresh one if needed. A rejected paste stays editable while you remain this room’s connected host. Leaving the room or stopping locally clears its controls; it does not revoke an invitation already copied. End the music session or remove the guest in the host app when needed.</p>
                 </details>
             </div>
@@ -402,12 +404,12 @@
             <div class="pmreq" data-pmreqs></div>
             <div class="quick" data-quick>
                 <button type="button" class="startroom" data-show="rooms" aria-controls="rooms-pane">＋ Start a room</button>
-                <button type="button" data-quick-line="🤘 SHRED">🤘</button>
-                <button type="button" data-quick-line="happy little tree 🌲">🌲</button>
+                <button type="button" data-quick-line="🤘 SHRED" aria-label="Send rock horns and SHRED" title="Send rock horns and SHRED">🤘</button>
+                <button type="button" data-quick-line="happy little tree 🌲" aria-label="Send happy little tree" title="Send happy little tree">🌲</button>
                 <button type="button" data-quick-me="moshes">/me mosh</button>
                 <button type="button" data-quick-cmd="slap">🐟 slap</button>
                 <button type="button" data-quick-cmd="away">💤 away</button>
-                <button type="button" data-quick-cmd="help">? help</button>
+                <button type="button" data-quick-cmd="help" aria-label="Help with chat commands">? help</button>
             </div>
             <section class="message-recovery" data-message-recovery hidden aria-label="Saved message copies">
                 <p data-message-recovery-status role="status"></p>
@@ -439,7 +441,7 @@
             <div class="game-offer" data-music-invite hidden>
                 <p data-music-invite-message aria-hidden="true"></p>
                 <button class="btn btn--small" type="button" data-music-invite-action aria-describedby="music-invite-status"></button>
-                <button class="btn btn--small btn--ghost" type="button" data-music-invite-dismiss>Not now</button>
+                <button class="btn btn--small btn--ghost" type="button" data-music-invite-dismiss aria-describedby="music-invite-status">Not now</button>
             </div>
             <div class="game-offer" data-game-offer hidden>
                 <p data-game-offer-message aria-hidden="true"></p>
