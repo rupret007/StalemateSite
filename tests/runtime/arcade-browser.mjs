@@ -2406,7 +2406,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
         await a.getByRole('button', { name: /Game Night/ }).click();
         await inviteToGame(a, b, 'ChessGuest');
-        await expect(b.getByRole('link', { name: 'Open Rad Dad Arcade' })).toHaveAttribute('href', 'https://raddadband.com/play/');
+        await expect(b.getByRole('button', { name: 'Open Rad Dad Arcade', exact: true })).toBeVisible();
+        await expect(b.locator('[data-game-arcade-external]')).not.toHaveAttribute('href', /./);
         for (const page of [a, b]) await page.locator('.arcade-chess summary').click();
         await a.getByRole('button', { name: 'Open Chess match' }).click();
         await b.getByRole('button', { name: 'Join as Black' }).click();
