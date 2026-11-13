@@ -1937,6 +1937,25 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         await track(a).focus();
+        // The same phone swipe can cross the countdown without sending an early move.
+        const startSwipe = engine === 'chromium' && !media;
+        const touchDirection = danger === 0 ? -1 : 1;
+        const swipeBox = engine === 'chromium' ? await track(b).boundingBox() : null;
+        const swipeX = swipeBox ? swipeBox.x + swipeBox.width / 2 : 0;
+        const swipeY = swipeBox ? swipeBox.y + swipeBox.height * .66 : 0;
+        const touchSession = engine === 'chromium' ? await b.context().newCDPSession(b) : null;
+        const startTouch = async () => {
+            await touchSession.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: swipeX, y: swipeY }] });
+            await touchSession.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: swipeX + touchDirection * 48, y: swipeY }] });
+        };
+        if (startSwipe) {
+            await b.bringToFront();
+            await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
+            await startTouch();
+            await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
+            await expect(race(b)).toHaveAttribute('data-sequence', '0');
+            await expect(race(b)).toHaveAttribute('data-lane', '1');
+        }
         await expect(race(a)).toHaveAttribute('data-phase', 'play');
         await expect(race(b)).toHaveAttribute('data-phase', 'play');
         await expect(b.locator('[data-race-status]')).toHaveText('Go! Swipe the track or tap a control.');
@@ -1964,16 +1983,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }
             return false;
         }, String(danger)) : null;
-        if (engine === 'chromium') {
-            const connection = await b.context().newCDPSession(b);
+        if (touchSession) {
             try {
-                const box = await track(b).boundingBox();
-                assert.ok(box);
-                const x = box.x + box.width / 2, y = box.y + box.height * .66;
-                await connection.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-                await connection.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + (danger === 0 ? -75 : 75), y }] });
-                await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-            } finally { await connection.detach(); }
+                if (!startSwipe) await startTouch();
+                await touchSession.send('Input.dispatchTouchEvent', { type: 'touchMove',
+                    touchPoints: [{ x: swipeX + touchDirection * 75, y: swipeY }] });
+                await touchSession.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+            } finally { await touchSession.detach(); }
         } else await b.touchscreen.tap(controlBox.x + controlBox.width / 2, controlBox.y + controlBox.height / 2);
         await a.keyboard.press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
         if (prediction) assert.equal(await prediction, true, 'native phone swipe moves locally before delayed confirmation');

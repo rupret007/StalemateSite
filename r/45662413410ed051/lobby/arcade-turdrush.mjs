@@ -172,15 +172,16 @@ export function mountArcadeTurdRush(container, onMatch) {
     function queue(action) {
         const match = model?.match;
         if (connection !== 'ready' || !model?.seat || !match || match.result || pending || confirm.open || buffer.length >= 8 ||
-            visual?.status !== 'running') return;
+            visual?.status !== 'running') return false;
         const now = serverNow(performance.now());
-        if (now < match.startsAt) return;
+        if (now < match.startsAt) return false;
         const tick = Math.max(visual.tick + 1, rushRaceTick(match.startsAt, now) + 1, visual.queue.at(-1)?.[0] || 1);
-        if (tick > RUSH_LIMIT_TICKS) return;
+        if (tick > RUSH_LIMIT_TICKS) return false;
         const input = [tick, action];
         buffer.push(input);
         visual.queue.push(input);
         put(error, '');
+        return true;
     }
 
     function drawFrame(time) {
@@ -311,7 +312,7 @@ export function mountArcadeTurdRush(container, onMatch) {
     function swipe(event) {
         if (gesture?.id !== event.pointerId || gesture.action) return;
         const action = classifyRushSwipe(event.clientX - gesture.x, event.clientY - gesture.y);
-        if (action) { gesture.action = action; queue(isLane(action) ? 'swipe-' + action : action); }
+        if (action && queue(isLane(action) ? 'swipe-' + action : action)) gesture.action = action;
     }
     track.addEventListener('pointermove', swipe);
     track.addEventListener('pointerup', event => { swipe(event); if (gesture?.id === event.pointerId) gesture = null; });
