@@ -875,7 +875,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-room-filter] option[value=mine]').disabled = true;
         if ($('[data-room-filter]').value === 'mine') $('[data-room-filter]').value = 'active';
         app.ignores.clear(); app.peerIgnores.clear(); app.selfId = ''; personPreferencePending = null; $('[data-pmreqs]').replaceChildren();
-        clearTimeout(toastTimer); toastRegion.replaceChildren(); toastRegion.hidden = true;
+        dismissToast(); toastRegion.replaceChildren();
         for (const dialog of $$('dialog')) if (dialog.open) dialog.close();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
         $('[data-sheet-buttons]').replaceChildren(); $('[data-palette-buttons]').replaceChildren();
@@ -1152,7 +1152,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 drawGameOffer();
             }
             if (wasIn && app.resetSession) {
-                if (!gameGuest && !gameReturnOffered) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
+                if (!gameGuest && !gameReturnOffered) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.', [], 'reconnect');
             }
             else if (wasIn) line(app.active, { event: true, text: `* You are now ${m.nick}` });
             app.resetSession = false;
@@ -1188,6 +1188,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
+            if (c.name !== '#stalemate' && toastKind === 'reconnect') dismissToast();
             if (gameGuest?.game === 'four' && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginFourInvitation(c);
             if (joinedFromChannelDialog) focusChannelTab(c.name, { preventScroll: false });
             else if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
@@ -3583,7 +3584,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     });
     show('chat');
 
-    let toastTimer, toastDuration = 4000;
+    let toastTimer, toastDuration = 4000, toastKind;
     const toastRegion = $('[data-toast]');
     if (gameGuest) {
         $('[data-gate]').hidden = true;
@@ -3604,17 +3605,24 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             void connect('');
         }
     }
+    function dismissToast() {
+        clearTimeout(toastTimer);
+        toastRegion.hidden = true;
+        toastKind = undefined;
+    }
+
     function scheduleToastDismiss() {
         clearTimeout(toastTimer);
         if (toastRegion.hidden || toastRegion.contains(document.activeElement)) return;
         toastTimer = setTimeout(() => {
-            if (!toastRegion.contains(document.activeElement)) toastRegion.hidden = true;
+            if (!toastRegion.contains(document.activeElement)) dismissToast();
         }, toastDuration);
     }
     toastRegion.addEventListener('focusin', () => clearTimeout(toastTimer));
     toastRegion.addEventListener('focusout', () => queueMicrotask(scheduleToastDismiss));
-    function toast(text, actions = []) {
-        const t = $('[data-toast]');
+    function toast(text, actions = [], kind) {
+        const t = toastRegion;
+        toastKind = kind;
         t.replaceChildren(text);
         for (const [label, fn] of actions) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label; b.addEventListener('click', () => { fn(); t.hidden = true; }); t.append(' ', b); }
         t.hidden = false;
