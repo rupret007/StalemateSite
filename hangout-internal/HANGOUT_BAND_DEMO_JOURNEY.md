@@ -6,6 +6,8 @@ Keep the rehearsal private and use the build-specific invitation steps below.
 
 ## What to send the guest
 
+Use this message with the currently serving private beta.
+
 > Hey Che’, open the private Hang Out invite I send you in Chrome on your PC.
 > Pick a nickname and enter the lobby. Put on your wired headphones. I’ll
 > invite you to the Jam room. Click **Join room**, then **Join in browser**
@@ -16,6 +18,17 @@ Keep the rehearsal private and use the build-specific invitation steps below.
 > **Microphone detected.**, check the headphones box and click
 > **Join with microphone**. Chrome is all you need on the PC. If the invite
 > expires, stay in Hang Out and I’ll send another.
+
+Once the selected-guest Music build is deployed, use this version.
+
+> Hey Che’, open the private Hang Out invite I send you in Chrome on your PC.
+> Pick a nickname and wait in the lobby. When my Music invite appears, click
+> **Accept and join**, then **Open WebJam in browser**. To listen, choose
+> **Join to listen**. To play, put on wired headphones, choose **Check
+> microphone**, and play a few hits. If Chrome picked the wrong input, choose
+> your drum interface under **Microphone**. Once the check detects it, check
+> the headphones box and choose **Join with microphone**. Keep the Hang Out
+> tab open for chat or to ask me for another invite.
 
 Send the private Hang Out invitation separately through the usual private
 channel. A guest opens it and reads the guest agreement before entering. A
@@ -40,8 +53,8 @@ the same lobby and can see each other in **People**.
 | Selected-guest Music candidate, private fixture | Choose **Invite bandmate to Music**, select the guest, and confirm in WebJam. Wait for Hang Out to show the invitation was sent. | Choose **Accept and join**, then **Open WebJam in browser**. Choose **Join to listen** to keep the microphone off, or follow the microphone check to play. |
 
 Use the `8d76db40` instructions for the staged rehearsal. Both Mac
-shortcuts point to `c6eecdc`. The current candidate pairs website
-`b6e80b3` with desktop source `72e5e28`. Chromium and WebKit fixtures
+shortcuts point to `c6eecdc`. The invitation-code follow-up pairs
+website `183c045` with desktop source `72e5e28`. Chromium and WebKit fixtures
 passed the selected-guest invitation and recovery through native Qt
 confirmation. The Apple Silicon `72e5e28` test package is archived and
 reached the startup dialog. The packaged macOS handoff and live audio
