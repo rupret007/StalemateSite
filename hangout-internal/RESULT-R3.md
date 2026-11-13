@@ -1,11 +1,11 @@
 # RESULT-R3: Bridge slice 1 review fixes
 
-**Status: done, local only.** The public-root files are under `hangout-internal/` and `tests/`. Both boundary tests pass. The bridge unit tests and the bridge Playwright suite pass. Nothing was pushed or deployed. The never-edit files are untouched.
+**Status: done, local only.** The public-root files from the fix commit are under `hangout-internal/` and `tests/`. Both boundary tests passed at the verified code head below. That claim was false once this file was tracked at the repository root: `.htaccess` does not deny `RESULT-R3.md`, so `apache-public-boundary.test.js` failed at that head. This note now lives in `hangout-internal/`. The bridge unit tests and the bridge Playwright suite pass. Nothing was pushed or deployed. The never-edit files are untouched.
 
 - Branch: `grok/bridge-slice1-int-20261112`
 - Verified code head: `57d2aece9d07f5db7e8e80370d80ce0d541c0ffb`
-- Result commit, which added this file: `7350266983b6a6ab146fe0a4229058325509f143`
-- The commit after that one only records the result SHA above. That commit is the branch head.
+- Result commit, which added this file at the repository root: `7350266983b6a6ab146fe0a4229058325509f143`
+- The commit after that one only records the result SHA above. That commit, `683277e520d10a13b7b8371ee45549361fa901b0`, was the branch head while this file sat at the repository root.
 
 ## What changed
 
@@ -27,7 +27,7 @@ Paths in the runner banner are omitted here.
    Duration  844ms (transform 84ms, setup 81ms, import 97ms, tests 504ms, environment 0ms)
 ```
 
-Exit 0.
+Exit 0. That run is the verified code head, before this file was tracked. The same command fails at `7350266` and `683277e`, where this file is a tracked root entry.
 
 `npx vitest run tests/unit/bridge-* hangout-worker/tests/game-night-room-grants.test.js`
 
@@ -60,7 +60,7 @@ Exit 0. The 7 passed are the 4 in-process grant cases plus the 3 local-preview t
    Duration  436.14s
 ```
 
-Exit 1. No bridge file failed (`apache-public-boundary`, `hangout-hidden`, `bridge-grants`, `bridge-hook1-proposal`, `bridge-shots`, `game-night-room-grants`). The failures are timeouts in files this change does not touch.
+Exit 1. No bridge file failed (`apache-public-boundary`, `hangout-hidden`, `bridge-grants`, `bridge-hook1-proposal`, `bridge-shots`, `game-night-room-grants`) in this run, which was taken before this file was tracked at the repository root. Tracking it there adds one `apache-public-boundary` failure. The other failures are timeouts in files this change does not touch.
 
 ## Baseline at `4f35bc3`
 
@@ -75,9 +75,9 @@ Temporary worktree, `node_modules` symlinked the same way as this worktree (no i
    Duration  351.44s
 ```
 
-Exit 1. `apache-public-boundary` and `hangout-hidden` passed at the base. They were the two failures this branch had introduced, and they pass here now.
+Exit 1. `apache-public-boundary` and `hangout-hidden` passed at the base. They were the two failures this branch had introduced, and they passed at the verified code head. They did not pass at the branch head that tracked this file at the repository root.
 
-17 files failed in both runs. Three files failed only at the base (`hangout-worker/tests/lobby-sharing-controls.test.js`, `tests/unit/hangout-lobby-incident-sources.test.js`, `tests/unit/search-discovery.test.js`). Six files failed only on this branch, all as timeouts, and all of them exist at the base: `tests/unit/hangout-durable-participation.test.js`, `tests/unit/hangout-lobby-media-client.test.js`, `tests/unit/hangout-participation-enforcement.test.js`, `tests/unit/hangout-person-target-authority.test.js`, `tests/unit/hangout-room-lifecycle.test.js`, `tests/unit/package-pages.test.js`. The failed set moves between runs the same way earlier full-suite notes described. The failure count is 63 on both.
+17 files failed in both runs. Three files failed only at the base (`hangout-worker/tests/lobby-sharing-controls.test.js`, `tests/unit/hangout-lobby-incident-sources.test.js`, `tests/unit/search-discovery.test.js`). Six files failed only on this branch, all as timeouts, and all of them exist at the base: `tests/unit/hangout-durable-participation.test.js`, `tests/unit/hangout-lobby-media-client.test.js`, `tests/unit/hangout-participation-enforcement.test.js`, `tests/unit/hangout-person-target-authority.test.js`, `tests/unit/hangout-room-lifecycle.test.js`, `tests/unit/package-pages.test.js`. The failed set moves between runs the same way earlier full-suite notes described. The failure count is 63 on both of those runs. The head that tracked this file at the repository root had one more failure, the boundary test on `RESULT-R3.md`.
 
 ## Limits
 
