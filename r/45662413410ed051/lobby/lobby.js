@@ -1546,7 +1546,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const room = result?.ok && store(result.room);
         if (room?.kind === 'game' && room.keepRef === result.ref) {
             const requestedGame = pending.fromEntry && gameEntry?.table;
-            if (arcadeTables.get(requestedGame)?.supported) arcadeReturning = { room: room.name, ref: room.keepRef, game: requestedGame };
+            if (arcadeTables.get(requestedGame)?.supported) arcadeReturning = { room: room.name, ref: room.keepRef, game: requestedGame, reveal: true };
             if (pending.fromEntry) gameEntry = null;
             if (app.active !== room.name) switchTo(room.name);
             else if (arcadeReturning) drawGameNight();
@@ -1781,8 +1781,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             table.controller.setRoom(scope);
             if (scope && arcadeInvitation?.game === game && arcadeInvitation.ref === scope.ref) table.controller.open();
             if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
+                const { reveal } = arcadeReturning;
                 arcadeReturning = null;
-                table.controller.open();
+                const wasOpen = table.controller.isOpen();
+                const panel = table.controller.open();
+                if (reveal && panel) requestAnimationFrame(() => {
+                    if (panel.open && currentGameNight()?.keepRef === scope.ref) revealArcadePanel(panel, wasOpen);
+                });
             }
             return;
         }
@@ -1831,9 +1836,33 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const game = event.target.value;
         event.target.value = '';
         if (!currentGameNight() || !game) return;
-        if (game === 'four' && !$('[data-four]').hidden) $('[data-four]').open = true;
-        else arcadeTables.get(game)?.controller?.open();
+        const four = game === 'four' ? $('[data-four]:not([hidden])') : null;
+        const controller = arcadeTables.get(game)?.controller;
+        const wasOpen = four?.open || controller?.isOpen();
+        const panel = four || controller?.open();
+        if (!panel) return;
+        if (four) four.open = true;
+        revealArcadePanel(panel, wasOpen);
     });
+    function revealArcadePanel(panel, wasOpen) {
+        const heading = panel.querySelector('summary');
+        heading.focus({ preventScroll: true });
+        const reveal = () => {
+            const target = panel.offsetHeight < panel.parentElement.clientHeight ? panel : heading;
+            target.scrollIntoView({ block: 'center', behavior: 'instant' });
+        };
+        reveal();
+        // Some games reset the scroll position as their panel opens.
+        if (!wasOpen) panel.addEventListener('toggle', () => {
+            if (panel.open && document.activeElement === heading) reveal();
+        }, { once: true });
+        // The start controls can appear after the match service responds.
+        const resize = new ResizeObserver(() => {
+            if (panel.open && document.activeElement === heading) reveal();
+        });
+        resize.observe(panel);
+        heading.addEventListener('blur', () => resize.disconnect(), { once: true });
+    }
     window.addEventListener('pagehide', () => {
         const current = currentGameNight();
         const open = [...arcadeTables].find(([, table]) => table.controller?.isOpen());

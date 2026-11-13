@@ -511,8 +511,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
     }
     async function verifyGameNightEntry() {
-        const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
+        const host = await guest('rad-dad', 'LinkHost', { width: 1440, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad&table=chess');
         await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+        await expect(host.locator('details.arcade-chess > summary')).toBeFocused();
+        await expectUncoveredControl(host.getByRole('button', { name: 'Open Chess match', exact: true }));
         await verifyArcadeInvites(host);
         if (!mixed) {
             await verifyFirstVisit(host);
@@ -566,6 +568,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         const playerGame = player.getByRole('combobox', { name: 'Switch game' });
         await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+        await expect(host.locator('details.arcade-chess > summary')).toBeFocused();
+        await expectUncoveredControl(host.getByRole('button', { name: 'Open Chess match' }));
         if (media && !relay) await player.route('**/beta/arcade-ticket', route => route.fulfill({ status: 403 }), { times: 1 });
         await playerGame.selectOption('chess');
         if (media && !relay) {
