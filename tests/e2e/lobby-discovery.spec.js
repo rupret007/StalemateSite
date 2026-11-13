@@ -26,7 +26,7 @@ async function guest(browser, nick, viewport) {
 }
 const lobbyTab = (page) => page.locator('[data-tabs] [data-channel-key="#stalemate"]');
 
-test('guests host named chat channels with live-only history and can hand off room controls', async ({ browser }) => {
+test('guests host named chat channels with live-only history and can hand off room controls', async ({ browser }, testInfo) => {
     const host = await guest(browser, 'NightHost');
     let visitor;
     try {
@@ -34,6 +34,7 @@ test('guests host named chat channels with live-only history and can hand off ro
         await host.press('[data-text]', 'Enter');
         await expect(host.locator('[data-buffer]')).toContainText('predates the next visitor');
         visitor = await guest(browser, 'NightGuest');
+        await visitor.setViewportSize({ width: 1440, height: 900 });
         await expect(visitor.locator('[data-buffer]')).not.toContainText('predates the next visitor');
 
         await host.click('[data-start="chat"]');
@@ -54,19 +55,25 @@ test('guests host named chat channels with live-only history and can hand off ro
         await host.press('[data-text]', 'Enter');
         await expect(host.locator('[data-buffer]')).toContainText('before you joined');
 
-        await visitor.locator('[data-roomlist] [data-room="#night-owls"]').click();
+        const roomCard = visitor.locator('[data-roomlist] [data-room="#night-owls"]');
+        await expect(roomCard).toBeInViewport();
+        await visitor.screenshot({ path: testInfo.outputPath('discover-chat-room-1440x900.png') });
+        await roomCard.press('Enter');
         await expect(visitor.locator('[data-chat-context]')).toHaveText('#night-owls');
         await expect(visitor.locator('[data-buffer]')).not.toContainText('before you joined');
         await expect(visitor.locator('[data-roomtools]')).toBeHidden();
         await host.fill('[data-text]', 'This message arrives while we are both here');
         await host.press('[data-text]', 'Enter');
         await expect(visitor.locator('[data-buffer]')).toContainText('while we are both here');
+        await visitor.screenshot({ path: testInfo.outputPath('joined-chat-room-1440x900.png') });
         await lobbyTab(visitor).click();
         await visitor.locator('[data-tabs] [data-channel-key="#night-owls"]').click();
         await expect(visitor.locator('[data-buffer]')).toContainText('while we are both here');
 
-        await visitor.click('[data-leave]');
+        await visitor.getByRole('button', { name: 'Leave', exact: true }).press('Enter');
         await expect(visitor.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(lobbyTab(visitor)).toBeFocused();
+        await visitor.screenshot({ path: testInfo.outputPath('left-chat-room-1440x900.png') });
         await host.fill('[data-text]', 'This message arrives while you are away');
         await host.press('[data-text]', 'Enter');
         await expect(host.locator('[data-buffer]')).toContainText('while you are away');
