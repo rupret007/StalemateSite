@@ -63,8 +63,8 @@ export function createGameNightTable({
             return subjectValid(subject) ? sides.find(seat => this.#seats[seat] === subject) ?? null : null;
         }
 
-        hasGuestSeat(id, host) {
-            return id === this.#id && !this.#match && this.#seats[first] === host && this.#occupied().length < sides.length;
+        hasGuestSeat(id, host, reserved = 0) {
+            return id === this.#id && !this.#match && this.#seats[first] === host && this.#occupied().length + reserved < sides.length;
         }
 
         view(subject, now) {
@@ -78,8 +78,8 @@ export function createGameNightTable({
             };
         }
 
-        join(subject, id, now, requested) {
-            if (id !== this.#id || this.#match || !subjectValid(subject) || this.seat(subject)) return false;
+        join(subject, id, now, requested, reserved = 0) {
+            if (id !== this.#id || this.#match || !subjectValid(subject) || this.seat(subject) || this.#occupied().length + reserved >= sides.length) return false;
             const seat = twoSeats ? sides[1] : requested === 'next' ? sides.find(side => !this.#seats[side]) : requested;
             if (!sides.includes(seat) || this.#seats[seat]) return false;
             if (!manualStart && this.subjects.length === sides.length - 1) this.#match = create(id, now);

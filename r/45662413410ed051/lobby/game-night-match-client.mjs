@@ -11,12 +11,13 @@ export const matchConnectionErrors = Object.freeze({
 // A match connection can be replaced without changing room, chat or call.
 export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1' ? '?game-guest=1' : '';
-    let scope, socket, controller, reconnectTimer, joinTimer, generation = 0, failures = 0, ready = false;
+    let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
     function reset() {
         generation++;
         onMatch?.(scope);
         clearTimeout(reconnectTimer);
         clearTimeout(joinTimer);
+        clearTimeout(claimTimer);
         controller?.abort();
         controller = null;
         const prior = socket;
@@ -72,6 +73,11 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                 } else if (frame?.t === 'match-state' && frame.version === 1 && frame.room === scope.room) {
                     clearTimeout(joinTimer);
                     failures = 0;
+                    clearTimeout(claimTimer);
+                    const wait = frame.state?.pendingGuestMs;
+                    if (Number.isInteger(wait) && wait > 0 && wait <= 60000) {
+                        claimTimer = setTimeout(() => send({ action: 'sync' }), wait);
+                    }
                     onState(frame);
                     if (attempt === generation) onMatch?.(scope, frame.state, send);
                 } else if (frame?.t === 'match-error') onError(frame.reason);
