@@ -260,6 +260,10 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         expect(await returnInvite(invite)).toBe(true);
         const acceptReply = panel.getByRole('button', { name: 'Accept and join' });
+        if (!delayed) {
+            await expect(acceptReply).toBeInViewport();
+            await guest.screenshot({ path: testInfo.outputPath(`music-invite-${width}x${height}.png`) });
+        }
         if (delayed) {
             await guest.clock.install();
             await guest.evaluate(() => {
@@ -336,7 +340,11 @@ for (const { delayed, width, height, hostSite, guestSite } of [
                 await expect(leave).toBeFocused();
                 await listener.screenshot({ path: testInfo.outputPath(`listening-${width}x${height}.png`) });
                 await leave.press('Enter');
-                await expect(listener.locator('#status')).toBeFocused();
+                const listenerStatus = listener.locator('#status');
+                await expect(listenerStatus).toHaveText('You left the session.');
+                await expect(listenerStatus).toBeFocused();
+                await expect(listener.locator('#error-hint')).toHaveText('Ask your host for a new browser invite to rejoin.');
+                await listener.screenshot({ path: testInfo.outputPath(`listen-left-${width}x${height}.png`) });
                 expect(await listener.evaluate(() => ({ capture: window.audioRequests, copy: window.copiedInvite })))
                     .toEqual({ capture: 0, copy: '' });
                 expect(await guest.evaluate(() => window.copiedInvite)).toBe('');
