@@ -2124,7 +2124,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             } else {
                 const lastMove = game.moves ? `${fourMark(game.moves - 1)} played column ${game.lastColumn + 1}. ` : '';
                 const turn = yourTurn ? `Your turn (${seat}).` : `${fourMark(game.moves)} to play.`;
-                const result = game.winner ? `${game.winner} wins.` : 'Draw.';
+                const result = lastMove + (game.winner ? `${game.winner} wins.` : 'Draw.');
                 if (playing) {
                     message = lastMove + (seat ? turn : `Match full. You’re watching. ${turn}`);
                     if (seat) leaveLabel = 'Leave match';
