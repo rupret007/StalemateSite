@@ -799,6 +799,11 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .conversation-starters { flex-wrap: wrap; overflow: visible; }
   .conversation-starters button { max-width: 100%; white-space: normal; }
 }
+@media (max-width: 480px) and (min-height: 451px) and (max-height: 740px) {
+  /* A return offer takes its own row. Save room for the composer while it is open. */
+  .irc:has(.game-offer:not([hidden])) .lobby-welcome p { display: none; }
+  .irc:has(.game-offer:not([hidden])) .buffer { min-height: 24px; }
+}
 /* Small phones and landscape windows keep the composer ahead of welcome copy. */
 @media (max-height: 620px) and (max-width: 900px) {
   .titlebar { min-height: 52px; padding: 8px 12px; }

@@ -686,6 +686,14 @@ for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionab
         await expect(context).toHaveText('#stalemate');
         expect(await composerClear()).toBe(true);
         await guest.screenshot({ path: testInfo.outputPath(`jam-room-return-${width}.png`) });
+        if (width === 375) {
+            // Leave room for the browser chrome and a longer wrapped recovery message.
+            await guest.setViewportSize({ width, height: 640 });
+            expect(await composerClear()).toBe(true);
+            await expect(guest.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+            await guest.screenshot({ path: testInfo.outputPath('jam-room-return-375x640.png') });
+            await guest.setViewportSize({ width, height: 667 });
+        }
         await offer.getByRole('button', { name: 'Return to room', exact: true }).press('Enter');
         await expect(context).toHaveText(room);
         await expect(roomTab).toBeFocused();
