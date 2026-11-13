@@ -427,7 +427,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
             try {
                 const friend = await context.newPage();
+                await friend.route('**/beta/game-night/invitation/details', route => route.fulfill({
+                    status: 503, json: {}
+                }), { times: 1 });
                 await openGameNightLink(friend, link);
+                const retry = friend.getByRole('button', { name: 'Try again', exact: true });
+                await expect(retry).toBeFocused();
+                await friend.keyboard.press('Enter');
+                await expect(friend.getByRole('button', { name: 'Join game', exact: true })).toBeFocused();
                 await friend.route('**/beta/game-night/invitation/accept', route => route.fulfill({
                     status: 503, json: { error: message }
                 }), { times: 1 });
