@@ -36,6 +36,14 @@
         <p class="small">Select and copy this text yourself. Nothing is sent again.</p>
         <button class="btn" type="button" data-message-copy-close>Done</button>
     </dialog>
+    <dialog class="sheet" data-pm-report-dialog aria-labelledby="pm-report-title" aria-describedby="pm-report-description">
+        <h3 id="pm-report-title">Report a private message?</h3>
+        <p id="pm-report-description">Send only this message to moderators for review.</p>
+        <div class="sheet-buttons">
+            <button class="btn btn--ghost" type="button" data-pm-report-cancel autofocus>Cancel</button>
+            <button class="btn" type="button" data-pm-report-send>Send report</button>
+        </div>
+    </dialog>
     <dialog class="sheet" data-sheet aria-labelledby="person-dialog-title">
         <h3 id="person-dialog-title" data-sheet-title></h3>
         <div class="sheet-buttons" data-sheet-buttons></div>
@@ -52,11 +60,17 @@
             <button class="btn btn--ghost" type="button" data-game-share-close>Done</button>
         </div>
     </dialog>
-    <dialog class="sheet" data-invite-dialog aria-labelledby="invite-dialog-title">
+    <dialog class="sheet" data-invite-dialog aria-labelledby="invite-dialog-title" aria-describedby="invite-dialog-intro">
         <h3 id="invite-dialog-title">Invite a guest</h3>
-        <p>Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
+        <p id="invite-dialog-intro">Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
+        <div data-invite-quick hidden>
+            <div class="sheet-buttons invite-people" data-invite-people role="group" aria-label="Online guests"></div>
+            <p data-invite-empty hidden>No one else is available to invite. Ask your bandmate to enter Hang Out, then open this list again.</p>
+            <p class="status" data-invite-quick-error role="status" aria-atomic="true"></p>
+            <button class="btn btn--ghost" type="button" data-invite-quick-cancel>Cancel</button>
+        </div>
         <form data-invite-form>
-            <label class="channel-label" for="invite-person">Choose a current person</label>
+            <label class="channel-label" for="invite-person">Choose someone online</label>
             <select id="invite-person" data-invite-options aria-describedby="invite-person-hint"></select>
             <p class="small" id="invite-person-hint">This choice stays with that connection if their nickname changes.</p>
             <button class="btn" type="button" data-invite-person-send>Invite selected person</button>
@@ -102,6 +116,7 @@
             <label class="nickrow">Your nick
                 <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a name — random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
             </label>
+            <p class="status" id="nickname-error" role="status"></p>
             <p class="small gate-hint">Remembered on this device, not reserved. Camera &amp; mic stay off.</p>
             <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span> beside my name</label><p class="small">Your entrance, not a verified identity. You can hide it in People.</p></div>
             <p class="small" data-entry-unavailable hidden>Entry-site badges aren’t available on this server. Your return link still works.</p>
@@ -281,16 +296,17 @@
                 <h3 class="jam-title" id="jam-title">Live music with WebJam</h3>
                 <p class="small jam-note">Browser audio: headphones required; higher delay.</p>
                 <button class="btn btn--ghost jam-room-invite" type="button" data-jam-invite-room aria-haspopup="dialog" hidden>Invite bandmate to room</button>
-                <ol class="small jam-host-steps" id="jam-host-steps" data-jam-host-steps hidden>
-                    <li>On your Mac, open the supplied WebJam beta app and choose <strong>Music → Host</strong>.</li>
-                    <li>Click <strong>Invite a browser guest → Copy browser invite</strong>.</li>
-                </ol>
+                <p class="small room-invite-status" data-room-invite-status role="status" aria-atomic="true"></p>
+                <button class="btn btn--ghost jam-room-invite" type="button" data-jam-invite-music aria-haspopup="dialog" hidden>Invite bandmate to Music</button>
+                <p class="small room-invite-status" data-music-handoff-status role="status" aria-atomic="true"></p>
+                <button class="btn btn--ghost jam-room-invite" type="button" data-music-handoff-cancel hidden>Cancel Music invite</button>
+                <p class="small room-invite-status" data-music-invite-outcome role="status" aria-atomic="true"></p>
                 <div class="jam-actions" data-jam-actions>
-                    <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
-                    <button class="btn" type="button" data-jam-copy hidden>Copy full invitation</button>
-                    <button class="btn" type="button" data-jam-invite-copy hidden>Copy invite link</button>
-                    <span class="small" data-jam-wait>Waiting for the host’s invite. When it’s ready, choose Join in browser—no app needed.</span>
+                    <span class="small" data-jam-wait role="status" tabindex="-1">Waiting for the host’s invite. When it’s ready, choose Join in browser—no app needed.</span>
                     <button class="btn btn--ghost" type="button" data-jam-web disabled title="Your host has not shared an approved browser invite yet">Browser join unavailable</button>
+                    <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
+                    <button class="btn" type="button" data-jam-copy hidden>Copy desktop invite</button>
+                    <button class="btn btn--ghost" type="button" data-jam-invite-copy hidden>Copy browser invite</button>
                     <button class="btn btn--ghost" type="button" data-jam-invite-qr-toggle hidden aria-expanded="false">Show QR code</button>
                 </div>
                 <div class="jam-invite-qr" data-jam-invite-qr-panel hidden>
@@ -303,18 +319,25 @@
                 <label class="small" data-jam-invite-copy-fallback hidden>Select this invite link, then copy it.
                     <textarea data-jam-invite-copy-value readonly aria-label="Browser invite link to copy" autocomplete="off" spellcheck="false" rows="2"></textarea>
                 </label>
-                <form class="jam-paste op-only" data-jam-form>
-                    <textarea data-jam-link placeholder="Paste a full desktop invite or browser link" aria-label="WebJam invitation" aria-describedby="jam-host-steps jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
-                    <button class="btn btn--small" type="submit">Share</button>
-                    <p class="small" id="jam-share-help">Paste that link here and click <strong>Share</strong>. Keep the Music session running. For a desktop guest, paste the full desktop invite instead.</p>
+                <details class="jam-setup" data-jam-manual hidden>
+                  <summary data-jam-manual-label>Share a link manually</summary>
+                  <ol class="small jam-host-steps" id="jam-host-steps" data-jam-host-steps hidden>
+                    <li>In the WebJam beta app on your Mac, choose <strong>Music → Host</strong>.</li>
+                    <li>Once your bandmate is in this room, click <strong>Copy browser invite</strong> in WebJam.</li>
+                  </ol>
+                  <form class="jam-paste op-only" data-jam-form>
+                    <textarea data-jam-link placeholder="Paste an invite link or the whole message" aria-label="WebJam invitation" aria-describedby="jam-host-steps jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
+                    <button class="btn btn--small" type="submit">Share with room</button>
+                    <p class="small" id="jam-share-help">Paste the link and choose <strong>Share with room</strong>. Your bandmate can then choose <strong>Join in browser</strong>. For desktop guests, paste the full desktop invite.</p>
                     <p class="small" data-jam-share-status role="status"></p>
-                </form>
+                  </form>
+                </details>
                 <p class="small jam-platform" data-jam-platform>A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.</p>
                 <details class="jam-setup" data-jam-help>
                     <summary>Setup &amp; invitation help</summary>
                     <p>Use the beta app supplied by your host; the public download may reject this invitation. WebJam connects through a desktop host using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.</p>
                     <p>On a computer, copy the invite, open WebJam, choose Join, and paste it there. Opening the app directly is supported on Mac; Windows and Linux require pasting private invites. Phones can use this room’s chat while music runs on a computer.</p>
-                    <p>Hosting a browser guest: in WebJam’s Music room, click <strong>Copy browser invite</strong>. Wait for <strong>Link copied</strong>, then paste the link above and click <strong>Share</strong>. Keep the Music session open. For desktop guests, paste the entire Copy Invite message instead. Sharing an invite does not turn on your microphone.</p>
+                    <p>Hosting a browser guest: in WebJam’s Music room, click <strong>Copy browser invite</strong>. Wait for <strong>Link copied</strong>, then paste the link above and choose <strong>Share with room</strong>. Keep the Music session open. For desktop guests, paste the entire Copy Invite message instead. Sharing an invite does not turn on your microphone.</p>
                     <p>Invites may expire or admit one guest; ask the host for a fresh one if needed. A rejected paste stays editable while you remain this room’s connected host. Leaving the room or stopping locally clears its controls; it does not revoke an invitation already copied. End the music session or remove the guest in the host app when needed.</p>
                 </details>
             </div>
@@ -331,9 +354,10 @@
                         <p class="small" data-act-video-status role="status" hidden></p>
                         <button class="btn btn--small" type="button" data-act-tap hidden>Tap to play</button>
                         <form class="act-load op-only" data-act-load>
-                            <input data-act-url placeholder="Paste a YouTube link" aria-label="YouTube URL">
+                            <input data-act-url placeholder="Paste a YouTube link" aria-label="YouTube URL" aria-describedby="activity-lesson-status">
                             <button class="btn btn--small" type="submit">Load</button>
                         </form>
+                        <p class="small op-only act-load-status" data-act-load-status id="activity-lesson-status" role="status" aria-atomic="true"></p>
                         <div class="bob-picks op-only" data-bob-picks></div>
                         <details class="paint-start" data-paint-start hidden>
                             <summary>Getting started · kit and materials</summary>
@@ -388,10 +412,17 @@
             <p class="small" data-entry-unavailable hidden>Entry-site badges aren’t available on this server.</p>
         </aside>
 
+        <p class="sr-only" id="music-invite-status" data-music-invite-status role="status" aria-atomic="true"></p>
+        <p class="sr-only" id="game-offer-status" data-game-offer-status role="status" aria-atomic="true"></p>
         <div class="irc-notices">
+            <div class="game-offer" data-music-invite hidden>
+                <p data-music-invite-message aria-hidden="true"></p>
+                <button class="btn btn--small" type="button" data-music-invite-action aria-describedby="music-invite-status"></button>
+                <button class="btn btn--small btn--ghost" type="button" data-music-invite-dismiss>Not now</button>
+            </div>
             <div class="game-offer" data-game-offer hidden>
-                <p data-game-offer-status role="status"></p>
-                <button class="btn btn--small" type="button" data-game-offer-join></button>
+                <p data-game-offer-message aria-hidden="true"></p>
+                <button class="btn btn--small" type="button" data-game-offer-join aria-describedby="game-offer-status"></button>
                 <button class="btn btn--small btn--ghost" type="button" data-game-offer-dismiss>Not now</button>
             </div>
             <div class="toast" data-toast role="status" tabindex="0" hidden></div>

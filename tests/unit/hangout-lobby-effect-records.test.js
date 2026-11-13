@@ -28,6 +28,39 @@ async function fixture({ logs = [], initialize = true } = {}) {
 }
 const log = (n, at = NOW) => ({ at, by: 'TestOwner', action: 'room-register', target: `#test-${n}`, reason: '', ch: '#stalemate' });
 describe('known lobby effects in one physical-record transaction', () => {
+    it('persists only bounded room invitation metadata for exact live endpoints', async () => {
+        const f = await fixture(), frames = [];
+        const app = createLobby({ now: () => NOW, send: (_, frame) => frames.push(frame) });
+        const room = '#jam-rehearsal', request = 'c'.repeat(32);
+        const send = (id, frame) => app.message(id, JSON.stringify(frame));
+        for (const [id, nick] of [['host', 'InviteHost'], ['guest', 'InviteGuest']]) {
+            app.connect({ id, dev: `test-${id}-device`, iph: `test-${id}-ip`, role: 'fan' });
+            send(id, { t: 'hello', nick, age13: true });
+        }
+        send('host', { t: 'cmd', ch: '#stalemate', name: 'join', args: [room] });
+        const roomInstance = frames.findLast(m => m.t === 'join').ch.keepRef;
+        send('host', { t: 'room-invite-request', request, ch: room, roomInstance, peer: 'guest' });
+        const sessions = app.sessionSnapshot();
+        const metadata = { request, host: 'host', guest: 'guest', room, roomInstance, until: NOW + 120_000 };
+        expect(sessions.roomInvites).toEqual([metadata]);
+        await f.write([['rooms', app.roomSnapshot()], ['sessions', sessions]]);
+        expect((await f.read()).sessions.roomInvites).toEqual([metadata]);
+        const olderReaderSnapshot = await f.storage.transaction(tx => tx.get('sessions'));
+        expect(olderReaderSnapshot).not.toHaveProperty('roomInvites');
+        for (const invalid of [{ ...metadata, guest: 'not-connected' }, { ...metadata, href: 'fixture-only' }]) {
+            await expect(f.write([['sessions', { ...sessions, roomInvites: [invalid] }]])).rejects.toThrow('lobby-effects-unavailable');
+        }
+        // Model a session write by the former release while its invite state is absent.
+        olderReaderSnapshot.connections[0].frames += 1;
+        await f.storage.transaction(tx => tx.put('sessions', olderReaderSnapshot));
+        expect((await f.read()).sessions).not.toHaveProperty('roomInvites');
+        await f.write([['sessions', sessions]]);
+        send('guest', { t: 'room-invite-answer', request, accept: false });
+        await f.write([['sessions', app.sessionSnapshot()]]);
+        expect((await f.read()).sessions).not.toHaveProperty('roomInvites');
+        expect(await f.storage.transaction(tx => tx.get('room-invites:v1'))).toBeUndefined();
+    });
+
     it('persists Game Night as an ordinary invite-only chat record without the call URL', async () => {
         const f = await fixture(), frames = [];
         const app = createLobby({ gameNight: true, now: () => NOW, send: (_, frame) => frames.push(frame) });

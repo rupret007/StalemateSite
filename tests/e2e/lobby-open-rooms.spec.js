@@ -22,8 +22,8 @@ test.beforeEach(async ({ baseURL }) => {
 
 const lobbyUrl = () => `/r/${SLUG}/lobby/?preview=${KEY}&relay=${encodeURIComponent(relayWs)}`;
 
-async function fan(browser, nick) {
-    const ctx = await browser.newContext({ permissions: ['camera', 'microphone'] });
+async function fan(browser, nick, viewport) {
+    const ctx = await browser.newContext({ permissions: ['camera', 'microphone'], viewport });
     await ctx.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());
     await ctx.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));
     const page = await ctx.newPage();
@@ -190,6 +190,8 @@ test('bob ross room: curated episodes and custom lesson links sync beside the sh
     await lesson.fill('https://example.com/lesson');
     await lesson.press('Enter');
     await expect(lesson).toHaveJSProperty('validationMessage', 'Enter a YouTube video link or video ID.');
+    await expect(lesson).toHaveAttribute('aria-invalid', 'true');
+    await expect(host.locator('[data-act-load-status]')).toHaveText('Enter a YouTube video link or video ID.');
     await expect(lesson).toHaveValue('https://example.com/lesson');
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'sS-hNYgDUak');
     await lesson.fill('https://youtu.be/vgbMONXc9Cs');
@@ -199,4 +201,88 @@ test('bob ross room: curated episodes and custom lesson links sync beside the sh
     await expect(guest.locator('[data-act-url]')).toBeHidden();
     await guest.context().close();
     await host.context().close();
+});
+
+test('Paint Along keeps a custom link until Hang Out confirms the lesson', async ({ browser }) => {
+    const host = await fan(browser, 'PaintLinkHost', { width: 375, height: 844 });
+    const guest = await fan(browser, 'PaintLinkGuest');
+    try {
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="bobross"]');
+        await expect(host.locator('[data-act-canvas]')).toBeVisible();
+        const room = await host.evaluate(() => window.__lobby.active);
+        await guest.evaluate(room => window.__lobby.cmd('join', [room]), room);
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        const video = page => page.locator('[data-fake-yt]');
+        await expect(video(host)).toHaveAttribute('data-video-id', 'mT0RNrTDHkI');
+        await expect(video(guest)).toHaveAttribute('data-video-id', 'mT0RNrTDHkI');
+        const input = host.getByRole('textbox', { name: 'YouTube URL' });
+        await expect(input).toHaveCSS('font-size', '16px');
+        const status = host.locator('[data-act-load-status]');
+        const lesson = 'https://youtu.be/vgbMONXc9Cs';
+        await host.clock.install();
+        await host.evaluate(() => {
+            const socket = window.__lobby.ws;
+            const send = socket.send;
+            const receive = socket.onmessage;
+            let fail = true;
+            window.oldLessonUpdates = 0;
+            socket.send = function (data) {
+                const frame = JSON.parse(data);
+                if (frame.kind === 'video' && frame.source?.id === 'mT0RNrTDHkI') window.oldLessonUpdates++;
+                if (fail && frame.kind === 'video' && frame.source?.id === 'vgbMONXc9Cs') {
+                    fail = false;
+                    throw new Error('Synthetic lesson send failure');
+                }
+                return send.call(this, data);
+            };
+            socket.onmessage = event => {
+                const frame = JSON.parse(event.data);
+                if (frame.kind !== 'video' || frame.video?.source?.id !== 'vgbMONXc9Cs') return receive.call(socket, event);
+                window.releaseLesson = () => {
+                    socket.onmessage = receive;
+                    receive.call(socket, event);
+                };
+            };
+        });
+        await input.fill(lesson);
+        await input.press('Enter');
+        await expect(input).toHaveValue(lesson);
+        await expect(status).toContainText('Couldn’t share the lesson');
+        await expect(host.locator('[data-act-relay-status]')).toBeEmpty();
+        await expect(video(host)).toHaveAttribute('data-video-id', 'mT0RNrTDHkI');
+        await expect(video(guest)).toHaveAttribute('data-video-id', 'mT0RNrTDHkI');
+
+        await input.press('Enter');
+        await host.waitForFunction(() => typeof window.releaseLesson === 'function');
+        await expect(video(guest)).toHaveAttribute('data-video-id', 'vgbMONXc9Cs');
+        await expect(video(host)).toHaveAttribute('data-video-id', 'mT0RNrTDHkI');
+        await expect(input).toHaveValue(lesson);
+        const oldUpdates = await host.evaluate(() => {
+            window.__ytLog.at(-1).seekTo(60);
+            window.__ytLog.at(-1).pauseVideo();
+            return window.oldLessonUpdates;
+        });
+        await host.clock.fastForward(10_000);
+        expect(await host.evaluate(() => window.oldLessonUpdates)).toBe(oldUpdates);
+        await expect(video(guest)).toHaveAttribute('data-video-id', 'vgbMONXc9Cs');
+        await expect(status).toContainText('Hang Out hasn’t confirmed the lesson');
+        const nextDraft = 'https://youtu.be/sS-hNYgDUak';
+        await input.fill(nextDraft);
+        await host.evaluate(() => window.releaseLesson());
+        await expect(video(host)).toHaveAttribute('data-video-id', 'vgbMONXc9Cs');
+        await expect(status).toHaveText('Lesson shared with the room.');
+        await expect(input).toHaveValue(nextDraft);
+        await input.press('Enter');
+        await expect(video(guest)).toHaveAttribute('data-video-id', 'sS-hNYgDUak');
+        await expect(input).toHaveValue('');
+        await input.fill(lesson);
+        await host.locator('[data-leave]').click();
+        await expect(host.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await host.evaluate(room => window.__lobby.cmd('join', [room]), room);
+        await expect(input).toHaveValue('');
+    } finally {
+        await guest.context().close();
+        await host.context().close();
+    }
 });

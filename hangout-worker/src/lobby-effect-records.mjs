@@ -8,6 +8,7 @@ import { LOBBY_INCIDENT_SOURCE_KEY, validPublicReportOrigin, initializeLobbyInci
 export const LOBBY_EFFECT_MARKER = 'lobby-effects:v1';
 export const LOBBY_LOG_INDEX = 'lobby-log:v1:index';
 export const LOBBY_LOG_PREFIX = 'lobby-log:v1:segment:';
+const ROOM_INVITES_KEY = 'room-invites:v1';
 const MARKER = { version: 1, format: 'indexed-rooms-segmented-log-v1' };
 const enc = new TextEncoder(), DAY = 86400000, MIB = 1024 * 1024;
 const fail = () => { throw Error('lobby-effects-unavailable'); };
@@ -19,6 +20,7 @@ const number = value => Number.isFinite(value) && value >= 0;
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const text = (value, max, min = 0) => typeof value === 'string' && value.length >= min && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value);
 const id = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+const nonce = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
 const nick = value => typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_\-[\]{}^`|]{2,19}$/.test(value);
 const channel = value => typeof value === 'string' && /^#[a-z0-9-]{2,30}$/.test(value);
 const time = (value, now) => number(value) && value <= now;
@@ -140,7 +142,7 @@ function validSessions(value, now) {
     const endpoints = row => id(row.from) && id(row.fromId) && id(row.toId) && row.fromId !== row.toId
         && row.key === [row.fromId, row.toId].sort().join('|') && connections.get(row.fromId)?.dev === row.from && connections.has(row.toId)
         && !connections.get(row.fromId).safetyOnly && !connections.get(row.toId).safetyOnly;
-    const reference = row => !Object.hasOwn(row, 'ref') || typeof row.ref === 'string' && /^[a-f0-9]{32}$/.test(row.ref);
+    const reference = row => !Object.hasOwn(row, 'ref') || nonce(row.ref);
     const receipt = row => shape(row, ['t', 'id', 'ch', 'from', 'to', 'prefix', 'band', 'moderator', 'me', 'ts', 'authorDev', 'digest', 'recipients'], ['publicOrigin'])
         && nick(row.from) && id(row.authorDev) && /^[a-f0-9]{64}$/.test(row.digest) && time(row.ts, now) && ['', '@', '+'].includes(row.prefix)
         && ['band', 'moderator', 'me'].every(key => typeof row[key] === 'boolean')
@@ -154,6 +156,30 @@ function validSessions(value, now) {
         && new Set([...value.pm, ...value.pendingPm].map(row => row.key)).size === value.pm.length + value.pendingPm.length
         && new Set([...value.pm, ...value.pendingPm].filter(row => Object.hasOwn(row, 'ref')).map(row => row.ref)).size === [...value.pm, ...value.pendingPm].filter(row => Object.hasOwn(row, 'ref')).length
         && list(value.receipts, 1000, receipt) && bytes(value.receipts) <= MIB && new Set(value.receipts.map(row => row.id)).size === value.receipts.length;
+}
+function validRoomInvites(invites, sessions, now) {
+    if (Array.isArray(invites) && !invites.length) return true;
+    const connections = new Map(sessions.connections.map(row => [row.id, row]));
+    return list(invites, 200, row => shape(row, ['request', 'host', 'guest', 'room', 'roomInstance', 'until'])
+        && nonce(row.request) && nonce(row.roomInstance) && id(row.host) && id(row.guest)
+        && channel(row.room) && row.host !== row.guest && integer(row.until) && row.until <= now + 120_000
+        && connections.get(row.host)?.channels.includes(row.room) && !connections.get(row.host).safetyOnly
+        && connections.get(row.guest)?.channels.includes('#stalemate') && !connections.get(row.guest).safetyOnly)
+        && new Set(invites.map(row => row.request)).size === invites.length;
+}
+async function sessionDigest(sessions) {
+    const bytes = await crypto.subtle.digest('SHA-256', enc.encode(JSON.stringify(sessions)));
+    return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+async function storeSessions(tx, value, now) {
+    ensure(object(value));
+    const { roomInvites = [], ...sessions } = value;
+    ensure(validSessions(sessions, now) && validRoomInvites(roomInvites, sessions, now));
+    await tx.put('sessions', sessions);
+    // The former release can still read and write its strict sessions record.
+    // If it changes that record, its pending invites no longer match on return.
+    if (roomInvites.length) await tx.put(ROOM_INVITES_KEY, { session: await sessionDigest(sessions), invites: roomInvites });
+    else if (await tx.get(ROOM_INVITES_KEY) !== undefined) await tx.delete(ROOM_INVITES_KEY);
 }
 function validNet(value, now) {
     const counts = rows => object(rows) && Object.values(rows).every(number);
@@ -267,11 +293,12 @@ export async function initializeLobbyEffects({ tx, state, now = Date.now(), inci
     checkTx(tx); ensure(integer(now) && typeof incidentSources === 'boolean'); const value = ownedJson(state).value;
     ensure(shape(value, ['net', 'rooms', 'abuse', 'sessions', 'moderationQueue', 'aiReviews', 'modlog']));
     ensure(await tx.get(LOBBY_EFFECT_MARKER) === undefined && await tx.get(LOBBY_INCIDENT_SOURCE_KEY) === undefined);
-    for (const key of [...domainKeys, 'rooms']) ensure(await tx.get(key) === undefined);
+    for (const key of [...domainKeys, 'rooms', ROOM_INVITES_KEY]) ensure(await tx.get(key) === undefined);
     for (const prefix of ['community-room:', LOBBY_LOG_PREFIX, 'log:']) ensure((await tx.list({ prefix, limit: 1 })).size === 0);
     ensure(validRooms(value.rooms, now) && list(value.modlog, 2000, row => validLog(row, now)));
     for (const [key, data] of [['net', value.net], ['abuse', value.abuse], ['sessions', value.sessions], ['moderation-queue', value.moderationQueue], ['ai-reviews', value.aiReviews]]) {
-        ensure(validators[key](data, now)); await tx.put(key, data);
+        if (key === 'sessions') await storeSessions(tx, data, now);
+        else { ensure(validators[key](data, now)); await tx.put(key, data); }
     }
     await tx.put('room-index', { version: 1, names: [] }); await writeRooms(tx, value.rooms, now);
     await tx.put(LOBBY_LOG_INDEX, { version: 1, next: 0, segments: [] });
@@ -290,9 +317,10 @@ export async function writeLobbyEffects({ tx, effects, costsOnly = false, now = 
         if (kind === 'rooms') await writeRooms(tx, value, now);
         else if (kind === 'modlog') { ensure(validLog(value, now)); logs.push(value); }
         else {
-            ensure(validators[kind](value, now)); const previous = await tx.get(kind);
+            const previous = await tx.get(kind);
             ensure(previous !== undefined && validators[kind](ownedJson(previous).value, now));
-            await tx.put(kind, value);
+            if (kind === 'sessions') await storeSessions(tx, value, now);
+            else { ensure(validators[kind](value, now)); await tx.put(kind, value); }
             if (kind === 'moderation-queue') {
                 if (incidentSources) await reconcileLobbyIncidentSources({ tx, previous: ownedJson(previous).value, current: value, now });
                 else ensure(await tx.get(LOBBY_INCIDENT_SOURCE_KEY) === undefined);
@@ -313,6 +341,9 @@ export async function readLobbyState({ tx, now = Date.now(), incidentSources = f
         const raw = await tx.get(key); ensure(raw !== undefined); const value = ownedJson(raw).value;
         ensure(validate(value, now)); result[key] = value;
     }
+    const roomInvites = await tx.get(ROOM_INVITES_KEY);
+    if (shape(roomInvites, ['session', 'invites']) && validRoomInvites(roomInvites.invites, result.sessions, now)
+        && roomInvites.session === await sessionDigest(result.sessions)) result.sessions.roomInvites = roomInvites.invites;
     if (incidentSources) await validateLobbyIncidentSources({ tx, queue: result['moderation-queue'], now });
     else ensure(await tx.get(LOBBY_INCIDENT_SOURCE_KEY) === undefined);
     const index = await tx.get('room-index'); ensure(validIndex(index) && await tx.get('rooms') === undefined);

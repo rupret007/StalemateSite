@@ -20,7 +20,7 @@ async function community(browser, baseURL) {
         else sockets.get(id)?.send(raw);
     },
         limits: { defaultSlow: 0, roomPerDevice: 1 } });
-    const visitor = async (nick, viewport, controls = false) => {
+    const visitor = async (nick, viewport, controls = false, via = '') => {
         const context = await browser.newContext({ viewport,
             ...(controls && browser.browserType().name() === 'chromium' ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
         await context.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
@@ -53,12 +53,12 @@ async function community(browser, baseURL) {
             socket.onClose(() => { sockets.delete(identity.id); void engine.disconnect(identity.id); });
             engine.connect(identity);
         });
-        await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(hangoutRelayWsBase(baseURL, 'invitation-lifecycle'))}`);
+        await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(hangoutRelayWsBase(baseURL, 'invitation-lifecycle'))}${via ? `&via=${encodeURIComponent(via)}` : ''}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
         await expect(page.locator('[data-connection]')).toHaveText('Connected');
         return page;
     };
-    return { visitor, inbound,
+    return { visitor, inbound, advance: ms => { at += ms; },
         holdServerFrames: nick => {
             const id = identities.get(nick)?.id;
             if (!sockets.has(id) || held.has(id)) throw Error('Hold requires one live, unheld connection');
@@ -197,6 +197,55 @@ test('an unconfirmed share keeps one request and an editable paste without autom
     } finally { await f.close(); }
 });
 
+for (const late of [false, true]) test(`a published invitation unlocks Share if its separate result is lost (${late ? 'late room state' : 'early room state'})`, async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('LostResultHost'), guest = await f.visitor('LostResultGuest');
+        await create(host, '#jam-lostresult');
+        await invite(host, guest, '#jam-lostresult', 'LostResultGuest');
+        await host.clock.install();
+        const held = f.holdServerFrames('LostResultHost');
+        const submit = host.locator('[data-jam-form] button[type="submit"]');
+        await host.fill('[data-jam-link]', FIRST);
+        await submit.click();
+        await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        const request = f.inbound.find(frame => frame.name === 'jamlink');
+        await expect.poll(() => held.frames.some(raw => {
+            const frame = JSON.parse(raw);
+            return frame.t === 'jam-share-result' && frame.id === request.jamRequestId;
+        })).toBe(true);
+        if (late) {
+            await host.clock.runFor(8_500);
+            await expect(host.locator('[data-jam-share-status]')).toContainText('Still waiting');
+            await expect(submit).toBeDisabled();
+        }
+        held.releaseThrough(frame => frame.t === 'chan' && frame.ch.jam?.invitation === FIRST);
+        const resultIndex = held.frames.findIndex(raw => {
+            const frame = JSON.parse(raw);
+            return frame.t === 'jam-share-result' && frame.id === request.jamRequestId;
+        });
+        expect(resultIndex).toBeGreaterThanOrEqual(0);
+        held.frames.splice(resultIndex, 1);
+        held.release();
+        await expect(host.locator('[data-jam-copy]')).toBeVisible();
+        await host.fill('[data-jam-link]', DRAFT);
+        await expect(submit).toBeDisabled();
+        await host.clock.runFor(late ? 500 : 8_500);
+        await expect(submit).toBeEnabled();
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('Invitation is available in the room. Your paste is kept.');
+        await expect(host.locator('[data-jam-link]')).toHaveValue(DRAFT);
+        expect(f.inbound.filter(frame => frame.name === 'jamlink')).toHaveLength(1);
+
+        await submit.click();
+        await expect(host.locator('[data-jam-share-status]')).toHaveText('Invitation shared.');
+        await expect(host.locator('[data-jam-link]')).toHaveValue('');
+        await expect.poll(() => guest.evaluate(expected => __lobby.chans.get(__lobby.active).jam.invitation === expected, DRAFT)).toBe(true);
+        expect(f.inbound.filter(frame => frame.name === 'jamlink').map(frame => frame.args)).toEqual([
+            ['invitation', FIRST], ['invitation', DRAFT]
+        ]);
+    } finally { await f.close(); }
+});
+
 test('a delayed confirmation from another room cannot clear or share the current room draft', async ({ browser, baseURL }) => {
     const f = await community(browser, baseURL);
     try {
@@ -293,6 +342,58 @@ test('host-power loss clears only unpublished draft; current members can still c
         expect(f.inbound.some(frame => frame.name === 'jamlink' && frame.args.includes(DRAFT))).toBe(false);
         await command(peer, 'kick', ['PowerHost', 'Synthetic removal']); await expect(host.locator('[data-chat-context]')).toHaveText('#stalemate');
         await cleared(host);
+    } finally { await f.close(); }
+});
+
+test('a co-host can kick or ban after the founder leaves and the guest can tell which happened', async ({ browser, baseURL }) => {
+    const f = await community(browser, baseURL);
+    try {
+        const host = await f.visitor('RoomFounder', undefined, false, 'stalemate');
+        const cohost = await f.visitor('GuestCohost', undefined, false, 'rad-dad');
+        const guest = await f.visitor('RoomVisitor', undefined, false, 'stalemate');
+        const room = '#room-handoff';
+        await host.locator('[data-start="chat"]').click();
+        await host.getByLabel('Channel name').fill(room);
+        await host.getByRole('button', { name: 'Join / create' }).click();
+        await expect(host.locator('[data-chat-context]')).toHaveText(room);
+
+        const join = page => page.locator(`[data-roomlist] button[data-room="${room}"]`).click();
+        for (const page of [cohost, guest]) {
+            await join(page);
+            await expect(page.locator('[data-chat-context]')).toHaveText(room);
+            await expect(page.locator('[data-roomtools]')).toBeHidden();
+        }
+        const person = (page, nick) => page.locator('[data-nicks] button.nick').filter({ hasText: new RegExp(`^${nick}$`) });
+        await person(host, 'GuestCohost').click();
+        await host.getByRole('button', { name: 'Make @', exact: true }).click();
+        await expect(cohost.locator('[data-roomtools]')).toBeVisible();
+        await host.locator('[data-leave]').click();
+        await expect(host.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(cohost.locator('[data-roomtools]')).toBeVisible();
+
+        await person(cohost, 'RoomVisitor').click();
+        await cohost.getByRole('button', { name: 'Kick', exact: true }).click();
+        await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(guest.locator('[data-toast]')).toHaveText(`Kicked from ${room} by GuestCohost: take a breather`);
+        await join(guest);
+        await expect(guest.locator('[data-buffer]')).toContainText(`Kicked from ${room} recently.`);
+
+        const { LOBBY_LIMITS } = await import('../../hangout-worker/src/lobby-core.mjs');
+        f.advance(LOBBY_LIMITS.kickCooldown);
+        await join(guest);
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await person(cohost, 'RoomVisitor').click();
+        cohost.once('dialog', dialog => dialog.accept('Room rule broken'));
+        await cohost.getByRole('button', { name: 'Ban', exact: true }).click();
+        await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(guest.locator('[data-toast]')).toHaveText(`Banned from ${room} by GuestCohost: Room rule broken`);
+        await join(guest);
+        await expect(guest.locator('[data-buffer]')).toContainText(`You're banned from ${room}.`);
+        await expect(guest.locator('[data-connection]')).toHaveText('Connected');
+        await expect(cohost.locator('[data-chat-context]')).toHaveText(room);
+        await guest.locator('[data-text]').fill('Still here in the lobby');
+        await guest.locator('[data-text]').press('Enter');
+        await expect(host.locator('[data-buffer]')).toContainText('Still here in the lobby');
     } finally { await f.close(); }
 });
 
@@ -561,8 +662,7 @@ for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionab
         };
         const inviteGuest = async () => {
             await host.locator('[data-jam-invite-room]').click();
-            await host.locator('[data-invite-options]').selectOption({ label: 'JamGuest' });
-            await host.locator('[data-invite-person-send]').click();
+            await host.getByRole('button', { name: 'Invite JamGuest', exact: true }).click();
             await expect(offer).toContainText(`JamHost invited you to ${room}.`);
         };
         await guest.clock.install();

@@ -9,11 +9,11 @@ let clock;
 let L;
 let inbox;
 let closed;
-function boot(limits = {}, gameNight = false) {
+function boot(limits = {}, gameNight = false, directMusicInvites = false) {
     clock = 1_800_000_000_000;
     inbox = new Map();
     closed = [];
-    L = createLobby({ gameNight, now: () => clock, limits, send: (id, m) => { if (!inbox.has(id)) inbox.set(id, []); inbox.get(id).push(m); }, close: (id, code) => closed.push([id, code]) });
+    L = createLobby({ gameNight, directMusicInvites, now: () => clock, limits, send: (id, m) => { if (!inbox.has(id)) inbox.set(id, []); inbox.get(id).push(m); }, close: (id, code) => closed.push([id, code]) });
 }
 let n = 0;
 function join(nick, { role = 'fan', iph = 'ip1', dev, admin } = {}) {
@@ -28,9 +28,202 @@ const cmd = (u, name, args = [], ch = LOBBY) => L.message(u.id, JSON.stringify({
 // Explicit nickname-intent fixtures only; generic/selected/malformed commands stay separate.
 const namedCmd = (u, name, args = [], ch = LOBBY) => L.message(u.id, JSON.stringify({ t: 'cmd', name, args, ch, personNamed: true }));
 const got = (u) => inbox.get(u.id) || [];
+
+it('tracks a room invitation only between the original host and guest, and expires it without granting access', () => {
+    boot();
+    const host = join('InviteHost'), guest = join('InviteGuest'), other = join('OtherGuest');
+    const ch = '#jam-garage';
+    const send = (user, frame) => L.message(user.id, JSON.stringify(frame));
+    cmd(host, 'join', [ch]);
+    const roomInstance = got(host).find(m => m.t === 'join' && m.ch.name === ch).ch.keepRef;
+    function offer(request) {
+        send(host, { t: 'room-invite-request', request, ch, roomInstance, peer: guest.id });
+        expect(got(host).at(-1)).toMatchObject({ t: 'room-invite-result', request, status: 'sent' });
+        expect(got(guest).at(-1)).toMatchObject({ t: 'invite', request, ch, roomInstance });
+        expect(got(other).some(m => m.request === request)).toBe(false);
+    }
+    const expired = 'a'.repeat(32);
+    offer(expired);
+    send(other, { t: 'room-invite-answer', request: expired, accept: true });
+    expect(got(host).at(-1)).toMatchObject({ status: 'sent' });
+    clock += 120_000;
+    L.tick();
+    expect(got(host)).toContainEqual({ t: 'room-invite-result', request: expired, status: 'expired' });
+    expect(got(guest)).toContainEqual({ t: 'room-invite-ended', request: expired, status: 'expired' });
+    cmd(guest, 'join', [ch]);
+    expect(got(guest).some(m => m.t === 'join' && m.ch.name === ch)).toBe(false);
+    const accepted = 'b'.repeat(32);
+    offer(accepted);
+    send(guest, { t: 'room-invite-answer', request: accepted, accept: true });
+    expect(got(guest).some(m => m.t === 'join' && m.ch.name === ch)).toBe(true);
+    expect(got(host)).toContainEqual({ t: 'room-invite-result', request: accepted, status: 'accepted' });
+    L.disconnect(guest.id);
+    const otherDevice = join(guest.nick, { dev: 'other-device' });
+    cmd(otherDevice, 'join', [ch]);
+    expect(got(otherDevice).some(m => m.t === 'join' && m.ch.name === ch)).toBe(false);
+    L.disconnect(otherDevice.id);
+    const returning = join(guest.nick);
+    cmd(returning, 'join', [ch]);
+    expect(got(returning).some(m => m.t === 'join' && m.ch.name === ch)).toBe(true);
+    cmd(returning, 'part', [], ch);
+    cmd(returning, 'join', [ch]);
+    expect(got(returning).filter(m => m.t === 'join' && m.ch.name === ch)).toHaveLength(1);
+});
+
+it('lets a host send a fresh room invitation at the deadline without waiting for maintenance', () => {
+    boot();
+    const host = join('InviteHost'), guest = join('InviteGuest');
+    const room = '#jam-garage';
+    cmd(host, 'join', [room]);
+    const roomInstance = got(host).find(m => m.t === 'join' && m.ch.name === room).ch.keepRef;
+    const first = 'a'.repeat(32), fresh = 'b'.repeat(32);
+    const invite = request => L.message(host.id, JSON.stringify({
+        t: 'room-invite-request', request, ch: room, roomInstance, peer: guest.id,
+    }));
+    invite(first);
+    expect(got(host).at(-1)).toMatchObject({ request: first, status: 'sent' });
+    clock = got(host).at(-1).until - 1;
+    invite(fresh);
+    expect(got(host).at(-1)).toMatchObject({ request: fresh, status: 'unavailable' });
+    clock += 1;
+    invite(fresh);
+    expect(got(host).slice(-2)).toEqual([
+        { t: 'room-invite-result', request: first, status: 'expired' },
+        expect.objectContaining({ request: fresh, status: 'sent' }),
+    ]);
+    expect(got(guest).at(-1)).toMatchObject({ t: 'invite', request: fresh });
+});
+
+it('lets the same live guest accept a pending room invitation after engine recovery', () => {
+    boot();
+    const host = join('InviteHost'), guest = join('InviteGuest');
+    const room = '#jam-garage', request = 'c'.repeat(32);
+    cmd(host, 'join', [room]);
+    const roomInstance = got(host).find(m => m.t === 'join' && m.ch.name === room).ch.keepRef;
+    L.message(host.id, JSON.stringify({ t: 'room-invite-request', request, ch: room, roomInstance, peer: guest.id }));
+    expect(got(host).at(-1)).toMatchObject({ status: 'sent' });
+    const sessions = structuredClone(L.sessionSnapshot());
+    const rooms = structuredClone(L.roomSnapshot());
+    const net = structuredClone(L.snapshot());
+    const live = sessions.connections.map(({ id, dev, iph, account, role, admin }) => ({ id, dev, iph, account, role, admin }));
+
+    boot();
+    L.restore(net);
+    L.restoreRooms(rooms);
+    expect(L.restoreSessions(sessions, live)).toEqual({ resumed: [host.id, guest.id], rejected: [] });
+    L.message(guest.id, JSON.stringify({ t: 'room-invite-answer', request, accept: true }));
+    expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(true);
+    expect(got(host)).toContainEqual({ t: 'room-invite-result', request, status: 'accepted' });
+});
+
 const lines = (u) => got(u).filter((m) => m.t === 'line').map((m) => m.text);
 const notices = (u) => got(u).filter((m) => m.t === 'notice' || m.t === 'denied').map((m) => m.text).join('\n');
 const later = (ms) => { clock += ms; };
+
+describe('direct Jam music invitations', () => {
+    const room = '#jam-practice';
+    const origin = 'https://music.example.test';
+    const send = (user, frame) => L.message(user.id, JSON.stringify(frame));
+    let host, guest, peer, invite, roomInstance;
+    beforeEach(() => {
+        boot({ webJoinOrigins: [origin] }, false, true);
+        host = join('GuitarHost');
+        guest = join('DrumGuest');
+        peer = join('OtherBandmate');
+        cmd(host, 'join', [room]);
+        roomInstance = got(host).find(m => m.t === 'join' && m.ch.name === room).ch.keepRef;
+        invite = `${origin}/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${clock / 1000 + 60}`;
+    });
+    function offer(sender = host, overrides = {}) {
+        send(sender, { t: 'music-invite-offer', request: 'd'.repeat(32), ch: room, roomInstance, peer: guest.id, href: invite, ...overrides });
+        return got(guest).filter(m => m.t === 'music-invite').at(-1);
+    }
+    function accept(user, received, overrides = {}) {
+        send(user, { t: 'music-invite-accept', id: received.id, ch: room, roomInstance, ...overrides });
+    }
+    const delivered = user => got(user).filter(m => m.t === 'music-invite-accepted');
+    const outcomes = () => got(host).filter(m => m.t === 'music-invite-outcome');
+    it('sends only an offer to the chosen connection and delivers audio only once after room admission', () => {
+        const pending = offer();
+        expect(pending).toMatchObject({ ch: room, roomInstance, by: host.nick });
+        expect(got(host).at(-1)).toEqual({ t: 'music-invite-result', request: 'd'.repeat(32), status: 'sent' });
+        expect(got(peer).some(m => m.t === 'music-invite')).toBe(false);
+        expect(JSON.stringify([...inbox.values()])).not.toContain(invite);
+        expect(JSON.stringify(L.roomSnapshot())).not.toContain(invite);
+        expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
+        accept(peer, pending);
+        expect(delivered(peer)).toHaveLength(0);
+        accept(guest, pending);
+        const guestFrames = got(guest);
+        expect(delivered(guest)).toEqual([expect.objectContaining({ id: pending.id, href: invite })]);
+        expect(outcomes()).toEqual([{ t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'accepted' }]);
+        expect(guestFrames.findIndex(m => m.t === 'join' && m.ch.name === room)).toBeLessThan(guestFrames.indexOf(delivered(guest)[0]));
+        accept(guest, pending);
+        expect(delivered(guest)).toHaveLength(1);
+        expect(outcomes()).toHaveLength(1);
+        expect(JSON.stringify(got(host))).not.toContain(invite);
+        expect(JSON.stringify(got(peer))).not.toContain(invite);
+        L.disconnect(guest.id);
+        const returning = join(guest.nick);
+        cmd(returning, 'join', [room]);
+        expect(got(returning).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
+        accept(returning, pending);
+        expect(delivered(returning)).toHaveLength(0);
+        cmd(returning, 'part', [], room);
+        cmd(returning, 'join', [room]);
+        expect(got(returning).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
+    });
+    it('reports a decline only from the selected guest and expires a replacement separately', () => {
+        const pending = offer();
+        const decline = (user, id) => send(user, { t: 'music-invite-decline', id, ch: room, roomInstance });
+        decline(peer, pending.id);
+        expect(outcomes()).toEqual([]);
+        decline(guest, pending.id);
+        expect(outcomes()).toEqual([{ t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'declined' }]);
+        expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
+        expect(JSON.stringify(got(guest))).not.toContain(invite);
+        const replacement = offer(host, { request: 'e'.repeat(32) });
+        expect(replacement.id).not.toBe(pending.id);
+        decline(guest, pending.id);
+        later(61_000);
+        L.tick();
+        expect(outcomes()).toEqual([
+            { t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'declined' },
+            { t: 'music-invite-outcome', request: 'e'.repeat(32), status: 'expired' }
+        ]);
+        expect(got(peer).some(m => m.t === 'music-invite-outcome')).toBe(false);
+    });
+    it('refuses a nonhost, a different room instance, and an invalid browser destination', () => {
+        expect(offer(peer)).toBeUndefined();
+        expect(offer(host, { roomInstance: '0'.repeat(32) })).toBeUndefined();
+        expect(offer(host, { href: invite.replace('/join/', '/other/') })).toBeUndefined();
+        expect(offer(host, { href: invite.replace(origin, 'https://another.example.test') })).toBeUndefined();
+        expect(got(host).at(-1)).toEqual({ t: 'music-invite-result', request: 'd'.repeat(32), status: 'unavailable' });
+    });
+    it('refuses expired offers and offers whose host has left', () => {
+        const expired = offer();
+        later(61_000);
+        accept(guest, expired);
+        invite = invite.replace(/&e=\d+$/, `&e=${clock / 1000 + 60}`);
+        const pending = offer();
+        cmd(host, 'part', [], room);
+        const ended = () => got(guest).filter(m => m.t === 'music-invite-ended').map(m => m.id);
+        expect(ended()).toEqual([expired.id, pending.id]);
+        accept(guest, pending);
+        expect(delivered(guest)).toHaveLength(0);
+        expect(ended()).toEqual([expired.id, pending.id, pending.id]);
+    });
+    it('does not transfer an unaccepted invitation to a new connection for the same bandmate', () => {
+        const pending = offer();
+        L.disconnect(guest.id);
+        const reconnected = join(guest.nick);
+        expect(reconnected.id).not.toBe(guest.id);
+        expect(got(reconnected).some(m => m.t === 'music-invite')).toBe(false);
+        accept(reconnected, pending);
+        expect(delivered(reconnected)).toHaveLength(0);
+        expect(got(reconnected).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
+    });
+});
 
 beforeEach(() => boot());
 

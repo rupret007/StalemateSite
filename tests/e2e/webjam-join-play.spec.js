@@ -267,6 +267,7 @@ async function openOwnedInvitation(page, width = 390, skipCheck = true) {
       configurable: true,
       value: async () => {
         // Synthetic audio only; never request the tester's microphone.
+        const { closeAudioContext } = await import(new URL('/join/audio.js', location.href).href);
         const context = new AudioContext();
         const output = context.createMediaStreamDestination();
         const { stream } = output;
@@ -280,7 +281,11 @@ async function openOwnedInvitation(page, width = 390, skipCheck = true) {
         }
         for (const track of stream.getTracks()) {
           const stop = track.stop.bind(track);
-          track.stop = () => { stop(); context.close().catch(() => {}); };
+          track.stop = () => {
+            if (track.readyState === 'ended') return;
+            stop();
+            void closeAudioContext(context);
+          };
           window.captureTracks.push(track);
         }
         return stream;
@@ -294,23 +299,56 @@ async function openOwnedInvitation(page, width = 390, skipCheck = true) {
   if (skipCheck) await page.getByRole('button', { name: 'Skip check' }).click();
 }
 
+for (const width of [375, 390]) {
+  test(`a closed browser session sends guests back to their Jam room at ${width}px`, async ({ page }) => {
+    await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+      export class WebJoinSession {
+        constructor(options) { this.options = options; }
+        async join() {
+          this.authorized = true;
+          this.options.onStatus('Synthetic session connected.');
+          window.endJoinedSession = () => this.options.onError(new Error('The Web Join connection ended.'));
+        }
+        close() { this.options.stream.getTracks().forEach(track => track.stop()); }
+      }` }));
+    await openOwnedInvitation(page, width);
+    await page.getByRole('button', { name: 'Join with microphone' }).press('Enter');
+    const leave = page.getByRole('button', { name: 'Leave session' });
+    await expect(page.locator('#status')).toHaveText('Synthetic session connected.');
+    await expect(leave).toBeFocused();
+    await page.evaluate(() => window.endJoinedSession());
+    await expect(page.locator('#status')).toHaveText('The Web Join connection ended.');
+    await expect(page.locator('#error-hint')).toContainText('return to your Jam room to accept it.');
+    await expect(page.locator('#status')).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeHidden();
+    await expect.poll(() => page.evaluate(() => captureTracks.every(track => track.readyState === 'ended')
+      && audioContexts.every(context => context.state === 'closed'))).toBe(true);
+  });
+}
+
 test('losing the checked microphone clears Join readiness until a deliberate recheck', async ({ page }) => {
   await openOwnedInvitation(page, 390, false);
   await page.getByRole('button', { name: 'Check microphone', exact: true }).click();
-  await expect(page.locator('#join')).toBeEnabled();
+  const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+  const retry = page.getByRole('button', { name: 'Try again', exact: true });
+  await expect(join).toBeEnabled();
+  await join.focus();
+  await expect(join).toBeFocused();
   await page.evaluate(() => {
     captureTracks[0].stop();
     captureTracks[0].dispatchEvent(new Event('ended'));
   });
   await expect(page.locator('#mic-error')).toContainText('Microphone disconnected');
   await expect(page.locator('#mic-heard')).toBeHidden();
-  await expect(page.locator('#join')).toBeDisabled();
+  await expect(join).toBeDisabled();
+  await expect(retry).toBeFocused();
   expect(await page.evaluate(() => captureTracks.length)).toBe(1);
-  await page.getByRole('button', { name: 'Try again', exact: true }).click();
-  await expect(page.locator('#join')).toBeEnabled();
+  await retry.press('Enter');
+  await expect(join).toBeEnabled();
+  await expect(join).toBeFocused();
   expect(await page.evaluate(() => captureTracks.length)).toBe(2);
   await page.evaluate(() => captureTracks[0].dispatchEvent(new Event('ended')));
-  await expect(page.locator('#join')).toBeEnabled();
+  await expect(join).toBeEnabled();
 });
 
 for (const skipCheck of [false, true]) {

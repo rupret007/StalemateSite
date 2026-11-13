@@ -47,7 +47,7 @@ test('blank nick by default, dice fills a fun one, StaleBot says hi, rooms start
     await page.goto(lobbyUrl());
     await expect(page.locator('[data-nick]')).toHaveValue('');
     await page.click('[data-enter]');
-    await expect(page.locator('[data-gate-status]')).toContainText('Type a nick');
+    await expect(page.locator('#nickname-error')).toContainText('Type a nick');
     await expect(page.locator('[data-reroll]')).toHaveText('🎲 Make me a name');
     await expect(page.locator('[data-nick]')).toHaveAttribute('placeholder', 'Type a nickname… or roll one →');
     expect((await page.locator('[data-reroll]').boundingBox()).height).toBeGreaterThanOrEqual(44);
@@ -56,7 +56,7 @@ test('blank nick by default, dice fills a fun one, StaleBot says hi, rooms start
     await expect(page.locator('[data-nick]')).toHaveValue(/^[A-Z][A-Za-z0-9-]{2,19}$/);
     await page.fill('[data-nick]', 'jeff');
     await page.click('[data-enter]');
-    await expect(page.locator('[data-gate-status]')).toContainText('reserved');
+    await expect(page.locator('#nickname-error')).toContainText('reserved');
     await page.fill('[data-nick]', 'GhostRider');
     await page.click('[data-enter]');
     await expect(buffer(page)).toContainText('StaleBot');

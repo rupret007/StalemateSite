@@ -20,6 +20,7 @@
             tap: $('[data-act-tap]'),
             videoStatus: $('[data-act-video-status]'),
             load: $('[data-act-load]'),
+            loadStatus: $('[data-act-load-status]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
             paintStart: $('[data-paint-start]'),
@@ -36,7 +37,7 @@
             onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
             onError: (error) => videoFailure(player.key, error)
         });
-        let videoPublishTimer;
+        let videoPublishTimer, pendingLesson = null;
         let live = null;
         let pendingPts = [];
         let flushTimer = 0;
@@ -50,7 +51,7 @@
 
         window.__lobbyRoom = { state, player }; // test hook
 
-        const actSend = (obj, onSent) => send(Object.assign({ t: 'act', ch: state.ch }, obj), null, onSent);
+        const actSend = (obj, onFailed) => send(Object.assign({ t: 'act', ch: state.ch }, obj), null, null, onFailed);
         const isOp = () => {
             const c = app.chans.get(state.ch);
             return app.band || (c && c.names && c.names.some((n) => n.nick === app.me && n.prefix === '@'));
@@ -131,23 +132,26 @@
                 let sent = false;
                 try { sent = rawSend(JSON.parse(item.raw)) !== false; } catch (_) { /* connection ended */ }
                 if (!sent) {
-                    item.failed = true;
-                    activityNotice('Activity connection interrupted. Rejoin this room to refresh shared activity.');
-                    const pending = activity.queue.splice(0); activity.bytes = 0;
-                    if (item.entry) closePc(item.to);
-                    for (const queued of pending) { queued.failed = true; if (queued.entry) closePc(queued.to); }
+                    const dropped = [item, ...activity.queue.splice(0)]; activity.bytes = 0;
+                    if (dropped.some(queued => !queued.onFailed))
+                        activityNotice('Activity connection interrupted. Rejoin this room to refresh shared activity.');
+                    for (const queued of dropped) {
+                        queued.failed = true;
+                        if (queued.entry) closePc(queued.to);
+                        queued.onFailed?.();
+                    }
                     cancelStroke(); redraw(); break;
                 }
                 item.onSent?.();
             }
             if (activity.queue.length) activity.timer = window.setTimeout(flushActivity, 125);
         }
-        function send(frame, entry, onSent) {
+        function send(frame, entry, onSent, onFailed) {
             if (frame.t !== 'act') return rawSend(frame) !== false;
             const raw = JSON.stringify(frame), bytes = new Blob([raw]).size;
             const ufrag = frame.ice?.usernameFragment || /(?:^|\s)ufrag\s+(\S+)/.exec(frame.ice?.candidate || '')?.[1] || '';
             const item = { raw, bytes, channel: frame.ch, generation: roomGeneration, kind: frame.kind,
-                entry, to: frame.to, sdp: frame.sdp, ufrag, onSent,
+                entry, to: frame.to, sdp: frame.sdp, ufrag, onSent, onFailed,
                 iceSelector: frame.ice ? { sdpMid: frame.ice.sdpMid, sdpMLineIndex: frame.ice.sdpMLineIndex } : null,
                 epoch: entry?.descriptionEpoch, iceGeneration: frame.ice ? iceGeneration(entry?.pc.localDescription, frame.ice, ufrag) : null,
                 priority: frame.kind === 'rtc' && !!frame.sdp };
@@ -170,7 +174,7 @@
                 }
             }
             if (bytes > 16384 || activity.queue.length >= ACT_QUEUE_FRAMES || activity.bytes + bytes > ACT_QUEUE_BYTES) {
-                activityNotice('Activity is busy. This action was not queued; wait a moment before trying again.');
+                if (!onFailed) activityNotice('Activity is busy. This action was not queued; wait a moment before trying again.');
                 if (entry) closePc(frame.to);
                 return false;
             }
@@ -188,6 +192,11 @@
             clearTimeout(activity.timer); activity.timer = 0; activity.queue = []; activity.bytes = 0;
             cancelStroke();
             clearTimeout(videoPublishTimer);
+            clearPendingLesson();
+            ui.url.value = '';
+            ui.url.setCustomValidity('');
+            ui.url.removeAttribute('aria-invalid');
+            ui.loadStatus.textContent = '';
             turnClient?.stop(); turnClient = null; turnInit = null; state.ice = null;
             ui.relayStatus.textContent = '';
             cameraFailureNotice = '';
@@ -230,7 +239,7 @@
             syncNames(chan);
             if (video && chan.kind === 'bobross' && isOp() && !state.room.video) {
                 const ep = BOB.DEFAULT_LESSON;
-                hostVideo({ kind: 'yt', id: ep.id }, true, 0);
+                shareLesson(ep.id);
             }
         }
 
@@ -283,7 +292,15 @@
             }
             if (m.kind === 'video' && m.video) {
                 H.apply(state.room, { type: 'video', source: m.video.source, playing: m.video.playing, pos: m.video.pos }, { t: m.video.t });
-                syncToState(true);
+                const selection = pendingLesson;
+                const confirmed = selection && m.by === app.me && m.video.playing && m.video.pos === 0
+                    && m.video.source?.kind === 'yt' && m.video.source.id === selection.id;
+                if (confirmed) {
+                    clearPendingLesson();
+                    if (selection.draft !== undefined && ui.url.value === selection.draft) ui.url.value = '';
+                    if (!ui.url.hasAttribute('aria-invalid')) ui.loadStatus.textContent = 'Lesson shared with the room.';
+                }
+                syncToState(true, Boolean(confirmed));
             }
             if (m.kind === 'rtc' && m.from) onRtc(m.from, m);
         }
@@ -405,21 +422,29 @@
                 b.type = 'button';
                 b.className = 'btn btn--small';
                 b.textContent = `${BOB.label(ep)} · ${ep.title}`;
-                b.addEventListener('click', () => hostVideo({ kind: 'yt', id: ep.id }, true, 0));
+                b.addEventListener('click', () => shareLesson(ep.id));
                 ui.bobPicks.append(b);
             });
             ui.load.addEventListener('submit', (e) => {
                 e.preventDefault();
-                const id = H.parseYouTubeId(ui.url.value);
+                const draft = ui.url.value;
+                const id = H.parseYouTubeId(draft);
                 if (!id) {
-                    ui.url.setCustomValidity('Enter a YouTube video link or video ID.');
+                    const message = 'Enter a YouTube video link or video ID.';
+                    ui.url.setCustomValidity(message);
+                    ui.url.setAttribute('aria-invalid', 'true');
+                    ui.loadStatus.textContent = message;
                     ui.url.reportValidity();
                     return;
                 }
-                ui.url.value = '';
-                hostVideo({ kind: 'yt', id }, true, 0);
+                shareLesson(id, draft);
             });
-            ui.url.addEventListener('input', () => ui.url.setCustomValidity(''));
+            ui.url.addEventListener('input', () => {
+                if (!ui.url.hasAttribute('aria-invalid')) return;
+                ui.url.setCustomValidity('');
+                ui.url.removeAttribute('aria-invalid');
+                ui.loadStatus.textContent = '';
+            });
             ui.tap.addEventListener('click', () => syncToState(true, true));
         }
 
@@ -489,12 +514,31 @@
             if (!v.playing && localPlaying()) pauseLocal();
         }
 
-        function hostVideo(source, playing, pos) {
+        function clearPendingLesson() {
+            clearTimeout(pendingLesson?.timer);
+            pendingLesson = null;
+        }
+
+        function shareLesson(id, draft) {
             if (!isOp()) return;
-            actSend({ kind: 'video', source, playing, pos }, () => {
-                H.apply(state.room, { type: 'video', source, playing, pos }, { t: state.clock.relayNow() });
-                syncToState(true, true);
-            });
+            clearPendingLesson();
+            clearTimeout(videoPublishTimer);
+            const selection = { id, draft };
+            pendingLesson = selection;
+            const failed = () => {
+                if (pendingLesson !== selection) return;
+                clearPendingLesson();
+                ui.loadStatus.textContent = 'Couldn’t share the lesson. Check the connection and try again.';
+            };
+            if (!actSend({ kind: 'video', source: { kind: 'yt', id }, playing: true, pos: 0 }, failed)) {
+                failed();
+                return;
+            }
+            ui.loadStatus.textContent = 'Waiting for Hang Out to confirm the lesson…';
+            selection.timer = setTimeout(() => {
+                if (pendingLesson === selection && !ui.url.hasAttribute('aria-invalid'))
+                    ui.loadStatus.textContent = 'Hang Out hasn’t confirmed the lesson. Wait here or try again.';
+            }, 10000);
         }
 
         function onYtAutoplayBlocked() {
@@ -507,13 +551,13 @@
         function onYtState(ev) {
             if (!state.ch || ev.target !== player.yt || ev.data !== player.yt?.getPlayerState()) return;
             if (ev.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
-            if (!isOp() || player.autoplayBlocked || !state.room.video || (!player.seenPlaying && state.room.video.playing)
+            if (!isOp() || pendingLesson || player.autoplayBlocked || !state.room.video || (!player.seenPlaying && state.room.video.playing)
                 || player.readyKey !== `${state.room.video.source.kind}:${state.room.video.source.id}`) return;
             if (ev.data !== 1 && ev.data !== 2) return;
             clearTimeout(videoPublishTimer);
             const channel = state.ch, generation = roomGeneration, instance = player.yt, key = player.readyKey;
             videoPublishTimer = setTimeout(() => {
-                if (generation === roomGeneration && state.ch === channel && isOp() && !player.autoplayBlocked && state.room.video
+                if (generation === roomGeneration && state.ch === channel && isOp() && !pendingLesson && !player.autoplayBlocked && state.room.video
                     && player.yt === instance && player.readyKey === key && key === `${state.room.video.source.kind}:${state.room.video.source.id}`) {
                     const v = state.room.video, playing = localPlaying(), pos = localTime();
                     // Suppress the echo of our own sync, not a subsequent
@@ -525,6 +569,9 @@
         }
         setInterval(() => {
             if (!isOp()) return syncToState(false);
+            // The old player is still visible while the new lesson awaits its
+            // room update. Its local callbacks must not publish it again.
+            if (pendingLesson) return;
             const v = state.room.video;
             if (!v || !player.yt || (!player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
             // YouTube does not reliably emit a state change when a paused
@@ -532,8 +579,7 @@
             // of correcting the host back to the previous shared position.
             const pos = localTime(), playing = localPlaying();
             if (playing !== v.playing || H.needsCorrection(pos, H.expectedPosition(v, state.clock.relayNow()))) {
-                actSend({ kind: 'video', source: v.source, playing, pos }, () =>
-                    H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() }));
+                actSend({ kind: 'video', source: v.source, playing, pos });
             }
         }, 2000);
 

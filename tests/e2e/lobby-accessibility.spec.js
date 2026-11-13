@@ -412,6 +412,67 @@ test('reduced-motion settings and user-controlled announcements survive keyboard
     } finally { await visitor.close(); }
 });
 
+test('new messages keep keyboard focus in the conversation when the catch-up button disappears', async ({ browser, baseURL }) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const viewport = { width: 375, height: 667 };
+    const reader = await guest(browser, baseURL, 'CatchUpReader', viewport, relay);
+    let writer;
+    try {
+        writer = await guest(browser, baseURL, 'CatchUpWriter', viewport, relay);
+        const log = reader.page.getByRole('log', { name: 'Conversation' });
+        const composer = reader.page.getByRole('textbox', { name: 'Message', exact: true });
+        const writerInput = writer.page.getByRole('textbox', { name: 'Message', exact: true });
+        for (const [visitor, input] of [[reader, composer], [writer, writerInput]]) {
+            await input.fill('/join #catch-up');
+            await input.press('Enter');
+            await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#catch-up');
+        }
+        const jump = reader.page.getByRole('button', { name: /new message/ });
+        const write = async text => {
+            await writerInput.fill(text);
+            await writerInput.press('Enter');
+            await expect(log).toContainText(text);
+        };
+        const readHistory = async () => {
+            await expect.poll(() => log.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(60);
+            await log.evaluate(element => { element.scrollTop = 0; });
+        };
+        const focusJump = async () => {
+            await expect(jump).toBeVisible();
+            await composer.focus();
+            for (let i = 0; i < 20 && !await jump.evaluate(element => element === document.activeElement); i += 1) {
+                await reader.page.keyboard.press(tabKey(reader.page, true));
+            }
+            await expect(jump).toBeFocused();
+        };
+
+        for (const text of [
+            'The first arrangement starts with a quiet guitar part and adds the drums after the opening bars. I would like to leave space for the vocal before we bring the bass in. We can try an extra bar after the chorus to make the transition easier to hear.',
+            'For the next rehearsal we can check the drum levels first, especially the kick and snare. After that I will play the bridge so we can agree on where the fills should land. I can bring a short backing track to help us keep the same tempo.',
+            'I was listening to the older version and liked the ending where everybody leaves the last chord ringing. We could use that idea again and give the bass a little more room. It also makes a good place to stop and talk through the changes between takes.'
+        ]) await write(text);
+        await readHistory();
+        await write('Latest line after reading scrollback');
+        await focusJump();
+        await reader.page.keyboard.press('Enter');
+        const latest = log.getByRole('listitem').filter({ hasText: 'Latest line after reading scrollback' });
+        await expect(jump).toBeHidden();
+        await expect(latest).toBeFocused();
+        await expect(latest).toBeInViewport();
+
+        await readHistory();
+        await write('Another arrival while reading scrollback');
+        await focusJump();
+        await log.evaluate(element => { element.scrollTop = element.scrollHeight; });
+        await expect(jump).toBeHidden();
+        await expect(log).toBeFocused();
+        expect(reader.errors).toEqual([]);
+    } finally {
+        await writer?.close();
+        await reader.close();
+    }
+});
+
 test('People roster: live joins preserve focused connection identity', async ({ browser, baseURL }) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
     const viewport = { width: 1280, height: 900 };
@@ -628,6 +689,13 @@ for (const width of [375, 390]) {
             expect(await button.evaluate((element, before) => element === before, original)).toBe(true);
             await visitor.page.keyboard.press('Enter');
             await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#directory-room');
+            const activeTab = visitor.page.getByRole('tab', { name: '#directory-room', exact: true });
+            await expect(activeTab).toBeFocused();
+            await expect(activeTab).toBeInViewport({ ratio: 1 });
+            await section(visitor.page, 'rooms');
+            await tabTo(visitor.page, button);
+            await visitor.page.keyboard.press('Enter');
+            await expect(activeTab).toBeFocused();
             const composer = visitor.page.getByRole('textbox', { name: 'Message', exact: true });
             await tabTo(visitor.page, composer); await visitor.page.keyboard.type('A draft while room metadata changes');
             await send(host.page, '/mode +l 5');
@@ -637,6 +705,38 @@ for (const width of [375, 390]) {
             contained(await composerGeometry(visitor.page));
             expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]); expect(arrival.errors).toEqual([]);
         } finally { await arrival?.close(); await visitor.close(); await host.close(); }
+    });
+
+    test(`room directory explains why there are no results at ${width}px`, async ({ browser, baseURL }) => {
+        const relay = hangoutRelayWsBase(baseURL, `directory-results-${randomUUID()}`), viewport = { width, height: 667 };
+        const host = await guest(browser, baseURL, 'SearchHost', viewport, relay);
+        const visitor = await guest(browser, baseURL, 'SearchGuest', viewport, relay);
+        try {
+            const empty = visitor.page.locator('[data-rooms-empty]');
+            await section(visitor.page, 'rooms');
+            await expect(empty).toBeVisible();
+            await expect(empty).toContainText('No rooms yet');
+            await send(host.page, '/join #open-practice');
+            const card = visitor.page.locator('[data-roomlist] button[data-room="#open-practice"]');
+            await expect(card).toBeVisible();
+            await expect(empty).toBeHidden();
+            const search = visitor.page.getByRole('searchbox', { name: 'Find a room', exact: true });
+            await search.fill('missing-room');
+            await expect(empty).toBeVisible();
+            await expect(empty).toHaveText('No rooms match your search. Try another name or clear the search.');
+            await search.fill('');
+            const filter = visitor.page.getByRole('combobox', { name: 'Room directory', exact: true });
+            await filter.selectOption('registered');
+            await expect(empty).toBeVisible();
+            await expect(empty).toHaveText('No registered rooms to show.');
+            await filter.selectOption('active');
+            await expect(card).toBeVisible();
+            await expect(empty).toBeHidden();
+            await filter.selectOption('registered');
+            await visitor.page.evaluate(() => window.__lobby.ws.close(1000));
+            await expect(visitor.page.locator('[data-connection]')).toHaveText('Offline');
+            await expect(empty).toHaveText('Connect to see current rooms.');
+        } finally { await visitor.close(); await host.close(); }
     });
 
     test(`a removed focused room returns to the visible directory filter at ${width}px`, async ({ browser, baseURL }) => {
