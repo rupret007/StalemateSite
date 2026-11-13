@@ -662,8 +662,8 @@ for (const failure of ['getter', 'getItem', 'setItem']) {
 }
 
 for (const width of [375, 390]) {
-    test(`room directory preserves keyboard identity and current capacity through live updates at ${width}px`, async ({ browser, baseURL }) => {
-        const relay = hangoutRelayWsBase(baseURL, `directory-${randomUUID()}`), viewport = { width, height: 667 };
+    test(`room directory preserves keyboard identity and current capacity through live updates at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        const relay = hangoutRelayWsBase(baseURL, `directory-${randomUUID()}`), viewport = { width, height: width === 390 ? 844 : 667 };
         const host = await guest(browser, baseURL, 'DirectoryHost', viewport, relay);
         const visitor = await guest(browser, baseURL, 'DirectoryReader', viewport, relay);
         let arrival;
@@ -687,11 +687,13 @@ for (const width of [375, 390]) {
             await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
             await expect(button).toBeFocused();
             expect(await button.evaluate((element, before) => element === before, original)).toBe(true);
+            if (width === 390) await visitor.page.screenshot({ path: testInfo.outputPath('discover-chat-room-390x844.png') });
             await visitor.page.keyboard.press('Enter');
             await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#directory-room');
             const activeTab = visitor.page.getByRole('tab', { name: '#directory-room', exact: true });
             await expect(activeTab).toBeFocused();
             await expect(activeTab).toBeInViewport({ ratio: 1 });
+            if (width === 390) await visitor.page.screenshot({ path: testInfo.outputPath('joined-chat-room-390x844.png') });
             await section(visitor.page, 'rooms');
             await tabTo(visitor.page, button);
             await visitor.page.keyboard.press('Enter');
@@ -703,6 +705,12 @@ for (const width of [375, 390]) {
             await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
             await expect(composer).toBeFocused(); await expect(composer).toHaveValue('A draft while room metadata changes');
             contained(await composerGeometry(visitor.page));
+            const leave = visitor.page.getByRole('button', { name: 'Leave', exact: true });
+            await tabTo(visitor.page, leave);
+            await visitor.page.keyboard.press('Enter');
+            await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            await expect(visitor.page.getByRole('tab', { name: '#stalemate', exact: true })).toBeFocused();
+            if (width === 390) await visitor.page.screenshot({ path: testInfo.outputPath('left-chat-room-390x844.png') });
             expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]); expect(arrival.errors).toEqual([]);
         } finally { await arrival?.close(); await visitor.close(); await host.close(); }
     });
