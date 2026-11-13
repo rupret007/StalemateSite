@@ -2024,8 +2024,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const availabilityText = openSeat ? 'Four in a Row has an open seat. Choose Join match to play.' : '';
         if (availability.textContent !== availabilityText) availability.textContent = availabilityText;
         $('[data-four-seats]').hidden = !game;
+        const playerName = (id, mark) => id ? c.names.find(person => person.id === id)?.nick || `Player ${mark}` : 'Open seat';
         if (game) {
-            const playerName = (id, mark) => id ? c.names.find(person => person.id === id)?.nick || `Player ${mark}` : 'Open seat';
             $('[data-four-player="X"]').textContent = playerName(game.host, 'X');
             $('[data-four-player="O"]').textContent = playerName(game.guest, 'O');
         }
@@ -2037,12 +2037,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (game) {
             fourPlayed = true;
             if (!game.guest) {
-                message = seat ? 'Waiting for someone in the room to join.' : 'An open seat is available. X goes first.';
+                message = fourInvite ? 'Invite a friend. You play first when they join.'
+                    : seat ? 'Waiting for a second player. You play first.' : 'An open seat is available. X goes first.';
                 button = seat ? null : ['join', 'Join match'];
                 if (seat) leaveLabel = 'Close match';
             } else {
                 const lastMove = game.moves ? `${fourMark(game.moves - 1)} played column ${game.lastColumn + 1}. ` : '';
-                const turn = yourTurn ? `Your turn (${seat}).` : `${fourMark(game.moves)} to play.`;
+                const mark = fourMark(game.moves);
+                const opponent = playerName(mark === 'X' ? game.host : game.guest, mark);
+                const turn = yourTurn ? `Your turn (${seat}).`
+                    : seat ? `You’re ${seat}. ${opponent} (${mark}) ${game.moves ? 'to play' : 'goes first'}.` : `${mark} to play.`;
                 message = lastMove + (game.winner ? `${game.winner} wins.` : playing ? turn : 'Draw.');
                 if (playing) {
                     button = null;

@@ -278,6 +278,10 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .four-columns .btn[aria-disabled="false"] { border-color: #637943; color: var(--lime); }
 .four-board { table-layout: fixed; border-spacing: 4px; padding-bottom: 6px; text-align: center; }
 .four-board tr { scroll-margin-block-start: 44px; }
+@media (pointer: coarse) {
+  .four-columns .btn { min-height: 44px; }
+  .four-board tr { scroll-margin-block-start: 50px; }
+}
 .four-board td { padding: 0; border: 1px solid #394739; border-radius: 3px; background: var(--surface); }
 .four-board td span { display: grid; min-height: 22px; place-items: center; font: bold 14px var(--mono); }
 .four-board td[data-mark="X"] { color: var(--lime); background: #222b19; }
