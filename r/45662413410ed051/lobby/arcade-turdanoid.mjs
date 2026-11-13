@@ -13,7 +13,7 @@ const markup = `
 <p class="small arcade-card-error" data-brick-error role="status"></p>
 <div class="arcade-card-actions brick-race-actions">
     <button class="btn btn--small" type="button" data-brick-main hidden></button>
-    <button class="btn btn--small btn--ghost" type="button" data-brick-leave hidden>Leave race</button>
+    <button class="btn btn--small btn--ghost" type="button" data-brick-leave hidden>Leave</button>
 </div>
 <div data-card-table data-brick-match hidden>
     <div class="brick-race-layout">
@@ -25,19 +25,19 @@ const markup = `
             <time role="timer" data-brick-clock></time>
             <div data-brick-score="a"><b></b><span></span><small></small></div>
             <div data-brick-score="b"><b></b><span></span><small></small></div>
-            <button type="button" class="btn btn--small" data-brick-serve hidden>Launch ball</button>
+            <button type="button" class="btn btn--small" data-brick-serve hidden>Launch</button>
             <span class="small" data-brick-power></span>
         </div>
     </div>
     <p class="small" id="brick-race-launch-wait" data-brick-launch-wait hidden></p>
-    <p class="small brick-race-help" id="brick-race-help">Drag or use the arrow keys to move. Tap the stuck ball, press Launch, or press Space.</p>
+    <p class="small brick-race-help" id="brick-race-help">Drag or use the arrow keys to move. Tap the stuck ball or press Launch.</p>
 </div>
 <dialog class="sheet" aria-labelledby="brick-confirm-title" data-brick-confirm>
     <h3 id="brick-confirm-title">Leave this race?</h3>
     <p class="small" data-brick-confirm-text></p>
     <div class="arcade-card-actions">
-        <button class="btn btn--small" type="button" data-brick-confirm-yes>Leave race</button>
-        <button class="btn btn--small btn--ghost" type="button" data-brick-confirm-no>Keep playing</button>
+        <button class="btn btn--small" type="button" data-brick-confirm-yes>Leave</button>
+        <button class="btn btn--small btn--ghost" type="button" data-brick-confirm-no>Cancel</button>
     </div>
 </dialog>`;
 
@@ -257,23 +257,24 @@ export function mountArcadeTurdanoid(container, onMatch) {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
         if (connection === 'unavailable') {
-            message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
-            if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect race'; }
+            message = matchConnectionErrors[connectionError] || 'Reconnecting… The clock keeps running.';
+            if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Retry'; }
         } else if (connection !== 'ready') {
-            if (match) message = match.result ? 'Reconnecting to the race…' : 'Reconnecting · race clock keeps running';
+            if (match) message = match.result ? 'Reconnecting…' : 'Reconnecting… The clock keeps running.';
         } else if (!model) {
-            message = 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.';
-            if (canOpen) { action = 'open'; label = 'Open Turdanoid race'; }
+            message = canOpen ? 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.'
+                : 'Waiting for the host to open a table.';
+            if (canOpen) { action = 'open'; label = 'Open'; }
         } else if (model?.waiting) {
             message = seat ? 'Waiting for a second player.' : 'An opponent is ready.';
-            if (!seat) { action = 'join'; label = 'Join Turdanoid race'; }
+            if (!seat) { action = 'join'; label = 'Join'; }
         } else if (result) {
             message = result.winner === null ? 'Draw' : seat ? (result.winner === seat ? 'You win' : 'Rival wins')
                 : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
             message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
-            if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
+            if (seat && seat !== model.rematch) { action = 'rematch'; label = 'Rematch'; }
             if (seat && seat === model.rematch) message += ' · Rematch requested';
-        } else if (match) message = match.wall.name;
+        } else if (match) message = seat ? match.wall.name : `Watching · ${match.wall.name}`;
         put(status, message);
         main.hidden = !action;
         main.dataset.command = action;

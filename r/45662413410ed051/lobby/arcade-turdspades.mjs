@@ -8,7 +8,7 @@ const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds
 const cardLabel = card => card.rank + ' of ' + suits[card.suit][1];
 const face = card => card.rank + suits[card.suit][0];
 const errors = {
-    'seat-unavailable': 'That seat is unavailable. Pick an open seat.',
+    'seat-unavailable': 'This table is full. You can watch.',
     'illegal-card': 'Follow the led suit if you can. Lead spades after they’re broken or when you hold only spades.',
     'wrong-turn': 'Wait for your turn.',
     'invalid-bid': 'Choose a bid from 0 to 13.',
@@ -19,7 +19,7 @@ const markup = `
 <p class="small arcade-card-status" data-spades-status role="status"></p>
 <p class="small arcade-card-error" data-spades-error role="status"></p>
 <div class="arcade-card-actions">
-    <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>
+    <button class="btn btn--small btn--ghost" type="button" data-spades-partners hidden>Open</button>
     <button class="btn btn--small" type="button" data-spades-main hidden></button>
 </div>
 <div class="arcade-card-actions" data-spades-seats hidden></div>
@@ -28,14 +28,14 @@ const markup = `
     <ul class="spades-trick" aria-label="Bids and trick cards" data-spades-trick></ul>
     <div class="arcade-card-actions" data-spades-bid hidden>
         <label for="spades-bid">Your bid</label><select id="spades-bid"></select>
-        <button class="btn btn--small" type="button" data-spades-action="bid">Bid for me</button>
+        <button class="btn btn--small" type="button" data-spades-action="bid">Bid</button>
     </div>
     <p class="small arcade-card-hand-label" data-spades-hand-label></p>
     <div class="arcade-card-hand" role="group" aria-label="Your hand" data-spades-hand></div>
     <div class="arcade-card-actions">
         <button class="btn btn--small" type="button" data-spades-action="next-round" hidden>Next round</button>
         <button class="btn btn--small btn--ghost" type="button" data-spades-action="resign" hidden>Resign</button>
-        <button class="btn btn--small btn--ghost" type="button" data-spades-action="leave" hidden>Leave table</button>
+        <button class="btn btn--small btn--ghost" type="button" data-spades-action="leave" hidden>Leave</button>
     </div>
 </div>
 <dialog class="sheet" aria-labelledby="spades-confirm-title" data-spades-confirm>
@@ -103,7 +103,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         feedback.textContent = '';
         timer = setTimeout(() => {
             pending = false;
-            feedback.textContent = 'Checking the table…';
+            feedback.textContent = 'Checking…';
             client.send({ action: 'sync' });
             draw();
         }, 6000);
@@ -125,7 +125,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         const button = document.createElement('button');
         button.className = 'btn btn--small btn--ghost';
         button.type = 'button';
-        button.textContent = `Join ${names[seat]}`;
+        button.textContent = 'Join';
         button.addEventListener('click', () => send('join', { seat }));
         seatsHost.append(button);
         return button;
@@ -175,23 +175,23 @@ export function mountArcadeTurdSpades(container, onMatch) {
         const teams = paired ? ['South + North CPU', 'West + East CPU'] : partnerships;
         let command = '', label = '', message = 'Connecting to the table…';
         if (connection === 'unavailable') {
-            message = matchConnectionErrors[connectionError] || 'The table couldn’t reconnect. Try again from this room.';
-            if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Reconnect table'; }
+            message = matchConnectionErrors[connectionError] || 'Reconnecting… Your hand is paused.';
+            if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Retry'; }
         } else if (connection !== 'ready') {
-            if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
+            if (match) message = seat ? 'Reconnecting… Your hand is paused.' : 'Reconnecting…';
         } else if (!model) {
-            message = canOpen ? (partnersSupported ? 'Play with one friend and a CPU partner on each team, or fill all four seats with friends.'
-                : 'Open a partnership table for four players.') : 'Waiting for the host to open a table.';
-            if (canOpen) { command = 'open'; label = partnersSupported ? 'Open 4-player Spades' : 'Open Spades table'; }
+            message = canOpen ? (partnersSupported ? '4 players. South and North versus West and East.'
+                : '4 players. South and North versus West and East.') : 'Waiting for the host to open a table.';
+            if (canOpen) { command = 'open'; label = 'Open'; }
         } else if (model?.waiting) {
             message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
-            if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
+            if (seat) { command = 'leave'; label = 'Leave'; }
         } else if (match?.result) {
             message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
             if (seat) {
                 const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
                 message += ` ${votes.length}/${people} ready for a rematch.`;
-                if (!votes.includes(seat)) { command = 'rematch'; label = votes.length ? 'Accept Spades rematch' : 'Request Spades rematch'; }
+                if (!votes.includes(seat)) { command = 'rematch'; label = 'Rematch'; }
             }
         } else if (match?.roundResult) {
             message = match.roundResult.map((result, team) => {
@@ -203,9 +203,9 @@ export function mountArcadeTurdSpades(container, onMatch) {
         } else if (match) {
             const yourTurn = seat === match.turn;
             if (paired && match.phase === 'bid' && yourTurn && seat === 'west') {
-                message = 'You and a computer partner vs the host and a computer · tap Bid for me';
+                message = 'You and a computer partner vs the host and a computer · tap Bid';
             } else if (paired && match.phase === 'bid' && yourTurn && seat === 'south') {
-                message = 'You and a computer partner vs your friend and a computer · tap Bid for me';
+                message = 'You and a computer partner vs your friend and a computer · tap Bid';
             } else if (paired && match.phase === 'bid' && seat === 'west') {
                 message = 'Waiting for the host to bid';
             } else {
@@ -224,6 +224,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         partnerButton.disabled = pending;
         seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
+        if (model?.waiting && !seat && seatButtons.every(button => button.hidden)) message = 'This table is full. You can watch.';
         table.hidden = !match;
         if (!match) { showHand([]); return; }
         table.dataset.phase = match.phase;
@@ -291,10 +292,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
         else {
             confirmation = action;
             $('[data-spades-confirm-yes]').textContent = control.textContent;
-            $('#spades-confirm-title').textContent = action === 'resign' ? 'Resign for your team?' : 'Leave this table?';
+            $('#spades-confirm-title').textContent = action === 'resign' ? 'Resign for your team?' : 'Leave?';
             $('[data-spades-confirm-text]').textContent = action === 'resign'
                 ? 'The other partnership wins if you resign.' : model?.mode === 'partners'
-                    ? 'Leaving ends this match for both players.' : 'Leaving closes the table for all four players.';
+                    ? 'Leave ends the match for both players.' : 'Leaving closes the table for all four players.';
             confirm.showModal();
         }
     });
