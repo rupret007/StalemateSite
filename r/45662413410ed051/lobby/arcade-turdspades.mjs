@@ -1,12 +1,14 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createEngineLoadFailure, loadEngine } from './arcade-engine-load.mjs';
 
 let suggestSpadesBid;
-let spadesEngine;
+const spadesSlot = { current: null };
+let onSpadesLoadFailure = () => {};
+let onSpadesLoadSuccess = () => {};
 function loadSpadesEngine() {
-    spadesEngine ??= import('/play/games/turdspades-engine.js').then(mod => {
+    return loadEngine(spadesSlot, () => import('/play/games/turdspades-engine.js').then(mod => {
         suggestSpadesBid = mod.suggestSpadesBid;
-    });
-    return spadesEngine;
+    }), () => onSpadesLoadFailure(), () => onSpadesLoadSuccess());
 }
 
 const seats = ['south', 'west', 'north', 'east'];
@@ -73,6 +75,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
 
     function clearPending() { clearTimeout(timer); pending = false; }
     function closeConfirmation() { confirmation = ''; if (confirm.open) confirm.close(); }
+    const engineLoad = createEngineLoadFailure(status, main);
+    const retrySpades = () => loadSpadesEngine().then(ok => { if (ok && panel.isConnected) draw(); });
+    onSpadesLoadFailure = () => engineLoad.fail(retrySpades);
+    onSpadesLoadSuccess = () => engineLoad.loaded(retrySpades);
     const client = createGameNightMatchClient({
         onMatch,
         prefix: '/beta/arcade-turdspades',
@@ -185,6 +191,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
     }
 
     function draw() {
+        if (engineLoad.showing()) {
+            engineLoad.hold();
+            return;
+        }
         const match = model?.match, seat = model?.seat, occupied = model?.occupied || [];
         const paired = model?.mode === 'partners', people = paired ? 2 : 4;
         const computer = position => paired && ['north', 'east'].includes(position);
@@ -280,7 +290,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 bidEdited = false;
             }
             if (!bidEdited) {
-                if (!suggestSpadesBid) loadSpadesEngine().then(() => { if (panel.isConnected) draw(); });
+                if (!suggestSpadesBid && !engineLoad.showing()) retrySpades();
                 const suggestion = suggestSpadesBid ? String(suggestSpadesBid(match.hand)) : bid.value;
                 if (bid.value !== suggestion) {
                     applyingBid = true;

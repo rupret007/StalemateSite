@@ -1,23 +1,27 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createEngineLoadFailure, loadEngine } from './arcade-engine-load.mjs';
 
 let classifyRushSwipe, advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer, TurdRushRenderer;
-let rushEngine, rushView;
+const rushEngineSlot = { current: null };
+const rushViewSlot = { current: null };
+let onRushEngineFailure = () => {};
+let onRushEngineSuccess = () => {};
+let onRushViewFailure = () => {};
+let onRushViewSuccess = () => {};
 function loadRushEngine() {
     // Same versioned core URL as turdrush-race.js so the browser fetches that file once.
-    rushEngine ??= Promise.all([
+    return loadEngine(rushEngineSlot, () => Promise.all([
         import('/play/games/turdrush-core.js?v=fa8a8ce86510b759'),
         import('/play/games/turdrush-race.js')
     ]).then(([core, race]) => {
         classifyRushSwipe = core.classifyRushSwipe;
         ({ advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer } = race);
-    });
-    return rushEngine;
+    }), () => onRushEngineFailure(), () => onRushEngineSuccess());
 }
 function loadRushView() {
-    rushView ??= import('/play/games/turdrush-renderer.js').then(view => {
+    return loadEngine(rushViewSlot, () => import('/play/games/turdrush-renderer.js').then(view => {
         TurdRushRenderer = view.TurdRushRenderer;
-    });
-    return rushView;
+    }), () => onRushViewFailure(), () => onRushViewSuccess());
 }
 
 const keys = { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'jump', w: 'jump', ' ': 'jump', ArrowDown: 'slide', s: 'slide' };
@@ -108,6 +112,7 @@ export function mountArcadeTurdRush(container, onMatch) {
     const status = $('[data-race-status]'), error = $('[data-race-error]'), main = $('[data-race-main]'), leave = $('[data-race-leave]'),
         table = $('[data-race-match]'), track = $('[data-race-track]'), controls = $('[data-race-controls]'), confirm = $('[data-race-confirm]'),
         canvas = $('[data-race-3d]'), flat = $('[data-race-2d]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
+    let pendingRushFrame = null;
     let scope, model, canOpen, connection, connectionError, visual, receivedAt, renderer, fallback = false, raf = 0, previous = 0,
         lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, pending, gesture, redraw = true;
     let buffer = [], flights = [];
@@ -128,6 +133,22 @@ export function mountArcadeTurdRush(container, onMatch) {
         visual.queue.sort((a, b) => a[0] - b[0]);
         redraw = true;
     }
+    const engineLoad = createEngineLoadFailure(status, main);
+    const retryRushEngine = () => loadRushEngine().then(ok => {
+        if (!ok || !unpackRushRacer || !pendingRushFrame || !panel.isConnected) return;
+        const frame = pendingRushFrame;
+        pendingRushFrame = null;
+        clientOptions.onState(frame);
+    });
+    const retryRushView = () => loadRushView().then(ok => {
+        if (!ok) return;
+        redraw = true;
+        if (!raf && panel.open && !panel.hidden) raf = requestAnimationFrame(drawFrame);
+    });
+    onRushEngineFailure = () => engineLoad.fail(retryRushEngine);
+    onRushEngineSuccess = () => engineLoad.loaded(retryRushEngine);
+    onRushViewFailure = () => engineLoad.fail(retryRushView);
+    onRushViewSuccess = () => engineLoad.loaded(retryRushView);
     const clientOptions = {
         onMatch,
         prefix: '/beta/arcade-turdrush',
@@ -142,9 +163,11 @@ export function mountArcadeTurdRush(container, onMatch) {
         },
         onState(frame) {
             if (!unpackRushRacer) {
-                loadRushEngine().then(() => { if (unpackRushRacer && panel.isConnected) clientOptions.onState(frame); });
+                pendingRushFrame = frame;
+                if (!engineLoad.showing()) retryRushEngine();
                 return;
             }
+            pendingRushFrame = null;
             const { state, canOpen: host } = frame;
             if (state && (state.game !== 'turdrush' || state.version !== 1)) return;
             const changed = state?.id !== model?.id || state?.seat !== model?.seat;
@@ -248,7 +271,7 @@ export function mountArcadeTurdRush(container, onMatch) {
         flat.hidden = render3d;
         if (render3d && !renderer) {
             if (!TurdRushRenderer) {
-                loadRushView().then(() => { redraw = true; if (!raf && panel.open && !panel.hidden) raf = requestAnimationFrame(drawFrame); });
+                if (!engineLoad.showing()) retryRushView();
             } else {
                 try { renderer = new TurdRushRenderer(canvas, { reducedMotion: motion.matches, onLost: fallbackView }); }
                 catch { fallbackView(); canvas.hidden = true; flat.hidden = false; }
@@ -268,6 +291,10 @@ export function mountArcadeTurdRush(container, onMatch) {
     }
 
     function render() {
+        if (engineLoad.showing()) {
+            engineLoad.hold();
+            return;
+        }
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
         if (connection === 'unavailable') {

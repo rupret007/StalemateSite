@@ -1,9 +1,12 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createEngineLoadFailure, loadEngine } from './arcade-engine-load.mjs';
 
 let createTurdtrisArt, classifyGesture, formatRunTime, SPRINT_TICK_MS, advanceSprint, applySprintInput, sprintCells, sprintGhost, sprintNext;
-let trisEngine;
+const trisSlot = { current: null };
+let onTrisLoadFailure = () => {};
+let onTrisLoadSuccess = () => {};
 function loadTurdtrisEngine() {
-    trisEngine ??= Promise.all([
+    return loadEngine(trisSlot, () => Promise.all([
         import('/play/games/turdtris-art.js'),
         import('/play/games/turdtris-presentation.js'),
         import('/play/games/turdtris-modes.js'),
@@ -13,8 +16,7 @@ function loadTurdtrisEngine() {
         classifyGesture = presentation.classifyGesture;
         formatRunTime = modes.formatRunTime;
         ({ SPRINT_TICK_MS, advanceSprint, applySprintInput, sprintCells, sprintGhost, sprintNext } = sprint);
-    });
-    return trisEngine;
+    }), () => onTrisLoadFailure(), () => onTrisLoadSuccess());
 }
 
 const inputs = [
@@ -92,6 +94,12 @@ export function mountArcadeTurdtris(container, onMatch) {
     const tickAt = time => Math.floor((serverTime(time) - model.match.startsAt) / SPRINT_TICK_MS);
     const clearRepeat = () => { clearTimeout(repeatTimer); clearInterval(repeatInterval); };
     const clearInputs = () => { buffer = []; inflight = null; clearRepeat(); gesture = null; };
+    const engineLoad = createEngineLoadFailure(status, main);
+    const retryTris = () => loadTurdtrisEngine().then(ok => {
+        if (ok && !raf && panel.open && !panel.hidden) raf = requestAnimationFrame(drawFrame);
+    });
+    onTrisLoadFailure = () => engineLoad.fail(retryTris);
+    onTrisLoadSuccess = () => engineLoad.loaded(retryTris);
     const clearPending = () => { clearTimeout(pending); pending = null; };
     const client = createGameNightMatchClient({
         onMatch,
@@ -175,7 +183,7 @@ export function mountArcadeTurdtris(container, onMatch) {
         const match = model?.match;
         if (!match || !panel.open || panel.hidden) return;
         if (!formatRunTime || !advanceSprint) {
-            loadTurdtrisEngine().then(() => { if (!raf && panel.open && !panel.hidden) raf = requestAnimationFrame(drawFrame); });
+            if (!engineLoad.showing()) retryTris();
             return;
         }
         if (connection === 'ready' && !match.result) {
@@ -233,6 +241,10 @@ export function mountArcadeTurdtris(container, onMatch) {
     }
 
     function render() {
+        if (engineLoad.showing()) {
+            engineLoad.hold();
+            return;
+        }
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
         if (connection === 'unavailable') {

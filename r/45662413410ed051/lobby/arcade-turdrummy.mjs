@@ -1,12 +1,14 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createEngineLoadFailure, loadEngine } from './arcade-engine-load.mjs';
 
 let analyzeHand;
-let rummyRules;
+const rummySlot = { current: null };
+let onRummyLoadFailure = () => {};
+let onRummyLoadSuccess = () => {};
 function loadRummyRules() {
-    rummyRules ??= import('/play/games/turdrummy-rules.js').then(() => {
+    return loadEngine(rummySlot, () => import('/play/games/turdrummy-rules.js').then(() => {
         analyzeHand = globalThis.TurdRummyRules.analyzeHand;
-    });
-    return rummyRules;
+    }), () => onRummyLoadFailure(), () => onRummyLoadSuccess());
 }
 const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds'], C: ['♣', 'Clubs'] };
 const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -73,6 +75,10 @@ export function mountArcadeTurdRummy(container, onMatch) {
     let selected = null, pending = false, timer, confirmation = null;
 
     function clearPending() { clearTimeout(timer); pending = false; }
+    const engineLoad = createEngineLoadFailure(status, main);
+    const retryRummy = () => loadRummyRules().then(ok => { if (ok && panel.isConnected) draw(); });
+    onRummyLoadFailure = () => engineLoad.fail(retryRummy);
+    onRummyLoadSuccess = () => engineLoad.loaded(retryRummy);
     function clearChoice() {
         selected = null;
         confirmation = null;
@@ -171,6 +177,10 @@ export function mountArcadeTurdRummy(container, onMatch) {
     }
 
     function draw() {
+        if (engineLoad.showing()) {
+            engineLoad.hold();
+            return;
+        }
         const seat = model?.seat, match = model?.match;
         const name = value => value === seat ? 'You' : side[value];
         let command = '', label = '', message = 'Connecting to the table…';
@@ -215,7 +225,7 @@ export function mountArcadeTurdRummy(container, onMatch) {
 
         const active = !!seat && !match.roundResult && !match.result;
         const canSelect = active && seat === match.turn && match.phase === 'discard';
-        if (canSelect && selected !== null && !analyzeHand) loadRummyRules().then(() => { if (panel.isConnected) draw(); });
+        if (canSelect && selected !== null && !analyzeHand && !engineLoad.showing()) retryRummy();
         const deadwood = canSelect && selected !== null && analyzeHand ? analyzeHand(match.hand.filter(card => card.id !== selected)).deadwoodScore : null;
         $('[data-rummy-hand-label]').textContent = seat
             ? `Your hand · ${match.hand.length} cards${deadwood === null ? '' : ` · ${deadwood} deadwood after discard`}`

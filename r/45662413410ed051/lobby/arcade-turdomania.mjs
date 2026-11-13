@@ -1,12 +1,14 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createEngineLoadFailure, loadEngine } from './arcade-engine-load.mjs';
 
 let POOP_KINDS, findGroup, popGroup;
-let maniaEngine;
+const maniaSlot = { current: null };
+let onManiaLoadFailure = () => {};
+let onManiaLoadSuccess = () => {};
 function loadManiaEngine() {
-    maniaEngine ??= import('/play/games/turdomania-core.js').then(mod => {
+    return loadEngine(maniaSlot, () => import('/play/games/turdomania-core.js').then(mod => {
         ({ POOP_KINDS, findGroup, popGroup } = mod);
-    });
-    return maniaEngine;
+    }), () => onManiaLoadFailure(), () => onManiaLoadSuccess());
 }
 
 const sprite = '/play/assets/turdomania-tiles.svg#';
@@ -169,6 +171,10 @@ export function mountArcadeTurdomania(container, onMatch) {
     let scope, model, canOpen, connection, connectionError, receivedAt, busy = null, prediction = null, ticker, lastSync = -Infinity;
     const serverNow = () => model.match.at + Math.max(0, performance.now() - receivedAt);
     function clearPending() { clearTimeout(busy); busy = null; prediction = null; }
+    const engineLoad = createEngineLoadFailure(status, main);
+    const retryMania = () => loadManiaEngine().then(ok => { if (ok && panel.open && scope) render(); });
+    onManiaLoadFailure = () => engineLoad.fail(retryMania);
+    onManiaLoadSuccess = () => engineLoad.loaded(retryMania);
     const client = createGameNightMatchClient({
         onMatch,
         prefix: '/beta/arcade-turdomania',
@@ -245,6 +251,10 @@ export function mountArcadeTurdomania(container, onMatch) {
     }
 
     function render() {
+        if (engineLoad.showing()) {
+            engineLoad.hold();
+            return;
+        }
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the duel…', action = '', label = '';
         if (connection === 'unavailable') {
@@ -322,7 +332,7 @@ export function mountArcadeTurdomania(container, onMatch) {
         if (!panel.open || !scope) { reset(); return; }
         for (const other of container.querySelectorAll(':scope > details[open]')) if (other !== panel) other.open = false;
         container.scrollTop = 0;
-        loadManiaEngine().then(() => { if (panel.open && scope) render(); });
+        retryMania();
         ticker = setInterval(clock, 200);
         client.start(scope);
     });

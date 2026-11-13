@@ -1,11 +1,14 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createEngineLoadFailure, loadEngine } from './arcade-engine-load.mjs';
 
 let Chess, claimReason, colorName, intendedClaims, pieceName, ChessBoard;
-let chessAssets;
+const chessSlot = { current: null };
+let onChessLoadFailure = () => {};
+let onChessLoadSuccess = () => {};
 function loadChessAssets() {
     // chess-core and chess-board import these next. Start them in the same turn
     // so the phone does not wait a second round trip.
-    chessAssets ??= Promise.all([
+    return loadEngine(chessSlot, () => Promise.all([
         import('/play/assets/chess/chess.js'),
         import('/play/assets/chess/chessground.js'),
         import('/play/games/chess-core.js'),
@@ -13,8 +16,7 @@ function loadChessAssets() {
     ]).then(([, , core, board]) => {
         ({ Chess, claimReason, colorName, intendedClaims, pieceName } = core);
         ChessBoard = board.ChessBoard;
-    });
-    return chessAssets;
+    }), () => onChessLoadFailure(), () => onChessLoadSuccess());
 }
 
 const files = 'abcdefgh', ranks = '87654321';
@@ -94,6 +96,15 @@ export function mountArcadeChess(container, onMatch) {
     let model = null, chess = null, board = null, selected = null, focused = 'e2';
     let hadTable = false, tableEnded = false, leftVoluntarily = false, droppedSeat = null, resumedSeat = null;
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null, queuedFrame = null;
+    const engineLoad = createEngineLoadFailure(status, primary);
+    const retryChess = () => loadChessAssets().then(ok => {
+        if (!ok || !queuedFrame || !Chess) return;
+        const frame = queuedFrame;
+        queuedFrame = null;
+        applyState(frame);
+    });
+    onChessLoadFailure = () => engineLoad.fail(retryChess);
+    onChessLoadSuccess = () => engineLoad.loaded(retryChess);
     const client = createGameNightMatchClient({
         onMatch,
         prefix: '/beta/arcade',
@@ -159,17 +170,14 @@ export function mountArcadeChess(container, onMatch) {
         connection = 'connecting'; connectionError = undefined;
         model = null; chess = null; selected = null; canOpen = false;
         hadTable = false; tableEnded = false; leftVoluntarily = false; droppedSeat = null; resumedSeat = null;
+        queuedFrame = null;
         board?.cancel();
     }
 
     function applyState(frame) {
         if (!Chess) {
             queuedFrame = frame;
-            loadChessAssets().then(() => {
-                if (queuedFrame !== frame) return;
-                queuedFrame = null;
-                applyState(frame);
-            });
+            if (!engineLoad.showing()) retryChess();
             return;
         }
         queuedFrame = null;
@@ -293,6 +301,10 @@ export function mountArcadeChess(container, onMatch) {
     }
 
     function draw() {
+        if (engineLoad.showing()) {
+            engineLoad.hold();
+            return;
+        }
         const match = model?.match, seated = !!model?.seat;
         $('[data-chess-playing]').hidden = !match || !panel.open;
         primary.hidden = true; primary.disabled = pending; primary.dataset.command = '';

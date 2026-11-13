@@ -1,18 +1,20 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createEngineLoadFailure, loadEngine } from './arcade-engine-load.mjs';
 
 // Same field as BRICK_WIDTH and BRICK_HEIGHT in the race module. Local copies
 // keep the canvas markup from pulling that module in for every other game.
 const BRICK_WIDTH = 480, BRICK_HEIGHT = 400;
 let advanceBrickRacer, brickRaceWall, brickRacePaddle, brickRaceTick, BRICK_LIMIT_TICKS;
-let brickEngine;
+const brickSlot = { current: null };
+let onBrickLoadFailure = () => {};
+let onBrickLoadSuccess = () => {};
 function loadBrickEngine() {
-    brickEngine ??= Promise.all([
+    return loadEngine(brickSlot, () => Promise.all([
         import('/play/games/turdanoid-sprites-core.js'),
         import('/play/games/turdanoid-race.js')
     ]).then(([, race]) => {
         ({ advanceBrickRacer, brickRaceWall, brickRacePaddle, brickRaceTick, BRICK_LIMIT_TICKS } = race);
-    });
-    return brickEngine;
+    }), () => onBrickLoadFailure(), () => onBrickLoadSuccess());
 }
 const tileColors = [['#72efad', '#1f8b66'], ['#68d5ed', '#236c9b'], ['#f6d677', '#b48b2b'], ['#ffac87', '#be6151'],
     ['#f294d5', '#9c4383'], ['#b8a7ff', '#6d56be']];
@@ -134,6 +136,15 @@ export function mountArcadeTurdanoid(container, onMatch) {
         visual.queue.sort((a, b) => a[0] - b[0]);
         redraw = true;
     }
+    const engineLoad = createEngineLoadFailure(status, main);
+    const retryBrick = () => loadBrickEngine().then(ok => {
+        if (!ok || !brickRaceWall || !model?.match) return;
+        wall = brickRaceWall(model.match.seed);
+        redraw = true;
+        render();
+    });
+    onBrickLoadFailure = () => engineLoad.fail(retryBrick);
+    onBrickLoadSuccess = () => engineLoad.loaded(retryBrick);
     const client = createGameNightMatchClient({
         onMatch,
         prefix: '/beta/arcade-turdanoid',
@@ -156,13 +167,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
             const reveal = state?.match && (!model?.match || changed);
             if (reveal) {
                 if (brickRaceWall) wall = brickRaceWall(state.match.seed);
-                else loadBrickEngine().then(() => {
-                    if (brickRaceWall && model?.id === state.id && model.match) {
-                        wall = brickRaceWall(model.match.seed);
-                        redraw = true;
-                        render();
-                    }
-                });
+                else if (!engineLoad.showing()) retryBrick();
             }
             if (changed || state?.match?.result) {
                 clearInputs();
@@ -282,6 +287,10 @@ export function mountArcadeTurdanoid(container, onMatch) {
     }
 
     function render() {
+        if (engineLoad.showing()) {
+            engineLoad.hold();
+            return;
+        }
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
         if (connection === 'unavailable') {
