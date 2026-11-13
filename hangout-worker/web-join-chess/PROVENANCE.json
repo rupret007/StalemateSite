@@ -1,0 +1,23 @@
+{
+  "repository": "https://github.com/rupret007/webjam",
+  "commit": "5ae09b196ee7bc8a854e54d15065227d289d43cf",
+  "sourcePR": "https://github.com/rupret007/webjam/pull/501",
+  "license": "MIT",
+  "files": {
+    "game-offer.js": {
+      "source": "web/join/game-offer.js",
+      "sha256": "03ff4afaef2b28a3f7908861d517518c9013ef5deda530563e1ffec2d4715ea7",
+      "adaptation": null
+    },
+    "index.html": {
+      "source": "web/join/index.html",
+      "sha256": "b6e053f522d4791cce2f32e390dc2fe2b6790d6cb66bcbe128cd823cad8fc055",
+      "adaptation": "Chess-only delta applied to the reviewed website Web Join client"
+    },
+    "session.js": {
+      "source": "web/join/session.js",
+      "sha256": "a07653525bfd8f9c0345556499bec609e0867aef64558c8247e575371a5f86ad",
+      "adaptation": "Chess-only delta applied to the reviewed website Web Join client"
+    }
+  }
+}
