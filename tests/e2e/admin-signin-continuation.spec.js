@@ -13,8 +13,17 @@ function url(baseURL, extra = {}) {
 }
 
 test('email callback opens the real local moderation queue without another click', async ({ page, baseURL }) => {
+    const sent = [], received = [];
+    page.on('websocket', ws => {
+        ws.on('framesent', ({ payload }) => sent.push(JSON.parse(String(payload))));
+        ws.on('framereceived', ({ payload }) => received.push(JSON.parse(String(payload))));
+    });
     await page.goto(url(baseURL, { 'signed-in': '1', devadmin: 'local-dev-admin-key-0001' }));
     await expect(page.locator('[data-panel]')).toBeVisible();
+    await expect.poll(() => received.find(frame => frame.t === 'admin')?.transportSeq).toBeGreaterThan(0);
+    const snapshot = received.find(frame => frame.t === 'admin');
+    await expect.poll(() => sent.some(frame => frame.t === 'transport-ack' && frame.seq >= snapshot.transportSeq)).toBe(true);
+    expect(received.some(frame => frame.t === 'notice' && frame.text.includes('This page needs an update.'))).toBe(false);
     await expect.poll(() => page.evaluate(() => !!window.__admin.state)).toBe(true);
     await expect(page.getByRole('heading', { name: 'Reports', exact: true })).toBeVisible();
     expect(new URL(page.url()).search).toBe('');

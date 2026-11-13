@@ -50,6 +50,17 @@
         if (previous && previous.readyState < 2) previous.close(1000, 'staff connection replaced');
         let opened = false;
         let timedOut = false;
+        let ackTimer = null, handledSequence = 0;
+        const acknowledge = (sequence) => {
+            if (!Number.isSafeInteger(sequence) || sequence <= handledSequence) return;
+            handledSequence = sequence;
+            if (ackTimer !== null) return;
+            // Coalesce frames within the Worker's 20-controls-per-second allowance.
+            ackTimer = setTimeout(() => {
+                ackTimer = null;
+                if (app.ws === ws) send({ t: 'transport-ack', seq: handledSequence });
+            }, 50);
+        };
         const deadline = setTimeout(() => {
             if (app.ws !== ws) return;
             timedOut = true;
@@ -57,7 +68,7 @@
         }, 12000);
         ws.onopen = () => { if (app.ws === ws) opened = true; };
         ws.onclose = (event) => {
-            clearTimeout(deadline);
+            clearTimeout(deadline); clearTimeout(ackTimer);
             if (app.ws !== ws) return;
             app.ws = null;
             clearPanel();
@@ -71,14 +82,16 @@
         ws.onmessage = (e) => {
             if (app.ws !== ws || ws.readyState !== 1) return;
             let m; try { m = JSON.parse(e.data); } catch (err) { return; }
+            if (!m || typeof m !== 'object') return;
             if (m.t === 'device') localStorage.setItem('hangout-dev', m.token);
-            if (m.t === 'hello') { personTargetsSupported = m.features?.personTargets === 1; send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Helper', age13: true }); }
+            if (m.t === 'hello') { personTargetsSupported = m.features?.personTargets === 1; send({ t: 'hello', nick: $('[data-nick]').value.trim() || 'Helper', age13: true, transport: 1 }); }
             if (m.t === 'nick-error') status(m.text);
             if (m.t === 'welcome') status('Loading the review queue…');
             if (m.t === 'admin') { app.state = m.state; draw(); clearTimeout(deadline); status('Connected.'); $('[data-gate]').hidden = true; $('[data-panel]').hidden = false; }
             if (m.t === 'notice' && m.kind === 'error') toast(m.text);
             if (m.t === 'rate-limit') toast(m.text);
             if (m.t === 'denied') toast(m.text);
+            acknowledge(m.transportSeq);
         };
         return undefined;
     }
