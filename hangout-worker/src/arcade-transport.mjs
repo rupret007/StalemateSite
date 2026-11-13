@@ -82,6 +82,13 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         publish(scope, record.game, null, claims);
         return true;
     }
+    async function releaseGuestClaim(scope, sid) {
+        const record = await load(scope);
+        if (!record || !record.claims.some(claim => claim.sid === sid)) return;
+        const claims = record.claims.filter(claim => claim.sid !== sid);
+        await state.storage.put(key(scope), savedRecord(scope, record.game, record.expiresAt, claims));
+        publish(scope, record.game, null, claims);
+    }
     function publish(scope, game, requester = null, claims = []) {
         for (const socket of requester ? [requester] : sockets()) {
             const recipient = socket.deserializeAttachment();
@@ -242,5 +249,5 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         const records = await state.storage.list({ prefix, limit: MATCH_CAP });
         if (records.size) await state.storage.delete([...records.keys()]);
     }
-    return { issue, upgrade, receive, reconcile, revoke, maintain, retireDisabled, hasGuestSeat, reserveGuestSeat };
+    return { issue, upgrade, receive, reconcile, revoke, maintain, retireDisabled, hasGuestSeat, reserveGuestSeat, releaseGuestClaim };
 }

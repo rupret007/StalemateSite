@@ -31,6 +31,12 @@ export function gameGuestScope(value) {
 
 // Called within the lobby's serialized event path. Only the Worker sends a trusted session for issuance.
 export async function gameInvitationRequest(lobby, operation, body, session) {
+    if (operation === 'release') {
+        const scope = gameGuestScope(body.scope);
+        if (!scope || !sidPattern.test(body.sid || '')) return reply({ ok: false }, 400);
+        await lobby.arcade.get(scope.game).releaseGuestClaim(scope, body.sid);
+        return reply({ ok: true });
+    }
     if (!gameGuestEnabled(lobby.env)) return reply({ error: 'Game invitations are unavailable.' }, 404);
     const now = Date.now();
     const storage = lobby.state.storage;
