@@ -1702,7 +1702,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(table(b)).toHaveAttribute('data-phase', 'countdown');
         assert.equal(await a.locator('[data-tris-preview]').textContent(), await b.locator('[data-tris-preview]').textContent());
         await expect(spectator.locator('[data-tris-controls]')).toBeHidden();
+        await expect(b.locator('[data-tris-countdown]')).toHaveText(/^Starts in [1-9]$/);
+        await expect(b.locator('[data-tris-status]')).toHaveText('Get ready to stack.');
+        await expect(b.getByRole('button', { name: 'Hard drop' })).toBeDisabled();
         await expect(table(b)).toHaveAttribute('data-phase', 'play');
+        await expect(b.locator('[data-tris-status]')).toHaveText('Go! Tap ⇊ or press Space to drop.');
         if (evidence) {
             await mkdir(evidence, { recursive: true });
             await b.screenshot({ path: join(evidence, `tris-${engine}-before-input.png`) });
