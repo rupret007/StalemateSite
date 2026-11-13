@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { rolldown } from 'rolldown';
 import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
-import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
+import { RUSH_INPUT_BUFFER_MS, RUSH_TICKS_PER_SECOND, rushRaceTick, unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
 import { Miniflare, convertV4MiniflareOptions } from './durable-records/node_modules/miniflare/dist/src/index.js';
 import { createArcadePreviewSite } from './arcade-preview-site.mjs';
 
@@ -617,10 +617,14 @@ async function verifyTurdRush(white, black, spectator, ref) {
     assert.deepEqual(a.runner.run.entities, b.runner.run.entities);
     const hazards = unpackRushRacer(a.runner).run.entities.filter(entity => entity.at === 100 && ['crate', 'beam', 'barrier'].includes(entity.kind));
     const lane = hazards.find(entity => entity.lane !== 1).lane;
-    const inputs = [[1, lane === 0 ? 'swipe-left' : 'swipe-right']];
-    send(host, 'input', { sequence: 1, inputs });
+    const steer = lane === 0 ? 'swipe-left' : 'swipe-right';
+    send(host, 'input', { sequence: 1, inputs: [[1, steer]] });
     await host.wait(frame => frame.reason === 'countdown', 'Turd Rush prestart input refusal');
     await new Promise(resolve => setTimeout(resolve, Math.max(0, a.startsAt - Date.now()) + 20));
+    // A busy runner can resume after tick 1 has already been confirmed.
+    // Schedule both racers at the same current tick, ahead of that frontier.
+    const inputTick = Math.max(1, rushRaceTick(a.startsAt, Date.now()));
+    const inputs = [[inputTick, steer]];
     send(watch, 'input', { sequence: 1, inputs });
     send(host, 'input', { sequence: 1, inputs });
     send(guest, 'input', { sequence: 1, inputs });
@@ -629,7 +633,8 @@ async function verifyTurdRush(white, black, spectator, ref) {
     await guest.wait(frame => frame.state?.match?.runner.sequence === 1, 'Turd Rush guest accepted input');
     guest.socket.close(1000, 'Turd Rush reconnect fixture');
     guest = await connect(black);
-    await new Promise(resolve => setTimeout(resolve, Math.max(0, a.startsAt + 650 - Date.now())));
+    const recoveryAt = a.startsAt + RUSH_INPUT_BUFFER_MS + inputTick * 1000 / RUSH_TICKS_PER_SECOND + 330;
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, recoveryAt - Date.now())));
     send(guest, 'sync');
     const recovered = (await guest.wait(frame => frame.state?.match?.runner.run.player.lane === lane, 'Turd Rush recovered lane')).state.match;
     assert.equal(recovered.runner.sequence, 1);
