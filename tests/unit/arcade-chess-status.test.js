@@ -26,13 +26,14 @@ function state(extra = {}) {
     return { version: 1, game: 'chess', id: 'chess-status-1', seat: null, waiting: false, rematch: null, match: match(), ...extra };
 }
 
-function mount() {
+async function mount() {
     client.sent.length = 0;
     document.body.replaceChildren();
     const container = document.createElement('div');
     document.body.append(container);
     const api = mountArcadeChess(container, () => {});
     api.setRoom({ room: '#game-2ca9e1x1be34a', ref: 'ref-1', actor: 'actor-1' });
+    await api.ready();
     const panel = container.querySelector('.arcade-chess');
     return {
         publish(next, canOpen = false) { client.handlers.onState({ state: next, canOpen }); },
@@ -43,39 +44,39 @@ function mount() {
 }
 
 describe('Chess table next step', () => {
-    it('tells a watcher the table is full and hides seat controls', () => {
-        const view = mount();
+    it('tells a watcher the table is full and hides seat controls', async () => {
+        const view = await mount();
         view.publish(state());
         expect(view.status()).toBe('Table full. You’re up next game.');
         expect(view.primary.hidden).toBe(true);
         expect(view.leave.hidden).toBe(true);
     });
 
-    it('tells a watcher they are up if a finished game rematches', () => {
-        const view = mount();
+    it('tells a watcher they are up if a finished game rematches', async () => {
+        const view = await mount();
         view.publish(state({ match: match({ result: { winner: 'w', reason: 'Checkmate' } }) }));
         expect(view.status()).toBe('White wins · Checkmate. You’re up if they rematch.');
         expect(view.primary.hidden).toBe(true);
     });
 
-    it('keeps Rematch for a seated player when the game is over', () => {
-        const view = mount();
+    it('keeps Rematch for a seated player when the game is over', async () => {
+        const view = await mount();
         view.publish(state({ seat: 'b', match: match({ result: { winner: 'w', reason: 'Checkmate' } }) }));
         expect(view.status()).toBe('White wins · Checkmate');
         expect(view.primary.hidden).toBe(false);
         expect(view.primary.textContent).toBe('Rematch');
     });
 
-    it('says the game is over when the table disappears', () => {
-        const view = mount();
+    it('says the game is over when the table disappears', async () => {
+        const view = await mount();
         view.publish(state({ seat: 'b' }));
         view.publish(null);
         expect(view.status()).toBe('The host left. This game is over.');
         expect(view.primary.hidden).toBe(true);
     });
 
-    it('offers Open after the table disappears when this player can open one', () => {
-        const view = mount();
+    it('offers Open after the table disappears when this player can open one', async () => {
+        const view = await mount();
         view.publish(state(), true);
         view.publish(null, true);
         expect(view.status()).toBe('The host left. This game is over.');
@@ -83,8 +84,8 @@ describe('Chess table next step', () => {
         expect(view.primary.hidden).toBe(false);
     });
 
-    it('does not call a voluntary leave a host departure', () => {
-        const view = mount();
+    it('does not call a voluntary leave a host departure', async () => {
+        const view = await mount();
         view.publish(state({ seat: 'w', waiting: true, match: null }));
         view.primary.click();
         view.publish(null, true);
@@ -92,8 +93,8 @@ describe('Chess table next step', () => {
         expect(view.primary.textContent).toBe('Open');
     });
 
-    it('tells a seated player who dropped and returned that the seat is still theirs', () => {
-        const view = mount();
+    it('tells a seated player who dropped and returned that the seat is still theirs', async () => {
+        const view = await mount();
         view.publish(state({ seat: 'w' }));
         client.handlers.onStatus('reconnecting');
         view.publish(state({ seat: 'w' }));

@@ -1,6 +1,17 @@
-import { Chess, claimReason, colorName, intendedClaims, pieceName } from '/play/games/chess-core.js';
-import { ChessBoard } from '/play/games/chess-board.js';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+
+let Chess, claimReason, colorName, intendedClaims, pieceName, ChessBoard;
+let chessAssets;
+function loadChessAssets() {
+    chessAssets ??= Promise.all([
+        import('/play/games/chess-core.js'),
+        import('/play/games/chess-board.js')
+    ]).then(([core, board]) => {
+        ({ Chess, claimReason, colorName, intendedClaims, pieceName } = core);
+        ChessBoard = board.ChessBoard;
+    });
+    return chessAssets;
+}
 
 const files = 'abcdefgh', ranks = '87654321';
 const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
@@ -58,9 +69,14 @@ export function mountArcadeChess(container, onMatch) {
     panel.hidden = true;
     panel.innerHTML = markup;
     container.append(panel);
-    appendStyle(document, '/play/assets/chess/chessground.base.css');
-    appendStyle(document, '/play/assets/chess/chess-board.css');
     appendStyle(document, new URL('./arcade-chess.css', import.meta.url));
+    let boardStyles = false;
+    function ensureBoardStyles() {
+        if (boardStyles) return;
+        boardStyles = true;
+        appendStyle(document, '/play/assets/chess/chessground.base.css');
+        appendStyle(document, '/play/assets/chess/chess-board.css');
+    }
     const $ = selector => panel.querySelector(selector);
     const primary = $('[data-chess-primary]');
     const status = $('[data-chess-status]');
@@ -73,7 +89,7 @@ export function mountArcadeChess(container, onMatch) {
     let pending = false, canOpen = false, connection = 'connecting', connectionError;
     let model = null, chess = null, board = null, selected = null, focused = 'e2';
     let hadTable = false, hostLeft = false, leftVoluntarily = false, droppedSeat = null, resumedSeat = null;
-    let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
+    let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null, queuedFrame = null;
     const client = createGameNightMatchClient({
         onMatch,
         prefix: '/beta/arcade',
@@ -143,6 +159,16 @@ export function mountArcadeChess(container, onMatch) {
     }
 
     function applyState(frame) {
+        if (!Chess) {
+            queuedFrame = frame;
+            loadChessAssets().then(() => {
+                if (queuedFrame !== frame) return;
+                queuedFrame = null;
+                applyState(frame);
+            });
+            return;
+        }
+        queuedFrame = null;
         const prior = model?.match, next = frame.state?.match, nextState = frame.state;
         const enteringBoard = next && next.id !== prior?.id;
         resumedSeat = droppedSeat && nextState?.seat === droppedSeat && nextState.match && !nextState.match.result && !nextState.waiting
@@ -203,7 +229,8 @@ export function mountArcadeChess(container, onMatch) {
     }
 
     function drawBoard() {
-        if (!chess || !model?.match) return;
+        if (!chess || !model?.match || !ChessBoard) return;
+        ensureBoardStyles();
         if (!board) board = new ChessBoard(boardHost, { select, move, cancel: () => { selected = null; draw(); } });
         const flipped = model.seat === 'b';
         if (flipped !== lastOrientation) {
@@ -352,14 +379,19 @@ export function mountArcadeChess(container, onMatch) {
     panel.addEventListener('toggle', () => {
         if (panel.open && scope) {
             if (four) four.open = false;
+            ensureBoardStyles();
+            void loadChessAssets();
             client.start(scope);
         } else stop();
     });
     return {
         panel,
         isOpen: () => panel.open,
+        ready: () => loadChessAssets(),
         open() {
             if (!scope) return;
+            ensureBoardStyles();
+            void loadChessAssets();
             panel.open = true;
             return panel;
         },

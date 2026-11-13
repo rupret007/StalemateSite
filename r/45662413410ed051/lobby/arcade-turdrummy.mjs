@@ -1,7 +1,13 @@
-import '/play/games/turdrummy-rules.js';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
-const { analyzeHand } = globalThis.TurdRummyRules;
+let analyzeHand;
+let rummyRules;
+function loadRummyRules() {
+    rummyRules ??= import('/play/games/turdrummy-rules.js').then(() => {
+        analyzeHand = globalThis.TurdRummyRules.analyzeHand;
+    });
+    return rummyRules;
+}
 const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds'], C: ['♣', 'Clubs'] };
 const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const side = { a: 'Seat 1', b: 'Seat 2' };
@@ -209,7 +215,8 @@ export function mountArcadeTurdRummy(container, onMatch) {
 
         const active = !!seat && !match.roundResult && !match.result;
         const canSelect = active && seat === match.turn && match.phase === 'discard';
-        const deadwood = canSelect && selected !== null ? analyzeHand(match.hand.filter(card => card.id !== selected)).deadwoodScore : null;
+        if (canSelect && selected !== null && !analyzeHand) loadRummyRules().then(() => { if (panel.isConnected) draw(); });
+        const deadwood = canSelect && selected !== null && analyzeHand ? analyzeHand(match.hand.filter(card => card.id !== selected)).deadwoodScore : null;
         $('[data-rummy-hand-label]').textContent = seat
             ? `Your hand · ${match.hand.length} cards${deadwood === null ? '' : ` · ${deadwood} deadwood after discard`}`
             : 'Watching · hands are private';
@@ -269,13 +276,16 @@ export function mountArcadeTurdRummy(container, onMatch) {
         if (!panel.open || !scope) { reset(); return; }
         for (const details of container.querySelectorAll(':scope > details[open]')) if (details !== panel) details.open = false;
         container.scrollTop = 0;
+        void loadRummyRules();
         client.start(scope);
     });
     return {
         panel,
         isOpen: () => panel.open,
+        ready: () => loadRummyRules(),
         open() {
             if (!scope) return;
+            void loadRummyRules();
             panel.open = true;
             return panel;
         },

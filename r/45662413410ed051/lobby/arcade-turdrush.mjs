@@ -1,7 +1,24 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
-import { classifyRushSwipe } from '/play/games/turdrush-core.js';
-import { advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer } from '/play/games/turdrush-race.js';
-import { TurdRushRenderer } from '/play/games/turdrush-renderer.js';
+
+let classifyRushSwipe, advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer, TurdRushRenderer;
+let rushEngine, rushView;
+function loadRushEngine() {
+    // Same versioned core URL as turdrush-race.js so the browser fetches that file once.
+    rushEngine ??= Promise.all([
+        import('/play/games/turdrush-core.js?v=fa8a8ce86510b759'),
+        import('/play/games/turdrush-race.js')
+    ]).then(([core, race]) => {
+        classifyRushSwipe = core.classifyRushSwipe;
+        ({ advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer } = race);
+    });
+    return rushEngine;
+}
+function loadRushView() {
+    rushView ??= import('/play/games/turdrush-renderer.js').then(view => {
+        TurdRushRenderer = view.TurdRushRenderer;
+    });
+    return rushView;
+}
 
 const keys = { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'jump', w: 'jump', ' ': 'jump', ArrowDown: 'slide', s: 'slide' };
 const buttons = [['left', '←', 'Move left'], ['right', '→', 'Move right'], ['jump', '↑', 'Jump'], ['slide', '↓', 'Slide']];
@@ -104,14 +121,14 @@ export function mountArcadeTurdRush(container, onMatch) {
         redraw = true;
     }
     function rebuild() {
-        visual = model?.match ? unpackRushRacer(model.match.runner) : null;
+        visual = model?.match && unpackRushRacer ? unpackRushRacer(model.match.runner) : null;
         if (!visual) return;
         const outstanding = [...flights.flatMap(flight => flight.inputs), ...buffer].filter(input => input[0] > visual.tick);
         visual.queue.push(...outstanding);
         visual.queue.sort((a, b) => a[0] - b[0]);
         redraw = true;
     }
-    const client = createGameNightMatchClient({
+    const clientOptions = {
         onMatch,
         prefix: '/beta/arcade-turdrush',
         onStatus(next, reason) {
@@ -123,7 +140,12 @@ export function mountArcadeTurdRush(container, onMatch) {
             if (confirm.open) confirm.close();
             render();
         },
-        onState({ state, canOpen: host }) {
+        onState(frame) {
+            if (!unpackRushRacer) {
+                loadRushEngine().then(() => { if (unpackRushRacer && panel.isConnected) clientOptions.onState(frame); });
+                return;
+            }
+            const { state, canOpen: host } = frame;
             if (state && (state.game !== 'turdrush' || state.version !== 1)) return;
             const changed = state?.id !== model?.id || state?.seat !== model?.seat;
             const reveal = state?.match && (!model?.match || changed);
@@ -153,7 +175,8 @@ export function mountArcadeTurdRush(container, onMatch) {
                 : reason === 'input-paced' ? 'Too many moves at once.' : 'The race could not confirm that action.');
             render();
         }
-    });
+    };
+    const client = createGameNightMatchClient(clientOptions);
 
     function send(action) {
         if (action === 'retry') { client.start(scope); return; }
@@ -165,7 +188,7 @@ export function mountArcadeTurdRush(container, onMatch) {
 
     function queue(action) {
         const match = model?.match;
-        if (connection !== 'ready' || !model?.seat || !match || match.result || pending || confirm.open || buffer.length >= 8 ||
+        if (!rushRaceTick || connection !== 'ready' || !model?.seat || !match || match.result || pending || confirm.open || buffer.length >= 8 ||
             visual?.status !== 'running') return;
         const now = serverNow(performance.now());
         if (now < match.startsAt) return;
@@ -193,7 +216,7 @@ export function mountArcadeTurdRush(container, onMatch) {
             if (time - lastSync >= 950 && time - lastSent >= 350 && client.send({ action: 'sync' })) lastSync = time;
         }
         const at = serverNow(time), countdown = Math.ceil((match.startsAt - at) / 1000), oldTick = visual.tick;
-        if (connection === 'ready' && !match.result && countdown <= 0) {
+        if (connection === 'ready' && !match.result && countdown <= 0 && advanceRushRacer) {
             advanceRushRacer(visual, seat ? rushRaceTick(match.startsAt, at) : match.tick);
         }
         const run = visual.run;
@@ -224,8 +247,12 @@ export function mountArcadeTurdRush(container, onMatch) {
         canvas.hidden = !render3d;
         flat.hidden = render3d;
         if (render3d && !renderer) {
-            try { renderer = new TurdRushRenderer(canvas, { reducedMotion: motion.matches, onLost: fallbackView }); }
-            catch { fallbackView(); canvas.hidden = true; flat.hidden = false; }
+            if (!TurdRushRenderer) {
+                loadRushView().then(() => { redraw = true; if (!raf && panel.open && !panel.hidden) raf = requestAnimationFrame(drawFrame); });
+            } else {
+                try { renderer = new TurdRushRenderer(canvas, { reducedMotion: motion.matches, onLost: fallbackView }); }
+                catch { fallbackView(); canvas.hidden = true; flat.hidden = false; }
+            }
         }
         const resized = renderer?.resize();
         if (redraw || resized || visual.tick !== oldTick) {
@@ -303,6 +330,7 @@ export function mountArcadeTurdRush(container, onMatch) {
     });
     function swipe(event) {
         if (gesture?.id !== event.pointerId || gesture.action) return;
+        if (!classifyRushSwipe) return;
         const action = classifyRushSwipe(event.clientX - gesture.x, event.clientY - gesture.y);
         if (action) { gesture.action = action; queue(isLane(action) ? 'swipe-' + action : action); }
     }
@@ -339,13 +367,18 @@ export function mountArcadeTurdRush(container, onMatch) {
         if (!panel.open || !scope) { reset(); return; }
         for (const other of container.querySelectorAll(':scope > details[open]')) if (other !== panel) other.open = false;
         container.scrollTop = 0;
+        void loadRushEngine();
+        void loadRushView();
         client.start(scope);
     });
     return {
         panel,
         isOpen: () => panel.open,
+        ready: () => loadRushEngine(),
         open() {
             if (!scope) return;
+            void loadRushEngine();
+            void loadRushView();
             panel.open = true;
             return panel;
         },

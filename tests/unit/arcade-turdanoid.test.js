@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { TurdanoidBrickRace } from '../../play/games/turdanoid-race.js';
+import { BRICK_HEIGHT, BRICK_WIDTH, TurdanoidBrickRace } from '../../play/games/turdanoid-race.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const client = vi.hoisted(() => ({ sent: [], handlers: null }));
@@ -46,6 +46,13 @@ function inputs() {
 }
 
 describe('Turdanoid brick race phone friction', () => {
+    it('keeps the playfield canvas on the race module field size', async () => {
+        const view = await mount();
+        const canvas = view.board.querySelector('canvas');
+        expect(canvas.width).toBe(BRICK_WIDTH);
+        expect(canvas.height).toBe(BRICK_HEIGHT);
+    });
+
     it('keeps a full-width board in the short landscape brick rules', () => {
         const css = readFileSync(path.join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
         const start = css.indexOf('@media (max-height: 450px) and (max-width: 900px) and (orientation: landscape)');
@@ -62,8 +69,8 @@ describe('Turdanoid brick race phone friction', () => {
         expect(landscape).not.toMatch(/\.brick-race-layout,\s*\.brick-race-rail/);
     });
 
-    it('explains a disabled Launch during the countdown and hides that hint in play', () => {
-        const view = mount();
+    it('explains a disabled Launch during the countdown and hides that hint in play', async () => {
+        const view = await mount();
         view.publish(50_000);
         view.pump();
         expect(view.hint.hidden).toBe(false);
@@ -79,10 +86,10 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.table.dataset.phase).toBe('play');
     });
 
-    it('launches from a tap on the stuck ball and lets a drag only aim', () => {
+    it('launches from a tap on the stuck ball and lets a drag only aim', async () => {
         const source = readFileSync(path.join(root, 'r/45662413410ed051/lobby/arcade-turdanoid.mjs'), 'utf8');
         expect(source.match(/queue\('serve'\)/g)).toEqual(["queue('serve')"]);
-        const view = mount();
+        const view = await mount();
         view.publish(54_000);
         view.pump();
         const ball = view.ballPoint();
@@ -104,8 +111,8 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.table.dataset.stuck).toBe('false');
     });
 
-    it('does not launch from a tap away from the stuck ball', () => {
-        const view = mount();
+    it('does not launch from a tap away from the stuck ball', async () => {
+        const view = await mount();
         view.publish(54_000);
         view.pump();
         client.sent.length = 0;
@@ -117,16 +124,16 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.table.dataset.stuck).toBe('true');
     });
 
-    it('hides the countdown hint for a spectator', () => {
-        const view = mount();
+    it('hides the countdown hint for a spectator', async () => {
+        const view = await mount();
         view.publish(50_000, null);
         view.pump();
         expect(view.hint.hidden).toBe(true);
         expect(view.launch.hidden).toBe(true);
     });
 
-    it('tells a watcher the table is full and a finished watcher who won', () => {
-        const view = mount();
+    it('tells a watcher the table is full and a finished watcher who won', async () => {
+        const view = await mount();
         view.publish(54_000, null);
         expect(view.status.textContent).toBe('Table full. You’re up next race.');
         expect(view.main.hidden).toBe(true);
@@ -140,16 +147,16 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.main.hidden).toBe(true);
     });
 
-    it('says the race is over when the table disappears', () => {
-        const view = mount();
+    it('says the race is over when the table disappears', async () => {
+        const view = await mount();
         view.publish(54_000, 'b');
         client.handlers.onState({ state: null, canOpen: false });
         expect(view.status.textContent).toBe('The host left. This race is over.');
         expect(view.main.hidden).toBe(true);
     });
 
-    it('tells a seated player to reconnect and keeps Retry', () => {
-        const view = mount();
+    it('tells a seated player to reconnect and keeps Retry', async () => {
+        const view = await mount();
         view.publish(54_000, 'b');
         client.handlers.onStatus('unavailable');
         expect(view.status.textContent).toBe('Reconnecting to your seat.');
@@ -158,16 +165,16 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.main.dataset.command).toBe('retry');
     });
 
-    it('tells a touch player to drag and tap instead of using arrow keys and Space', () => {
-        const touch = mount({ coarse: true });
+    it('tells a touch player to drag and tap instead of using arrow keys and Space', async () => {
+        const touch = await mount({ coarse: true });
         expect(touch.help.textContent).toBe('Drag to move. Tap the stuck ball or press Launch.');
         expect(touch.help.textContent).not.toMatch(/arrow keys|Space/);
-        const keys = mount({ coarse: false });
+        const keys = await mount({ coarse: false });
         expect(keys.help.textContent).toBe('Drag or use the arrow keys to move. Tap the stuck ball or press Launch.');
     });
 });
 
-function mount({ coarse = true } = {}) {
+async function mount({ coarse = true } = {}) {
     client.sent.length = 0;
     document.body.replaceChildren();
     const media = query => ({
@@ -191,6 +198,7 @@ function mount({ coarse = true } = {}) {
     });
     api.setRoom({ room: '#game-2ca9e1x1be34a', ref: 'ref-1', actor: 'actor-1' });
     api.open();
+    await api.ready();
     return {
         board,
         hint: container.querySelector('[data-brick-launch-wait]'),
