@@ -1759,7 +1759,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (gameShareButton) gameShareButton.hidden = !canShare;
         if (gameShareDialog?.open && (!canShare || gameShareDialog.dataset.room !== c.keepRef)) gameShareDialog.close();
         $('[data-game-night]').hidden = !c;
-        $('[data-arcade-game]').hidden = !!gameGuest || !c || ![...arcadeTables.values()].some(table => table.supported);
+        const picker = $('[data-arcade-game]');
+        picker.hidden = !!gameGuest || !c || ![...arcadeTables.values()].some(table => table.supported);
+        picker.querySelector('option[value="four"]').disabled = !fourInARowSupported || shieldActive;
         drawFour(c);
         for (const [game, table] of arcadeTables) drawArcadeTable(c, game, table);
         drawArcadeMedia(c);

@@ -596,6 +596,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function verifyGameNightEntry() {
         const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
         await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+        const picker = host.locator('.game-actions').getByRole('combobox', { name: 'Switch game' });
+        await expectUncoveredControl(picker);
+        await expect(picker.locator('option[value=""]')).toHaveText('Choose a game');
+        await expect(picker.locator('optgroup option:enabled')).toHaveCount(10);
+        await expect(picker.locator('option[value="four"]')).toBeEnabled();
         await verifyArcadeInvites(host);
         if (!mixed) {
             await verifyFirstVisit(host);
