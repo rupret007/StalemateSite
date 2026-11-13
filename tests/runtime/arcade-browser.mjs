@@ -2041,7 +2041,6 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Accept Turd Rush rematch' }).click();
         await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(race(b)).toHaveAttribute('data-sequence', '0');
-        if (engine === 'chromium') await verifyTurdRushSwipeAcrossGo(b);
         console.log(`Passed ${engine} Turd Rush shared course and collision, keyboard, ${media ? 'native swipe with 220 ms delay and active call' : '44px phone touch and full reload'}, 2D fallback, spectator and rematch.`);
     }
     async function verifyBrickRaceFinish(a, b, spectator) {
@@ -2352,6 +2351,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playTurdtris(a, b, spectator);
         await playTurdomania(a, b, spectator);
         await playTurdRush(a, b, spectator);
+        if (engine === 'chromium') await verifyTurdRushSwipeAcrossGo(b);
         await playTurdanoid(a, b, spectator);
         if (relay) {
             const stats = (await Promise.all([selectedPairStats(a), selectedPairStats(b)])).flat();
