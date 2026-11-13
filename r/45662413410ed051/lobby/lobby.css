@@ -785,7 +785,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
-  .buffer:has(:focus-visible),
+  .buffer:has(:focus-visible) { min-height: 64px; flex-shrink: 0; }
   .buffer li { padding-block: 0; }
   .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
