@@ -2035,15 +2035,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const control = b.getByRole('button', { name: 'Move ' + direction });
         const controlBox = await control.boundingBox();
         assert.ok(controlBox?.width >= 44 && controlBox.height >= 44, 'phone-sized Turd Rush control');
-        const prediction = media ? b.evaluate(async expectedLane => {
-            const table = document.querySelector('[data-race-match]');
-            const start = performance.now();
-            while (performance.now() - start < 400) {
-                await new Promise(requestAnimationFrame);
-                if (table.dataset.sequence !== '0') return false;
-                if (table.dataset.lane === expectedLane) return true;
-            }
-            return false;
+        await track(a).press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
+        await b.bringToFront();
+        const prediction = media ? await race(b).evaluateHandle((table, expectedLane) => {
+            const result = { predicted: false, observer: null };
+            result.observer = new MutationObserver(() => {
+                if (table.dataset.sequence === '0' && table.dataset.lane === expectedLane) result.predicted = true;
+            });
+            result.observer.observe(table, { attributes: true, attributeFilter: ['data-lane', 'data-sequence'] });
+            return result;
         }, String(danger)) : null;
         if (engine === 'chromium') {
             const connection = await b.context().newCDPSession(b);
@@ -2056,8 +2056,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
             } finally { await connection.detach(); }
         } else await b.touchscreen.tap(controlBox.x + controlBox.width / 2, controlBox.y + controlBox.height / 2);
-        await a.keyboard.press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
-        if (prediction) assert.equal(await prediction, true, 'native phone swipe moves locally before delayed confirmation');
+        if (prediction) {
+            try {
+                await expect.poll(() => prediction.evaluate(result => result.predicted), {
+                    message: 'native phone swipe moves locally before delayed confirmation'
+                }).toBe(true);
+            } finally {
+                await prediction.evaluate(result => result.observer.disconnect());
+                await prediction.dispose();
+            }
+        }
         for (const page of [a, b]) {
             await expect(race(page)).toHaveAttribute('data-sequence', '1');
             await expect(race(page)).toHaveAttribute('data-lane', String(danger));
