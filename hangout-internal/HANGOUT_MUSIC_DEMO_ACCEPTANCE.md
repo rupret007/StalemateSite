@@ -23,8 +23,8 @@ package and deployment receipts below describe their own candidates.
 
 Each physical trial remains one native host and one browser guest for at most
 ten minutes, with capture consent, headphones and no recording. Retain the
-earlier Wi-Fi-first results at their original revisions; the currently prepared
-MacBook route uses dock Ethernet. Keep wired, Wi-Fi and second-network evidence
+earlier Wi-Fi-first results at their original revisions. Use dock Ethernet
+for the wired baseline. Keep wired, Wi-Fi and second-network evidence
 separate. Do not stop an independently opened Art session as though it belonged
 to a bounded test.
 Only Jeff disposes moderation reports. Actual headphone and microphone use on
@@ -34,11 +34,12 @@ Windows still needs the participant's confirmation.
 
 Use the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
 for current delivery and device checks. The private site is serving the Arcade
-trial, which includes the current Jam invitation and Web Join changes. Both
-Mac Desktop shortcuts select verified `23cfae6` builds that passed idle
-startup. Installed Windows Chrome passed simulated microphone recovery,
-expired-invite and Retry checks. Both hosts still need an attended listening
-test with the current Windows browser guest.
+trial, which includes the delivered Jam invitation and Web Join changes. On
+either Mac, use **WebJam Private Rehearsal (c6eecdc)** on the Desktop. Both
+shortcuts resolve to their verified private packages. The older **WebJam
+Private Band Demo** shortcut selects `23cfae6`. Installed Windows Chrome
+passed simulated microphone recovery, expired-invite and Retry checks. Both
+hosts still need an attended listening test with the current Windows browser guest.
 
 The earlier generated Mac-to-Windows trial passed transport both ways,
 40-second synthetic WAV chord detection, a fresh invitation and shutdown at its
@@ -58,8 +59,9 @@ application delivery gate.
    account headroom checks before starting a bounded trial.
 2. Invite the Windows guest to the same private Jam room in Hang Out. The
    guest selects **Join room** at the bottom of the lobby. Once both are in
-   the room, the **host** uses native WebJam: Music → Host → Start Session if
-   shown. Use **Copy browser invite**, wait for **Link copied**, paste the fresh
+   the room, the **host** chooses **Music → Host** in native WebJam and clicks
+   **Start Session** if shown. On the current private site, choose
+   **Copy browser invite** and wait for **Link copied**. Paste the fresh
    link into the Jam room's invitation field and click **Share**. The guest
    opens **Join in browser** in Chrome, checks the selected microphone and
    headphones, then chooses **Join with microphone**. The guest needs no
@@ -87,8 +89,11 @@ application delivery gate.
    [attended manual audio handoff](HANGOUT_WEBEX_AUDIO_HANDOFF.md) with consenting
    participants and no recording. The current integration opens the external
    meeting; automatic cross-app muting/switching is not implemented. Repeat a
-   bounded music trial from a second network when available. Keep these outcomes separate from same-household
-   transport. Existing caps and all release/trust holds remain in force.
+   bounded music trial from a second network. End the home-network session,
+   move Windows to a phone hotspot while the Mac stays on the home network,
+   then start a fresh session. Confirm sound both ways and note the browser's
+   selected connection type. Return Windows to its original network afterward.
+   Existing caps and release and trust holds remain in force.
 
 The [overnight evidence note](HANGOUT_OVERNIGHT_CHECKS_20261107.md) records
 earlier hosted chat and layout tests separately from the attended music checks.

@@ -1,31 +1,49 @@
 # Webex companion: current behavior and acceptance
 
 WebJam carries the music through Jamulus and browser Web Join. An optional
-Webex meeting can provide video or conversation separately. The current qualified native
-candidate source is `ae49c915070f2951db9ff441c23c7f0a9d90ce1b`; existing Desktop
-selections were preserved and may still open older builds. Use the
-[current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md) for actual package and
-website identities. This note does not qualify a real meeting.
+Webex meeting can provide video or conversation separately. The staged native
+rehearsal build is `c6eecdc` on both Macs. Use **WebJam Private Rehearsal
+(c6eecdc)** on the Desktop and check the [current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+for exact package and website identities. Real meeting acceptance remains open.
 
-**November 9 update:** the existing Personal Room was saved through normal
-Settings in the verified Mini build and remained correct after reopening, with
-the musician name unchanged. Only the Mini preference was qualified; MacBook
-setup and the attended meeting checks remain pending. Do not recover the same
-private URL again merely because the historical readiness notes below predate
-that setup. Private links and room numbers stay out of repository evidence.
+**November 12 device check.** Both `c6eecdc` Macs have the same existing
+Personal Room saved. The Intel MacBook has Chrome and a listed camera. Use
+the browser option offered by Webex there. The Windows NucBox has Chrome
+and a Webex app, but the readback found no enabled camera. For a two-way
+video check, connect a camera to Windows and confirm its preview before
+joining. Keep the room link and number private.
 
 ## What the current application controls
 
 | Participant | Available behavior | Boundary |
 | --- | --- | --- |
 | Native Mac host | Conversation opens its panel. An explicit Join / Open Meeting action hands the saved validated meeting link to the operating system. | The meeting owns sign-in, camera, microphone, speakers and participant state. Opening a link does not prove the meeting was joined. |
-| Native Mac with verified Webex | Show Webex App and Open Webex to Mute bring the verified Cisco application forward for its own controls. | The participant must operate Webex's Mute control. WebJam cannot verify or change that external meeting's mute state. |
+| Native Mac with verified Webex | **Show Webex App** and **Open Webex for Audio** bring the verified Cisco application forward. | Each participant changes their audio connection in Webex. WebJam has no verification of the meeting's audio state. |
 | Browser Music guest | Web Join supplies music audio. A separately supplied meeting invitation can be opened in Webex's supported app or browser. | Web Join has no embedded meeting, camera, Webex SDK session or automatic cross-app audio switch. |
 
 The desired simple audio switch remains an implementation gap. Legacy
 Talkback, video-only or audience preferences do not establish automatic routing.
 The supported external path is documented in the native
 [meeting-platform guidance](https://github.com/rupret007/webjam/blob/76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c/WEBEX_AUDIO_MODES.md).
+
+## Two-person handoff
+
+1. Join the Personal Room on both ends. For video during Music, select
+   **Don't connect to audio** in Webex prejoin. Check that both people can see
+   video and that Webex audio is disconnected at each endpoint.
+   [Cisco prejoin guide](https://help.webex.com/en-us/article/ela6i8)
+2. Play and listen in WebJam. For conversation, the guest leaves WebJam
+   audio and the host ends Music. Verify Music has stopped at both ends,
+   then connect computer audio in Webex.
+3. To play again, disconnect Webex audio at both endpoints. If that option
+   is unavailable, leave Webex before restarting Music. The Music host sends
+   a fresh invitation and both people confirm they can hear the new session.
+   [Cisco audio connection guide](https://help.webex.com/en-us/article/871cgu)
+
+Microphone mute stops your voice from going to the meeting. WebJam monitor
+mute changes what you hear in WebJam. Disconnecting Webex audio stops both
+meeting input and playback. Record the result of each step without saving
+any audio, video or meeting links.
 
 ## November 8 device readiness
 
@@ -42,16 +60,16 @@ Personal Room. The current vendor signature was valid. One HTTPS Webex Personal
 Room link was validated without saving its URL, room number or host fields to
 evidence; the client was quit normally. No meeting, camera or microphone started.
 
-That November 8 discovery did not configure WebJam or prove a meeting join.
-The November 9 Mini setup above supersedes its missing-preference state: do not
-recover or re-enter the Mini link again just because this dated section exists.
-MacBook setup remains unqualified; use normal existing-client/browser navigation
-and save only the validated existing meeting link when the device/resource gates
-permit. Do not ask Jeff to paste the private URL into chat. Do not create a new
-meeting, publish the link, enroll an SDK, or buy a license for this test. Use the
-supported external app/browser offered by the meeting; a native Show Webex App
-control requires a verified installed client. The read-only checks launched no
-meeting, microphone or camera and do not qualify video or audio switching.
+The November 12 setup above supersedes the earlier missing preferences.
+On the MacBook, choose **Join / Open Meeting** in Conversation. On a Mac
+with a verified Cisco client, **Show Webex App** brings that app forward.
+To undo the MacBook setup, clear its Webex meeting link in Settings. Its
+original meeting field was empty.
+
+The local Apple Silicon test candidate `58c269b` passed the Conversation
+layout, keyboard actions and audio-handoff instructions with the meeting
+launch intercepted. Use the staged `c6eecdc` build for the attended check.
+Joining, camera preview and exclusive audio still need that check.
 
 ## Attended manual handoff check
 
@@ -70,7 +88,7 @@ normal fresh resource and account-headroom checks.
    enabling the meeting's audio. Check speech in both directions and video.
 3. Before returning to Music, disconnect the meeting's audio using its own
    controls. If the available client or meeting cannot do this, leave the
-   meeting. Start Music explicitly and share a fresh browser invitation.
+   meeting. The Music host starts the next session and sends a fresh invitation.
    Confirm music works and meeting audio remains off.
 4. Verify normal Leave / End Session and meeting exit. Retain only revisions,
    client/device roles, timing, outcomes and sanitized errors. Do not put
