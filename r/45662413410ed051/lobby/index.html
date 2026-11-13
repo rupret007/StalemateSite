@@ -21,10 +21,12 @@
         <h3 id="channel-dialog-title">Your own #channel</h3>
         <p>Anyone can host. Join an existing channel, or create one and become its @ host.</p>
         <form data-channel-form>
-            <label class="channel-label" for="channel-name">Channel name</label>
-            <input id="channel-name" data-channel-name maxlength="31" autocomplete="off" spellcheck="false" placeholder="#night-owls" aria-describedby="channel-name-hint channel-name-error" required>
+            <div data-channel-field>
+                <label class="channel-label" for="channel-name">Channel name</label>
+                <input id="channel-name" data-channel-name maxlength="31" autocomplete="off" spellcheck="false" placeholder="#night-owls" aria-describedby="channel-name-hint channel-name-error" required>
+                <p class="status" id="channel-name-error" data-channel-error role="status"></p>
+            </div>
             <p class="small" id="channel-name-hint">2–30 letters, numbers or dashes. You can also type /join #night-owls in chat.</p>
-            <p class="status" id="channel-name-error" data-channel-error role="status"></p>
             <div class="sheet-buttons"><button class="btn" type="submit">Join / create</button><button class="btn btn--ghost" type="button" data-channel-cancel>Cancel</button></div>
         </form>
         <p class="small">Give another member @ with /op nick before you leave. Rooms close after 10 minutes empty.</p>
@@ -133,12 +135,15 @@
             <p class="small gate-hint">Remembered on this device, not reserved. Camera &amp; mic stay off.</p>
             <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span> beside my name</label><p class="small">Your entrance, not a verified identity. You can hide it in People.</p></div>
             <p class="small" data-entry-unavailable hidden>Entry-site badges aren’t available on this server. Your return link still works.</p>
-            <button class="btn btn--big" type="button" data-enter disabled>I’m 13+ and I agree · Let me in ↗</button>
+            <div>
+                <button class="btn btn--big" type="button" data-enter aria-describedby="gate-status" disabled>I’m 13+ and I agree · Let me in ↗</button>
+                <p class="status" id="gate-status" data-gate-status role="status">Getting Hang Out ready…</p>
+                <a class="btn btn--ghost" data-lobby-reload href="" hidden>Reload Hang Out</a>
+            </div>
             <p class="rules"><b>One rule: Don’t be a dick.</b> Swear all you want. You own what you post; site moderators can remove abusive content. <a href="../terms/" data-terms>House rules &amp; privacy</a></p>
             <details class="entry-details"><summary>How session scrollback works</summary><p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p></details>
             <p class="small gate-disclosure" data-ai-disclosure>When AI review is enabled, public text may go to OpenAI after posting to flag messages for our moderators. PMs, invite links, invite-only/key-protected/locked rooms, cameras and encrypted private rooms are excluded. Flagged, reported or held evidence stays up to 24 hours, separate from chat scrollback.</p>
             <button class="btn btn--ghost" data-gate-guest hidden>Continue as guest</button>
-            <p class="status" data-gate-status role="status"></p>
             <a class="btn btn--ghost" data-gate-private-entry href="/beta/" hidden>Open private entry</a>
           </div>
         </div>
@@ -471,6 +476,7 @@
     <script src="discovery-core.js"></script>
     <script src="lobby-room.js"></script>
     <script src="qr-lite.js"></script>
-    <script type="module" src="lobby.js"></script>
+    <script src="lobby-startup.js"></script>
+    <script type="module" src="lobby.js" data-lobby-module></script>
 </body>
 </html>
