@@ -2088,7 +2088,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const target = fourInvite;
         if (!target) return;
         openInviteDialog($('[data-four-invite]'), target);
-        if ($('[data-invite-dialog]').open) void prepareGuestLink(target, true, true);
+        if ($('[data-invite-dialog]').open) void prepareGuestLink(target, true);
     });
     function changeGameLink(value) {
         const c = currentGameNight();
@@ -2714,30 +2714,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         guestLinkStatus.textContent = 'The table changed. Prepare a new invitation.';
     }
     createGuestLink.addEventListener('click', () => void prepareGuestLink(arcadeInviteTarget()));
-    async function deliverPreparedLink(request) {
-        const title = `Join me for ${gameLabel(request.target.game)}`;
-        if (typeof navigator.share === 'function') {
-            try {
-                await navigator.share({ title, url: request.link });
-                if (pendingGuestLink === request) closeInviteDialog();
-                return true;
-            } catch (error) {
-                if (pendingGuestLink !== request || error.name === 'AbortError') return true;
-                return false;
-            }
-        }
-        if (typeof navigator.clipboard?.writeText === 'function') {
-            try {
-                await navigator.clipboard.writeText(request.link);
-                if (pendingGuestLink === request) guestLinkStatus.textContent = 'Invitation copied. Send it to your friend in a message.';
-                return true;
-            } catch {
-                return false;
-            }
-        }
-        return false;
-    }
-    async function prepareGuestLink(target, preferEmail = false, deliver = false) {
+    async function prepareGuestLink(target, preferEmail = false) {
         const room = inviteContext;
         if (!target || !room || room !== currentGameNight() || room.keepRef !== inviteInstance || !amOp(room)) {
             guestLinkStatus.textContent = 'Open a game table with a free seat first.';
@@ -2765,8 +2742,6 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
             shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
             guestLinkStatus.textContent = 'One guest can use this invitation within 20 minutes.';
-            if (deliver && await deliverPreparedLink(request)) return;
-            if (pendingGuestLink !== request) return;
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();
         } catch (error) {
             if (pendingGuestLink !== request) return;

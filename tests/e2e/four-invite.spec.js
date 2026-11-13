@@ -59,12 +59,19 @@ test('a phone guest joins an open Four seat from one invite tap and drops a piec
 
         await host.evaluate(() => {
             window.__fourInvite = '';
-            const share = async data => { window.__fourInvite = data?.url || ''; };
+            const share = async data => {
+                if (!navigator.userActivation.isActive) throw new DOMException('User activation required', 'NotAllowedError');
+                window.__fourInvite = data?.url || '';
+            };
             try { Object.defineProperty(navigator, 'share', { configurable: true, value: share }); }
             catch { navigator.share = share; }
         });
         const opened = Date.now();
         await inviteButton.click();
+        const share = sheet.getByRole('button', { name: 'Share invite', exact: true });
+        await expect(share).toBeFocused();
+        expect(await host.evaluate(() => window.__fourInvite)).toBe('');
+        await share.click();
         await expect.poll(() => host.evaluate(() => window.__fourInvite)).not.toBe('');
         const href = await host.evaluate(() => window.__fourInvite);
         const link = new URL(href);
