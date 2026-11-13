@@ -810,7 +810,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(guest.locator('[data-jam-web]')).toBeEnabled();
         await expect(host.getByRole('button', { name: 'Copy desktop invite', exact: true })).toBeVisible();
         await expect(host.getByRole('button', { name: 'Copy browser invite', exact: true })).toBeVisible();
-        await expect(guest.locator('[data-jam-web]')).toHaveAttribute('title', /headphones and audio consent/);
+        await expect(guest.locator('[data-jam-web]')).toHaveAttribute('title', /listen or join with a microphone/);
         await expect(guest.locator('[data-jam-wait]')).toBeHidden();
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         await guest.click('[data-jam-copy]');

@@ -2038,7 +2038,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         web.hidden = expired;
         web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser';
         web.title = web.disabled ? 'Your host has not shared an approved browser invite yet'
-            : 'Open the host’s browser invitation; headphones and audio consent are required there';
+            : 'Open the host’s browser invitation to listen or join with a microphone';
         const context = jamContext;
         web.onclick = () => {
             if (jamContext !== context || currentJam() !== context.room) return;
