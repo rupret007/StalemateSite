@@ -1826,7 +1826,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
     }
     function arcadeMatchState(game, table, scope, state, sendMatch) {
-        table.invite = scope && state?.seat && state.waiting ? gameNightInvite(game, state.id) : null;
+        table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
         const invite = arcadeInvitation;
         if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
         if (state?.seat && (state.id === invite.match || gameGuest)) {
@@ -1837,7 +1837,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
             return finishArcadeInvitation();
         }
-        if (state?.id !== invite.match || !state.waiting) {
+        if (state?.id !== invite.match || !state.waiting || state.hasOpenSeat === false) {
             return finishArcadeInvitation('This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
         }
         if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
