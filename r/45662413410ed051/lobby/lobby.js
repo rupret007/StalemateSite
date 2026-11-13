@@ -1556,7 +1556,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (room?.kind === 'game' && room.keepRef === result.ref) {
             const requestedGame = pending.fromEntry && gameEntry?.table;
             if (arcadeTables.get(requestedGame)?.supported) {
-                arcadeReturning = { room: room.name, ref: room.keepRef, game: requestedGame };
+                arcadeReturning = { room: room.name, ref: room.keepRef, game: requestedGame, reveal: true };
                 arcadeShareIntent = gameEntry.prepareShare && gameGuestInvitesSupported ? arcadeReturning : null;
             }
             if (pending.fromEntry) gameEntry = null;
@@ -1794,8 +1794,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             updateTableInvite(table, c);
             if (scope && arcadeInvitation?.game === game && arcadeInvitation.ref === scope.ref) table.controller.open();
             if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
+                const { reveal } = arcadeReturning;
                 arcadeReturning = null;
-                table.controller.open();
+                const wasOpen = table.controller.isOpen();
+                const panel = table.controller.open();
+                if (reveal && panel) requestAnimationFrame(() => {
+                    if (panel.open && currentGameNight()?.keepRef === scope.ref) revealArcadePanel(panel, wasOpen);
+                });
             }
             return;
         }
@@ -1930,6 +1935,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const panel = four || controller?.open();
         if (!panel) return;
         if (four) four.open = true;
+        revealArcadePanel(panel, wasOpen);
+    });
+    function revealArcadePanel(panel, wasOpen) {
         const heading = panel.querySelector('summary');
         heading.focus({ preventScroll: true });
         const reveal = () => {
@@ -1947,7 +1955,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         });
         resize.observe(panel);
         heading.addEventListener('blur', () => resize.disconnect(), { once: true });
-    });
+    }
     window.addEventListener('pagehide', () => {
         const current = currentGameNight();
         const open = [...arcadeTables].find(([, table]) => table.controller?.isOpen());
