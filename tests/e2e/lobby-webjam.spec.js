@@ -837,7 +837,9 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         const help = guest.locator('[data-jam-help]'), summary = help.locator('summary');
         await summary.focus(); await summary.press('Enter');
         await expect(help).toHaveAttribute('open'); await expect(summary).toBeFocused();
-        await expect(help).toContainText('click Copy browser invite. Wait for Link copied, then paste the link above and choose Share with room.');
+        await expect(help).toContainText('Open WebJam in browser');
+        await expect(help).toContainText('Invite bandmate to Music');
+        await expect(help).toContainText('click Copy browser invite in WebJam. Wait for Link copied, then paste the link in Hang Out and choose Share with room.');
         await expect(help).toContainText('Sharing an invite does not turn on your microphone');
         await expect(help.locator('p').first()).toBeInViewport({ ratio: 0.5, timeout: 1000 });
         expect(await summary.evaluate(element => {
