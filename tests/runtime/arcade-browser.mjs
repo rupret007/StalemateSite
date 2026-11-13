@@ -219,7 +219,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             try {
                 await host.getByRole('combobox', { name: 'Switch game' }).selectOption(game);
                 const openTable = phone ? chessPrimary(host) : spadesMain(host);
-                await expect(openTable).toHaveText('Open');
+                await expect(openTable).toHaveText(phone ? 'Open' : 'Open 4-player');
                 await openTable.click();
                 await expect(host.locator(phone ? '[data-chess-status]' : '[data-spades-status]')).toContainText(phone ? 'Waiting for an opponent' : '1/4 seated');
                 const hostViewport = host.viewportSize();
@@ -243,7 +243,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(friend.locator('[data-spades-status]')).toHaveText(/2\/4 seated · You’re West/);
                     await expect(host.locator('[data-spades-status]')).toContainText('2/4 seated');
                     await expect(friend.locator('[data-spades-seats]')).toBeHidden();
-                    await expect(friend.locator('[data-spades-seats] button')).toHaveText(['Join', 'Join', 'Join', 'Join']);
+                    await expect(friend.locator('[data-spades-seats] button')).toHaveText(['Join South', 'Join West', 'Join North', 'Join East']);
                 }
                 await captureArcadeInvite(friend, viewport, '02-seated');
                 console.log(`Passed ${engine} ${viewport.width}x${viewport.height} ${label} invitation, one guest tap to the same table.`);
@@ -471,7 +471,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
                 const reused = await context.newPage();
                 await openGameNightLink(reused, link);
-                await expect(reused.getByRole('status')).toHaveText('Ask your host for a new invite.');
+                await expect(reused.getByRole('status')).toHaveText('This invite expired. Ask your host for a new invite.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
@@ -534,7 +534,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         try {
             await host.setViewportSize(desktop);
             await host.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
-            await expect(spadesPartners(host)).toHaveText('Open');
+            await expect(spadesPartners(host)).toHaveText('Open 2-player');
+            await expect(spadesMain(host)).toHaveText('Open 4-player');
             await spadesPartners(host).click();
             await expect(status(host)).toContainText('1/2 seated');
             const link = await shareGameNightLink(host, desktop, 'spades-00-host-share');
@@ -714,7 +715,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         if (media && !relay) await player.route('**/beta/arcade-ticket', route => route.fulfill({ status: 403 }), { times: 1 });
         await playerGame.selectOption('chess');
         if (media && !relay) {
-            await expect(player.locator('[data-chess-status]')).toHaveText('Return to the room.');
+            await expect(player.locator('[data-chess-status]')).toHaveText('This game connection closed. Reopen the room to play.');
             await expect(chessPrimary(player)).toBeHidden();
             await playerGame.selectOption('four');
             await playerGame.selectOption('chess');
@@ -920,7 +921,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect.poll(() => matches.length, { timeout: 12000, message: 'Chess retries a socket that never confirms its board' }).toBe(3);
         assert.match(recoveringStatus, /Reconnecting…/);
         assert.equal(confirmedBoardVisible, true);
-        await expect(player.locator('[data-chess-status]')).toHaveText('You’re still Black.');
+        await expect(player.locator('[data-chess-status]')).toHaveText('You’re still Black · Your turn');
         await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
         await expect(player.locator('[data-connection]')).toHaveText('Connected');
         await expect(player.locator('[data-call-toggle]')).toHaveText('Call joined');
@@ -1569,11 +1570,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(page.locator('[data-arcade-game] option[value="turdspades"]')).toBeEnabled();
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
         }
-        await expect(spadesMain(a)).toHaveText('Open');
+        await expect(spadesMain(a)).toHaveText('Open 4-player');
         await spadesMain(a).click();
         for (const [index, [page, seat]] of [[b, 'west'], [north, 'north'], [east, 'east']].entries()) {
             const join = spadesSeat(page, seat);
-            await expect(join).toHaveText('Join');
+            await expect(join).toHaveText('Join ' + seat[0].toUpperCase() + seat.slice(1));
             await join.click();
             if (index < 2) await expect(a.locator('[data-spades-status]')).toContainText(`${index + 2}/4 seated`);
         }
@@ -2197,8 +2198,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(status(page)).toHaveText(`${labels[index]} · ${reason}`);
             assert.deepEqual(await scoreboard(page), scores);
         }
-        const watcher = lead > 0 ? 'Player 1 wins. You’re up if they rematch.'
-            : lead < 0 ? 'Player 2 wins. You’re up if they rematch.' : 'Draw. You’re up if they rematch.';
+        const watcher = `Watching · ${lead > 0 ? 'Player 1 wins' : lead < 0 ? 'Player 2 wins' : 'Draw'} · ${reason}`;
         await expect(status(spectator)).toHaveText(watcher);
         assert.deepEqual(await scoreboard(spectator), scores);
         await expect(brickMain(b)).toHaveText('Rematch');

@@ -72,7 +72,7 @@ export function mountArcadeChess(container, onMatch) {
     let scope, pendingTimer, clockTimer;
     let pending = false, canOpen = false, connection = 'connecting', connectionError;
     let model = null, chess = null, board = null, selected = null, focused = 'e2';
-    let hadTable = false, hostLeft = false, leftVoluntarily = false, droppedSeat = null, resumedSeat = null;
+    let hadTable = false, tableEnded = false, leftVoluntarily = false, droppedSeat = null, resumedSeat = null;
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
     const client = createGameNightMatchClient({
         onMatch,
@@ -138,7 +138,7 @@ export function mountArcadeChess(container, onMatch) {
         clearPending(); closeChoice();
         connection = 'connecting'; connectionError = undefined;
         model = null; chess = null; selected = null; canOpen = false;
-        hadTable = false; hostLeft = false; leftVoluntarily = false; droppedSeat = null; resumedSeat = null;
+        hadTable = false; tableEnded = false; leftVoluntarily = false; droppedSeat = null; resumedSeat = null;
         board?.cancel();
     }
 
@@ -148,9 +148,9 @@ export function mountArcadeChess(container, onMatch) {
         resumedSeat = droppedSeat && nextState?.seat === droppedSeat && nextState.match && !nextState.match.result && !nextState.waiting
             ? nextState.seat : null;
         droppedSeat = null;
-        if (nextState) { hostLeft = false; hadTable = true; leftVoluntarily = false; }
-        else if (hadTable && !leftVoluntarily) { hostLeft = true; hadTable = false; }
-        else { hostLeft = false; hadTable = false; leftVoluntarily = false; }
+        if (nextState) { tableEnded = false; hadTable = true; leftVoluntarily = false; }
+        else if (hadTable && !leftVoluntarily) { tableEnded = true; hadTable = false; }
+        else { tableEnded = false; hadTable = false; leftVoluntarily = false; }
         if (model?.id !== frame.state?.id || prior?.revision !== next?.revision) {
             selected = null; closeChoice(); feedback.textContent = '';
         }
@@ -266,31 +266,35 @@ export function mountArcadeChess(container, onMatch) {
         $('[data-chess-playing]').hidden = !match || !panel.open;
         primary.hidden = true; primary.disabled = pending; primary.dataset.command = '';
         const button = (text, command) => { primary.hidden = false; primary.textContent = text; primary.dataset.command = command; };
+        const live = match && !match.result;
         if (connection === 'unavailable') {
-            status.textContent = matchConnectionErrors[connectionError] || 'Reconnecting… Clocks keep running.';
+            // Nothing retries from here until Retry is tapped, so do not say "Reconnecting".
+            status.textContent = matchConnectionErrors[connectionError]
+                || (live ? 'Couldn’t reconnect. Clocks keep running. Tap Retry.' : 'Couldn’t reconnect. Tap Retry.');
             if (!connectionError || connectionError === 'rate-limited') button('Retry', 'retry');
         } else if (connection !== 'ready') {
-            status.textContent = match ? 'Reconnecting… Clocks keep running.'
-                : connection === 'reconnecting' ? 'Reconnecting…' : 'Connecting…';
+            status.textContent = live ? 'Reconnecting… Clocks keep running.'
+                : match || connection === 'reconnecting' ? 'Reconnecting…' : 'Connecting…';
         } else if (!model) {
-            if (hostLeft) status.textContent = 'The host left. This game is over.';
-            else status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a table.';
+            // The server does not say why a table closed, so this only says that it did.
+            const next = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a table.';
+            status.textContent = tableEnded ? `This game ended. ${next}` : next;
             if (canOpen) button('Open', 'open');
         } else if (model.waiting) {
             status.textContent = seated ? 'You’re White · Waiting for an opponent.' : 'Black is open. Join to play.';
             button(seated ? 'Leave' : 'Join', seated ? 'leave' : 'join');
         } else if (match?.result) {
             const result = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
-            status.textContent = seated ? result : `${result}. You’re up if they rematch.`;
+            // No one queues for a seat here, so a watcher is only told the result.
+            status.textContent = seated ? result : `Watching · ${result}`;
             if (seated && model.rematch !== model.seat) button('Rematch', 'rematch');
             if (seated && model.rematch) status.textContent += model.rematch === model.seat
                 ? ' · Rematch requested. Waiting for your opponent.' : ' · Your opponent requested a rematch.';
-        } else if (!seated) {
-            status.textContent = 'Table full. You’re up next game.';
-        } else if (resumedSeat === model.seat) {
-            status.textContent = `You’re still ${colorName(model.seat)}.`;
         } else {
-            status.textContent = `You’re ${colorName(model.seat)} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
+            const turn = model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move';
+            const who = !seated ? 'Watching'
+                :`You’re ${resumedSeat === model.seat ? 'still ' : ''}${colorName(model.seat)}`;
+            status.textContent = `${who} · ${turn}`;
         }
         for (const control of actions) {
             const active = seated && match && !match.result;

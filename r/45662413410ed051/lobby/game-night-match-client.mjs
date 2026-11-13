@@ -3,9 +3,9 @@ const socketErrors = { 4403: 'room', 4409: 'room', 4429: 'rate-limited' };
 
 export const matchConnectionErrors = Object.freeze({
     'sign-in': 'Sign in, then return to this room.',
-    'room': 'Return to the room.',
+    'room': 'This game connection closed. Reopen the room to play.',
     'disabled': 'This game is unavailable.',
-    'rate-limited': 'Try again later.'
+    'rate-limited': 'Too many tries. Try again later.'
 });
 
 // A match connection can be replaced without changing room, chat or call.

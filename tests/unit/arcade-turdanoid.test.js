@@ -125,10 +125,12 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.launch.hidden).toBe(true);
     });
 
-    it('tells a watcher the table is full and a finished watcher who won', () => {
+    // Finding 2: nobody queues for a seat and a rematch keeps the same two players.
+    it('tells a watcher what they are watching and how it ended without promising a turn', () => {
         const view = mount();
         view.publish(54_000, null);
-        expect(view.status.textContent).toBe('Table full. You’re up next race.');
+        expect(view.status.textContent).toBe('Watching · ' + race.view('a', 54_000).wall.name);
+        expect(view.status.textContent).not.toMatch(/up next|You’re up/);
         expect(view.main.hidden).toBe(true);
         const finished = race.view('a', 80_000);
         finished.result = { winner: 'a', reason: 'time' };
@@ -136,26 +138,39 @@ describe('Turdanoid brick race phone friction', () => {
             state: { version: 1, game: 'turdanoid', id: 'race-12345', seat: null, waiting: false, rematch: null, match: finished },
             canOpen: false
         });
-        expect(view.status.textContent).toBe('Player 1 wins. You’re up if they rematch.');
+        expect(view.status.textContent).toBe('Watching · Player 1 wins · time limit');
         expect(view.main.hidden).toBe(true);
     });
 
-    it('says the race is over when the table disappears', () => {
+    // Finding 1: a race also closes when the guest leaves, a player is removed or it times out.
+    it('says the race ended, not that the host left, when the table disappears', () => {
         const view = mount();
         view.publish(54_000, 'b');
         client.handlers.onState({ state: null, canOpen: false });
-        expect(view.status.textContent).toBe('The host left. This race is over.');
+        expect(view.status.textContent).toBe('This race ended. Waiting for the host to open a table.');
         expect(view.main.hidden).toBe(true);
+        const host = mount();
+        host.publish(54_000, 'a');
+        client.handlers.onState({ state: null, canOpen: true });
+        expect(host.status.textContent).toBe('This race ended. Same wall and three balls. Clear it first or break the most bricks in 75 seconds.');
+        expect(host.status.textContent).not.toMatch(/host left/i);
+        expect(host.main.textContent).toBe('Open');
     });
 
-    it('tells a seated player to reconnect and keeps Retry', () => {
+    // Finding 6: after three failed tries nothing reconnects until Retry is tapped.
+    it('does not say Reconnecting once the client has stopped trying', () => {
         const view = mount();
         view.publish(54_000, 'b');
         client.handlers.onStatus('unavailable');
-        expect(view.status.textContent).toBe('Reconnecting to your seat.');
+        expect(view.status.textContent).toBe('Couldn’t reconnect. The race clock keeps running. Tap Retry.');
+        expect(view.status.textContent).not.toMatch(/Reconnecting/);
         expect(view.main.hidden).toBe(false);
         expect(view.main.textContent).toBe('Retry');
         expect(view.main.dataset.command).toBe('retry');
+        const never = mount();
+        client.handlers.onStatus('unavailable');
+        expect(never.status.textContent).toBe('Couldn’t reconnect. Tap Retry.');
+        expect(never.main.textContent).toBe('Retry');
     });
 
     it('tells a touch player to drag and tap instead of using arrow keys and Space', () => {
@@ -163,7 +178,7 @@ describe('Turdanoid brick race phone friction', () => {
         expect(touch.help.textContent).toBe('Drag to move. Tap the stuck ball or press Launch.');
         expect(touch.help.textContent).not.toMatch(/arrow keys|Space/);
         const keys = mount({ coarse: false });
-        expect(keys.help.textContent).toBe('Drag or use the arrow keys to move. Tap the stuck ball or press Launch.');
+        expect(keys.help.textContent).toBe('Drag or use the arrow keys to move. Tap the stuck ball, press Launch, or press Space.');
     });
 });
 

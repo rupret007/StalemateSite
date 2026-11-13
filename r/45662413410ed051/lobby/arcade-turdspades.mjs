@@ -8,7 +8,7 @@ const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds
 const cardLabel = card => card.rank + ' of ' + suits[card.suit][1];
 const face = card => card.rank + suits[card.suit][0];
 const errors = {
-    'seat-unavailable': 'This table is full. You can watch.',
+    'seat-unavailable': 'That seat is unavailable. Pick an open seat.',
     'illegal-card': 'Follow the led suit if you can. Lead spades after they’re broken or when you hold only spades.',
     'wrong-turn': 'Wait for your turn.',
     'invalid-bid': 'Choose a bid from 0 to 13.',
@@ -19,7 +19,7 @@ const markup = `
 <p class="small arcade-card-status" data-spades-status role="status"></p>
 <p class="small arcade-card-error" data-spades-error role="status"></p>
 <div class="arcade-card-actions">
-    <button class="btn btn--small btn--ghost" type="button" data-spades-partners hidden>Open</button>
+    <button class="btn btn--small btn--ghost" type="button" data-spades-partners hidden>Open 2-player</button>
     <button class="btn btn--small" type="button" data-spades-main hidden></button>
 </div>
 <div class="arcade-card-actions" data-spades-seats hidden></div>
@@ -59,7 +59,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
     const bid = $('#spades-bid'), confirm = $('[data-spades-confirm]');
     const actions = [...panel.querySelectorAll('[data-spades-action]')];
     let scope = null, model = null, canOpen = false, partnersSupported = false, connection = 'connecting', connectionError;
-    let hadTable = false, hostLeft = false, leftVoluntarily = false;
+    let hadTable = false, tableEnded = false, leftVoluntarily = false;
     let pending = false, timer, confirmation = '';
     let suggestedBidKey = '', bidEdited = false, applyingBid = false;
 
@@ -78,9 +78,9 @@ export function mountArcadeTurdSpades(container, onMatch) {
         },
         onState({ state, canOpen: host, partners }) {
             if (state && (state.game !== 'turdspades' || state.version !== 1)) return;
-            if (state) { hostLeft = false; hadTable = true; leftVoluntarily = false; }
-            else if (hadTable && !leftVoluntarily) { hostLeft = true; hadTable = false; }
-            else { hostLeft = false; hadTable = false; leftVoluntarily = false; }
+            if (state) { tableEnded = false; hadTable = true; leftVoluntarily = false; }
+            else if (hadTable && !leftVoluntarily) { tableEnded = true; hadTable = false; }
+            else { tableEnded = false; hadTable = false; leftVoluntarily = false; }
             const revealing = state?.match && (!model?.match || model.id !== state.id);
             if (state?.id !== model?.id || state?.match?.revision !== model?.match?.revision) {
                 closeConfirmation();
@@ -120,7 +120,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         canOpen = false;
         partnersSupported = false;
         hadTable = false;
-        hostLeft = false;
+        tableEnded = false;
         leftVoluntarily = false;
         connection = 'connecting';
         connectionError = undefined;
@@ -133,7 +133,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         const button = document.createElement('button');
         button.className = 'btn btn--small btn--ghost';
         button.type = 'button';
-        button.textContent = 'Join';
+        // The seat decides your partner, so each button names its seat.
+        button.textContent = `Join ${names[seat]}`;
         button.addEventListener('click', () => send('join', { seat }));
         seatsHost.append(button);
         return button;
@@ -181,33 +182,35 @@ export function mountArcadeTurdSpades(container, onMatch) {
         const computer = position => paired && ['north', 'east'].includes(position);
         const nameFor = position => names[position] + (computer(position) ? ' (CPU)' : '');
         const teams = paired ? ['South + North CPU', 'West + East CPU'] : partnerships;
-        let command = '', label = '', message = 'Connecting to the table…';
+        let command = '', label = '', message = 'Connecting to the table…', tableFull = false;
         if (connection === 'unavailable') {
-            message = matchConnectionErrors[connectionError] || 'Reconnecting… Your hand is paused.';
+            // Nothing retries from here until Retry is tapped, so do not say "Reconnecting".
+            message = matchConnectionErrors[connectionError]
+                || (seat && match && !match.result ? 'Couldn’t reconnect. Tap Retry to get back to your hand.' : 'Couldn’t reconnect. Tap Retry.');
             if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Retry'; }
         } else if (connection !== 'ready') {
-            if (match) message = seat ? 'Reconnecting… Your hand is paused.' : 'Reconnecting…';
+            if (match) message = seat && !match.result ? 'Reconnecting… Your hand is paused.' : 'Reconnecting…';
         } else if (!model) {
-            if (hostLeft) message = 'The host left. This game is over.';
-            else message = canOpen ? (partnersSupported ? '4 players. South and North versus West and East.'
-                : '4 players. South and North versus West and East.') : 'Waiting for the host to open a table.';
-            if (canOpen) { command = 'open'; label = 'Open'; }
+            // The server does not say why a table closed, so this only says that it did.
+            message = !canOpen ? 'Waiting for the host to open a table.'
+                : partnersSupported ? '2-player: you and a friend, each with a computer partner. 4-player: South and North versus West and East.'
+                    : '4 players. South and North versus West and East.';
+            if (tableEnded) message = `This game ended. ${message}`;
+            // Two different tables can be opened here, so each button says which.
+            if (canOpen) { command = 'open'; label = partnersSupported ? 'Open 4-player' : 'Open'; }
         } else if (model?.waiting) {
             const openSeat = seats.some(position => !computer(position) && !occupied.includes(position));
-            if (!seat && !openSeat) message = 'Table full. You’re up next game.';
-            else {
-                message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
-                if (seat) { command = 'leave'; label = 'Leave'; }
-            }
+            tableFull = !seat && !openSeat;
+            message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
+            if (tableFull) message = `Watching · ${message}`;
+            if (seat) { command = 'leave'; label = 'Leave'; }
         } else if (match?.result) {
             message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
             if (seat) {
                 const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
                 message += ` ${votes.length}/${people} ready for a rematch.`;
                 if (!votes.includes(seat)) { command = 'rematch'; label = 'Rematch'; }
-            } else message = 'You’re up if they rematch.';
-        } else if (match && !seat) {
-            message = 'Table full. You’re up next game.';
+            } else message = `Watching · ${message}`;
         } else if (match?.roundResult) {
             message = match.roundResult.map((result, team) => {
                 const signed = result.delta > 0 ? '+' + result.delta : result.delta;
@@ -230,6 +233,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
             }
         }
+        // No one queues for a seat here, so a watcher is told what is happening, not that a turn is coming.
+        if (connection === 'ready' && match && !seat && !match.result) message = `Watching · ${message}`;
         if (status.textContent !== message) status.textContent = message;
         main.hidden = !command;
         main.textContent = label;
@@ -237,7 +242,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         main.disabled = pending;
         partnerButton.hidden = command !== 'open' || !partnersSupported;
         partnerButton.disabled = pending;
-        seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat || message === 'Table full. You’re up next game.';
+        seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat || tableFull;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
         table.hidden = !match;
         if (!match) { showHand([]); return; }
@@ -309,7 +314,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             $('#spades-confirm-title').textContent = action === 'resign' ? 'Resign for your team?' : 'Leave?';
             $('[data-spades-confirm-text]').textContent = action === 'resign'
                 ? 'The other partnership wins if you resign.' : model?.mode === 'partners'
-                    ? 'Leave ends the match for both players.' : 'Leaving closes the table for all four players.';
+                    ? 'Leaving ends the match for both players.' : 'Leaving closes the table for all four players.';
             confirm.showModal();
         }
     });

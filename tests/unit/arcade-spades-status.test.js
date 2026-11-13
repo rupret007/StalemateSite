@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const client = vi.hoisted(() => ({ handlers: null }));
+const client = vi.hoisted(() => ({ handlers: null, sent: [] }));
 
 vi.mock('../../r/45662413410ed051/lobby/game-night-match-client.mjs', () => ({
     matchConnectionErrors: {},
     createGameNightMatchClient: options => {
         client.handlers = options;
-        return { start() {}, stop() {}, send() { return true; } };
+        return { start() {}, stop() {}, send(frame) { client.sent.push(JSON.parse(JSON.stringify(frame))); return true; } };
     }
 }));
 
@@ -38,15 +38,19 @@ function mount() {
         publish(next, canOpen = false, partners = false) { client.handlers.onState({ state: next, canOpen, partners }); },
         status: () => panel.querySelector('[data-spades-status]').textContent,
         main: panel.querySelector('[data-spades-main]'),
+        partners: panel.querySelector('[data-spades-partners]'),
+        error: () => panel.querySelector('[data-spades-error]').textContent,
         seats: panel.querySelector('[data-spades-seats]')
     };
 }
 
 describe('Spades table next step', () => {
-    it('tells a full-table watcher they are up next game in four-player and partners', () => {
+    // Finding 2: nobody queues for a seat and a rematch keeps the same players.
+    it('tells a watcher what is happening without promising them a seat', () => {
         const four = mount();
         four.publish(state());
-        expect(four.status()).toBe('Table full. You’re up next game.');
+        expect(four.status()).toBe('Watching · Round 1 · South to play');
+        expect(four.status()).not.toMatch(/up next|You’re up/);
         expect(four.main.hidden).toBe(true);
         expect(four.seats.hidden).toBe(true);
 
@@ -55,30 +59,84 @@ describe('Spades table next step', () => {
             mode: 'partners', occupied: ['south', 'west'],
             match: hand({ turn: 'west', bids: { south: null, west: null, north: null, east: null }, phase: 'bid' })
         }), false, true);
-        expect(partners.status()).toBe('Table full. You’re up next game.');
+        expect(partners.status()).toBe('Watching · Round 1 · West to bid');
         expect(partners.main.hidden).toBe(true);
     });
 
-    it('tells a watcher of a full waiting table the same next step and hides seat buttons', () => {
+    it('tells a watcher of a full waiting table that they are watching and hides seat buttons', () => {
         const view = mount();
         view.publish(state({ waiting: true, match: null }));
-        expect(view.status()).toBe('Table full. You’re up next game.');
+        expect(view.status()).toBe('Watching · 4/4 seated · South + North vs West + East');
         expect(view.seats.hidden).toBe(true);
         expect(view.main.hidden).toBe(true);
     });
 
-    it('keeps an open seat available to a watcher', () => {
+    // Finding 4: the seat decides your partner, so every seat button names its seat.
+    it('names the seat on every Join button and hides taken seats', () => {
         const view = mount();
         view.publish(state({ waiting: true, match: null, occupied: ['south'] }));
         expect(view.status()).toContain('1/4 seated');
         expect(view.seats.hidden).toBe(false);
+        const buttons = [...view.seats.querySelectorAll('button')];
+        expect(buttons.map(button => button.textContent)).toEqual(['Join South', 'Join West', 'Join North', 'Join East']);
+        expect(buttons.filter(button => !button.hidden).map(button => button.textContent)).toEqual(['Join West', 'Join North', 'Join East']);
+        expect(new Set(buttons.map(button => button.textContent)).size).toBe(4);
     });
 
-    it('tells a finished watcher they are up if the table rematches', () => {
+    it('tells a watcher who won a finished match', () => {
         const view = mount();
         view.publish(state({ match: hand({ result: { winner: 0, reason: 'score' } }) }));
-        expect(view.status()).toBe('You’re up if they rematch.');
+        expect(view.status()).toBe('Watching · South + North win.');
+        expect(view.status()).not.toMatch(/up next|You’re up/);
         expect(view.main.hidden).toBe(true);
+    });
+
+    // Finding 3: the two buttons open different tables, so they cannot share a label.
+    it('gives the host two differently named Open buttons and explains both tables', () => {
+        const view = mount();
+        view.publish(null, true, true);
+        expect(view.main.hidden).toBe(false);
+        expect(view.partners.hidden).toBe(false);
+        expect(view.main.textContent).toBe('Open 4-player');
+        expect(view.partners.textContent).toBe('Open 2-player');
+        expect(view.status()).toBe('2-player: you and a friend, each with a computer partner. 4-player: South and North versus West and East.');
+        view.partners.click();
+        expect(client.sent.at(-1)).toMatchObject({ action: 'open', mode: 'partners' });
+    });
+
+    it('shows one plain Open button when only the four-player table exists', () => {
+        const view = mount();
+        view.publish(null, true, false);
+        expect(view.main.textContent).toBe('Open');
+        expect(view.partners.hidden).toBe(true);
+        expect(view.status()).toBe('4 players. South and North versus West and East.');
+        view.main.click();
+        expect(client.sent.at(-1)).toMatchObject({ action: 'open' });
+        expect(client.sent.at(-1).mode).toBeUndefined();
+    });
+
+    // Finding 7: one taken seat does not mean the table is full.
+    it('tells a guest whose seat was taken to pick another, not that the table is full', () => {
+        const view = mount();
+        view.publish(state({ waiting: true, match: null, occupied: ['south', 'west'] }));
+        client.handlers.onError('seat-unavailable');
+        expect(view.error()).toBe('That seat is unavailable. Pick an open seat.');
+        expect(view.seats.hidden).toBe(false);
+    });
+
+    // Finding 6: after three failed tries nothing reconnects until Retry is tapped.
+    it('does not say Reconnecting once the client has stopped trying', () => {
+        const view = mount();
+        view.publish(state({ seat: 'west' }));
+        client.handlers.onStatus('reconnecting');
+        expect(view.status()).toBe('Reconnecting… Your hand is paused.');
+        client.handlers.onStatus('unavailable');
+        expect(view.status()).toBe('Couldn’t reconnect. Tap Retry to get back to your hand.');
+        expect(view.main.textContent).toBe('Retry');
+        const never = mount();
+        client.handlers.onStatus('unavailable');
+        expect(never.status()).toBe('Couldn’t reconnect. Tap Retry.');
+        expect(never.status()).not.toMatch(/Reconnecting|hand/);
     });
 
     it('keeps the result and Rematch for a seated player', () => {
@@ -89,12 +147,19 @@ describe('Spades table next step', () => {
         expect(view.main.hidden).toBe(false);
     });
 
-    it('says the game is over when the table disappears', () => {
+    // Finding 1: a table also closes when a guest leaves a started match, a player is removed or it times out.
+    it('says the game ended, not that the host left, when the table disappears', () => {
         const view = mount();
         view.publish(state({ seat: 'west' }));
         view.publish(null);
-        expect(view.status()).toBe('The host left. This game is over.');
+        expect(view.status()).toBe('This game ended. Waiting for the host to open a table.');
         expect(view.main.hidden).toBe(true);
+        const host = mount();
+        host.publish(state({ seat: 'south' }), true);
+        host.publish(null, true);
+        expect(host.status()).toBe('This game ended. 4 players. South and North versus West and East.');
+        expect(host.status()).not.toMatch(/host left/i);
+        expect(host.main.textContent).toBe('Open');
     });
 
     it('does not call a voluntary leave a host departure', () => {

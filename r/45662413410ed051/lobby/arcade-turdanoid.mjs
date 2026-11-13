@@ -30,7 +30,7 @@ const markup = `
         </div>
     </div>
     <p class="small" id="brick-race-launch-wait" data-brick-launch-wait hidden></p>
-    <p class="small brick-race-help" id="brick-race-help">Drag or use the arrow keys to move. Tap the stuck ball or press Launch.</p>
+    <p class="small brick-race-help" id="brick-race-help">Drag or use the arrow keys to move. Tap the stuck ball, press Launch, or press Space.</p>
 </div>
 <dialog class="sheet" aria-labelledby="brick-confirm-title" data-brick-confirm>
     <h3 id="brick-confirm-title">Leave this race?</h3>
@@ -97,7 +97,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     }
     const paint = createPainter(board.querySelector('canvas'));
     let scope, model, canOpen, connection, connectionError, visual, wall, receivedAt, raf = 0, pending, pointer,
-        hadTable = false, hostLeft = false, leftVoluntarily = false,
+        hadTable = false, tableEnded = false, leftVoluntarily = false,
         desiredAim = null, lastAim = -Infinity, lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, redraw = true;
     const inputBufferLimit = 8;
     let launchPointer = null, desiredAxis = null, keyboardActive = false, pointerStart = null;
@@ -134,9 +134,9 @@ export function mountArcadeTurdanoid(container, onMatch) {
         },
         onState({ state, canOpen: host }) {
             if (state && (state.game !== 'turdanoid' || state.version !== 1)) return;
-            if (state) { hostLeft = false; hadTable = true; leftVoluntarily = false; }
-            else if (hadTable && !leftVoluntarily) { hostLeft = true; hadTable = false; }
-            else { hostLeft = false; hadTable = false; leftVoluntarily = false; }
+            if (state) { tableEnded = false; hadTable = true; leftVoluntarily = false; }
+            else if (hadTable && !leftVoluntarily) { tableEnded = true; hadTable = false; }
+            else { tableEnded = false; hadTable = false; leftVoluntarily = false; }
             const reconnecting = connection !== 'ready';
             const changed = state?.id !== model?.id || state?.seat !== model?.seat;
             const reveal = state?.match && (!model?.match || changed);
@@ -262,30 +262,30 @@ export function mountArcadeTurdanoid(container, onMatch) {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
         if (connection === 'unavailable') {
+            // Nothing retries from here until Retry is tapped, so do not say "Reconnecting".
             message = connectionError && matchConnectionErrors[connectionError] ? matchConnectionErrors[connectionError]
-                : seat ? 'Reconnecting to your seat.' : 'Reconnecting… The clock keeps running.';
+                : match && !result ? 'Couldn’t reconnect. The race clock keeps running. Tap Retry.' : 'Couldn’t reconnect. Tap Retry.';
             if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Retry'; }
         } else if (connection !== 'ready') {
             if (match) message = match.result ? 'Reconnecting…' : 'Reconnecting… The clock keeps running.';
         } else if (!model) {
-            if (hostLeft) message = 'The host left. This race is over.';
-            else message = canOpen ? 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.'
+            // The server does not say why a table closed, so this only says that it did.
+            message = canOpen ? 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.'
                 : 'Waiting for the host to open a table.';
+            if (tableEnded) message = `This race ended. ${message}`;
             if (canOpen) { action = 'open'; label = 'Open'; }
         } else if (model?.waiting) {
             message = seat ? 'Waiting for a second player.' : 'An opponent is ready.';
             if (!seat) { action = 'join'; label = 'Join'; }
         } else if (result) {
-            if (!seat) {
-                message = result.winner === null ? 'Draw. You’re up if they rematch.'
-                    : `${result.winner === 'a' ? 'Player 1' : 'Player 2'} wins. You’re up if they rematch.`;
-            } else {
-                message = result.winner === null ? 'Draw' : result.winner === seat ? 'You win' : 'Rival wins';
-                message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
-                if (seat !== model.rematch) { action = 'rematch'; label = 'Rematch'; }
-                if (seat === model.rematch) message += ' · Rematch requested';
-            }
-        } else if (match) message = seat ? match.wall.name : 'Table full. You’re up next race.';
+            // No one queues for a seat here, so a watcher is only told the result.
+            message = result.winner === null ? 'Draw' : seat ? (result.winner === seat ? 'You win' : 'Rival wins')
+                : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
+            message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
+            if (!seat) message = 'Watching · ' + message;
+            if (seat && seat !== model.rematch) { action = 'rematch'; label = 'Rematch'; }
+            if (seat && seat === model.rematch) message += ' · Rematch requested';
+        } else if (match) message = seat ? match.wall.name : 'Watching · ' + match.wall.name;
         put(status, message);
         main.hidden = !action;
         main.dataset.command = action;
@@ -399,7 +399,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         raf = 0;
         model = visual = wall = null;
         hadTable = false;
-        hostLeft = false;
+        tableEnded = false;
         leftVoluntarily = false;
         connection = 'connecting';
         connectionError = undefined;
