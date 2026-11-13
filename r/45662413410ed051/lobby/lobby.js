@@ -1188,6 +1188,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         case 'event': pushLine(m.ch, { ...m, event: true }); break;
         case 'notice':
             line(app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
+            if (m.kind === 'game-invite-sent') toast(m.text);
             if (m.kind === 'error') {
                 const failedGameJoin = !!joiningGameRoom;
                 if (joiningGameRoom) {

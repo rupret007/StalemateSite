@@ -5,7 +5,7 @@ import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRat
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
-import { discordCallLink, dropFour, fourFinished, fourMark, gameNightInvite, gameNightRoomName, newGameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { discordCallLink, dropFour, fourFinished, fourMark, gameNightInvite, gameNightLabels, gameNightRoomName, newGameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { personRoomProjection } from './lobby-effect-records.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
@@ -1809,7 +1809,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const gameRoom = roomKind(chan) === 'game';
             const arcade = gameRoom && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
             out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(gameRoom ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
-            return bot(c, `Invited ${t.nick} to ${chan.name}.`);
+            return arcade ? bot(c, `Invitation sent to ${t.nick} for ${gameNightLabels[arcade.game]}.`, 'game-invite-sent')
+                : bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },
         op(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', true, '+o', peer); },
         deop(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', false, '-o', peer); },

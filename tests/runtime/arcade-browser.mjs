@@ -212,8 +212,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.locator(phone ? '[data-chess-status]' : '[data-spades-status]')).toContainText(phone ? 'Waiting for an opponent' : '1/4 seated');
                 const hostViewport = host.viewportSize();
                 await host.setViewportSize(viewport);
-                try { await sendGameInvite(host, nick, () => captureArcadeInvite(host, viewport, '00-host-invite')); }
-                finally { await host.setViewportSize(hostViewport); }
+                try {
+                    await sendGameInvite(host, nick, () => captureArcadeInvite(host, viewport, '00-host-invite'));
+                    await expect(host.locator('[data-toast]')).toHaveText(`Invitation sent to ${nick} for ${label}.`);
+                } finally { await host.setViewportSize(hostViewport); }
                 const offer = friend.locator('[data-game-offer]');
                 await expect(offer).toContainText(`LinkHost invited you to play ${label}.`);
                 await expect(friend.locator('[data-game-night]')).toBeHidden();
