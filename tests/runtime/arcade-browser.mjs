@@ -1136,6 +1136,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const aCards = a.locator('[data-eights-card]'), bCards = b.locator('[data-eights-card]');
         await expect(aCards).toHaveCount(7);
         await expect(bCards).toHaveCount(7);
+        await expect(b.locator('[data-eights-status]')).toHaveText('Round 1 · Waiting for your opponent');
+        await expect(b.locator('[data-eights-action="draw"]')).toBeDisabled();
+        await expect(a.locator('[data-eights-status]')).toHaveText(/^Round 1 · Your turn\. (Play a highlighted card or draw|Draw a card)\.$/);
         try {
             await expect(b.locator('[data-eights-hand]')).toBeInViewport({ ratio: 1 });
             await expect(b.locator('[data-send]')).toBeInViewport({ ratio: 1 });
