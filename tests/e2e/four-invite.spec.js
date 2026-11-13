@@ -32,7 +32,7 @@ async function enterHost(page, nick) {
 async function openFour(page) {
     await page.getByRole('combobox', { name: 'Switch game' }).selectOption('four');
     await page.getByRole('button', { name: 'Open a match' }).click();
-    await page.locator('[data-four-status]').filter({ hasText: /Waiting for someone/ }).waitFor({ timeout: 15000 });
+    await expect(page.locator('[data-four-status]')).toHaveText('Invite a friend. You play first when they join.');
 }
 
 test('a phone guest joins an open Four seat from one invite tap and drops a piece', async ({ browser }, testInfo) => {
@@ -92,6 +92,8 @@ test('a phone guest joins an open Four seat from one invite tap and drops a piec
         const columns = guest.locator('[data-four-columns] button');
         await expect(columns).toHaveCount(7);
         await expect(columns.first()).toBeInViewport();
+        expect((await columns.first().boundingBox()).height).toBeGreaterThanOrEqual(44);
+        await expect(guest.locator('[data-four-status]')).toHaveText('You’re O. FourHost (X) goes first.');
         await host.locator('[data-four-columns] button').nth(0).click();
         await expect(guest.locator('[data-four-status]')).toContainText(/Your turn/);
         await guest.locator('[data-four-columns] button').nth(1).tap();
