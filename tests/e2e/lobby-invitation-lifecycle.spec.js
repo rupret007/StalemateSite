@@ -448,8 +448,7 @@ test('Game Night invites players, publishes a Discord handoff and keeps chat usa
         });
         await host.getByRole('button', { name: /Game Night/ }).click();
         await host.getByRole('region', { name: /Game Night/ }).getByRole('button', { name: 'Invite players' }).click();
-        await host.locator('[data-invite-options]').selectOption({ label: 'GameGuest' });
-        await host.locator('[data-invite-person-send]').click();
+        await host.getByRole('button', { name: 'Invite GameGuest', exact: true }).click();
         await guest.getByRole('button', { name: 'Join Game Night' }).click();
         const panel = guest.getByRole('region', { name: /Game Night/ });
         const open = panel.getByRole('link', { name: 'Open Discord call' });
@@ -503,8 +502,7 @@ test('Game Night plays one shared Four in a Row match with the chat composer sti
         const guest = await fixture.visitor('FourGuest', { width: 390, height: 844 });
         await host.getByRole('button', { name: /Game Night/ }).click();
         await host.getByRole('button', { name: 'Invite players' }).click();
-        await host.locator('[data-invite-options]').selectOption({ label: 'FourGuest' });
-        await host.locator('[data-invite-person-send]').click();
+        await host.getByRole('button', { name: 'Invite FourGuest', exact: true }).click();
         await guest.getByRole('button', { name: 'Join Game Night' }).click();
         await expect(guest.getByRole('tab', { name: 'Game Night' })).toHaveAttribute('aria-selected', 'true');
         await host.locator('[data-four] summary').click();
@@ -588,8 +586,7 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
         await guest.clock.install();
         const invitePlayer = async () => {
             await host.getByRole('button', { name: 'Invite players' }).click();
-            await host.locator('[data-invite-options]').selectOption({ label: 'ReturnGuest' });
-            await host.locator('[data-invite-person-send]').click();
+            await host.getByRole('button', { name: 'Invite ReturnGuest', exact: true }).click();
             await expect(offer).toContainText('ReturnHost invited you to Game Night.');
         };
         await invitePlayer();

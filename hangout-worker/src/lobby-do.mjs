@@ -19,6 +19,7 @@ import { PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 import { lobbyIncidentSourceMode, incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 import { arcadeEnabled, arcadeGame, arcadeGames, arcadePath, arcadeRoomRequest, arcadeSocketGame, createArcadeTransport, isArcadeSocket } from './arcade-transport.mjs';
 import { createGameNightMedia, isMediaSocket, mediaEnabled, mediaPath } from './game-night-media.mjs';
+import { GAME_INVITATION_PATH, gameGuestEnabled, gameInvitationRequest } from './game-night-invitations.mjs';
 import { issueGameNightTurn } from './turn.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
@@ -961,6 +962,14 @@ export class HangoutLobby {
         const { pathname: path, searchParams } = new URL(request.url);
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
+        if (path.startsWith(GAME_INVITATION_PATH + '/') && request.method === 'POST') {
+            return retirementGate(this, async () => {
+                try {
+                    const { body, session } = await request.json();
+                    return await gameInvitationRequest(this, path.slice(GAME_INVITATION_PATH.length + 1), body, session);
+                } catch { return new Response('Game invitations are temporarily unavailable.', { status: 503 }); }
+            });
+        }
         if (arcadePath(path) || mediaPath(path)) {
             const media = mediaPath(path), game = arcadeGame(path);
             if (!(media ? mediaEnabled(this.env) : this.arcadeAvailable(game))) return new Response('not found', { status: 404 });
@@ -1021,6 +1030,7 @@ export class HangoutLobby {
         }
         return retirementGate(this, async gate => {
         if (!identity || !identity.dev) return new Response('no', { status: 400 });
+        if (identity.gameGuest && !gameGuestEnabled(this.env)) return new Response('game invitations unavailable', { status: 403 });
         if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
         if (this.env.HANGOUT_BETA_MODE === 'protected' && !await this.sessionActive(identity)) return new Response('beta session required', { status: 403 });
         if (!this.authorityMode) {
@@ -1057,6 +1067,7 @@ export class HangoutLobby {
         pair[1].serializeAttachment({ id, pilotSid: this.env.PILOT_MODE === 'protected' ? identity.pilotSid : undefined,
             betaSid: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaSid : undefined,
             betaInviteVersion: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaInviteVersion : undefined,
+            ...(identity.gameGuest ? { gameGuest: identity.gameGuest } : {}),
             ...(this.authorityMode ? { authorityRef: id, authorityRevision: 1 } : {}),
             dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
         // Fresh browsers can read the device token from the hello. Some
@@ -1066,7 +1077,7 @@ export class HangoutLobby {
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
             else this.delivery.send(pair[1], frame.t === 'hello'
-                ? { ...frame, features: { ...frame.features, transportPing: 1, ...(this.arcadeAvailable('chess') ? { arcadeChess: 1 } : {}),
+                ? { ...frame, features: { ...frame.features, transportPing: 1, ...(gameGuestEnabled(this.env) && !identity.gameGuest ? { gameGuestInvites: 1 } : {}), ...(this.arcadeAvailable('chess') ? { arcadeChess: 1 } : {}),
                     ...(this.arcadeAvailable('crapeights') ? { arcadeCrapeights: 1 } : {}),
                     ...(this.arcadeAvailable('turdrummy') ? { arcadeTurdRummy: 1 } : {}),
                     ...(this.arcadeAvailable('turdspades') ? { arcadeTurdSpades: 1 } : {}),
@@ -1075,7 +1086,7 @@ export class HangoutLobby {
                     ...(this.arcadeAvailable('turdomania') ? { arcadeTurdomania: 1 } : {}),
                     ...(this.arcadeAvailable('turdrush') ? { arcadeTurdRush: 1 } : {}),
                     ...(this.arcadeAvailable('turdanoid') ? { arcadeTurdanoid: 1 } : {}),
-                    ...(mediaEnabled(this.env) ? { arcadeMedia: 1 } : {}) },
+                    ...(mediaEnabled(this.env) && !identity.gameGuest ? { arcadeMedia: 1 } : {}) },
                     ...(deviceInHello && identity.devToken ? { deviceToken: identity.devToken } : {}) } : frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });

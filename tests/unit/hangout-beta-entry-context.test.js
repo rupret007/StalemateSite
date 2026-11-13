@@ -101,6 +101,24 @@ describe('entry context through the private beta shell', () => {
             expect(link.href).toBe(`https://beta.example${root}lobby/?entry-return=1`);
         } finally { older.window.close(); }
     });
+    it.each(['rad-dad', 'stalemate'])('offers Game Night from the private arcade handoff for %s', async source => {
+        const address = `https://beta.example/beta/?via=${source}`;
+        const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });
+        const enabled = await shell(address, config);
+        const disabled = await shell(address);
+        const explicit = await shell(address + '&game-night=1', config);
+        try {
+            expect(enabled.window.document.querySelector('#band-games').hidden).toBe(false);
+            expect(click(enabled, '#band-game-night').href).toBe(`https://beta.example${root}lobby/?entry-return=1&game-night=1`);
+            expect(entryFunctions.readEntryHandoff(enabled.window.sessionStorage.getItem(entryFunctions.ENTRY_HANDOFF_KEY)))
+                .toEqual({ source, share: true });
+            expect(click(enabled, '#inside .button').href).toBe(`https://beta.example${root}lobby/?entry-return=1`);
+            expect(disabled.window.document.querySelector('#band-games').hidden).toBe(true);
+            expect(explicit.window.document.querySelector('#band-games').hidden).toBe(true);
+        } finally {
+            for (const dom of [enabled, disabled, explicit]) dom.window.close();
+        }
+    });
     it('uses the same bounded handoff for owner sign-in while a direct visit erases stale attribution', async () => {
         const dom = await shell('https://beta.example/?via=stalemate');
         try {

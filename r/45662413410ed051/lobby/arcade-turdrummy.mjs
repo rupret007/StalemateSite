@@ -1,5 +1,5 @@
 import '/play/games/turdrummy-rules.js';
-import { createGameNightMatchClient } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
 const { analyzeHand } = globalThis.TurdRummyRules;
 const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds'], C: ['♣', 'Clubs'] };
@@ -52,7 +52,7 @@ const markup = `
     </div>
 </dialog>`;
 
-export function mountArcadeTurdRummy(container) {
+export function mountArcadeTurdRummy(container, onMatch) {
     const panel = container.ownerDocument.createElement('details');
     const document = panel.ownerDocument;
     panel.className = 'arcade-card-table arcade-rummy';
@@ -63,7 +63,7 @@ export function mountArcadeTurdRummy(container) {
     const status = $('[data-rummy-status]'), error = $('[data-rummy-error]'), main = $('[data-rummy-main]');
     const hand = $('[data-rummy-hand]'), table = $('[data-rummy-table]'), confirm = $('[data-rummy-confirm]');
     const actions = [...panel.querySelectorAll('[data-rummy-action]')];
-    let scope = null, model = null, canOpen = false, connection = 'connecting';
+    let scope = null, model = null, canOpen = false, connection = 'connecting', connectionError;
     let selected = null, pending = false, timer, confirmation = null;
 
     function clearPending() { clearTimeout(timer); pending = false; }
@@ -74,11 +74,18 @@ export function mountArcadeTurdRummy(container) {
     }
 
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-turdrummy',
-        onStatus(value) {
+        onStatus(value, reason) {
             connection = value;
-            model = null;
-            clearChoice();
+            connectionError = reason;
+            if (reason && reason !== 'rate-limited') {
+                model = null;
+                clearChoice();
+            } else {
+                confirmation = null;
+                if (confirm.open) confirm.close();
+            }
             clearPending();
             draw();
         },
@@ -96,6 +103,7 @@ export function mountArcadeTurdRummy(container) {
             model = state;
             canOpen = host;
             connection = 'ready';
+            connectionError = undefined;
             clearPending();
             draw();
             if (revealing || showingOutcome && (focusInTable || focused === document.body)) container.scrollTop = 0;
@@ -127,6 +135,7 @@ export function mountArcadeTurdRummy(container) {
         model = null;
         canOpen = false;
         connection = 'connecting';
+        connectionError = undefined;
         error.textContent = '';
         clearChoice();
         clearPending();
@@ -160,8 +169,11 @@ export function mountArcadeTurdRummy(container) {
         const name = value => value === seat ? 'You' : side[value];
         let command = '', label = '', message = 'Connecting to the table…';
         if (connection === 'unavailable') {
-            message = 'The table is unavailable.'; command = 'retry'; label = 'Reconnect table';
-        } else if (connection === 'ready' && !model) {
+            message = matchConnectionErrors[connectionError] || 'The table couldn’t reconnect. Try again from this room.';
+            if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Reconnect table'; }
+        } else if (connection !== 'ready') {
+            if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
+        } else if (!model) {
             message = canOpen ? 'Open a head-to-head table for this room.' : 'Waiting for the host to open a table.';
             if (canOpen) { command = 'open'; label = 'Open Rummy table'; }
         } else if (model?.waiting) {
@@ -210,14 +222,14 @@ export function mountArcadeTurdRummy(container) {
             const action = button.dataset.rummyAction;
             const pile = action === 'draw-stock' || action === 'draw-discard';
             button.hidden = !pile && (!seat || (action === 'resign' ? !active : action !== 'leave' && !canSelect));
-            button.disabled = pending || !legal[action];
+            button.disabled = connection !== 'ready' || pending || !legal[action];
             if (action === 'draw-stock') button.textContent = `${match.canDrawStock ? 'Draw stock' : 'Stock'} · ${match.stockCount}`;
             if (action === 'draw-discard') {
                 button.textContent = match.top ? `${match.canTakeDiscard ? 'Take' : 'Discard'} ${face(match.top)}` : 'Discard pile empty';
                 button.setAttribute('aria-label', match.top ? `${match.canTakeDiscard ? 'Take' : 'Discard'} ${describe(match.top)}` : 'Discard pile empty');
             }
         }
-        showHand(match.hand, canSelect, match.blocked, match.drawn);
+        showHand(match.hand, connection === 'ready' && canSelect, match.blocked, match.drawn);
     }
 
     hand.addEventListener('click', event => {

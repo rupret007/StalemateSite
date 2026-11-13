@@ -1,6 +1,6 @@
 // @vitest-environment node
 // Hang Out lobby engine: IRC commands, server-side permissions, filters, PMs, moderation, budget, stats.
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { createLobby, COMMANDS, LOBBY, validWebjamInvite, validWebJoin } from '../../hangout-worker/src/lobby-core.mjs';
 import { discordCallLink, dropFour, fourFinished, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { checkText, checkNick, normalize } from '../../hangout-worker/src/filter.mjs';
@@ -1089,6 +1089,63 @@ describe('open-room paint + synced video (act frames)', () => {
 });
 
 describe('Game Night', () => {
+    it('replaces a generated room name rejected by moderation and acknowledges the original request', () => {
+        boot({}, true);
+        const host = join('GameHost');
+        const request = '#game-f468abxc9a4f0';
+        const replacement = '#game-1acbefx23acbe';
+        expect(checkText('game f468abxc9a4f0', undefined, { handles: false }).verdict).toBe('block');
+        cmd(host, 'join', [request]);
+        expect(notices(host)).toContain('Pick another room name');
+        const random = vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('1acbef23-acbe-4c49-bc32-550b4e03de23');
+        try {
+            cmd(host, 'gameopen', [request]);
+        } finally {
+            random.mockRestore();
+        }
+        const joined = got(host).findLast(frame => frame.t === 'join').ch;
+        expect(joined).toMatchObject({ name: replacement, kind: 'game', modes: { i: true } });
+        expect(got(host).findLast(frame => frame.t === 'game-room-open')).toEqual({
+            t: 'game-room-open', request, ok: true, room: replacement, ref: joined.keepRef
+        });
+    });
+
+    it('reopens the founder’s existing private room while keeping the creation allowance', () => {
+        boot({ roomsPerIpHour: 1 }, true);
+        const host = join('GameHost');
+        const first = '#game-1acbefx23acbe', next = '#game-9cde12x9df823';
+        cmd(host, 'gameopen', [first]);
+        const ref = got(host).findLast(frame => frame.t === 'join').ch.keepRef;
+        cmd(host, 'part', [first], first);
+        cmd(host, 'join', [next]);
+        expect(notices(host)).toContain('One new room per 10 minutes');
+        cmd(host, 'gameopen', [next]);
+        expect(got(host).findLast(frame => frame.t === 'game-room-open')).toEqual({
+            t: 'game-room-open', request: next, ok: true, room: first, ref
+        });
+        const anotherHost = join('OtherHost');
+        cmd(anotherHost, 'gameopen', [next]);
+        expect(got(anotherHost).findLast(frame => frame.t === 'game-room-open')).toEqual({ t: 'game-room-open', request: next, ok: false });
+        expect(notices(anotherHost)).toContain('Too many new rooms');
+    });
+
+    it('gives an invited guest a moderated alias when the first alias is already taken', () => {
+        boot({}, true);
+        const host = join('GameHost');
+        L._debug.conns.get(host.id).betaSid = 'room-host-session';
+        const taken = join('Guest-999999');
+        expect(got(taken).some(frame => frame.t === 'welcome')).toBe(true);
+        const room = '#game-1acbefx23acbe';
+        cmd(host, 'join', [room]);
+        const ref = got(host).findLast(frame => frame.t === 'join').ch.keepRef;
+        const visitor = { id: 'game-visitor' };
+        expect(L.connect({ ...visitor, dev: 'game-guest-device', iph: 'ip2', betaSid: 'room-guest-session',
+            gameGuest: { room, ref, host: 'room-host-session', nameSeed: 99_999_999 } }).ok).toBe(true);
+        L.message(visitor.id, JSON.stringify({ t: 'hello', nick: 'Ignored', age13: true }));
+        expect(got(visitor).find(frame => frame.t === 'welcome')).toMatchObject({ nick: 'Guest-000000' });
+        expect(got(visitor).filter(frame => frame.t === 'join').map(frame => frame.ch.name)).toEqual([room]);
+    });
+
     it('detects four in every direction, full columns and a draw without changing earlier positions', () => {
         const start = { ...openFour('fixture', 'host'), guest: 'guest' };
         const diagonal = [0, 1, 1, 2, 4, 2, 2, 3, 4, 3, 4, 3, 3];

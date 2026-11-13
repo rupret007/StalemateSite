@@ -5,7 +5,7 @@ import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRat
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
-import { discordCallLink, dropFour, fourFinished, fourMark, gameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { discordCallLink, dropFour, fourFinished, fourMark, gameNightInvite, gameNightRoomName, newGameNightRoomName, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { packLobbyRoster } from '../../r/45662413410ed051/lobby/lobby-roster.mjs';
 import { personRoomProjection } from './lobby-effect-records.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
@@ -126,7 +126,7 @@ const parseDuration = (s, fallback) => {
 export const COMMANDS = Object.freeze({
     register: 'any', cohost: 'any', transfer: 'any', acceptowner: 'any', unregister: 'any', join: 'any', part: 'any', quit: 'any', nick: 'any', me: 'any', msg: 'any', query: 'any', whois: 'any', away: 'any',
     ignore: 'any', unignore: 'any', list: 'any', names: 'any', topic: 'any', slap: 'any', help: 'any', report: 'any',
-    accept: 'any', decline: 'any', block: 'any', unblock: 'any', pm: 'any', cam: 'any', four: 'any',
+    accept: 'any', decline: 'any', block: 'any', unblock: 'any', pm: 'any', cam: 'any', four: 'any', gameopen: 'any',
     kick: 'chanop', ban: 'chanop', unban: 'chanop', invite: 'chanop', op: 'chanop', deop: 'chanop', voice: 'chanop',
     devoice: 'chanop', jamlink: 'chanop', discord: 'chanop', mode: 'chanop', close: 'chanop', lock: 'chanop',
     mute: 'moderator', gban: 'moderator', purge: 'moderator', shield: 'band', shieldoff: 'band', lobby: 'band', filter: 'band',
@@ -136,7 +136,7 @@ export const COMMANDS = Object.freeze({
 // effect. Every other command needs a real channel, never an implicit fallback
 // from a private conversation or a channel that has disappeared.
 const CONTEXT_INDEPENDENT_COMMANDS = new Set([
-    'join', 'quit', 'nick', 'msg', 'query', 'whois', 'away', 'ignore', 'unignore', 'list', 'help',
+    'join', 'gameopen', 'quit', 'nick', 'msg', 'query', 'whois', 'away', 'ignore', 'unignore', 'list', 'help',
     'accept', 'decline', 'block', 'unblock', 'pm', 'mute', 'gban', 'purge', 'shield', 'shieldoff',
     'lobby', 'filter', 'slow', 'approve', 'dismiss', 'aidismiss', 'privatereport', 'log', 'delete'
 ]);
@@ -257,7 +257,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
     // Bindings come from trusted admission/live sockets, never saved metadata or
     // browser frames. Existing adapters keep absent optional fields absent.
-    const bindingFields = ['iph', 'expiresAt', 'betaSid', 'betaInviteVersion', 'authorityRef', 'authorityRevision'];
+    const bindingFields = ['iph', 'expiresAt', 'betaSid', 'betaInviteVersion', 'authorityRef', 'authorityRevision', 'gameGuest'];
     const connectionBinding = c => Object.fromEntries(bindingFields.filter(key => c[key] !== undefined).map(key => [key, c[key]]));
     const connectionView = c => ({ id: c.id, dev: c.dev, account: c.account, role: c.role, admin: c.admin, ...connectionBinding(c) });
     const SAFE_COMMANDS = new Set(['help', 'h', '?', 'list', 'names', 'who', 'whois', 'w', 'part', 'leave', 'quit', 'exit', 'bye',
@@ -556,6 +556,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 && Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) <= now()
                 && (!chan.modes.m || hosts(c, chan) || chan.voice.has(c.dev)) };
     }
+    function invitedGameRoom(guest) {
+        const room = ch(guest.room);
+        if (!room || room.keepRef !== guest.ref || roomKind(room) !== 'game' || !room.modes.i || net.shield || roomsBroken) return null;
+        const host = membersOf(room).find(peer => peer.betaSid === guest.host && !peer.safetyOnly && isOp(peer, room));
+        return host ? { room, host } : null;
+    }
     function approveArcade(id) {
         const c = conns.get(id);
         if (!c || c.safetyOnly) return { ok: false };
@@ -614,7 +620,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
     }
     const visibleRoom = (viewer, room) => publicChannel(room) || isStaff(viewer) || !!viewer && (hosts(viewer, room) || room.members.has(viewer.id));
-    const directory = (viewer) => [...channels.values()].filter((r) => r.kind !== 'lobby' && visibleRoom(viewer, r))
+    const directory = (viewer) => [...channels.values()].filter((r) => r.kind !== 'lobby' && visibleRoom(viewer, r)
+        && (!viewer?.gameGuest || r.name === viewer.gameGuest.room && r.keepRef === viewer.gameGuest.ref))
         .map((r) => ({ name: r.name, kind: roomKind(r), title: r.title, count: r.members.size, max: r.modes.l, locked: r.modes.locked || r.modes.i, key: !!r.modes.k, cams: r.modes.C, persistent: !!r.owner, mine: !!viewer && owns(viewer, r), hostPresent: membersOf(r).some((m) => hosts(m, r)) }));
     const pushList = ({ presence = false } = {}) => {
         if (presence && typeof deferPresence === 'function') queuePresence({ directory: true });
@@ -891,9 +898,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         const c = { id, dev, iph, role, email, account, admin: band && admin, ...connectionBinding(binding), nick: '', entrySource: '', channels: new Set(), away: '', ignores: new Set(), ignoredPeerIds: new Set(), blocks: new Set(), pmOff: false,
             cams: new Set(), since: now(), lastNick: 0, tokens: L.burst, last: now(), frames: 0, lastSaid: {}, actTokens: L.actBurst, actLast: now() };
+        if (c.gameGuest) c.pmOff = true;
         conns.set(id, c);
         if (band) { net.lastBand = now(); if (net.shieldAuto || net.lockAuto) bot(c, 'A saved safety state needs review: fans can read but not talk while the lobby is read-only. Check the band panel; /lobby unlock and /shieldoff when you are ready.'); saveNet(); }
-        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, compactLobbyRoster: 1, ...(directMusicInvites && !participationConfigured && L.webJoinOrigins?.length ? { directMusicInvites: 1, musicInviteOutcomes: 1 } : {}), ...(gameNight ? { gameNight: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
+        out(c, { t: 'hello', role, lock: net.lock, shield: net.shield, budget: lvl, needNick: true, verified: !!account, capabilities: capabilities(c), features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, roomInvites: 1, compactLobbyRoster: 1, ...(directMusicInvites && !participationConfigured && L.webJoinOrigins?.length ? { directMusicInvites: 1, musicInviteOutcomes: 1 } : {}), ...(gameNight ? { gameNight: 1, gameOpen: 1, fourInARow: 1, discordLinks: !participationConfigured } : {}) } });
         return { ok: true };
     }
 
@@ -942,17 +950,18 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         pushList({ presence: true });
     }
 
-    function enter(c, chan, { key = '', invited = false } = {}) {
+    function enter(c, chan, { key = '', gameInvitation = false, invited = false, admitted } = {}) {
         if (chan.members.has(c.id)) return true;
         if (chan.kind !== 'lobby' && !chan.members.size && [...channels.values()].filter((r) => r.kind !== 'lobby' && r.members.size).length >= L.roomsListed) return bot(c, 'All 30 active room slots are busy. Try again shortly.', 'error');
         if (!isBand(c)) {
             if (!owns(c, chan) && banned(chan.bans, c)) return bot(c, `You're banned from ${chan.name}.`, 'error'), false;
             if (!owns(c, chan) && (chan.kicks[c.dev] || 0) > now()) return bot(c, `Kicked from ${chan.name} recently. Give it a few minutes.`, 'error'), false;
             if (chan.modes.locked && !hosts(c, chan)) return bot(c, `${chan.name} is locked right now.`, 'error'), false;
-            if (chan.modes.i && !invited && !chan.invites.has(c.dev) && !hosts(c, chan)) return bot(c, `${chan.name} is invite-only (+i). Ask an @ to /invite you.`, 'error'), false;
+            if (chan.modes.i && !invited && !gameInvitation && !chan.invites.has(c.dev) && !hosts(c, chan)) return bot(c, `${chan.name} is invite-only (+i). Ask an @ to /invite you.`, 'error'), false;
             if (chan.modes.k && key !== chan.modes.k && !hosts(c, chan)) return bot(c, `${chan.name} needs a key (+k): /join ${chan.name} key`, 'error'), false;
             if (chan.members.size >= chan.modes.l - (chan.owner && !owns(c, chan) && !membersOf(chan).some((m) => owns(m, chan)) ? 1 : 0)) return bot(c, `${chan.name} is full (+l ${chan.modes.l}).`, 'error'), false;
         }
+        admitted?.();
         if (owns(c, chan) || c.account && chan.cohosts.has(c.account)) chan.renewed = now();
         chan.members.add(c.id);
         chan.emptySince = null;
@@ -1165,6 +1174,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (f.t !== 'cmd' && ['personContext', 'personPeer', 'personNamed', 'cohostAccount'].some(key => Object.hasOwn(f, key))) return stalePerson(c);
         if (c.safetyOnly) return safetyOnlyMessage(c, f);
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
+        if (c.gameGuest && !['hello', 'report'].includes(f.t) && (f.ch !== c.gameGuest.room || !['say', 'cmd'].includes(f.t))) {
+            return bot(c, 'This invitation is for your Game Night room.', 'error');
+        }
         if (f.t === 'entry-source') {
             const source = normalizeEntrySource(f.source, entrySites);
             // A privacy withdrawal must not consume command tokens or wait for
@@ -1263,23 +1275,46 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function kill(c, code, reason) { if (closeBatch) closeBatch.push([c.id, code, reason]); else close(c.id, code, reason); disconnect(c.id, reason); }
 
+    function gameGuestNick(seed) {
+        for (const prefix of ['Guest', 'Player', 'Arcade']) {
+            for (let offset = 0; offset < 8; offset++) {
+                const suffix = String((seed + offset) % 1_000_000).padStart(6, '0');
+                const candidate = checkNick(`${prefix}-${suffix}`, net.lists);
+                if (candidate.ok && !byNick(candidate.nick)) return candidate;
+            }
+        }
+        return { ok: false, reason: 'Couldn’t assign a guest name. Ask your host for a fresh invitation.' };
+    }
+
     function hello(c, f) {
         if (c.nick) return bot(c, 'Already here. Use /nick to change.', 'error');
         if (!isStaff(c) && f.age13 !== true) return bot(c, 'Tick "I\'m 13+ and will be cool" to chat.', 'error');
-        const v = checkNick(f.nick, net.lists, { band: isBand(c) });
+        const game = c.gameGuest && invitedGameRoom(c.gameGuest);
+        if (c.gameGuest && (!game || game.host.blocks.has(c.dev))) return out(c, { t: 'nick-error', text: 'Your host’s room is unavailable. Ask them to send a fresh invitation.' });
+        const v = c.gameGuest ? gameGuestNick(c.gameGuest.nameSeed) : checkNick(f.nick, net.lists, { band: isBand(c) });
         if (!v.ok) return out(c, { t: 'nick-error', text: v.reason });
         if (byNick(v.nick)) return out(c, { t: 'nick-error', text: 'That nick is taken right now.' });
         if (!isBand(c) && banned(net.bans, { ...c, nick: v.nick })) { kill(c, 4403, 'banned'); return undefined; }
         requireParticipation(c, 'publicArtifact');
         c.nick = v.nick;
         c.compactLobbyRoster = f.compactLobbyRoster === 1;
-        c.entrySource = normalizeEntrySource(f.entrySource, entrySites);
+        c.entrySource = game ? '' : normalizeEntrySource(f.entrySource, entrySites);
         c.lastNick = now();
-        statHour().joins += 1; statPeak();
-        out(c, { t: 'welcome', id: c.id, nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
-        personPreferences(c);
-        out(c, { t: 'list', rooms: directory(c) });
-        enter(c, ch(LOBBY));
+        const admitted = () => {
+            statHour().joins += 1; statPeak();
+            out(c, { t: 'welcome', id: c.id, nick: c.nick, role: c.role, band: isBand(c), moderator: c.role === 'moderator', verified: !!c.account, capabilities: capabilities(c) });
+            personPreferences(c);
+        };
+        if (game) {
+            if (!enter(c, game.room, { gameInvitation: true, admitted })) {
+                c.nick = '';
+                return out(c, { t: 'nick-error', text: 'The Game Night room cannot admit you right now. Ask the host to check room access.' });
+            }
+        } else {
+            admitted();
+            out(c, { t: 'list', rooms: directory(c) });
+            enter(c, ch(LOBBY));
+        }
         if (c.admin) out(c, { t: 'admin', state: { ...adminState(), capabilities: capabilities(c) } });
         return undefined;
     }
@@ -1302,6 +1337,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function command(c, where, name, args, roomInstance, messageResult, frame, typedMention) {
+        if (c.gameGuest && !['part', 'leave', 'quit', 'exit', 'bye', 'me', 'help', 'h', '?', 'block', 'unblock', 'ignore', 'unignore'].includes(name)) {
+            return bot(c, 'This invitation is for playing and chatting in your Game Night room.', 'error');
+        }
         if (!limited(c, 'command', 10, 1, true)) return;
         if (roomsBroken && !['help', 'list', 'names', 'whois', 'part', 'quit', 'lobby', 'log'].includes(name)) return bot(c, 'Storage needs administrator recovery before changes can continue.', 'error');
         const alias = { j: 'join', leave: 'part', m: 'msg', q: 'query', w: 'whois', who: 'names', exit: 'quit', bye: 'quit', h: 'help', '?': 'help', deny: 'decline', approveheld: 'approve' };
@@ -1496,6 +1534,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!s || s.dev !== identity.dev || s.iph !== identity.iph || s.account !== (identity.account || '')
                 || s.role !== (identity.role || 'fan') || s.admin !== !!identity.admin) { deny('session-identity'); continue; }
             if (identity.expiresAt !== undefined && (!Number.isFinite(identity.expiresAt) || identity.expiresAt <= now())) { deny('session-expired'); continue; }
+            if (identity.gameGuest && s.channels.some(name => name !== identity.gameGuest.room || ch(name)?.keepRef !== identity.gameGuest.ref)) { deny('session-room'); continue; }
             if (!s.safetyOnly && !checkNick(s.nick, net.lists, { band: isBand(identity) }).ok) { deny('session-nickname'); continue; }
             if (!isStaff(identity) && (net.lock === 'closed' || budgetLevel() === 'closed' || banned(net.bans, s) || (net.kicks[s.dev] || 0) > now())) { deny('session-admission'); continue; }
             if (s.channels.some((name) => {
@@ -1720,6 +1759,24 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (existing) return enter(c, existing, { key });
             return create(c, name, key, titleWords.join(' '));
         },
+        gameopen(c, _chan, [request]) {
+            if (!gameNight || !gameNightRoomName(request)) return bot(c, 'Open Game Night from the room picker.', 'error');
+            let room = [...channels.values()].find(candidate => roomKind(candidate) === 'game'
+                && candidate.modes.i && candidate.founder === c.dev && hosts(c, candidate));
+            if (room) enter(c, room);
+            else if (!ch(request)) {
+                // Moderation can reject a generated name. Pick an approved candidate before creating the room once.
+                for (let attempt = 0; attempt < 4; attempt++) {
+                    const name = attempt === 0 ? request : newGameNightRoomName();
+                    if (ch(name) || !roomNameAllowed(name)) continue;
+                    create(c, name, '', '');
+                    room = ch(name);
+                    break;
+                }
+            }
+            const opened = room?.members.has(c.id);
+            return out(c, { t: 'game-room-open', request, ok: !!opened, ...(opened ? { room: room.name, ref: room.keepRef } : {}) });
+        },
         part(c, chan, [maybe]) {
             const target_ = maybe && ch(maybe) ? ch(maybe) : chan;
             if (target_.kind === 'lobby' && !isBand(c)) return bot(c, 'You can’t part #stalemate, but you can /quit.', 'error');
@@ -1932,12 +1989,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             log(c.nick, 'unban', mask, '', chan.name);
             return undefined;
         },
-        invite(c, chan, [n], _roomInstance, _messageResult, boundPeer) {
+        invite(c, chan, [n, , game, match], roomInstance, _messageResult, boundPeer) {
             const t = boundPeer || target(c, n); if (!t) return undefined;
             if (chan.kind === 'lobby') return bot(c, '/invite nick #room', 'error');
             if (chan.invites.size >= 150 && !chan.invites.has(t.dev)) return bot(c, 'Room invitation list is full.', 'error');
             chan.invites.add(t.dev);
-            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(roomKind(chan) === 'game' ? { roomInstance: chan.keepRef } : {}) });
+            const gameRoom = roomKind(chan) === 'game';
+            const arcade = gameRoom && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
+            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(gameRoom ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
             return bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },
         op(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', true, '+o', peer); },
@@ -2194,6 +2253,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return `+t${m.m ? 'm' : ''}${m.i ? 'i' : ''}${m.k ? 'k' : ''}${m.C ? 'C' : ''}${m.Q ? 'Q' : ''} l=${m.l}${m.S ? ` S=${m.S}s` : ''}${m.locked ? ' (locked)' : ''}`;
     }
 
+    function roomNameAllowed(name) {
+        return checkText(name.slice(1).replace(/-/g, ' '), net.lists, { handles: false }).verdict === 'ok';
+    }
+
     function create(c, name, key, titleText) {
         const kind = gameNight && gameNightRoomName(name) ? 'game'
             : Object.keys(KINDS).find((k) => k !== 'game' && (name === `#${k}` || name.startsWith(`#${k}-`))) || 'chat';
@@ -2212,8 +2275,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         const title = titleText ? checkText(titleText, net.lists) : { verdict: 'ok', text: KINDS[kind].replace(/^\S+\s/, '') };
         if (title.verdict !== 'ok') return bot(c, 'Not cool here. Pick another title.', 'error');
-        const nameCheck = checkText(name.slice(1).replace(/-/g, ' '), net.lists, { handles: false });
-        if (nameCheck.verdict !== 'ok') return bot(c, 'Not cool here. Pick another room name.', 'error');
+        if (!roomNameAllowed(name)) return bot(c, 'Not cool here. Pick another room name.', 'error');
         requireParticipation(c, 'createRoom');
         const room = mkChannel(name, kind === 'game' ? 'chat' : kind, title.text.slice(0, 40), c.dev);
         if (c.account) room.opAccounts.set(c.dev, c.account);
@@ -2789,7 +2851,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return controlledRun(message, [...args, true], safetyMessage(args[1]));
         }, flushPresence,
         transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
-        arcadeActor, arcadeRoomRef: name => {
+        arcadeActor, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: name => {
             const room = ch(name);
             return room && roomKind(room) === 'game' ? room.keepRef : null;
         }, approveArcade: id => execute(approveArcade, [id]),

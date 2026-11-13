@@ -9,18 +9,25 @@ import { rolldown } from 'rolldown';
 import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
 import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
 import { Miniflare, convertV4MiniflareOptions } from './durable-records/node_modules/miniflare/dist/src/index.js';
+import { createArcadePreviewSite } from './arcade-preview-site.mjs';
 
 const origin = 'https://local-fixture.invalid';
-const invite = 'local-arcade-fixture-invitation-2026';
+const serve = process.argv.includes('--serve');
+const invite = serve ? process.env.ARCADE_PREVIEW_INVITATION : 'local-arcade-fixture-invitation-2026';
+if (serve && (typeof invite !== 'string' || invite.length < 32)) {
+    throw new Error('Set ARCADE_PREVIEW_INVITATION to a local-only value with at least 32 characters.');
+}
 const preview = 'local-arcade-fixture-preview-key-2026';
 const nonce = randomBytes(16).toString('hex');
 const room = '#game-2ca9e1x1be34a';
 const browserName = process.argv.find(arg => arg.startsWith('--browser='))?.slice(10) || '';
 const browserMedia = process.argv.includes('--media');
+const siteGuest = process.argv.find(arg => arg.startsWith('--site-guest='))?.slice('--site-guest='.length);
 const relay = process.argv.includes('--relay');
 const rollback = process.argv.includes('--rollback');
 const rollbackRef = process.argv.find(arg => arg.startsWith('--rollback-ref='))?.slice(15);
 const mixedRef = process.argv.find(arg => arg.startsWith('--mixed-ref='))?.slice('--mixed-ref='.length);
+assert.ok(!serve || !browserName && !rollback && !relay && !mixedRef, 'serve the private preview on its own');
 const fixtureIce = { urls: [process.env.ARCADE_TEST_TURN_URL || 'turn:fixture.invalid:3478'],
     username: 'arcade-fixture', credential: 'arcade-local-turn-only' };
 assert.ok(!browserMedia || browserName === 'chromium', 'the synthetic device media test uses Chromium');
@@ -31,10 +38,16 @@ assert.ok(!rollbackRef || rollback && /^[a-f0-9]{40}$/.test(rollbackRef), 'use -
 assert.ok(mixedRef === undefined || browserName && !relay && /^[a-f0-9]{40}$/.test(mixedRef), 'use --mixed-ref with a browser and exact source revision');
 const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCADE_BROWSER_EVIDENCE) : null;
 const app = fileURLToPath(new URL('../../', import.meta.url));
+const previewSite = (browserName || serve) ? createArcadePreviewSite(app) : null;
 const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
 const sharedSource = process.env.ARCADE_TEST_SOURCE ? resolve(process.env.ARCADE_TEST_SOURCE) : null;
 const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST_RAD_DAD) : null;
 assert.equal(!!sharedSource, !!radDad, 'provide both arcade checkouts for the cross-site browser proof');
+const radDadRoot = process.env.ARCADE_PREVIEW_RAD_DAD ? resolve(process.env.ARCADE_PREVIEW_RAD_DAD) : radDad;
+const radDadPreview = radDadRoot && (browserName || serve) ? createArcadePreviewSite(radDadRoot, { radDad: true }) : null;
+assert.ok(siteGuest === undefined || browserName && !mixedRef && !relay &&
+    (siteGuest === 'stalemate' || siteGuest === 'rad-dad' && radDadPreview),
+    'choose a browser and --site-guest=stalemate or --site-guest=rad-dad (requires ARCADE_PREVIEW_RAD_DAD)');
 const previousAssets = new Map();
 if (mixedRef) {
     for (const file of ['entry-sites.mjs', 'lobby/index.html', 'lobby/lobby.js', 'lobby/lobby.css']) {
@@ -48,7 +61,13 @@ const arcadeCapabilities = {
     turdjack: 'arcadeTurdJack', turdtris: 'arcadeTurdtris', turdomania: 'arcadeTurdomania', turdrush: 'arcadeTurdRush',
     turdanoid: 'arcadeTurdanoid'
 };
-const arcadeFlags = Object.fromEntries(Object.keys(arcadeCapabilities).map(game => ['HANGOUT_ARCADE_' + game.toUpperCase(), '1']));
+const betaManifest = await readFile(join(app, 'hangout-worker/wrangler.beta.toml'), 'utf8');
+const arcadeFlags = Object.fromEntries(Object.keys(arcadeCapabilities).map(game => {
+    const flag = 'HANGOUT_ARCADE_' + game.toUpperCase();
+    const value = betaManifest.match(new RegExp(`^${flag} = "([01])"$`, 'm'))?.[1];
+    assert.equal(value, '1', `${game} is enabled in the protected build`);
+    return [flag, value];
+}));
 const arcadePrefix = game => game === 'chess' ? '/beta/arcade' : '/beta/arcade-' + game;
 let mf, runtime;
 let heldMint;
@@ -115,6 +134,8 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 600));
 
 async function serveAsset(request) {
     const pathname = decodeURIComponent(new URL(request.url).pathname);
+    if (radDadPreview && pathname.startsWith('/site/rad-dad/')) return radDadPreview(request);
+    if (previewSite && pathname.startsWith('/site/')) return previewSite(request);
     const name = pathname.endsWith('/') ? pathname + 'index.html' : pathname;
     const file = resolve(assets, '.' + name);
     if (!file.startsWith(assets.endsWith(sep) ? assets : assets + sep)) return new Response('Not found', { status: 404 });
@@ -973,7 +994,7 @@ const fixtureWorker = fileURLToPath(new URL('./lobby-session-authority/worker.mj
 async function bundleRollbackSource(revision) {
     const previous = join(directory, 'previous-source');
     await mkdir(previous);
-    const archive = execFileSync('git', ['archive', revision, 'hangout-worker/src', 'r/45662413410ed051', 'package-lock.json'],
+    const archive = execFileSync('git', ['archive', revision, 'hangout-worker', 'r/45662413410ed051', 'package-lock.json'],
         { cwd: app, maxBuffer: 32 * 1024 * 1024 });
     execFileSync('tar', ['-x', '-C', previous], { input: archive });
     assert.deepEqual(await readFile(join(previous, 'package-lock.json')), await readFile(join(app, 'package-lock.json')),
@@ -996,17 +1017,18 @@ try {
     const options = {
         name: 'private-arcade-fixture', rootPath: directory, modulesRoot: directory,
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
-        compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName, telemetry: { enabled: false },
+        compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName || serve, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true },
             ...(relay ? { TURN_BUDGET: { className: 'HangoutTurnBudget', useSQLite: true } } : {}) },
         bindings: { FIXTURE_NONCE: nonce, FIXTURE_ARCADE_REPORTS: '1', HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', ...arcadeFlags,
-            ...(browserName ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
-            ...(!browserName || browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
+            HANGOUT_GAME_NIGHT_GUESTS: betaManifest.match(/^HANGOUT_GAME_NIGHT_GUESTS = "([01])"$/m)?.[1] || '0',
+            ...(browserName || serve ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
+            ...(!serve && (!browserName || browserMedia) ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             ...(relay ? { HANGOUT_ARCADE_TURN: '1', HANGOUT_CF_ACCOUNT_ID: 'f'.repeat(32), HANGOUT_TURN_MONTHLY_GB: '1',
                 HANGOUT_TURN_KEY_ID: 'arcade-fixture-key', HANGOUT_TURN_API_TOKEN: 'fixture', HANGOUT_TURN_ANALYTICS_TOKEN: 'fixture' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_PREVIEW_KEY: preview, HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
-        ...(browserName ? { serviceBindings: { ASSETS: serveAsset } } : {}),
+        ...(browserName || serve ? { serviceBindings: { ASSETS: serveAsset } } : {}),
         ...(rollback ? { durableObjectsPersist: join(directory, 'state') } : {}),
         outboundService: async request => {
             if (relay && request.url === 'https://api.cloudflare.com/client/v4/graphql') {
@@ -1026,7 +1048,15 @@ try {
         method: 'POST', headers: { 'X-Fixture-Nonce': nonce, 'Content-Type': 'application/json' }, body: '{}'
     });
     assert.equal(initialized.status, 200, await initialized.text());
-    if (browserName) {
+    if (serve) {
+        const { origin: localOrigin } = await mf.ready;
+        console.log(`Stalemate private Game Night preview with all nine games: ${localOrigin}/site/`);
+        if (radDadPreview) console.log(`Rad Dad private Game Night preview: ${localOrigin}/site/rad-dad/`);
+        await new Promise(resolve => {
+            process.once('SIGINT', resolve);
+            process.once('SIGTERM', resolve);
+        });
+    } else if (browserName) {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;
         if (mixedRef) {
@@ -1036,7 +1066,8 @@ try {
             await runArcadeBrowser(browserName, (await mf.ready).origin, invite, evidence, null, browserMedia, false, { previousWorker: true });
             console.log(`Passed ${browserName} mixed lobby versions using source ${mixedRef}.`);
         } else {
-            await runArcadeBrowser(browserName, browserOrigin, invite, evidence, await previewEntrances(browserOrigin), browserMedia, relay);
+            await runArcadeBrowser(browserName, browserOrigin, invite, evidence,
+                siteGuest ? null : await previewEntrances(browserOrigin), browserMedia, relay, { siteGuest });
         }
     } else if (rollback) {
         await verifyRollback(async (bindings, revision) => {

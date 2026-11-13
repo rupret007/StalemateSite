@@ -50,13 +50,13 @@
         <button class="btn btn--ghost" type="button" data-sheet-close>Close</button>
     </dialog>
     <dialog class="sheet" data-game-share-dialog aria-labelledby="game-share-title">
-        <h3 id="game-share-title">Share Game Night</h3>
-        <p>Share this link to point friends to your room. Invite them from Hang Out to grant access.</p>
-        <label class="channel-label" for="game-share-value">Game Night room link</label>
+        <h3 id="game-share-title">Game Night room address</h3>
+        <p>Players with a room invitation can use this address. Use Invite players to send a friend a game invitation.</p>
+        <label class="channel-label" for="game-share-value">Room address</label>
         <input id="game-share-value" data-game-share-value readonly>
         <p role="status" data-game-share-status></p>
         <div class="sheet-buttons">
-            <button class="btn" type="button" data-game-share-copy>Copy link</button>
+            <button class="btn" type="button" data-game-share-copy>Copy address</button>
             <button class="btn btn--ghost" type="button" data-game-share-close>Done</button>
         </div>
     </dialog>
@@ -69,6 +69,17 @@
             <p class="status" data-invite-quick-error role="status" aria-atomic="true"></p>
             <button class="btn btn--ghost" type="button" data-invite-quick-cancel>Cancel</button>
         </div>
+        <div data-game-invite-picker hidden>
+            <div data-game-invite-link hidden>
+                <button class="btn" type="button" data-game-invite-new autofocus>Invite a friend</button>
+                <button class="btn" type="button" data-game-invite-share hidden>Share invite</button>
+                <p class="small" data-game-invite-link-status role="status"></p>
+            </div>
+            <div class="sheet-buttons" data-game-invite-people></div>
+            <p class="small" data-game-invite-empty hidden></p>
+            <p class="status" data-game-invite-error role="status"></p>
+            <button class="btn btn--ghost" type="button" data-game-invite-cancel>Cancel</button>
+        </div>
         <form data-invite-form>
             <label class="channel-label" for="invite-person">Choose someone online</label>
             <select id="invite-person" data-invite-options aria-describedby="invite-person-hint"></select>
@@ -77,9 +88,9 @@
             <label class="channel-label" for="invite-nickname">Guest nickname</label>
             <input id="invite-nickname" data-invite-nick maxlength="20" autocomplete="off" spellcheck="false" aria-describedby="invite-nickname-hint invite-nickname-error" required>
             <p class="small" id="invite-nickname-hint">Typing a nickname selects whoever uses it when the invitation is sent. An invitation does not give host controls.</p>
-            <p class="status" id="invite-nickname-error" data-invite-error role="status"></p>
             <div class="sheet-buttons"><button class="btn" type="submit">Send invitation</button><button class="btn btn--ghost" type="button" data-invite-cancel>Cancel</button></div>
         </form>
+        <p class="status" id="invite-nickname-error" data-invite-error role="status"></p>
     </dialog>
     <dialog class="sheet" data-cam-gate aria-labelledby="camera-dialog-title">
         <h3 id="camera-dialog-title">Camera on?</h3>
@@ -98,6 +109,7 @@
     <section class="session-ended" data-session-ended hidden aria-labelledby="session-ended-title">
         <div><h2 id="session-ended-title" tabindex="-1">Session ended</h2><p data-session-reason role="status"></p><p class="small">Your current unsent message stays below for copying. Leaving this page clears unsent drafts; they are never sent automatically.</p></div>
         <a class="btn" data-session-reentry href="/beta/" hidden>Return to invitation</a>
+        <button class="btn" type="button" data-game-guest-exit-retry hidden>Retry closing invitation</button>
     </section>
 
     <main class="gate" data-gate>
@@ -128,6 +140,15 @@
             <p class="status" data-gate-status role="status"></p>
             <a class="btn btn--ghost" data-gate-private-entry href="/beta/" hidden>Open private entry</a>
           </div>
+        </div>
+    </main>
+
+    <main class="gate" data-game-guest-connecting hidden>
+        <div class="gate-card">
+            <p class="eyebrow">Private Game Night</p>
+            <h1 data-game-guest-title>Game Night</h1>
+            <p data-game-guest-status role="status">Joining the game…</p>
+            <button class="btn" type="button" data-game-guest-retry hidden>Try again</button>
         </div>
     </main>
 
@@ -237,7 +258,7 @@
                 </div>
                 <div class="jam-actions game-actions">
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
-                    <button class="btn btn--small btn--ghost" type="button" data-game-share hidden>Share room link</button>
+                    <button class="btn btn--small btn--ghost" type="button" data-game-share hidden>Room address</button>
                     <a class="btn btn--small btn--ghost" data-game-arcade href="https://stalemate.band/play/" target="_blank" rel="noopener noreferrer" aria-describedby="game-arcade-tab-note"><span data-game-arcade-label>Open Stalemate Arcade</span> <span aria-hidden="true">↗</span></a>
                     <span class="sr-only" id="game-arcade-tab-note">Opens in a new tab</span>
                     <a class="btn btn--small btn--ghost" data-game-open target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open Discord call</a>

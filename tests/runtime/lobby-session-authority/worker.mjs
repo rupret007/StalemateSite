@@ -1112,6 +1112,7 @@ export class FixtureLobby extends HangoutLobby {
 export default { async fetch(request, env) {
     const local = new URL(request.url);
     if (env.FIXTURE_ARCADE_BROWSER === '1' && local.hostname === '127.0.0.1' && !local.pathname.startsWith(PREFIX)) {
+        if (local.pathname.startsWith('/site/')) return env.ASSETS.fetch(request);
         return betaFetch(request, env);
     }
     if (!admitted(request, env)) return denied();

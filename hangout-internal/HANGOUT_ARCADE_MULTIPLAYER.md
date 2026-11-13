@@ -2,6 +2,14 @@
 
 The goal covers all nine Turdanoid games on both sites, with one invite-only Game Night room for play, chat and opt-in voice/video. The protected candidate contains five tables, Turdtris Sprint, Turdomania Duel, Turd Rush Race and Turdanoid Brick Race. A local synthetic-device call stays joined across game switches. Players can send a call report to the private staff queue. Paired drafts provide the protected Game Night entrance and the WebJam Conversation action. Cross-network and physical-device calling, installed WebJam handoff and protected release qualification remain open.
 
+## Local Game Night review
+
+Set `ARCADE_PREVIEW_INVITATION` in the process environment to a local-only value of at least 32 characters, then run `npm run dev:game-night`. The printed loopback URL opens a local Stalemate homepage with **Play online with friends**. The private preview adds the same entrance to the Arcade and an online option to Royal Flush Chess. Starting Game Night from Chess opens its shared table panel. Use the local invitation value at the protected entry screen. The preview uses a local TLS certificate and temporary state. It reads the nine game defaults from `hangout-worker/wrangler.beta.toml`, as do the protected Chromium and WebKit tests. The ordinary site test server serves the solo arcade and a separate chat relay.
+
+In a room with an open game table, the host can choose **Invite players**, **Invite someone new**, and **Share invite**. Browsers without a share sheet can open an email draft instead. The friend opens the invite and selects **Join game** to confirm the house rules and join the same table. The link admits one guest and expires after 20 minutes. This guest session permits room chat and the invited game for up to two hours. Test the loopback invitation in a second browser profile on the same machine. For a cross-device trial use an approved private preview build.
+
+In TurdSpades, **Open 2-player Spades** seats the host and guest on opposite teams, with one computer partner on each team. **Open 4-player Spades** fills all four seats with people.
+
 ## Baseline and ownership
 
 - The live Rad Dad and Stalemate arcade receipts both reported Turdanoid `f9604242ac9fd2cbd28e94a524570ddbc228bd5c` during this checkpoint. Source main was `1804cf65d2a0a99e4cd1e153d4ea94d840f0d8f7`. Rad Dad main was `a365f984d39f3513d08e624caccac96471864b80`; Stalemate public main was `990a18c73de7b9b6710626167f2f368368132467`.

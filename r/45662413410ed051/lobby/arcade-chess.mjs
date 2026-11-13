@@ -1,5 +1,6 @@
 import { Chess, claimReason, colorName, intendedClaims, pieceName } from '/play/games/chess-core.js';
 import { ChessBoard } from '/play/games/chess-board.js';
+import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
 const files = 'abcdefgh', ranks = '87654321';
 const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
@@ -8,14 +9,13 @@ const reasonText = {
     stale: 'The board changed. Try your move again.',
     'wrong-turn': 'Wait for your turn.',
     'illegal-move': 'That move is unavailable.',
-    'match-changed': 'The match changed.',
-    'seat-unavailable': 'That seat is unavailable.',
+    'match-changed': 'The match changed. Check the current board before trying again.',
+    'seat-unavailable': 'The Black seat is no longer open. Check the match status.',
     'no-draw-claim': 'A draw cannot be claimed from this position.',
     'no-draw-offer': 'There is no draw offer to answer.',
     'rematch-unavailable': 'A rematch is unavailable right now.',
     'storage-unavailable': 'The change was not confirmed. Try again.'
 };
-
 const markup = `
 <summary>Royal Flush Chess</summary>
 <p class="small arcade-chess-status" data-chess-status role="status"></p>
@@ -23,8 +23,8 @@ const markup = `
 <button type="button" class="btn btn--small" data-chess-primary hidden></button>
 <div class="arcade-chess-playing" data-chess-playing hidden>
     <div class="arcade-chess-clocks" aria-label="Chess clocks">
-        <div data-clock-side="w"><span>White</span><time data-clock="w">10:00</time></div>
-        <div data-clock-side="b"><span>Black</span><time data-clock="b">10:00</time></div>
+        <div data-clock-side="w"><span data-clock-label>White</span><time data-clock="w">10:00</time></div>
+        <div data-clock-side="b"><span data-clock-label>Black</span><time data-clock="b">10:00</time></div>
     </div>
     <div id="board" class="arcade-chess-board" role="group" aria-label="Chessboard" aria-description="Use arrow keys to navigate squares and Enter to select or move."></div>
     <div class="arcade-chess-actions" aria-label="Match controls">
@@ -51,7 +51,7 @@ function appendStyle(document, href) {
     document.head.append(link);
 }
 
-export function mountArcadeChess(container) {
+export function mountArcadeChess(container, onMatch) {
     const document = container.ownerDocument;
     const panel = document.createElement('details');
     panel.className = 'arcade-chess';
@@ -69,13 +69,41 @@ export function mountArcadeChess(container) {
     const choice = $('[data-chess-choice]');
     const actions = [...panel.querySelectorAll('[data-action]')];
     const squares = new Map();
-    let scope, socket, controller, retryTimer, pendingTimer, clockTimer;
-    let sequence = 0, retries = 0, pending = false, canOpen = false, ready = false, stopped = false;
+    let scope, pendingTimer, clockTimer;
+    let pending = false, canOpen = false, connection = 'connecting', connectionError;
     let model = null, chess = null, board = null, selected = null, focused = 'e2';
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
+    const client = createGameNightMatchClient({
+        onMatch,
+        prefix: '/beta/arcade',
+        onStatus(next, reason) {
+            connection = next;
+            connectionError = reason;
+            if (reason && reason !== 'rate-limited') { model = null; chess = null; }
+            clearPending();
+            closeChoice();
+            selected = null;
+            board?.cancel();
+            draw();
+        },
+        onState(frame) {
+            try { applyState(frame); }
+            catch {
+                client.stop();
+                connection = 'unavailable';
+                connectionError = undefined;
+                draw();
+            }
+        },
+        onError(reason) {
+            clearPending();
+            feedback.textContent = reasonText[reason] || 'That action was not confirmed.';
+            draw();
+        }
+    });
 
     function send(action, details) {
-        if (!ready || socket?.readyState !== WebSocket.OPEN || pending) return;
+        if (connection !== 'ready' || pending || !client.send({ action, id: model?.id, revision: model?.match?.revision, ...details })) return;
         if (action !== 'sync') {
             pending = true;
             feedback.textContent = '';
@@ -85,10 +113,8 @@ export function mountArcadeChess(container) {
                 send('sync');
                 draw();
             }, 6000);
+            draw();
         }
-        try { socket.send(JSON.stringify({ version: 1, action, id: model?.id, revision: model?.match?.revision, ...details })); }
-        catch { socket.close(1000); }
-        if (action !== 'sync') draw();
     }
 
     function clearPending() {
@@ -102,73 +128,12 @@ export function mountArcadeChess(container) {
     }
 
     function stop() {
-        sequence++;
-        controller?.abort(); controller = null;
-        clearTimeout(retryTimer); clearInterval(clockTimer); clockTimer = null;
-        clearPending(); closeChoice();
-        if (socket) socket.close(1000);
-        socket = null;
-        ready = false; model = null; chess = null; selected = null; canOpen = false;
-        retries = 0; stopped = false;
-        board?.cancel();
-    }
-
-    function reconnect(attempt, code) {
-        if (attempt !== sequence || !scope || !panel.open) return;
-        ready = false; clearPending(); closeChoice(); selected = null;
+        client.stop();
         clearInterval(clockTimer); clockTimer = null;
-        if ([4403, 4409, 4429].includes(code) || retries >= 3) stopped = true;
-        else {
-            retries++;
-            retryTimer = setTimeout(connect, 400 * 2 ** (retries - 1));
-        }
-        draw();
-    }
-
-    async function connect() {
-        if (!scope || !panel.open || socket?.readyState === WebSocket.OPEN || controller) return;
-        const attempt = ++sequence;
-        const own = new AbortController();
-        controller = own;
-        stopped = false; draw();
-        try {
-            const response = await fetch('/beta/arcade-ticket', {
-                method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(scope), signal: own.signal
-            });
-            if (!response.ok) {
-                if (attempt === sequence) reconnect(attempt, [401, 403].includes(response.status) ? 4403 : response.status === 429 ? 4429 : 0);
-                return;
-            }
-            const { ticket, protocol } = await response.json();
-            if (attempt !== sequence) return;
-            if (!/^m[a-f0-9]{32}$/.test(ticket) || protocol !== 'game-night.v1') throw Error('invalid match grant');
-            const url = new URL('/beta/arcade-match', location.href);
-            url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const connection = new WebSocket(url, [protocol, ticket]);
-            socket = connection;
-            connection.addEventListener('close', event => {
-                if (socket === connection) { socket = null; reconnect(attempt, event.code); }
-            });
-            connection.addEventListener('message', event => {
-                if (attempt !== sequence || socket !== connection) return;
-                let frame;
-                try { frame = JSON.parse(event.data); } catch { return; }
-                if (frame?.t === 'match-ready' && frame.version === 1) {
-                    retries = 0; ready = true; send('sync');
-                    clockTimer = setInterval(drawClocks, 200);
-                } else if (frame?.t === 'match-state' && frame.version === 1 && frame.room === scope.room) {
-                    try { applyState(frame); } catch { connection.close(4403, 'invalid match state'); }
-                } else if (frame?.t === 'match-error') {
-                    clearPending(); feedback.textContent = reasonText[frame.reason] || 'That action was not confirmed.';
-                    draw();
-                }
-            });
-        } catch {
-            if (attempt === sequence) reconnect(attempt);
-        } finally {
-            if (controller === own) controller = null;
-        }
+        clearPending(); closeChoice();
+        connection = 'connecting'; connectionError = undefined;
+        model = null; chess = null; selected = null; canOpen = false;
+        board?.cancel();
     }
 
     function applyState(frame) {
@@ -181,13 +146,15 @@ export function mountArcadeChess(container) {
         if (next?.fen !== prior?.fen || !chess) chess = next ? new Chess(next.fen) : null;
         model = frame.state; canOpen = frame.canOpen === true;
         receivedAt = performance.now(); deadlineSynced = false;
+        connection = 'ready'; connectionError = undefined;
+        if (!clockTimer) clockTimer = setInterval(drawClocks, 200);
         draw();
         if (enteringBoard) requestAnimationFrame(() => {
             if (panel.open && model?.id === next.id) container.scrollTop = 0;
         });
     }
 
-    const isTurn = () => ready && !pending && model?.seat === model?.match?.turn && !!chess && !model.match.result;
+    const isTurn = () => connection === 'ready' && !pending && model?.seat === model?.match?.turn && !!chess && !model.match.result;
     function showChoice(title, hint, entries) {
         choiceContext = { id: model.id, revision: model.match.revision };
         choice.querySelector('h3').textContent = title;
@@ -264,9 +231,18 @@ export function mountArcadeChess(container) {
             const ms = Math.max(0, match.clock[color] - (color === running ? performance.now() - receivedAt : 0));
             const total = Math.ceil(ms / 1000);
             const clock = $(`[data-clock="${color}"]`);
-            clock.textContent = `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
-            clock.parentElement.dataset.running = String(color === running);
-            if (color === running && ms === 0 && !deadlineSynced && !pending && ready) {
+            const time = `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+            if (clock.textContent !== time) clock.textContent = time;
+            const seat = clock.parentElement;
+            const label = seat.querySelector('[data-clock-label]');
+            const labelText = colorName(color) + (model.seat === color ? ' · You' : '');
+            if (label.textContent !== labelText) label.textContent = labelText;
+            const active = String(color === running);
+            if (seat.dataset.running !== active) {
+                seat.dataset.running = active;
+                seat.setAttribute('aria-current', active);
+            }
+            if (color === running && ms === 0 && !deadlineSynced && !pending && connection === 'ready') {
                 deadlineSynced = true;
                 send('sync');
             }
@@ -278,19 +254,23 @@ export function mountArcadeChess(container) {
         $('[data-chess-playing]').hidden = !match || !panel.open;
         primary.hidden = true; primary.disabled = pending; primary.dataset.command = '';
         const button = (text, command) => { primary.hidden = false; primary.textContent = text; primary.dataset.command = command; };
-        if (!ready) {
-            status.textContent = stopped ? 'Chess connection unavailable.' : 'Connecting to Chess…';
-            if (stopped) button('Reconnect to Chess', 'retry');
+        if (connection === 'unavailable') {
+            status.textContent = matchConnectionErrors[connectionError] || 'Chess couldn’t reconnect. Try again from this room.';
+            if (!connectionError || connectionError === 'rate-limited') button('Reconnect to Chess', 'retry');
+        } else if (connection !== 'ready') {
+            status.textContent = match ? 'Reconnecting to Chess… The clocks keep running.'
+                : connection === 'reconnecting' ? 'Reconnecting to Chess…' : 'Connecting to Chess…';
         } else if (!model) {
             status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a match.';
             if (canOpen) button('Open Chess match', 'open');
         } else if (model.waiting) {
-            status.textContent = seated ? 'Waiting for another player. Invite someone from Game Night.' : 'A seat is available. You’ll play Black.';
+            status.textContent = seated ? 'You’re White · Waiting for an opponent. Use Invite players to bring someone in.' : 'Black is open. Join to play.';
             button(seated ? 'Close waiting match' : 'Join as Black', seated ? 'leave' : 'join');
         } else if (match?.result) {
             status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
             if (seated && model.rematch !== model.seat) button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');
-            if (seated && model.rematch === model.seat) status.textContent += ' · Waiting for rematch';
+            if (seated && model.rematch) status.textContent += model.rematch === model.seat
+                ? ' · Rematch requested. Waiting for your opponent.' : ' · Your opponent requested a rematch.';
         } else {
             const who = seated ? `You’re ${colorName(model.seat)}` : 'Watching';
             status.textContent = `${who} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
@@ -299,7 +279,7 @@ export function mountArcadeChess(container) {
             const active = seated && match && !match.result;
             const offer = active && match.drawOffer && match.drawOffer !== model.seat;
             const action = control.dataset.action;
-            control.disabled = pending || !ready;
+            control.disabled = pending || connection !== 'ready';
             control.hidden = action === 'leave' ? !seated
                 : action === 'accept-draw' || action === 'decline-draw' ? !offer
                     : !active || action === 'offer-draw' && !!match.drawOffer || action === 'claim-draw' && model.seat !== match.turn;
@@ -317,7 +297,7 @@ export function mountArcadeChess(container) {
     }
 
     primary.addEventListener('click', () => {
-        if (primary.dataset.command === 'retry') { retries = 0; void connect(); }
+        if (primary.dataset.command === 'retry') client.start(scope);
         else if (primary.dataset.command) send(primary.dataset.command);
     });
     for (const control of actions) control.addEventListener('click', () => {
@@ -355,7 +335,7 @@ export function mountArcadeChess(container) {
     panel.addEventListener('toggle', () => {
         if (panel.open && scope) {
             if (four) four.open = false;
-            void connect();
+            client.start(scope);
         } else stop();
     });
     return {

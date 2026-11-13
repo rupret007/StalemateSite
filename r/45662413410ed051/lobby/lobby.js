@@ -5,7 +5,7 @@ import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { unpackLobbyRoster } from './lobby-roster.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameNightRoomName } from './game-night.mjs';
+import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourWinningCells, gameInviteCode, gameNightInvite, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -40,8 +40,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const writeRemembered = (key, value) => { try { localStorage.setItem(key, value); } catch { /* Remembering this device is optional. */ } };
     // Only the protected shell adds this marker. Its current display/admission
     // hints also live in memory, independent of optional tab storage.
-    const betaShell = !!$('script[src="/beta/bootstrap.js"]');
+    const betaShell = !!$('script[src="/beta/bootstrap.js"], script[src="/beta/bootstrap.js?game-guest=1"]');
     const betaBootstrap = betaShell && window.HangoutBootstrap;
+    const gameGuest = betaBootstrap?.gameGuest;
+    const gameGuestQuery = gameGuest ? '?game-guest=1' : '';
+    const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
+    let gameGuestExit = gameGuest && ['left', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
+    let gameGuestSeated = false;
+    if (gameGuest) document.body.classList.add('game-guest');
     let gameEntry = betaShell ? gameNightEntry?.(params, location.hash) : null;
 
     const entrySites = createEntrySiteRegistry(window.HangoutEntrySites);
@@ -49,7 +55,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const savedArcade = readTab(ARCADE_RESUME_KEY);
     removeTab(ARCADE_RESUME_KEY);
     let arcadeResume = null, resumeEntry = null;
-    if (betaShell && typeof savedArcade === 'string' && savedArcade.length <= 512
+    if (betaShell && !gameGuest && typeof savedArcade === 'string' && savedArcade.length <= 512
         && !gameEntry && !params.has('via') && !location.hash && performance.getEntriesByType?.('navigation')[0]?.type === 'reload') {
         try {
             const saved = JSON.parse(savedArcade);
@@ -81,7 +87,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         'away', 'ignore', 'unignore', 'list', 'help', 'h', '?', 'accept', 'decline', 'deny', 'block', 'unblock', 'pm',
         'mute', 'gban', 'purge', 'shield', 'shieldoff', 'lobby', 'filter', 'slow', 'approve', 'approveheld',
         'dismiss', 'aidismiss', 'privatereport', 'log', 'delete']);
-    let ownerSession = params.get('owner') === '1' || (betaBootstrap ? betaBootstrap.owner === true : readTab('hangout-owner') === '1');
+    let ownerSession = !gameGuest && (params.get('owner') === '1' || (betaBootstrap ? betaBootstrap.owner === true : readTab('hangout-owner') === '1'));
     if (ownerSession) writeTab('hangout-owner', '1');
     const isLocal = /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
     // Read the preview key once, then drop the query from the address bar (keeps it out of history,
@@ -91,11 +97,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const relayBase = ((isLocal && (params.get('relay') || readTab('hangout-relay'))) || $('meta[name="hangout-relay"]').content || '').replace(/\/$/, '');
     const turnUrl = ((isLocal && params.get('turn')) || $('meta[name="hangout-turn"]').content || '').trim();
     if (isLocal && params.get('relay')) writeTab('hangout-relay', params.get('relay'));
-    if (location.search) history.replaceState(null, '', location.pathname + location.hash);
+    if (location.search) history.replaceState(gameGuest ? { gameSessionRef: history.state?.gameSessionRef || gameGuest.sessionRef, gameExit: gameGuestExit } : null, '', location.pathname + gameGuestQuery + location.hash);
     const siteKey = $('meta[name="hangout-turnstile"]').content || '';
     const inviteHash = new URLSearchParams(location.hash.slice(1));
     const pendingRoomFromInvite = gameEntry ? '' : inviteHash.get('room') || '';
-    if (pendingRoomFromInvite || gameEntry) history.replaceState(null, '', location.pathname);
+    if (pendingRoomFromInvite || gameEntry) history.replaceState(null, '', location.pathname + gameGuestQuery);
 
     // GoatCounter: fixed, privacy-safe event names only (no nicks, no room names, no query string).
     const count = (event) => { try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: `hangout-${event}`, title: 'Hang Out', event: true, referrer: '' }); } catch (e) { /* analytics never breaks chat */ } };
@@ -505,10 +511,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const musicInviteFailed = 'Music invitation couldn’t be sent. Try again from your Jam room.';
     const musicInviteConfirm = 'Confirm the invitation in WebJam.';
     const jamWaitingCopy = $('[data-jam-wait]').textContent;
-    let gameNightSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
+    let gameNightSupported = false, gameOpenSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
     const arcadeTables = new Map([
-        ['chess', { label: 'Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
+        ['chess', { label: 'Royal Flush Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
         ['crapeights', { label: 'Crappy Eights', load: () => import('./arcade-crapeights.mjs').then(module => module.mountArcadeCrapeights) }],
         ['turdrummy', { label: 'TurdRummy', load: () => import('./arcade-turdrummy.mjs').then(module => module.mountArcadeTurdRummy) }],
         ['turdspades', { label: 'TurdSpades', load: () => import('./arcade-turdspades.mjs').then(module => module.mountArcadeTurdSpades) }],
@@ -518,7 +524,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         ['turdrush', { label: 'Turd Rush Race', load: () => import('./arcade-turdrush.mjs').then(module => module.mountArcadeTurdRush) }],
         ['turdanoid', { label: 'Turdanoid Brick Race', load: () => import('./arcade-turdanoid.mjs').then(module => module.mountArcadeTurdanoid) }]
     ]);
-    let arcadeReturning = null;
+    let arcadeReturning = null, arcadeInvitation = null;
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
     let fourInARowSupported = false, fourRoom = null, fourPlayed = false;
     let fourGameId = '', fourActionPending = false;
@@ -527,7 +533,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const gameInvites = new Map();
     const sentRoomInvites = new Map();
     let roomInvitesSupported = false;
-    let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '';
+    let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '', joiningArcadeOffer = null;
+    let gameOpenPending = null, gameOpenError = '';
     // Jam rooms are invite-only like Game Night, so the directory cannot lead
     // an invited guest back. They share the same offer and return controls.
     const jamRoomName = name => typeof name === 'string' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(name);
@@ -583,7 +590,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         nickInput.focus();
     });
 
-    const gateStatus = (t) => { $('[data-gate-status]').textContent = t; };
+    const gateStatus = (t) => { $(gameGuest ? '[data-game-guest-status]' : '[data-gate-status]').textContent = t; };
     function showNicknameError(text) {
         gateStatus('');
         nicknameError.textContent = text;
@@ -653,9 +660,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function setConnection(state) {
         connectionState = state;
         if (state !== 'connected') {
+            if (gameOpenPending) {
+                clearTimeout(gameOpenPending.timer); gameOpenPending = null;
+                gameOpenError = 'Connection interrupted. Reconnect and try opening Game Night again.';
+            }
             gameInvites.clear(); gameReturnOffered = false; joiningGameRoom = ''; drawGameOffer();
             for (const invite of sentRoomInvites.values()) clearTimeout(invite.timer);
             sentRoomInvites.clear();
+            joiningArcadeOffer = null;
+            finishArcadeInvitation();
             clearGameLinks(); clearJamInvitations();
             if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.');
         }
@@ -664,6 +677,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-connection]').dataset.state = state;
         $('[data-send]').disabled = state !== 'connected';
         $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting' || state === 'ended' && betaShell;
+        if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline';
         $('[data-reconnect]').hidden = !(state === 'offline' || state === 'ended' && !betaShell) || !app.me;
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });
         if (state === 'offline' && app.pendingChannel) {
@@ -695,7 +709,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             // the protected shell's own read-only endpoint, without retrying,
             // following redirects, refreshing access or exposing credentials.
             try {
-                fetch('/beta/state', { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: controller.signal })
+                fetch('/beta/state' + gameGuestQuery, { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: controller.signal })
                     .then((response) => finish(response.status === 401), cancel);
             } catch { cancel(); }
         });
@@ -715,10 +729,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         entrySourcesSupported = null; drawEntryChoice();
         clearTimeout(retryTimer);
         setConnection(app.me ? 'reconnecting' : 'connecting');
+        if (gameGuest && !gameGuestSeated) {
+            gateStatus('Joining the game…');
+            $('[data-game-guest-retry]').hidden = true;
+        }
         const tsToken = ownerSession ? '' : await loadTurnstile();
         if (attempt !== connectionAttempt) return;
         if (!ownerSession && siteKey && !tsToken) { setConnection('offline'); return gateStatus('The guest check couldn’t finish. Please try again.'); }
         const q = new URLSearchParams({ preview: previewKey, 'device-in-hello': '1' });
+        if (gameGuest) { q.set('game-guest', '1'); q.set('game-room', gameGuest.ref); }
         const dev = readRemembered('hangout-dev');
         if (dev) q.set('dev', dev);
         if (tsToken) q.set('ts', tsToken);
@@ -783,7 +802,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (attempt !== connectionAttempt || app.ws !== ws || sessionEnded || pageLeaving) return;
                 if (missing) {
                     if (app.me) return endSession('private-access');
-                    gateStatus('Your private access needs renewal. Reopen your invitation link or enter its code.');
+                    gateStatus(gameGuest ? 'Your game access expired. Ask your host for a fresh invitation.' : 'Your private access needs renewal. Reopen your invitation link or enter its code.');
                     if (privateEntry) privateEntry.hidden = false;
                     return;
                 }
@@ -858,11 +877,38 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const next = reason === 'left' ? 'Return to the community to start a new chat session.' : betaShell
             ? wasVerified ? 'Return to your invitation, then verify your email again to recover your rooms.' : 'Return to your private invitation to join again.'
             : wasVerified ? 'Choose Try again to continue as a guest. Sign in again to recover your registered rooms.' : 'Choose Try again to start a fresh session.';
-        $('[data-session-reason]').textContent = `${ended} ${next} Cameras are off.`;
-        $('[data-session-reentry]').hidden = !betaShell;
+        $('[data-session-reason]').textContent = gameGuest ? `${gameGuestExitMessage(reason)} Ask your host for a fresh invitation.` : `${ended} ${next} Cameras are off.`;
+        $('[data-session-reentry]').hidden = !betaShell || !!gameGuest;
         $('[data-session-reentry]').textContent = reason === 'left' ? 'Return to community' : 'Return to invitation';
+        if (gameGuest) $('[data-game-guest-connecting]').hidden = true;
         $('[data-session-ended]').hidden = false;
         show('chat'); $('#session-ended-title').focus({ preventScroll: true });
+    }
+    function gameGuestExitMessage(reason) {
+        return { left: 'You left Game Night.', closed: 'This Game Night room closed.', removed: 'You were removed from Game Night.' }[reason] || 'Your Game Night access ended.';
+    }
+    function leaveGameGuest(reason) {
+        gameGuestExit = reason;
+        history.replaceState({ gameSessionRef: gameGuest.sessionRef, gameExit: reason }, '', location.pathname + gameGuestQuery);
+        endSession(reason);
+        void closeGameGuestAccess();
+    }
+    async function closeGameGuestAccess() {
+        const status = $('[data-session-reason]'), retry = $('[data-game-guest-exit-retry]');
+        const message = gameGuestExitMessage(gameGuestExit);
+        retry.hidden = true;
+        status.textContent = `${message} Closing the invitation…`;
+        try {
+            const response = await fetch('/beta/game-night/invitation/leave', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionRef: gameGuest.sessionRef }), keepalive: true,
+                signal: AbortSignal.timeout(10000)
+            });
+            if (!response.ok || (await response.json()).ok !== true) throw new Error('Invitation close unconfirmed');
+            status.textContent = `${message} Ask your host for a fresh invitation.`;
+        } catch {
+            status.textContent = `${message} The invitation could not be closed. Try again.`;
+            retry.hidden = false;
+        }
     }
     const send = (obj) => {
         const commandName = obj.t === 'cmd' ? String(obj.name || '').toLowerCase()
@@ -995,6 +1041,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             messageResultsSupported = m.features?.messageResults === 1;
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             gameNightSupported = m.features?.gameNight === 1;
+            gameOpenSupported = m.features?.gameOpen === 1;
+            gameGuestInvitesSupported = m.features?.gameGuestInvites === 1;
             arcadeTables.get('chess').supported = m.features?.arcadeChess === 1;
             arcadeTables.get('crapeights').supported = m.features?.arcadeCrapeights === 1;
             arcadeTables.get('turdrummy').supported = m.features?.arcadeTurdRummy === 1;
@@ -1045,12 +1093,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             send({ t: 'hello', nick, age13: true, entrySource: entrySharing.helloSource(), transport: 1,
                 ...(m.features?.compactLobbyRoster === 1 ? { compactLobbyRoster: 1 } : {}) }); break;
         case 'person-preferences': acknowledgePersonPreferences(m); break;
+        case 'game-room-open':
+            if (gameOpenPending?.request === m.request) finishGameOpen(m);
+            break;
         case 'entry-source': entrySharing.acknowledge(m); break;
         case 'nick-error':
             setConnection('offline');
-            $('[data-gate]').hidden = false;
+            if (gameGuest) gateStatus(m.text);
+            else showNicknameError(m.text);
+            $(gameGuest ? '[data-game-guest-connecting]' : '[data-gate]').hidden = false;
             $('[data-app]').hidden = true;
-            showNicknameError(m.text);
             break;
         case 'welcome': {
             if (!app.me || app.resetSession || app.verified !== (m.verified === true)) clearMessageRecovery();
@@ -1061,12 +1113,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             $('[data-room-filter] option[value=mine]').disabled = !app.verified;
             app.me = m.nick; app.selfId = personId(m.id) ? m.id : '';
             for (const view of app.pms.values()) updatePmName(view, view.nick);
-            app.band = m.band; writeRemembered('hangout-nick', m.nick);
+            app.band = m.band; if (!gameGuest) writeRemembered('hangout-nick', m.nick);
             $('[data-self-nick]').textContent = m.nick;
             $('[data-self-role]').textContent = app.capabilities.configure ? 'Site administrator' : app.capabilities.moderate ? 'Community moderator' : app.verified ? 'Room owner account' : 'Guest access';
             app.kicked = false; retry = 0; setConnection('connected');
             entrySharing.joined();
-            returnToKeepRoom();
+            if (!gameGuest) returnToKeepRoom();
             if (arcadeResume) {
                 if (arcadeTables.get(arcadeResume.game)?.supported && !app.sharingStopped && !pendingKeep &&
                     cmd('join', [arcadeResume.room], '#stalemate', arcadeResume.ref)) arcadeReturning = arcadeResume;
@@ -1074,14 +1126,19 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
-            $('[data-gate]').hidden = true; $('[data-app]').hidden = false;
-            if (!wasIn || app.resetSession) {
+            $('[data-gate]').hidden = true;
+            if (gameGuest && !gameGuestSeated) gateStatus('Finding your seat…');
+            else {
+                $('[data-app]').hidden = false;
+                $('[data-game-guest-connecting]').hidden = true;
+            }
+            if (!gameGuest && (!wasIn || app.resetSession)) {
                 gameReturn = readGameReturn();
                 gameReturnOffered = !!gameReturn;
                 drawGameOffer();
             }
             if (wasIn && app.resetSession) {
-                if (!gameReturnOffered) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
+                if (!gameGuest && !gameReturnOffered) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
             }
             else if (wasIn) line(app.active, { event: true, text: `* You are now ${m.nick}` });
             app.resetSession = false;
@@ -1095,10 +1152,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 drafts.delete(c.name);
             }
             const gameOfferAccepted = joiningGameRoom === c.name;
+            const invite = gameOfferAccepted ? joiningArcadeOffer : null;
             const returningToGame = gameReturnOffered && gameReturn?.room === c.name;
             const joiningLinkedGame = gameEntry?.target?.room === c.name;
             if (joiningLinkedGame) gameEntry = null;
-            if (gameOfferAccepted) joiningGameRoom = '';
+            if (gameOfferAccepted) { joiningGameRoom = ''; joiningArcadeOffer = null; }
             if (returningToGame) gameReturnOffered = false;
             if (gameInvites.delete(c.name) || gameOfferAccepted || returningToGame || joiningLinkedGame) drawGameOffer();
             if (app.pendingChannel === m.ch.name) {
@@ -1106,6 +1164,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 $('[data-channel-dialog]').close();
             }
             app.chans.set(m.ch.name, c);
+            if (c.kind === 'game' && invite?.arcade && invite.ref === c.keepRef) beginArcadeInvitation(c, invite.arcade);
+            if (gameGuest && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginArcadeInvitation(c, gameGuest);
             if (pendingKeep?.stage === 'joining' && c.name === pendingKeep.room) {
                 if (c.keepRef === pendingKeep.ref) pendingKeep.stage = 'confirm';
                 else clearKeep('That room changed while you signed in. Nothing was kept.');
@@ -1113,7 +1173,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
-            if (gameOfferAccepted) focusChannelTab(c.name);
+            if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
             followPendingRoomJoin();
             break;
         }
@@ -1174,6 +1234,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             break;
         }
         case 'part': case 'closed': {
+            if (gameGuest && m.ch === gameGuest.room) {
+                leaveGameGuest(m.t === 'closed' ? 'closed' : gameGuestExit === 'removed' ? 'removed' : 'left');
+                break;
+            }
             const leavingActiveGame = app.active === m.ch && app.chans.get(m.ch)?.kind === 'game';
             const leavingFromButton = app.active === m.ch && document.activeElement === $('[data-leave]');
             forgetGameRoom(m.ch);
@@ -1196,6 +1260,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (joiningGameRoom) {
                     const failedRoom = joiningGameRoom;
                     joiningGameRoom = '';
+                    joiningArcadeOffer = null;
                     forgetGameRoom(failedRoom);
                     toast(jamRoomName(failedRoom) ? `Couldn’t join ${failedRoom}. It may have closed. Ask the host to invite you again.`
                         : 'Couldn’t join Game Night. Ask the host for a fresh invitation.');
@@ -1271,8 +1336,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                     if (!gameInvites.has(m.ch) && gameInvites.size === 5 && !joiningGameRoom)
                         gameInvites.delete(gameInvites.keys().next().value);
                     if (gameInvites.has(m.ch) || gameInvites.size < 5) {
+                        const arcade = gameNightRoomName(m.ch) && arcadeTables.get(m.arcade?.game)?.supported
+                            ? gameNightInvite(m.arcade.game, m.arcade.match) : null;
                         const request = roomNonce(m.request) && Number.isFinite(m.until) ? m.request : '';
-                        const offer = { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by, request };
+                        const offer = { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by, request, arcade };
                         if (request) setTimeout(() => {
                             if (gameInvites.get(m.ch) !== offer) return;
                             if (joiningGameRoom === m.ch) joiningGameRoom = '';
@@ -1285,6 +1352,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]);
             break;
         case 'kicked': {
+            if (gameGuest && m.ch === gameGuest.room) { gameGuestExit = 'removed'; break; }
             forgetGameRoom(m.ch);
             app.kicked = m.ch === '#stalemate';
             toast(`${m.banned ? 'Banned' : 'Kicked'} from ${m.ch} by ${m.by}: ${m.reason}`);
@@ -1658,6 +1726,38 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (announcement.textContent !== message) announcement.textContent = message;
         if (visible.textContent !== message) visible.textContent = message;
     }
+    function finishGameOpen(result) {
+        const pending = gameOpenPending;
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        gameOpenPending = null;
+        const room = result?.ok && store(result.room);
+        if (room?.kind === 'game' && room.keepRef === result.ref) {
+            const requestedGame = pending.fromEntry && gameEntry?.table;
+            if (arcadeTables.get(requestedGame)?.supported) arcadeReturning = { room: room.name, ref: room.keepRef, game: requestedGame };
+            if (pending.fromEntry) gameEntry = null;
+            if (app.active !== room.name) switchTo(room.name);
+            else if (arcadeReturning) drawGameNight();
+        } else {
+            gameOpenError = 'Couldn’t open Game Night. Try again or return to your room from the room list.';
+            if (!pending.fromEntry) toast(gameOpenError);
+        }
+        drawGameOffer();
+    }
+    function openGameRoom(fromEntry = false) {
+        if (gameOpenPending) return;
+        const request = newGameNightRoomName();
+        count('room-start-game');
+        if (!gameOpenSupported) {
+            if (fromEntry) { gameEntry = null; drawGameOffer(); }
+            cmd('join', [request]);
+            return;
+        }
+        gameOpenError = '';
+        if (!cmd('gameopen', [request])) { toast('Reconnect before opening Game Night.'); return; }
+        gameOpenPending = { request, fromEntry, timer: setTimeout(() => finishGameOpen(null), 8000) };
+        drawGameOffer();
+    }
     function drawGameOffer() {
         const offer = currentGameOffer();
         const start = !offer && gameNightSupported && gameEntry && !gameEntry.target && connectionState === 'connected' && !app.sharingStopped;
@@ -1673,34 +1773,37 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         const jam = jamRoomName(offer?.room);
         const roomLabel = jam ? offer.room : 'Game Night';
+        const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
+        const selectedGame = arcadeTables.get(gameEntry?.table)?.label;
         let message;
-        if (start) message = 'Start a private Game Night or wait for your host’s invitation.';
+        if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || (selectedGame
+            ? `Start a private Game Night for ${selectedGame}.` : 'Start a private Game Night or wait for your host’s invitation.');
         else if (joiningGameRoom === offer.room) message = `Joining ${roomLabel}…`;
         else if (gameReturnOffered) {
             message = jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`
                 : 'Game Night disconnected. Return to the room to check your match.';
-        } else if (offer.by) message = `${offer.by} invited you to ${roomLabel}.`;
+        } else if (offer.by) message = gameLabel ? `${offer.by} invited you to play ${gameLabel}.` : `${offer.by} invited you to ${roomLabel}.`;
         else message = 'Your link points to a private Game Night. The host’s invitation is required.';
         updateOfferStatus(status, visible, message);
-        button.textContent = start ? 'Start Game Night' : gameReturnOffered ? 'Return to room' : jam ? 'Join room' : 'Join Game Night';
-        button.setAttribute('aria-disabled', String(!!joiningGameRoom));
-        $('[data-game-offer-dismiss]').disabled = !!joiningGameRoom;
+        button.textContent = start ? 'Start Game Night' : gameReturnOffered ? 'Return to room'
+            : gameLabel ? `Play ${gameLabel}` : jam ? 'Join room' : 'Join Game Night';
+        const busy = !!joiningGameRoom || start && !!gameOpenPending;
+        button.setAttribute('aria-disabled', String(busy));
+        $('[data-game-offer-dismiss]').disabled = busy;
     }
     $('[data-game-offer-join]').addEventListener('click', () => {
         const offer = currentGameOffer();
         if (joiningGameRoom || connectionState !== 'connected' || sessionEnded || app.sharingStopped) return;
         if (!offer) {
             if (!gameNightSupported || !gameEntry || gameEntry.target) return;
-            gameEntry = null;
-            drawGameOffer();
-            $('[data-start="game"]').click();
-            return;
+            return openGameRoom(true);
         }
         const sent = offer.request
             ? send({ t: 'room-invite-answer', request: offer.request, accept: true })
             : cmd('join', [offer.room], app.active, offer.ref);
         if (!sent) return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
         joiningGameRoom = offer.room;
+        joiningArcadeOffer = offer.arcade ? offer : null;
         drawGameOffer();
     });
     $('[data-game-offer-dismiss]').addEventListener('click', () => {
@@ -1954,7 +2057,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function drawGameNight() {
         const c = currentGameNight();
-        const canCall = discordLinksSupported && !shieldActive;
+        if (arcadeInvitation && c?.keepRef !== arcadeInvitation.ref) finishArcadeInvitation();
+        const canCall = !gameGuest && discordLinksSupported && !shieldActive;
         const canManage = c && canCall && amOp(c) && roomNonce(c.keepRef);
         const editor = $('[data-game-editor]');
         if (gameEditorRoom !== (canManage ? c : null)) {
@@ -1980,7 +2084,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (gameShareButton) gameShareButton.hidden = !canShare;
         if (gameShareDialog?.open && (!canShare || gameShareDialog.dataset.room !== c.keepRef)) gameShareDialog.close();
         $('[data-game-night]').hidden = !c;
-        $('[data-arcade-game]').hidden = !c || ![...arcadeTables.values()].some(table => table.supported);
+        $('[data-arcade-game]').hidden = !!gameGuest || !c || ![...arcadeTables.values()].some(table => table.supported);
         drawFour(c);
         for (const [game, table] of arcadeTables) drawArcadeTable(c, game, table);
         drawArcadeMedia(c);
@@ -2006,12 +2110,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             .finally(() => { arcadeMediaLoading = false; });
     }
     function drawArcadeTable(c, game, table) {
-        const scope = table.supported && !shieldActive && c && roomNonce(c.keepRef)
+        const scope = table.supported && (!gameGuest || gameGuest.game === game) && !shieldActive && c && roomNonce(c.keepRef)
             ? { actor: app.selfId, room: c.name, ref: c.keepRef } : null;
         const option = $(`[data-arcade-game] option[value="${game}"]`);
         option.hidden = option.disabled = !scope || !table.controller;
         if (table.controller) {
             table.controller.setRoom(scope);
+            if (scope && arcadeInvitation?.game === game && arcadeInvitation.ref === scope.ref) table.controller.open();
             if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
                 arcadeReturning = null;
                 table.controller.open();
@@ -2021,10 +2126,43 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!scope || table.loading) return;
         table.loading = true;
         table.load().then(mount => {
-            table.controller = mount($('[data-game-night]'));
+            table.controller = mount($('[data-game-night]'), (room, state, sendMatch) => arcadeMatchState(game, table, room, state, sendMatch));
             drawArcadeTable(currentGameNight(), game, table);
-        }).catch(() => toast(`${table.label} could not load. Reopen Game Night to try again.`))
+        }).catch(() => {
+            if (gameGuest && !gameGuestSeated) finishArcadeInvitation(`${table.label} could not load. Refresh to try again.`);
+            else toast(`${table.label} could not load. Reopen Game Night to try again.`);
+        })
             .finally(() => { table.loading = false; });
+    }
+    function beginArcadeInvitation(room, target) {
+        finishArcadeInvitation();
+        arcadeInvitation = { ...target, room: room.name, ref: room.keepRef, sent: false,
+            timer: setTimeout(() => finishArcadeInvitation('The seat could not be confirmed. Ask the host for a fresh game invitation.'), 15000) };
+    }
+    function finishArcadeInvitation(message) {
+        clearTimeout(arcadeInvitation?.timer);
+        arcadeInvitation = null;
+        if (message) {
+            if (gameGuest && !gameGuestSeated) gateStatus(message);
+            else toast(message);
+        }
+    }
+    function arcadeMatchState(game, table, scope, state, sendMatch) {
+        table.invite = scope && state?.seat && state.waiting ? gameNightInvite(game, state.id) : null;
+        const invite = arcadeInvitation;
+        if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
+        if (state?.seat && (state.id === invite.match || gameGuest)) {
+            if (gameGuest && !gameGuestSeated) {
+                gameGuestSeated = true;
+                $('[data-app]').hidden = false;
+                $('[data-game-guest-connecting]').hidden = true;
+            }
+            return finishArcadeInvitation();
+        }
+        if (state?.id !== invite.match || !state.waiting) {
+            return finishArcadeInvitation('This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
+        }
+        if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
     }
     $('[data-arcade-game]').addEventListener('change', event => {
         const game = event.target.value;
@@ -2036,7 +2174,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     window.addEventListener('pagehide', () => {
         const current = currentGameNight();
         const open = [...arcadeTables].find(([, table]) => table.controller?.isOpen());
-        if (!current || !open) return;
+        if (gameGuest || !current || !open) return;
         const intent = keepRoomIntent(current);
         if (intent) writeTab(ARCADE_RESUME_KEY, JSON.stringify({ intent, game: open[0], entry: entryHandoff(entrySource, shareEntry, Date.now(), entrySites) }));
     });
@@ -2158,7 +2296,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const c = currentGameNight();
         return !!(c && c === gameEditorRoom && amOp(c) && cmd('discord', [value], c.name, c.keepRef));
     }
-    $('[data-game-invite]').addEventListener('click', () => openInviteDialog());
+    $('[data-game-invite]').addEventListener('click', event => openInviteDialog(event.currentTarget));
     gameShareButton?.addEventListener('click', () => {
         const c = currentGameNight();
         if (!betaShell || !gameShareDialog || !c || !amOp(c)) return;
@@ -2177,11 +2315,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!gameShareDialog.open || !link) return;
         try {
             await navigator.clipboard.writeText(link);
-            if (gameShareDialog.open && gameShareValue.value === link) $('[data-game-share-status]').textContent = 'Room link copied.';
+            if (gameShareDialog.open && gameShareValue.value === link) $('[data-game-share-status]').textContent = 'Room address copied.';
         } catch {
             if (gameShareDialog.open && gameShareValue.value === link) {
                 gameShareValue.select();
-                $('[data-game-share-status]').textContent = 'Select and copy the room link.';
+                $('[data-game-share-status]').textContent = 'Select and copy the room address.';
             }
         }
     });
@@ -2436,17 +2574,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             return;
         }
         const kind = b.dataset.start;
-        if (kind === 'game' && !gameNightSupported) return;
+        if (kind === 'game') {
+            if (gameNightSupported) openGameRoom();
+            return;
+        }
         // Private activity names need a unique part even when their readable
         // words match. Break up digits so the code won't look like a phone number.
-        const code = kind === 'game' || kind === 'jam' ? crypto.randomUUID().replaceAll('-', '') : '';
-        let suffix;
-        if (kind === 'game') {
-            suffix = `${code.slice(0, 6)}x${code.slice(6, 12)}`;
-        } else {
-            suffix = slug();
-            if (kind === 'jam') suffix += `-${code.slice(0, 4)}x${code.slice(4, 8)}`;
-        }
+        const code = kind === 'jam' ? crypto.randomUUID().replaceAll('-', '') : '';
+        const suffix = kind === 'jam' ? `${slug()}-${code.slice(0, 4)}x${code.slice(4, 8)}` : slug();
         count(`room-start-${kind}`); cmd('join', [`#${kind}-${suffix}`]);
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
@@ -2754,6 +2889,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         inviteInstance = ''; invitePeople.clear();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
         $('[data-invite-people]').replaceChildren();
+        $('[data-game-invite-people]').replaceChildren();
+        resetGuestLink();
         if ($('[data-invite-dialog]').open) $('[data-invite-dialog]').close();
     }
     function onlineInvitePeople(current, music = false) {
@@ -2807,24 +2944,50 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
         jamInviteOpener = opener ? { button: opener, room: current, music } : null;
         inviteContext = current; inviteInstance = current.keepRef; invitePeople.clear(); $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
-        const quick = !!opener && personTargetsSupported && roomNonce(inviteInstance);
+        $('[data-game-invite-error]').textContent = '';
+        const isGame = current.kind === 'game';
+        const quick = !isGame && !!opener && personTargetsSupported && roomNonce(inviteInstance);
         const list = $('[data-invite-people]'), options = $('[data-invite-options]'), error = $('[data-invite-quick-error]');
-        $('[data-invite-quick]').hidden = !quick; $('[data-invite-form]').hidden = quick;
-        list.replaceChildren(); options.replaceChildren(); error.textContent = '';
+        const roster = $('[data-game-invite-people]');
+        $('#invite-dialog-intro').hidden = isGame;
+        $('[data-invite-quick]').hidden = !quick;
+        $('[data-invite-form]').hidden = isGame || quick;
+        $('[data-game-invite-picker]').hidden = !isGame;
+        list.replaceChildren(); options.replaceChildren(); roster.replaceChildren(); error.textContent = '';
         $('[data-invite-nick]').value = '';
-        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose someone online'; options.append(placeholder);
+        const placeholder = document.createElement('option');
+        placeholder.value = ''; placeholder.textContent = 'Choose someone online'; options.append(placeholder);
         if (quick) drawQuickInvitePeople();
         else {
             for (const person of onlineInvitePeople(current).values()) {
-                invitePeople.set(person.id, personContext(person.id, current.name, inviteInstance, person.nick));
+                const context = personContext(person.id, current.name, inviteInstance, person.nick);
+                invitePeople.set(person.id, context);
+                if (isGame) {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'btn btn--ghost';
+                    button.textContent = `Invite ${person.nick}`;
+                    button.disabled = !personTargetsSupported || !roomNonce(inviteInstance);
+                    button.addEventListener('click', () => sendInviteToPerson(context, $('[data-game-invite-error]')));
+                    roster.append(button);
+                    continue;
+                }
                 const option = document.createElement('option'); option.value = person.id;
                 option.textContent = person.busy ? `${person.nick} · Busy` : person.nick; options.append(option);
             }
         }
+        const canInviteNew = isGame && gameGuestInvitesSupported;
+        const target = canInviteNew && arcadeInviteTarget();
+        const inviteHint = $('[data-game-invite-empty]');
+        inviteHint.hidden = !!target || (!canInviteNew && !!roster.childElementCount);
+        inviteHint.textContent = canInviteNew ? 'Open a game with a free seat to invite a friend.' : 'Nobody else is in Hang Out yet.';
+        $('[data-game-invite-link]').hidden = !target;
+        if (target) createGuestLink.textContent = `Invite a friend to ${arcadeTables.get(target.game).label}`;
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal();
         const first = quick ? list.querySelector('button') || $('[data-invite-quick-cancel]') : $('[data-invite-nick]');
-        first.focus();
+        if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
+        else first.focus();
     }
     $('[data-jam-invite-room]').addEventListener('click', event => {
         if (event.currentTarget.getAttribute('aria-disabled') !== 'true') openInviteDialog(event.currentTarget);
@@ -2834,6 +2997,72 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     });
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-quick-cancel]').addEventListener('click', closeInviteDialog);
+    function roomInviteArgs(nick, room) {
+        const target = room.kind === 'game' && arcadeInviteTarget();
+        return target ? [nick, room.name, target.game, target.match] : [nick, room.name];
+    }
+    function arcadeInviteTarget() {
+        return [...arcadeTables.values()].find(table => table.invite && table.controller?.isOpen())?.invite;
+    }
+    const createGuestLink = $('[data-game-invite-new]'), shareGuestLink = $('[data-game-invite-share]'), guestLinkStatus = $('[data-game-invite-link-status]');
+    let pendingGuestLink = null;
+    function resetGuestLink() {
+        pendingGuestLink = null;
+        createGuestLink.hidden = false; createGuestLink.disabled = false;
+        shareGuestLink.hidden = true; guestLinkStatus.textContent = '';
+    }
+    createGuestLink.addEventListener('click', async () => {
+        const room = inviteContext, target = arcadeInviteTarget();
+        if (!target || !room || room !== currentGameNight() || room.keepRef !== inviteInstance || !amOp(room)) {
+            guestLinkStatus.textContent = 'Open a game table with a free seat first.';
+            return;
+        }
+        const request = { room, target };
+        pendingGuestLink = request;
+        createGuestLink.disabled = true;
+        guestLinkStatus.textContent = 'Preparing an invitation…';
+        try {
+            const response = await fetch('/beta/game-night/invitation/issue', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000),
+                body: JSON.stringify({ actor: app.selfId, room: room.name, ref: room.keepRef, ...target })
+            });
+            const value = await response.json();
+            if (pendingGuestLink !== request || room !== currentGameNight()) return;
+            if (!response.ok || !gameInviteCode(value.code)) throw new Error(value.error || 'The invitation could not be prepared. Try again.');
+            request.link = new URL('/beta/game-night/guest#invite=' + value.code, location.origin).href;
+            createGuestLink.hidden = true;
+            shareGuestLink.hidden = false;
+            shareGuestLink.textContent = typeof navigator.share === 'function' ? 'Share invite' : 'Email invite';
+            guestLinkStatus.textContent = 'One guest can use this invitation within 20 minutes.';
+            shareGuestLink.focus();
+        } catch (error) {
+            if (pendingGuestLink !== request) return;
+            guestLinkStatus.textContent = error.name === 'TimeoutError' ? 'The invitation took too long. Try again.' : error.message;
+        } finally {
+            if (pendingGuestLink === request) createGuestLink.disabled = false;
+        }
+    });
+    shareGuestLink.addEventListener('click', async () => {
+        const request = pendingGuestLink;
+        if (!request?.link || request.room !== currentGameNight() || request.target.match !== arcadeInviteTarget()?.match) {
+            resetGuestLink(); guestLinkStatus.textContent = 'The table changed. Prepare a new invitation.'; return;
+        }
+        const title = `Join me for ${arcadeTables.get(request.target.game).label}`;
+        if (shareGuestLink.textContent === 'Email invite') {
+            location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(request.link)}`;
+            guestLinkStatus.textContent = 'Choose a friend in the email draft.';
+            return;
+        }
+        try {
+            await navigator.share({ title, url: request.link });
+            if (pendingGuestLink === request) closeInviteDialog();
+        } catch (error) {
+            if (pendingGuestLink !== request || error.name === 'AbortError') return;
+            shareGuestLink.textContent = 'Email invite';
+            guestLinkStatus.textContent = 'Sharing didn’t open. You can send the invitation by email.';
+        }
+    });
+    $('[data-game-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-dialog]').addEventListener('close', () => {
         if ($('[data-invite-dialog]').open) return;
         const opener = jamInviteOpener;
@@ -2963,7 +3192,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             } else error.textContent = 'The invitation was not sent. Reconnect and try again.';
             return;
         }
-        if (send({ t: 'cmd', name: 'invite', args: [person.nick, current.name], ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer })) closeInviteDialog();
+        if (send({ t: 'cmd', name: 'invite', args: roomInviteArgs(person.nick, current), ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer })) closeInviteDialog();
         else error.textContent = 'The invitation was not sent. Reconnect before trying again.';
     }
     $('[data-invite-person-send]').addEventListener('click', () => {
@@ -2979,7 +3208,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         // This is only an affordance. The server checks the current host,
         // recipient and room before granting an invitation.
-        if (namedCmd('invite', [nick], current.name, inviteInstance)) closeInviteDialog();
+        const args = roomInviteArgs(nick, current);
+        if (namedCmd('invite', args.length === 2 ? [nick] : args, current.name, inviteInstance)) closeInviteDialog();
         else $('[data-invite-error]').textContent = 'Reconnect before sending an invitation.';
     });
 
@@ -3165,6 +3395,19 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
 
     let toastTimer, toastDuration = 4000;
     const toastRegion = $('[data-toast]');
+    if (gameGuest) {
+        $('[data-gate]').hidden = true;
+        $('[data-game-guest-exit-retry]').addEventListener('click', () => void closeGameGuestAccess());
+        if (guestInvitationChanged) {
+            $('[data-game-guest-connecting]').hidden = false;
+            gateStatus('This browser accepted a different invitation. Ask your host for a new invitation for this game.');
+        } else if (gameGuestExit) leaveGameGuest(gameGuestExit);
+        else {
+            $('[data-game-guest-connecting]').hidden = false;
+            $('[data-game-guest-retry]').addEventListener('click', () => connect(''));
+            void connect('');
+        }
+    }
     function scheduleToastDismiss() {
         clearTimeout(toastTimer);
         if (toastRegion.hidden || toastRegion.contains(document.activeElement)) return;

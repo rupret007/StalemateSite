@@ -359,6 +359,23 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .spades-trick [data-active="true"] { border-color: var(--lime); }
 .spades-trick [data-red="true"] b { color: #ffa6aa; }
 .arcade-spades [data-spades-bid] select { padding: 4px; min-height: 38px; }
+@media (max-width: 900px) {
+  .game-night :is(.arcade-eights, .arcade-rummy, .arcade-spades, .arcade-jack) :is(.btn, select) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .game-night :is(.arcade-spades, .arcade-jack) select {
+    appearance: none;
+    padding-inline-end: 24px;
+    background:
+      linear-gradient(45deg, transparent 50%, currentColor 50%) right 13px center / 5px 5px no-repeat,
+      linear-gradient(135deg, currentColor 50%, transparent 50%) right 8px center / 5px 5px no-repeat,
+      var(--ink);
+  }
+  .arcade-spades [data-spades-table][data-phase="bid"] :is(.spades-trick, .arcade-card-hand-label) {
+    margin-block: 2px;
+  }
+}
 @media (max-width: 355px) {
   .arcade-spades .arcade-card-hand { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
@@ -580,6 +597,25 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .sheet h3 { margin: 0 0 14px; font-size: 22px; letter-spacing: -.03em; }
 .sheet p { color: var(--muted); font-size: 13px; }
 .sheet-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
+[data-game-invite-link] { margin-block: 12px 16px; }
+[data-game-invite-link-status]:empty { display: none; }
+.game-guest [data-pane=rooms], .game-guest [data-show=rooms], .game-guest .chat .startroom,
+.game-guest .pmtoggle:has([data-pm-off]), .game-guest [data-four], .game-guest [data-game-arcade] { display: none !important; }
+body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: none; }
+[data-game-guest-connecting].gate {
+  place-items: start center; padding: 32px 20px; background: #101414;
+  color: #eeeeda; font: 16px/1.6 system-ui, sans-serif;
+}
+[data-game-guest-connecting] .gate-card {
+  display: block; width: min(680px, 100%); padding: 0; background: none; border: 0; box-shadow: none;
+}
+[data-game-guest-connecting] .eyebrow {
+  color: var(--lime); font: 11px/1.5 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase;
+}
+[data-game-guest-connecting] h1 {
+  margin: 24px 0; font: 700 clamp(2.6rem, 9vw, 4.5rem)/1 system-ui, sans-serif; letter-spacing: -.06em;
+}
+@media (max-width: 480px) { [data-game-guest-connecting].gate { padding: 24px 16px; } }
 .sheet-buttons .btn { font-size: 12px; }
 [data-call-report-reason] { display: block; width: 100%; margin: 6px 0 12px; padding: 8px;
   resize: vertical; color: var(--cream); background: var(--ink); border: 1px solid var(--control-line); border-radius: 4px; font: inherit; }
@@ -617,6 +653,7 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
    for the transcript. Inspired by mIRC and Halloy's single-pane workflow;
    the existing channel controls, focus model and received-session buffer stay. */
 @media (min-width: 901px) {
+  .game-guest .irc { grid-template-columns: minmax(0, 1fr) 210px; }
   .irc { width: 100%; grid-template-columns: 220px minmax(0, 1fr) 180px; }
   .titlebar { min-height: 48px; padding: 7px 14px; gap: 12px; }
   .title-extra { font-size: 11px; padding-left: 12px; margin-left: 4px; }
@@ -660,6 +697,12 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
   .phonetabs { display: grid; grid-column: 1; grid-row: 3; grid-template-columns: repeat(3, 1fr); min-height: 60px; padding-bottom: env(safe-area-inset-bottom, 0px); border-top: 1px solid var(--line); background: var(--surface); }
   .phonetabs button { min-height: 56px; border: 0; border-top: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 550; }
   .phonetabs button[aria-current=true] { border-top-color: var(--lime); color: var(--lime); background: #20271d; }
+  .game-guest .phonetabs { grid-template-columns: repeat(2, 1fr); }
+  .irc:has(.game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess, .four-match)[open]) :is(.phonetabs, .phonetabs button) {
+    min-height: 44px;
+  }
+  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess, .four-match)[open]) .quick { display: none; }
+  .game-night { scroll-padding-block: 8px; }
   .tabs { min-height: 47px; padding: 4px 10px 0; }
   .tabs button { min-height: 42px; padding: 8px 12px; font-size: 11px; }
   .topic { min-height: 35px; padding: 8px 14px; font-size: 10px; }
@@ -798,7 +841,7 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
   .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
   .chat:has(.buffer :focus-visible) .say,
-  .chat:has(.four-match[open]:not([hidden])) .say { position: static; }
+  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess, .four-match)[open]) .say { position: static; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   /* Send is shorter than its input. Leave room for the entire composer when
      native focus scrolling brings the button into a deeply zoomed viewport. */

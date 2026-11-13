@@ -1,4 +1,4 @@
-import { createGameNightMatchClient } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
 const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds'], C: ['♣', 'Clubs'] };
 const side = { a: 'Seat 1', b: 'Seat 2' };
@@ -47,7 +47,7 @@ const markup = `
     </div>
 </dialog>`;
 
-export function mountArcadeCrapeights(container) {
+export function mountArcadeCrapeights(container, onMatch) {
     const document = container.ownerDocument;
     const panel = document.createElement('details');
     panel.className = 'arcade-card-table arcade-eights';
@@ -60,7 +60,7 @@ export function mountArcadeCrapeights(container) {
     const choose = $('[data-eights-choose]'), suitControls = $('[data-eights-suits]'), confirm = $('[data-eights-confirm]');
     const actions = [...panel.querySelectorAll('[data-eights-action]')];
     let scope = null, model = null, canOpen = false, phase = 'connecting', pending = false, timer;
-    let selected = null, confirmation = null;
+    let selected = null, confirmation = null, connectionError;
 
     function clearPending() { clearTimeout(timer); pending = false; }
     function closeChoices() {
@@ -75,15 +75,18 @@ export function mountArcadeCrapeights(container) {
         model = null;
         canOpen = false;
         phase = 'connecting';
+        connectionError = undefined;
         error.textContent = '';
         draw();
     }
 
     const client = createGameNightMatchClient({
+        onMatch,
         prefix: '/beta/arcade-crapeights',
-        onStatus(next) {
+        onStatus(next, reason) {
             phase = next;
-            model = null;
+            connectionError = reason;
+            if (reason && reason !== 'rate-limited') model = null;
             clearPending();
             closeChoices();
             draw();
@@ -97,6 +100,7 @@ export function mountArcadeCrapeights(container) {
             const focusInTable = showingOutcome && panel.contains(focused);
             if (model?.id !== state?.id || previous?.revision !== match?.revision) closeChoices();
             phase = 'ready';
+            connectionError = undefined;
             model = state;
             canOpen = host;
             clearPending();
@@ -141,7 +145,7 @@ export function mountArcadeCrapeights(container) {
                 effect.textContent = special[card.rank] || suits[card.suit][1];
                 button.append(rank, effect);
             }
-            button.disabled = pending || !card.playable;
+            button.disabled = phase !== 'ready' || pending || !card.playable;
             return button;
         });
         if (next.length !== old.size || next.some((button, index) => hand.children[index] !== button)) {
@@ -168,10 +172,12 @@ export function mountArcadeCrapeights(container) {
         const match = model?.match, seated = !!model?.seat;
         let command = '', label = '';
         if (phase === 'unavailable') {
-            status.textContent = 'The table is unavailable.';
-            command = 'retry'; label = 'Reconnect table';
-        } else if (phase !== 'ready') status.textContent = 'Connecting to the table…';
-        else if (!model) {
+            status.textContent = matchConnectionErrors[connectionError] || 'The table couldn’t reconnect. Try again from this room.';
+            if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Reconnect table'; }
+        } else if (phase !== 'ready') {
+            status.textContent = match && seated ? 'Reconnecting to the table… Your hand is paused.'
+                : phase === 'reconnecting' ? 'Reconnecting to the table…' : 'Connecting to the table…';
+        } else if (!model) {
             status.textContent = canOpen ? 'Open a head-to-head table for this room.' : 'Waiting for the host to open a table.';
             if (canOpen) { command = 'open'; label = 'Open Eights table'; }
         } else if (model.waiting) {
@@ -207,7 +213,7 @@ export function mountArcadeCrapeights(container) {
             button.hidden = action === 'draw' ? !seated || !!match.roundResult || !!match.result
                 : action === 'pass' ? !match.canPass
                     : !seated || action === 'resign' && !!match.result;
-            button.disabled = pending || (action === 'draw' && !match.canDraw);
+            button.disabled = phase !== 'ready' || pending || (action === 'draw' && !match.canDraw);
             if (action === 'draw') button.textContent = `Draw · ${match.deckCount}`;
         }
         showHand(match);

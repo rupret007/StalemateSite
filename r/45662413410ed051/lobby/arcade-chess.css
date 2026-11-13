@@ -93,7 +93,8 @@
         margin-top: 0;
     }
     .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer { min-height: 64px; }
-    .arcade-chess #board, .arcade-chess-clocks { width: min(100%, 25rem, max(15rem, calc(100dvh - 568px))); }
+    .arcade-chess #board { width: min(100%, 25rem, max(15rem, calc(100dvh - 568px))); }
+    .arcade-chess-clocks { width: min(100%, 25rem, max(17rem, calc(100dvh - 568px))); }
 }
 @media (max-width: 900px) {
     body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .titlebar {
@@ -129,11 +130,16 @@
     }
     .arcade-chess-status { margin-block: 0 .3rem; }
     .arcade-chess-playing { gap: .35rem; justify-items: center; }
-    .arcade-chess #board, .arcade-chess-clocks { width: min(100%, 25rem, max(13.25rem, calc(100dvh - 454px))); }
+    .arcade-chess-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+    .arcade-chess-actions .btn { padding-inline: .25rem; overflow-wrap: anywhere; white-space: normal; }
+    .arcade-chess #board { width: min(100%, 25rem, max(13.25rem, calc(100dvh - 454px))); }
+    .arcade-chess-clocks { width: min(100%, 25rem, max(16.5rem, calc(100dvh - 454px))); }
+    .arcade-chess-clocks > div { padding: .25rem .35rem; font-size: .8rem; white-space: nowrap; }
 }
 @media (max-width: 359px) {
     body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .connection { font-size: 0; gap: 0; }
 }
 @media (max-height: 530px) {
-    .arcade-chess #board, .arcade-chess-clocks { width: min(100%, 15rem); }
+    .arcade-chess #board { width: min(100%, 15rem); }
+    .arcade-chess-clocks { width: min(100%, 16.5rem); }
 }
