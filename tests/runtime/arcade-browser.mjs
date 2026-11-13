@@ -707,6 +707,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await enterFromShell(player, 'LinkGuest', true);
             await expectRefusal();
             console.log('Passed Chromium kicked guest cannot reuse the old Game Night link.');
+        } else if (!media) {
+            const panel = player.locator('details.arcade-chess');
+            await panel.locator('summary').tap();
+            await expect(panel).not.toHaveAttribute('open', '');
+            await player.reload();
+            await player.locator('[data-enter]').click();
+            await expect(player.locator('[data-connection]')).toHaveText('Connected');
+            const returnToSeat = player.getByRole('button', { name: 'Back to my seat', exact: true });
+            await expectUncoveredControl(returnToSeat);
+            await returnToSeat.tap();
+            await expect(panel.locator('summary')).toBeFocused();
+            await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+            await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+            await tapSquare(player, 'd7');
+            await tapSquare(player, 'd5');
+            await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeVisible();
+            console.log(`Passed ${engine} phone seat recovery after closing the game panel and reloading.`);
         }
         console.log(`Passed ${engine} protected Game Night launch, invite-only room link, stale instance refusal, shared Chess move and chat.`);
     }

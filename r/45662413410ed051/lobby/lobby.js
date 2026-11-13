@@ -1547,8 +1547,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     function rememberGameReturn(room, previousGame) {
         if (!offerRoomName(room.name) || !roomNonce(room.keepRef)) return;
         // Tab-local room reference only. Admission, nicknames and match state stay elsewhere.
+        const savedGame = gameReturn?.ref === room.keepRef && gameReturn.room === room.name ? gameReturn.game : '';
         const activeGame = room.kind === 'game' && (previousGame || (arcadeReturning?.ref === room.keepRef ? arcadeReturning.game : '')
-            || [...arcadeTables].find(([, table]) => table.seatRef === room.keepRef && table.controller?.isOpen())?.[0]);
+            || [...arcadeTables].find(([, table]) => table.seatRef === room.keepRef && table.controller?.isOpen())?.[0]
+            || savedGame);
         gameReturn = { room: room.name, ref: room.keepRef, until: Date.now() + 30 * 60 * 1000,
             ...(activeGame ? { game: activeGame } : {}) };
         writeTab(gameReturnKey, JSON.stringify(gameReturn));
@@ -1892,7 +1894,11 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         table.seatRef = scope && state?.seat ? scope.ref : null;
         const room = currentGameNight();
         drawGameWaiting(room);
-        if (table.seatRef && room?.keepRef === table.seatRef) rememberGameReturn(room);
+        if (table.seatRef && room?.keepRef === table.seatRef) rememberGameReturn(room, game);
+        else if (sendMatch && scope?.ref === gameReturn?.ref && scope?.room === gameReturn?.room && gameReturn?.game === game) {
+            delete gameReturn.game;
+            writeTab(gameReturnKey, JSON.stringify(gameReturn));
+        }
         table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
         updateTableInvite(table, currentGameNight());
         const share = arcadeShareIntent;
