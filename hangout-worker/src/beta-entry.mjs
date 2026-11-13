@@ -280,7 +280,10 @@ async function gameInvitation(request, env, path, body) {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true } })
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
-    if (path === 'issue' && response.ok) return json({ code: await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY) });
+    if (path === 'issue' && response.ok) {
+        const code = await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY);
+        return json({ code, until: data.until });
+    }
     if (path !== 'accept' || !response.ok) return json(data, response.status);
     return gameGuestAccess(request, env, data);
 }

@@ -57,7 +57,7 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
             || !await lobby.sessionActive(host) || !await waitingGuestSeat(lobby, scope, game, match, host.betaSid)) {
             return reply({ error: 'Open a game table with an available seat before inviting a friend.' }, 403);
         }
-        if (!await lobby.controlBudget.take(host.socket, actor)) return reply({ error: 'Game invitation allowance reached. Try again in a few minutes.' }, 429);
+        if (!await lobby.controlBudget.take(host.socket, actor)) return reply({ error: 'New invitations are unavailable right now. Share an existing link if you have one.' }, 429);
         const rows = await storage.list({ prefix: STORAGE_PREFIX, limit: LINK_CAP });
         const expired = [...rows].filter(([, record]) => record.until <= now).map(([key]) => key);
         if (expired.length) await storage.delete(expired);
