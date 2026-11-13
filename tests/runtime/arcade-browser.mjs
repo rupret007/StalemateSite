@@ -751,8 +751,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await friend.route(url => url.pathname === acceptPath, async route => {
                     const response = await route.fetch();
                     firstStatus ??= response.status();
-                    await response.dispose();
-                    await route.abort();
+                    if (phone) {
+                        // The seat is reserved, but the phone receives an incomplete success body.
+                        await route.fulfill({ status: response.status(), contentType: 'application/json', body: '{"next":' });
+                        await response.dispose();
+                    } else {
+                        await response.dispose();
+                        await route.abort();
+                    }
                 }, { times: phone ? 1 : 2 });
                 await (phone ? joinGame.tap() : joinGame.click());
                 if (!phone) {
@@ -762,7 +768,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await friend.reload({ waitUntil: 'commit' });
                 }
                 await expect(friend.locator('[data-chess-status]')).toContainText('You’re Black');
-                assert.equal(firstStatus, 200, 'the server accepted the invitation before its response was dropped');
+                assert.equal(firstStatus, 200, 'the server accepted the invitation before its response was interrupted');
                 assert.equal(attempts.length, phone ? 2 : 3, 'one automatic retry before a manual recovery is needed');
                 assert.ok(attempts.every(attempt => attempt === attempts[0]), 'recovery reuses the accepted attempt');
                 assert.ok(await friend.evaluate(() => !history.state?.gameNightInvite), 'the seated page retains no invitation state');
