@@ -580,7 +580,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         if (!navigator.userActivation.isActive) throw new DOMException('No activation', 'NotAllowedError');
                         if (title !== 'Join me for Royal Flush Chess' || new URL(url).pathname !== '/beta/game-night/guest')
                             throw new DOMException('Unexpected destination', 'DataError');
-                        if (window.testGameShares === 1) throw new DOMException('Canceled', 'AbortError');
+                        if (window.testGameShares === 1) await new Promise((_, reject) => {
+                            window.cancelTestGameShare = () => reject(new DOMException('Canceled', 'AbortError'));
+                        });
                     } : undefined });
                 }, webShare);
                 await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
@@ -596,8 +598,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 assert.equal(await host.evaluate(() => window.testGameShares), 0, 'table readiness never invokes Web Share');
                 assert.ok(!new URL(host.url()).searchParams.has('deliver'), 'the handoff is removed from the address');
                 if (webShare) {
+                    const status = host.locator('[data-game-invite-link-status]');
                     await share.click();
-                    await expect(share).toBeVisible();
+                    await expect(share).toBeDisabled();
+                    await expect(status).toHaveText('Choose a friend in the share sheet…');
+                    await share.dispatchEvent('click');
+                    assert.equal(await host.evaluate(() => window.testGameShares), 1, 'only one share sheet can open');
+                    await host.evaluate(() => window.cancelTestGameShare());
+                    await expect(status).toContainText('Invitation still ready.');
+                    await expect(share).toBeEnabled();
                     await share.click();
                     await expect(share).toBeHidden();
                     assert.equal(await host.evaluate(() => window.testGameShares), 2, 'both share calls came from trusted clicks');
