@@ -7,8 +7,9 @@ Keep the rehearsal private and use the build-specific invitation steps below.
 ## What to send the guest
 
 > Hey Che’, open the private Hang Out invite I send you in Chrome on your PC.
-> Pick a nickname and enter the lobby. Keep wired headphones handy. I’ll send
-> you the Music invite from inside Hang Out. On the audio screen, click
+> Pick a nickname and enter the lobby. Put on your wired headphones. I’ll
+> invite you to the Jam room. Click **Join room**, then **Join in browser**
+> when I share the Music invite. On the audio screen, click
 > **Check microphone**, allow Chrome to use it, and play a few drum hits.
 > If **Using** names the wrong input, select your drum interface under
 > **Microphone** when the picker appears, then play again. When you see
@@ -22,8 +23,9 @@ the same lobby and can see each other in **People**.
 
 ## Host setup
 
-1. Open the verified WebJam rehearsal shortcut on the Mac. Choose **Music**
-   and **Host**, then **Start Session** if shown. Check the physical input,
+1. Open **WebJam Private Rehearsal (c6eecdc)** from the Mac Desktop. Check
+   **More → About WebJam** for build `c6eecdc`. Choose **Music** and **Host**,
+   then **Start Session** if shown. Check the physical input,
    wired headphones and intended network first. For the band's rehearsal,
    verify the SSL 2+ guitar and vocal inputs and Che’s drum interface.
 2. In Hang Out, open **Rooms** and choose **Jam (WebJam)**. Keep the lobby
@@ -33,7 +35,7 @@ the same lobby and can see each other in **People**.
 
 | Build | Host | Guest |
 | --- | --- | --- |
-| Current delivered rehearsal flow | Choose **Invite bandmate to room** if shown. If the room shows **Invite guest** under host controls, select the guest there. Once both guests are in the Jam room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it in the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** once the host has shared the Music invite. |
+| Last verified private site, `8d76db40` | Choose **Invite bandmate to room** if shown. If the room shows **Invite guest** under host controls, select the guest there. Once both people are in the Jam room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it in the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** once the host has shared the Music invite. |
 | One-tap Music candidate, private fixture | Choose **Invite bandmate to Music**, select the guest's name, and confirm the invitation in WebJam. Wait for Hang Out to show that it was sent. | Choose **Accept and join**. If the audio check remains available in the room, choose **Open audio check**. The browser joins the Jam room and opens the audio check without exchanging a link. |
 
 The verified one-tap candidate used private website tree `5553434` and
@@ -41,6 +43,8 @@ browser source `90331ff`. The isolated tests exercised native confirmation,
 Windows Chrome, fresh invites and mixer-loss recovery with generated audio.
 Use the one-tap instructions for an attended rehearsal once the corresponding
 site and native handoff are delivered and confirmed on the actual devices.
+The newer local `58c269b` Apple Silicon package is archived for testing.
+Both rehearsal shortcuts still point to `c6eecdc`.
 
 ## Audio check, recovery and ending the session
 
