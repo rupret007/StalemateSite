@@ -3,6 +3,7 @@ const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
 const retry = document.querySelector('[data-guest-retry]');
 const gameTitle = document.querySelector('[data-guest-game]');
+const returnToRoom = document.querySelector('[data-guest-return]');
 const webJam = document.querySelector('[data-webjam-guest]') !== null;
 const historyKey = webJam ? 'webJamGameNightInvite' : 'gameNightInvite';
 const restored = !location.hash && !location.search ? history.state?.[historyKey] : null;
@@ -31,7 +32,7 @@ async function request(action, data) {
         signal: AbortSignal.timeout(10000)
     });
     const value = await response.json();
-    if (!response.ok) throw Object.assign(new Error(value.error), { status: response.status });
+    if (!response.ok) throw Object.assign(new Error(value.error), { status: response.status, tableFull: value.tableFull === true });
     return value;
 }
 
@@ -39,6 +40,7 @@ async function describe() {
     retry.hidden = true;
     if (!hasInvitation) {
         status.textContent = 'Open the Game Night invitation your host sent you.';
+        if (returnToRoom) returnToRoom.hidden = false;
         return;
     }
     if (webJam) {
@@ -73,15 +75,20 @@ async function accept() {
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
         location.replace(next);
     } catch (error) {
-        const tableFull = webJam && error.status === 409;
+        const tableFull = webJam && error.status === 409 && error.tableFull;
         const closed = tableFull || error.status === 410;
         status.textContent = 'Couldn’t join just now. Try again.';
-        if (tableFull) status.textContent = 'This table is full. Ask your host for a new invite when a seat opens.';
+        if (tableFull) status.textContent = returnToRoom
+            ? 'This table is full. Return to your room for the next game.'
+            : 'This table is full. Ask your host for a new invite when a seat opens.';
         else if (closed || [429, 503].includes(error.status)) status.textContent = error.message;
         if (closed) {
             clearInvitation();
             invite.hidden = true;
             if (webJam) {
+                const inviter = document.querySelector('[data-guest-inviter]');
+                inviter.hidden = true;
+                if (returnToRoom) returnToRoom.hidden = false;
                 gameTitle.tabIndex = -1;
                 gameTitle.setAttribute('aria-describedby', status.id);
                 gameTitle.focus();
