@@ -132,6 +132,36 @@ describe('Game Night match transport', () => {
         expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
     });
 
+    it('transfers a WebJam hold atomically and only admits its scoped session to the reserved match', async () => {
+        const f = fixture();
+        await f.send(f.a, 'open');
+        const { id } = f.board(f.a);
+        const scope = { room, ref, host: sid, match: id };
+        const held = { holder: 'grant-hash', until: 61000, write: { grant: { kind: 'grant' } } };
+        const move = { subject: f.actors.get(guest).betaSid, holder: held.holder, until: 61000, write: { grant: { kind: 'redeemed' } } };
+        const bridge = f.transport.roomGrants;
+
+        f.storage.put.mockRejectedValueOnce(Error('fixture failure'));
+        await expect(bridge.hold(scope, held)).rejects.toThrow('fixture failure');
+        expect(await f.storage.get('grant')).toBeUndefined();
+        expect(f.board(f.a).hasOpenSeat).toBe(true);
+        expect(await bridge.hold(scope, held)).toBe(true);
+        await f.send(f.b, 'join', { id });
+        expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
+
+        f.storage.put.mockRejectedValueOnce(Error('fixture failure'));
+        await expect(bridge.seat(scope, move)).rejects.toThrow('fixture failure');
+        expect(await f.storage.get('grant')).toEqual(held.write.grant);
+        expect(await bridge.seat(scope, move)).toBe('b');
+        expect(await f.storage.get('grant')).toEqual(move.write.grant);
+        f.actors.get(guest).gameGuest = { ...scope, match: 'other-match', game: 'chess' };
+        await f.send(f.b, 'join', { id, seat: 'next' });
+        expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
+        f.actors.get(guest).gameGuest.match = id;
+        await f.send(f.b, 'join', { id, seat: 'next' });
+        expect(f.board(f.b)).toMatchObject({ id, seat: 'b', waiting: false });
+    });
+
     it('expires a room grant before opening a socket', async () => {
         const f = fixture(), session = { betaSid: sid, betaInviteVersion: 1 };
         const response = await f.transport.issue({ actor, room, ref }, session);

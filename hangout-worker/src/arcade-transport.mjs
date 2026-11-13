@@ -185,7 +185,8 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                     const held = claims.find(claim => claim.sid === subject);
                     const heldSeats = otherClaims.flatMap(claim => claim.seat ? [claim.seat] : []);
                     const seat = held?.seat ?? frame.seat;
-                    if (!game.subjects.every(peer => binding.canJoin(peer)) ||
+                    if (binding.gameGuest && binding.gameGuest.match !== frame.id ||
+                        !game.subjects.every(peer => binding.canJoin(peer)) ||
                         !game.join(subject, frame.id, now(), seat, otherClaims.length, heldSeats)) error = 'seat-unavailable';
                     else { claims = otherClaims; changed = true; expiresAt = now() + MATCH_TTL; }
                 } else if (frame.action === 'start') {
