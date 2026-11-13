@@ -2588,7 +2588,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         resetGuestLink();
         guestLinkStatus.textContent = 'The table changed. Prepare a new invitation.';
     }
-    createGuestLink.addEventListener('click', () => void prepareGuestLink(arcadeInviteTarget()));
+    createGuestLink.addEventListener('click', () => void prepareGuestLink(arcadeInviteTarget(), pendingGuestLink?.preferEmail));
     async function prepareGuestLink(target, preferEmail = false) {
         const room = inviteContext;
         if (!target || !room || room !== currentGameNight() || room.keepRef !== inviteInstance || !amOp(room)) {
@@ -2606,7 +2606,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             });
             const value = await response.json();
             if (pendingGuestLink !== request || room !== currentGameNight()) return;
-            if (!response.ok || !gameInviteCode(value.code)) throw new Error(value.error || 'The invitation could not be prepared. Try again.');
+            if (!response.ok || !gameInviteCode(value?.code)) throw new Error('Invitation unavailable');
             request.link = new URL('/beta/game-night/guest#invite=' + value.code, location.origin).href;
             createGuestLink.hidden = true;
             const canShare = typeof navigator.share === 'function';
@@ -2620,7 +2620,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();
         } catch (error) {
             if (pendingGuestLink !== request) return;
-            guestLinkStatus.textContent = error.name === 'TimeoutError' ? 'The invitation took too long. Try again.' : error.message;
+            const targetNow = arcadeInviteTarget();
+            if (room !== currentGameNight() || targetNow?.match !== target.match || targetNow.game !== target.game) {
+                resetGuestLink();
+                createGuestLink.hidden = true;
+                guestLinkStatus.textContent = 'The table changed. Close this dialog and invite from a game with a free seat.';
+                return;
+            }
+            guestLinkStatus.textContent = error.name === 'TimeoutError'
+                ? 'The invitation took too long. Try again.' : 'Couldn’t prepare the invitation. Try again.';
+            createGuestLink.textContent = 'Try again';
+            createGuestLink.disabled = false;
+            createGuestLink.focus();
         } finally {
             if (pendingGuestLink === request) createGuestLink.disabled = false;
         }

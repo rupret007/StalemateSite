@@ -559,12 +559,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const open = host.getByRole('button', { name: 'Open Chess match', exact: true });
                 await expect(open).toBeVisible();
                 assert.equal(issues, 0, 'the host opens a waiting match before preparing its invitation');
+                if (!webShare) await host.route('**/beta/game-night/invitation/issue', route => route.fulfill({
+                    status: 503, json: { error: 'storage-unavailable' }
+                }), { times: 1 });
                 await open.click();
+                if (!webShare) {
+                    await expect(host.locator('[data-game-invite-link-status]')).toHaveText('Couldn’t prepare the invitation. Try again.');
+                    const retry = host.getByRole('button', { name: 'Try again', exact: true });
+                    await expect(retry).toBeFocused();
+                    await retry.press('Enter');
+                }
                 const share = host.getByRole('button', { name: webShare ? 'Share invite' : 'Email invite', exact: true });
                 await expect(share).toBeFocused();
                 await expect(share).toBeEnabled();
                 await expect(host.getByRole('button', { name: 'Copy invite', exact: true })).toBeVisible();
-                assert.equal(issues, 1, 'the WebJam handoff prepares exactly one invitation');
+                assert.equal(issues, webShare ? 1 : 2, 'the WebJam handoff retries only after the host asks');
                 assert.equal(await host.evaluate(() => window.testGameShares), 0, 'table readiness never invokes Web Share');
                 assert.ok(!new URL(host.url()).searchParams.has('deliver'), 'the handoff is removed from the address');
                 if (webShare) {
@@ -574,7 +583,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(share).toBeHidden();
                     assert.equal(await host.evaluate(() => window.testGameShares), 2, 'both share calls came from trusted clicks');
                 }
-                assert.equal(issues, 1, 'sharing an already prepared invitation issues no extra link');
+                assert.equal(issues, webShare ? 1 : 2, 'sharing an already prepared invitation issues no extra link');
             } finally { await host.context().close(); }
         }
     }
