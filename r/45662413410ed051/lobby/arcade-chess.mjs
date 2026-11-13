@@ -33,7 +33,7 @@ const markup = `
         <button type="button" class="btn btn--small btn--ghost" data-action="decline-draw" hidden>Decline draw</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="claim-draw">Claim draw</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="resign">Resign</button>
-        <button type="button" class="btn btn--small btn--ghost" data-action="leave">Leave match</button>
+        <button type="button" class="btn btn--small btn--ghost" data-action="leave">Leave</button>
     </div>
     <a class="small" href="/play/assets/chess/chessground-10.5.0-source.tar.gz" download>Chess board source</a>
 </div>
@@ -109,7 +109,7 @@ export function mountArcadeChess(container, onMatch) {
             feedback.textContent = '';
             pendingTimer = setTimeout(() => {
                 pending = false;
-                feedback.textContent = 'Checking the current match…';
+                feedback.textContent = 'Checking…';
                 send('sync');
                 draw();
             }, 6000);
@@ -255,20 +255,20 @@ export function mountArcadeChess(container, onMatch) {
         primary.hidden = true; primary.disabled = pending; primary.dataset.command = '';
         const button = (text, command) => { primary.hidden = false; primary.textContent = text; primary.dataset.command = command; };
         if (connection === 'unavailable') {
-            status.textContent = matchConnectionErrors[connectionError] || 'Chess couldn’t reconnect. Try again from this room.';
-            if (!connectionError || connectionError === 'rate-limited') button('Reconnect to Chess', 'retry');
+            status.textContent = matchConnectionErrors[connectionError] || 'Reconnecting… Clocks keep running.';
+            if (!connectionError || connectionError === 'rate-limited') button('Retry', 'retry');
         } else if (connection !== 'ready') {
-            status.textContent = match ? 'Reconnecting to Chess… The clocks keep running.'
-                : connection === 'reconnecting' ? 'Reconnecting to Chess…' : 'Connecting to Chess…';
+            status.textContent = match ? 'Reconnecting… Clocks keep running.'
+                : connection === 'reconnecting' ? 'Reconnecting…' : 'Connecting…';
         } else if (!model) {
-            status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a match.';
-            if (canOpen) button('Open Chess match', 'open');
+            status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a table.';
+            if (canOpen) button('Open', 'open');
         } else if (model.waiting) {
             status.textContent = seated ? 'You’re White · Waiting for an opponent.' : 'Black is open. Join to play.';
-            button(seated ? 'Close waiting match' : 'Join as Black', seated ? 'leave' : 'join');
+            button(seated ? 'Leave' : 'Join', seated ? 'leave' : 'join');
         } else if (match?.result) {
             status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
-            if (seated && model.rematch !== model.seat) button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');
+            if (seated && model.rematch !== model.seat) button('Rematch', 'rematch');
             if (seated && model.rematch) status.textContent += model.rematch === model.seat
                 ? ' · Rematch requested. Waiting for your opponent.' : ' · Your opponent requested a rematch.';
         } else {
@@ -304,7 +304,7 @@ export function mountArcadeChess(container, onMatch) {
         const action = control.dataset.action;
         if (action === 'claim-draw') chooseClaim();
         else if (action === 'resign') showChoice('Resign match?', 'Your opponent wins if you resign.', [['Resign', () => send('resign')]]);
-        else if (action === 'leave') showChoice('Leave match?', 'This ends the match for both players.', [['Leave match', () => send('leave')]]);
+        else if (action === 'leave') showChoice('Leave?', 'This ends the match for both players.', [['Leave', () => send('leave')]]);
         else send(action);
     });
     $('[data-choice-cancel]').addEventListener('click', closeChoice);
