@@ -641,6 +641,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         drawCommunity(); drawRooms(); drawMessageRecovery(); refreshPaletteCohosts();
     }
     const JOIN_TIMEOUT_MS = 20_000;
+    const GAME_GUEST_RETRY_DELAY_MS = 5_000;
     let cancelTransportAck = () => {};
     let cancelEntryCheck = () => {}, pageLeaving = false;
     window.addEventListener('pagehide', () => { pageLeaving = true; cancelEntryCheck(); });
@@ -701,9 +702,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const heartbeat = createIdleHeartbeat(ws, () => attempt === connectionAttempt && app.ws === ws);
         let opened = false;
         let sessionNick = nick;
-        let joinTimer, ackTimer, ackSeq = 0, ackFrames = 0, ackSentAt = -Infinity;
+        let joinTimer, guestRetryTimer, ackTimer, ackSeq = 0, ackFrames = 0, ackSentAt = -Infinity;
         cancelTransportAck = () => {
             clearTimeout(joinTimer);
+            clearTimeout(guestRetryTimer);
             clearTimeout(ackTimer); ackTimer = null; ackFrames = 0; heartbeat.stop();
         };
         const flushAck = () => {
@@ -725,7 +727,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (!m || typeof m !== 'object') return;
             heartbeat.received();
             if (m.t === 'hello') heartbeat.negotiate(m.features?.transportPing);
-            if (m.t === 'welcome' || m.t === 'nick-error') clearTimeout(joinTimer);
+            if (m.t === 'welcome' || m.t === 'nick-error') {
+                clearTimeout(joinTimer);
+                clearTimeout(guestRetryTimer);
+            }
             if (m.t === 'welcome') sessionNick = m.nick;
             if (m.t !== 'transport-pong') handle(m, sessionNick);
             if (Number.isSafeInteger(m.transportSeq) && m.transportSeq > 0) {
@@ -786,6 +791,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             retryTimer = setTimeout(() => connect(app.me || nick), Math.min(10000, 1000 * (2 ** Math.min(retry++, 4))) * (0.75 + Math.random() * 0.25));
         };
         ws.onclose = onClose;
+        if (gameGuest && !gameGuestSeated) guestRetryTimer = setTimeout(() => {
+            if (attempt !== connectionAttempt || app.ws !== ws) return;
+            gateStatus('Still connecting to your game…');
+            $('[data-game-guest-retry]').hidden = false;
+        }, GAME_GUEST_RETRY_DELAY_MS);
         joinTimer = setTimeout(() => {
             if (attempt !== connectionAttempt || app.ws !== ws) return;
             // An open socket alone does not confirm that the visitor joined.
