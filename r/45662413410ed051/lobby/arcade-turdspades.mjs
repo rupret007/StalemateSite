@@ -231,6 +231,13 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 message = `Round ${match.round} · ${turn}`;
                 if (yourTurn && match.phase === 'play' && !match.trick.length && !match.lastTrick.length) message += ' · tap a card';
                 if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
+                // The lime box marks whose turn it is. Say who you are so that box is not read as "you".
+                if (seat) message += ` · You’re ${nameFor(seat)}`;
+                if (yourTurn && match.phase === 'bid') {
+                    const fresh = `${model.id}:${match.revision}` !== suggestedBidKey;
+                    const suggested = (fresh || !bidEdited) && match.hand.length === 13 ? suggestSpadesBid(match.hand) : null;
+                    message += suggested === null ? ' · tap Bid' : ` · ${suggested || 'Nil'} suggested · tap Bid`;
+                }
             }
         }
         // No one queues for a seat here, so a watcher is told what is happening, not that a turn is coming.
@@ -250,7 +257,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         table.dataset.mode = paired ? 'partners' : 'four';
 
         for (let team = 0; team < 2; team++) {
-            $(`[data-spades-score="${team}"]`).textContent = `${teams[team]} · ${match.scores[team]}/${match.target} · ${match.bags[team]} bags`;
+            const bags = match.bags[team];
+            $(`[data-spades-score="${team}"]`).textContent = `${teams[team]} · ${match.scores[team]}/${match.target} · ${bags} ${bags === 1 ? 'bag' : 'bags'}`;
         }
         $('.arcade-card-score').hidden = paired && match.phase !== 'round-end' && match.lastTrick.length !== 4;
         $('[data-spades-trick]').hidden = paired && match.phase === 'bid';
@@ -258,7 +266,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
             const called = match.bids[position];
-            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${called === null ? '—' : called || 'Nil'}`;
+            const bidText = called === null ? '—' : called === 0 ? 'bid Nil' : `bid ${called}`;
+            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${bidText}`;
             card.textContent = entry ? face(entry) : '—';
             card.setAttribute('aria-label', entry ? cardLabel(entry) : 'No card played');
             row.dataset.active = String(!match.result && match.phase !== 'round-end' && match.turn === position);
@@ -281,9 +290,12 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
         }
         bid.disabled = connection !== 'ready' || pending;
-        $('[data-spades-hand-label]').textContent = seat
-            ? `Your hand · ${match.hand.length} cards${match.phase === 'play' && match.spadesBroken ? ' · Spades broken' : ''}`
-            : 'Watching · hands are private';
+        const handOver = match.phase === 'round-end' && !match.result;
+        $('[data-spades-hand-label]').textContent = handOver
+            ? (seat ? 'Hand over · tap Next round' : 'Watching · hand over')
+            : seat
+                ? `Your hand · ${match.hand.length} cards${match.phase === 'play' && match.spadesBroken ? ' · Spades broken' : ''}`
+                : 'Watching · hands are private';
         for (const control of actions) {
             const action = control.dataset.spadesAction;
             control.hidden = !seat || (action === 'bid' ? !match.canBid

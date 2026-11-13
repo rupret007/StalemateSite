@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { suggestSpadesBid } from '../../play/games/turdspades-engine.js';
 
 const client = vi.hoisted(() => ({ handlers: null, sent: [] }));
 
@@ -40,8 +41,22 @@ function mount() {
         main: panel.querySelector('[data-spades-main]'),
         partners: panel.querySelector('[data-spades-partners]'),
         error: () => panel.querySelector('[data-spades-error]').textContent,
-        seats: panel.querySelector('[data-spades-seats]')
+        seats: panel.querySelector('[data-spades-seats]'),
+        handLabel: () => panel.querySelector('[data-spades-hand-label]').textContent,
+        trick: () => [...panel.querySelectorAll('[data-spades-trick] span')].map(node => node.textContent),
+        scores: () => [...panel.querySelectorAll('[data-spades-score]')].map(node => node.textContent)
     };
+}
+
+function dealtHand() {
+    const cards = [];
+    for (const suit of ['S', 'H', 'D', 'C']) {
+        for (const rank of ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']) {
+            cards.push({ id: cards.length + 1, suit, rank, playable: false });
+            if (cards.length === 13) return cards;
+        }
+    }
+    return cards;
 }
 
 describe('Spades table next step', () => {
@@ -169,5 +184,75 @@ describe('Spades table next step', () => {
         view.publish(null, true);
         expect(view.status()).toBe('4 players. South and North versus West and East.');
         expect(view.main.textContent).toBe('Open');
+    });
+
+    // A phone that just sat down sees a lime box on whoever is bidding. That box is their turn, not "you".
+    it('names your seat while someone else bids', () => {
+        const view = mount();
+        view.publish(state({
+            seat: 'east',
+            match: hand({
+                phase: 'bid', turn: 'west', canBid: false,
+                bids: { south: null, west: null, north: null, east: null }, hand: []
+            })
+        }));
+        expect(view.status()).toBe('Round 1 · West to bid · You’re East');
+        expect(view.trick()).toEqual(['South · —', 'West · —', 'North · —', 'East (you) · —']);
+    });
+
+    // The prefilled number is a suggestion. Say so, and say to tap Bid.
+    it('tells you the suggested bid and to tap Bid', () => {
+        const cards = dealtHand();
+        const suggested = suggestSpadesBid(cards);
+        const view = mount();
+        view.publish(state({
+            seat: 'west',
+            match: hand({
+                phase: 'bid', turn: 'west', canBid: true, hand: cards,
+                bids: { south: null, west: null, north: null, east: null }
+            })
+        }));
+        expect(view.status()).toBe(`Round 1 · Your bid · You’re West · ${suggested || 'Nil'} suggested · tap Bid`);
+        expect(view.status()).not.toMatch(/^Round 1 · Your bid$/);
+    });
+
+    // An empty hand at the end of the round is the result, not a missing deal.
+    it('says the hand is over, labels each bid, and uses bag for a single bag', () => {
+        const view = mount();
+        view.publish(state({
+            seat: 'west',
+            match: hand({
+                phase: 'round-end', turn: 'east', hand: [], target: 250,
+                scores: [31, 63], bags: [1, 3],
+                bids: { south: 1, west: 2, north: 2, east: 0 },
+                roundResult: [
+                    { delta: 31, nil: [], bagPenalties: 0 },
+                    { delta: 63, nil: [], bagPenalties: 0 }
+                ]
+            })
+        }));
+        expect(view.handLabel()).toBe('Hand over · tap Next round');
+        expect(view.handLabel()).not.toMatch(/0 cards/);
+        expect(view.scores()).toEqual([
+            'South + North · 31/250 · 1 bag',
+            'West + East · 63/250 · 3 bags'
+        ]);
+        expect(view.trick()).toEqual([
+            'South · bid 1', 'West (you) · bid 2', 'North · bid 2', 'East · bid Nil'
+        ]);
+        expect(view.status()).toBe('South + North +31 / West + East +63');
+
+        const watching = mount();
+        watching.publish(state({
+            match: hand({
+                phase: 'round-end', hand: [],
+                roundResult: [
+                    { delta: 31, nil: [], bagPenalties: 0 },
+                    { delta: 63, nil: [], bagPenalties: 0 }
+                ]
+            })
+        }));
+        expect(watching.handLabel()).toBe('Watching · hand over');
+        expect(watching.handLabel()).not.toContain('private');
     });
 });
