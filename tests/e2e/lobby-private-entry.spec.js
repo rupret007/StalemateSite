@@ -107,12 +107,16 @@ test('a reserved nickname returns keyboard focus to the field for correction', a
     const nickname = page.getByRole('textbox', { name: 'Your nick' });
     await nickname.fill('Stalemate');
     await page.locator('[data-enter]').press('Enter');
-    await expect(page.locator('[data-gate-status]')).toHaveText('That nick is reserved.');
+    const error = page.locator('#nickname-error');
+    await expect(error).toHaveText('That nick is reserved.');
+    await expect(error).toBeInViewport({ ratio: 1 });
+    await expect(nickname).toBeInViewport({ ratio: 1 });
     await expect(nickname).toHaveValue('Stalemate');
     await expect(nickname).toBeFocused();
     await expect(nickname).toHaveAttribute('aria-invalid', 'true');
     await expect(nickname).toHaveAccessibleDescription('That nick is reserved.');
     await nickname.fill('ReadyGuest');
+    await expect(error).toBeEmpty();
     await expect(nickname).not.toHaveAttribute('aria-invalid', 'true');
     await nickname.press('Enter');
     await expect(page.locator('[data-connection]')).toHaveText('Connected');

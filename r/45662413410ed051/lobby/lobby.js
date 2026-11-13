@@ -504,12 +504,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (c.actSnap.strokes.length > 400) c.actSnap.strokes.splice(0, c.actSnap.strokes.length - 400);
     }
     const nickInput = $('[data-nick]');
+    const nicknameError = $('#nickname-error');
     nickInput.value = nickInput.value || readRemembered('hangout-nick') || ''; // blank by default; remembered on this device
     function clearNicknameError() {
         if (!nickInput.hasAttribute('aria-invalid')) return;
         nickInput.removeAttribute('aria-invalid');
         nickInput.removeAttribute('aria-describedby');
-        gateStatus('');
+        nicknameError.textContent = '';
     }
     nickInput.addEventListener('input', clearNicknameError);
     $('[data-reroll]').addEventListener('click', (e) => {
@@ -523,9 +524,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
 
     const gateStatus = (t) => { $('[data-gate-status]').textContent = t; };
     function showNicknameError(text) {
-        gateStatus(text);
+        gateStatus('');
+        nicknameError.textContent = text;
         nickInput.setAttribute('aria-invalid', 'true');
-        nickInput.setAttribute('aria-describedby', 'gate-status');
+        nickInput.setAttribute('aria-describedby', nicknameError.id);
         nickInput.focus();
     }
     if (!previewKey) {
