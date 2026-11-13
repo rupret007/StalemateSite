@@ -134,7 +134,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         } else {
             if (media) await expect(host.locator('[data-call-toggle]')).toBeVisible();
             await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
-            await host.getByRole('button', { name: 'Open Chess match' }).click();
+            await expect(chessPrimary(host)).toHaveText('Open');
+            await chessPrimary(host).click();
             await expect(host.locator('[data-chess-status]')).toContainText('Waiting');
             await expect(player.locator('[data-four-board]')).toBeVisible();
         }
@@ -178,6 +179,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             return button.contains(hit) && (!navigation?.height || rect.bottom <= navigation.top);
         }), 'the full control stays above the mobile sections and receives the pointer');
     }
+    const chessPrimary = page => page.locator('.arcade-chess [data-chess-primary]');
+    const chessLeave = page => page.locator('.arcade-chess [data-action="leave"]');
+    const spadesMain = page => page.locator('[data-spades-main]');
+    const spadesPartners = page => page.locator('[data-spades-partners]');
+    const spadesBid = page => page.locator('[data-spades-action="bid"]');
+    const spadesSeat = (page, seat) => page.locator('[data-spades-seats] button').nth({ south: 0, west: 1, north: 2, east: 3 }[seat]);
+    const brickMain = page => page.locator('[data-brick-main]');
+    const brickServe = page => page.locator('[data-brick-serve]');
     async function reopenGameNight(host, viewport, phone) {
         const original = host.viewportSize();
         const before = await host.evaluate(() => window.__lobby.chans.get(window.__lobby.active)?.keepRef);
@@ -209,7 +218,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             const label = phone ? 'Royal Flush Chess' : 'TurdSpades';
             try {
                 await host.getByRole('combobox', { name: 'Switch game' }).selectOption(game);
-                await host.getByRole('button', { name: phone ? 'Open Chess match' : 'Open 4-player Spades' }).click();
+                const openTable = phone ? chessPrimary(host) : spadesMain(host);
+                await expect(openTable).toHaveText('Open');
+                await openTable.click();
                 await expect(host.locator(phone ? '[data-chess-status]' : '[data-spades-status]')).toContainText(phone ? 'Waiting for an opponent' : '1/4 seated');
                 const hostViewport = host.viewportSize();
                 await host.setViewportSize(viewport);
@@ -231,29 +242,35 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 } else {
                     await expect(friend.locator('[data-spades-status]')).toHaveText(/2\/4 seated · You’re West/);
                     await expect(host.locator('[data-spades-status]')).toContainText('2/4 seated');
-                    await expect(friend.getByRole('button', { name: 'Join West' })).toBeHidden();
+                    await expect(friend.locator('[data-spades-seats]')).toBeHidden();
+                    await expect(friend.locator('[data-spades-seats] button')).toHaveText(['Join', 'Join', 'Join', 'Join']);
                 }
                 await captureArcadeInvite(friend, viewport, '02-seated');
                 console.log(`Passed ${engine} ${viewport.width}x${viewport.height} ${label} invitation, one guest tap to the same table.`);
                 await friend.locator('[data-leave]').click();
                 await expect(friend.locator('[data-game-night]')).toBeHidden();
                 if (phone) {
-                    await host.getByRole('button', { name: 'Open Chess match' }).click();
+                    await expect(chessPrimary(host)).toHaveText('Open');
+                    await chessPrimary(host).click();
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await sendGameInvite(host, nick);
                     await expect(accept).toBeVisible();
-                    await host.getByRole('button', { name: 'Close waiting match' }).click();
-                    await host.getByRole('button', { name: 'Open Chess match' }).click();
+                    await expect(chessPrimary(host)).toHaveText('Leave');
+                    await chessPrimary(host).click();
+                    await expect(chessPrimary(host)).toHaveText('Open');
+                    await chessPrimary(host).click();
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await accept.tap();
                     await expect(friend.getByText('This game invitation no longer has an open seat. Ask the host for a fresh invitation.')).toBeVisible();
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await friend.locator('[data-leave]').click();
                     await expect(friend.locator('[data-game-night]')).toBeHidden();
-                    await host.getByRole('button', { name: 'Close waiting match' }).click();
+                    await expect(chessPrimary(host)).toHaveText('Leave');
+                    await chessPrimary(host).click();
                 } else {
                     await expect(host.locator('[data-spades-status]')).toContainText('1/4 seated');
-                    await host.getByRole('button', { name: 'Close table', exact: true }).click();
+                    await expect(spadesMain(host)).toHaveText('Leave');
+                    await spadesMain(host).click();
                 }
             } finally {
                 await friend.context().close();
@@ -333,7 +350,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (const phone of [true, false]) {
             const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
             await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
-            await host.getByRole('button', { name: 'Open Chess match' }).click();
+            await expect(chessPrimary(host)).toHaveText('Open');
+            await chessPrimary(host).click();
             await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
             const link = await shareGameNightLink(host, viewport, 'first-visit-00-host-share');
             const inviteFromTable = host.locator('.arcade-chess').getByRole('button', { name: 'Invite a friend', exact: true });
@@ -433,7 +451,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                 await captureArcadeInvite(guest, viewport, 'first-visit-02-seated');
-                const leaveMatch = guest.getByRole('button', { name: 'Leave match', exact: true });
+                const leaveMatch = chessLeave(guest);
+                await expect(leaveMatch).toHaveText('Leave');
                 await expectUncoveredControl(leaveMatch);
                 await expectUncoveredControl(guest.locator('[data-send]'));
                 if (phone) {
@@ -475,7 +494,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (const phone of [true, false]) {
             const viewport = phone ? { width: 390, height: 844 } : { width: 1440, height: 900 };
             await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
-            await host.getByRole('button', { name: 'Open Chess match' }).click();
+            await expect(chessPrimary(host)).toHaveText('Open');
+            await chessPrimary(host).click();
             await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
             const link = await shareGameNightLink(host, viewport, 'guest-retry-00-share', undefined, !phone);
             const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
@@ -514,7 +534,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         try {
             await host.setViewportSize(desktop);
             await host.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
-            await host.getByRole('button', { name: 'Open 2-player Spades' }).click();
+            await expect(spadesPartners(host)).toHaveText('Open');
+            await spadesPartners(host).click();
             await expect(status(host)).toContainText('1/2 seated');
             const link = await shareGameNightLink(host, desktop, 'spades-00-host-share');
             await openGameNightLink(friend, link);
@@ -522,7 +543,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await captureArcadeInvite(friend, phone, 'spades-01-guest-accept');
             await friend.getByRole('button', { name: 'Join game', exact: true }).tap();
             await expect(table(friend)).toHaveAttribute('data-mode', 'partners');
-            await expect(status(friend)).toHaveText('You and a computer partner vs the host and a computer · tap Bid for me');
+            await expect(status(friend)).toHaveText('You and a computer partner vs the host and a computer · tap Bid');
             await expect(friend.locator('.arcade-card-score')).toBeHidden();
             for (const player of [host, friend]) await expect(cards(player)).toHaveCount(13);
             const suitOf = { Spades: 'S', Hearts: 'H', Diamonds: 'D', Clubs: 'C' };
@@ -532,8 +553,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     return { rank, suit: suitOf[suitName] };
                 });
             await expect(friend.locator('#spades-bid')).toHaveValue(String(suggestSpadesBid(guestHand)));
-            await friend.getByRole('button', { name: 'Bid for me' }).tap();
-            await host.getByRole('button', { name: 'Bid for me' }).click();
+            await expect(spadesBid(friend)).toHaveText('Bid');
+            await spadesBid(friend).tap();
+            await expect(spadesBid(host)).toHaveText('Bid');
+            await spadesBid(host).click();
             await expect(table(host)).toHaveAttribute('data-phase', 'play');
             await expect(friend.locator('[data-spades-trick]')).toContainText('North (CPU)');
             await expect(friend.locator('[data-spades-trick]')).toContainText('East (CPU)');
@@ -571,9 +594,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             assert.deepEqual(await host.locator('[data-spades-score]').allTextContents(), await friend.locator('[data-spades-score]').allTextContents());
             await friend.locator('[data-spades-action="resign"]').click();
             await friend.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
-            await host.getByRole('button', { name: 'Request Spades rematch' }).click();
+            await expect(spadesMain(host)).toHaveText('Rematch');
+            await spadesMain(host).click();
             await expect(status(friend)).toContainText('1/2 ready for a rematch');
-            await friend.getByRole('button', { name: 'Accept Spades rematch' }).click();
+            await expect(spadesMain(friend)).toHaveText('Rematch');
+            await spadesMain(friend).click();
             await expect(cards(friend)).toHaveCount(13);
             await friend.locator('[data-leave]').click();
             await expect(friend.locator('[data-game-night]')).toBeHidden();
@@ -604,7 +629,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     } : undefined });
                 }, webShare);
                 await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
-                const open = host.getByRole('button', { name: 'Open Chess match', exact: true });
+                const open = chessPrimary(host);
+                await expect(open).toHaveText('Open');
                 await expect(open).toBeVisible();
                 assert.equal(issues, 0, 'the host opens a waiting match before preparing its invitation');
                 await open.click();
@@ -683,19 +709,22 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const playerGame = player.getByRole('combobox', { name: 'Switch game' });
         await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
         await expect(host.locator('details.arcade-chess > summary')).toBeFocused();
-        await expectUncoveredControl(host.getByRole('button', { name: 'Open Chess match' }));
+        await expect(chessPrimary(host)).toHaveText('Open');
+        await expectUncoveredControl(chessPrimary(host));
         if (media && !relay) await player.route('**/beta/arcade-ticket', route => route.fulfill({ status: 403 }), { times: 1 });
         await playerGame.selectOption('chess');
         if (media && !relay) {
-            await expect(player.locator('[data-chess-status]')).toHaveText('Return to your Game Night room and try again.');
-            await expect(player.getByRole('button', { name: 'Reconnect to Chess' })).toBeHidden();
+            await expect(player.locator('[data-chess-status]')).toHaveText('Return to the room.');
+            await expect(chessPrimary(player)).toBeHidden();
             await playerGame.selectOption('four');
             await playerGame.selectOption('chess');
         }
-        await host.getByRole('button', { name: 'Open Chess match' }).click();
+        await expect(chessPrimary(host)).toHaveText('Open');
+        await chessPrimary(host).click();
         await expect(host.locator('[data-chess-status]')).toContainText('You’re White · Waiting for an opponent');
         await expect(player.locator('[data-chess-status]')).toHaveText('Black is open. Join to play.');
-        await player.getByRole('button', { name: 'Join as Black' }).click();
+        await expect(chessPrimary(player)).toHaveText('Join');
+        await chessPrimary(player).click();
         await expect(host.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
         await expect(host.locator('[data-clock-side="w"] [data-clock-label]')).toHaveText('White · You');
         await expect(player.locator('[data-clock-side="b"] [data-clock-label]')).toHaveText('Black · You');
@@ -754,7 +783,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await enterFromShell(page, 'PreviewHost', true);
                     await expect(page.locator('[data-game-offer-status]')).toContainText('Royal Flush Chess');
                     await page.getByRole('button', { name: 'Start Game Night', exact: true }).click();
-                    await page.getByRole('button', { name: 'Open Chess match' }).click();
+                    await expect(chessPrimary(page)).toHaveText('Open');
+                    await chessPrimary(page).click();
                     await expect(page.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await captureArcadeInvite(page, viewport, 'site-03-shared-chess');
                 }
@@ -811,7 +841,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await captureArcadeInvite(host, viewport, step('02b-room-address'), [address.getByLabel('Room address')]);
                 await address.getByRole('button', { name: 'Done' }).click();
                 await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
-                await host.getByRole('button', { name: 'Open Chess match' }).click();
+                await expect(chessPrimary(host)).toHaveText('Open');
+                await chessPrimary(host).click();
                 await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                 const link = await shareGameNightLink(host, viewport, step('02-share'), async newGuest => {
                     await expect(newGuest).toHaveAccessibleName('Invite a friend to Royal Flush Chess');
@@ -887,7 +918,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const recoveringStatus = await player.locator('[data-chess-status]').textContent();
         const confirmedBoardVisible = await player.getByRole('button', { name: 'e4, White pawn' }).isVisible();
         await expect.poll(() => matches.length, { timeout: 12000, message: 'Chess retries a socket that never confirms its board' }).toBe(3);
-        assert.match(recoveringStatus, /Reconnecting to Chess/);
+        assert.match(recoveringStatus, /Reconnecting…/);
         assert.equal(confirmedBoardVisible, true);
         await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
         await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
@@ -938,7 +969,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect.poll(() => player.evaluate(() => window.testLocalTracks.map(track => track.readyState)))
             .toEqual(['ended', 'ended', 'ended']);
         await expect(host.locator('[data-call-peers] li')).toHaveCount(0);
-        await expect(host.getByRole('button', { name: 'Open Chess match' })).toBeVisible();
+        await expect(chessPrimary(host)).toHaveText('Open');
+        await expect(chessPrimary(host)).toBeVisible();
         await host.getByRole('button', { name: 'Leave call', exact: true }).click();
         console.log('Passed Chromium host room revocation retires the Chess seat and stops guest microphone and camera capture.');
     }
@@ -1027,8 +1059,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await waitForPackets(white, 'audio', before);
             await expectOriginalPeer(white);
         }
-        await black.getByRole('button', { name: 'Request rematch' }).click();
-        await white.getByRole('button', { name: 'Accept rematch' }).click();
+        await expect(chessPrimary(black)).toHaveText('Rematch');
+        await chessPrimary(black).click();
+        await expect(chessPrimary(white)).toHaveText('Rematch');
+        await chessPrimary(white).click();
         await expect(black.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
         console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
     }
@@ -1535,9 +1569,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(page.locator('[data-arcade-game] option[value="turdspades"]')).toBeEnabled();
             await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
         }
-        await a.getByRole('button', { name: 'Open 4-player Spades' }).click();
-        for (const [index, [page, seat]] of [[b, 'West'], [north, 'North'], [east, 'East']].entries()) {
-            await page.getByRole('button', { name: 'Join ' + seat }).click();
+        await expect(spadesMain(a)).toHaveText('Open');
+        await spadesMain(a).click();
+        for (const [index, [page, seat]] of [[b, 'west'], [north, 'north'], [east, 'east']].entries()) {
+            const join = spadesSeat(page, seat);
+            await expect(join).toHaveText('Join');
+            await join.click();
             if (index < 2) await expect(a.locator('[data-spades-status]')).toContainText(`${index + 2}/4 seated`);
         }
         const allHands = [];
@@ -1569,20 +1606,20 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             audioBeforeTrick = await Promise.all(players.map(page => packetCounts(page, 'audio')));
         }
         await b.getByLabel('Your bid').selectOption('0');
-        await verifyCardLandscape(b, 'TurdSpades bid', b.getByLabel('Your bid'), b.getByRole('button', { name: 'Bid for me' }));
+        await verifyCardLandscape(b, 'TurdSpades bid', b.getByLabel('Your bid'), b.getByRole('button', { name: 'Bid', exact: true }));
         if (pauseReconnect) {
             const cards = b.locator('[data-spades-card]');
             const hand = await cards.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard));
             const returnHand = await pauseReconnect();
-            await expect(b.locator('[data-spades-status]')).toHaveText('Reconnecting to the table… Your hand is paused.');
+            await expect(b.locator('[data-spades-status]')).toHaveText('Reconnecting… Your hand is paused.');
             await expect(b.getByLabel('Your bid')).toBeDisabled();
-            await expect(b.getByRole('button', { name: 'Bid for me' })).toBeDisabled();
+            await expect(b.getByRole('button', { name: 'Bid', exact: true })).toBeDisabled();
             assert.deepEqual(await cards.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard)), hand);
             returnHand();
             await expect(b.getByLabel('Your bid')).toBeEnabled();
             await expect(b.getByLabel('Your bid')).toHaveValue('0');
         }
-        for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Bid for me' }).click();
+        for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Bid', exact: true }).click();
         await expect(a.locator('[data-spades-trick]')).toContainText('West · Nil');
         const lead = b.locator('[data-spades-card]:enabled').first();
         await verifyCardLandscape(b, 'TurdSpades', lead, b.locator('[data-spades-action="resign"]'));
@@ -1628,14 +1665,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.locator('[data-spades-action="resign"]').click();
         await b.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
         await expect(a.locator('[data-spades-status]')).toContainText('South + North win by resignation');
-        await a.getByRole('button', { name: 'Request Spades rematch' }).click();
+        await expect(spadesMain(a)).toHaveText('Rematch');
+        await spadesMain(a).click();
         const votes = east.locator('[data-spades-status]');
         await expect(votes).toContainText('1/4 ready');
-        await b.getByRole('button', { name: 'Accept Spades rematch' }).click();
+        await expect(spadesMain(b)).toHaveText('Rematch');
+        await spadesMain(b).click();
         await expect(votes).toContainText('2/4 ready');
-        await north.getByRole('button', { name: 'Accept Spades rematch' }).click();
+        await expect(spadesMain(north)).toHaveText('Rematch');
+        await spadesMain(north).click();
         await expect(votes).toContainText('3/4 ready');
-        await east.getByRole('button', { name: 'Accept Spades rematch' }).click();
+        await expect(spadesMain(east)).toHaveText('Rematch');
+        await spadesMain(east).click();
         await expect(b.locator('[data-spades-status]')).toContainText('Round 1 · Your bid');
         await expect(b.locator('[data-spades-card]')).toHaveCount(13);
         if (media) {
@@ -2157,8 +2198,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(status(page)).toHaveText(`${labels[index]} · ${reason}`);
             assert.deepEqual(await scoreboard(page), scores);
         }
-        await expect(b.getByRole('button', { name: 'Request Turdanoid rematch' })).toBeInViewport({ ratio: 1 });
-        await expect(spectator.getByRole('button', { name: /Turdanoid rematch/ })).toBeHidden();
+        await expect(brickMain(b)).toHaveText('Rematch');
+        await expect(brickMain(b)).toBeInViewport({ ratio: 1 });
+        await expect(brickMain(spectator)).toBeHidden();
         if (media) {
             await waitForPackets(b, 'audio', audioBeforeWait);
             await expectOriginalPeer(b);
@@ -2213,10 +2255,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         const match = page => page.locator('[data-brick-match]');
         const board = page => page.getByRole('region', { name: 'Turdanoid playfield' });
-        const serve = page => page.getByRole('button', { name: 'Launch ball' });
+        const serve = page => brickServe(page);
         const launchWait = page => page.locator('[data-brick-launch-wait]');
-        await a.getByRole('button', { name: 'Open Turdanoid race' }).click();
-        await b.getByRole('button', { name: 'Join Turdanoid race' }).click();
+        await expect(brickMain(a)).toHaveText('Open');
+        await brickMain(a).click();
+        await expect(brickMain(b)).toHaveText('Join');
+        await brickMain(b).click();
         await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(serve(b)).toBeDisabled();
         await expect(launchWait(b)).toHaveText('Launch is not active yet. The countdown is still running.');
@@ -2233,12 +2277,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.ok(launch.width >= 44 && launch.height >= 44, 'phone-sized Turdanoid Launch button');
         assert.ok(launch.x >= field.x + field.width, 'Launch button does not cover the playfield or paddle');
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        await expect(serve(b)).toHaveText('Launch');
         await expect(serve(b)).toBeEnabled();
         await expect(serve(a)).toBeEnabled();
         await expect(launchWait(b)).toBeHidden();
         if (pauseReconnect) {
             const returnBoard = await pauseReconnect();
-            await expect(a.locator('[data-brick-status]')).toHaveText('Reconnecting · race clock keeps running');
+            await expect(a.locator('[data-brick-status]')).toHaveText('Reconnecting… The clock keeps running.');
             await expect(board(a)).toBeInViewport({ ratio: 1 });
             await expect(serve(a)).toBeDisabled();
             await board(a).press('Space');
@@ -2326,12 +2371,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         if (naturalBrickRace) await verifyBrickRaceFinish(a, b, spectator);
         else {
-            await b.getByRole('button', { name: 'Leave race' }).click();
-            await b.getByRole('dialog', { name: 'Leave this race?' }).getByRole('button', { name: 'Leave race' }).click();
+            await expect(b.locator('[data-brick-leave]')).toHaveText('Leave');
+            await b.locator('[data-brick-leave]').click();
+            await b.getByRole('dialog', { name: 'Leave this race?' }).getByRole('button', { name: 'Leave', exact: true }).click();
             await expect(a.locator('[data-brick-status]')).toHaveText('You win · forfeit');
         }
-        await a.getByRole('button', { name: 'Request Turdanoid rematch' }).click();
-        await b.getByRole('button', { name: 'Accept Turdanoid rematch' }).click();
+        await expect(brickMain(a)).toHaveText('Rematch');
+        await brickMain(a).click();
+        await expect(brickMain(b)).toHaveText('Rematch');
+        await brickMain(b).click();
         await expect(match(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(match(b)).toHaveAttribute('data-sequence', '0');
         await expect(launchWait(b)).toHaveText('Launch is not active yet. The countdown is still running.');
@@ -2396,8 +2444,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await inviteToGame(a, b, 'ChessGuest');
         await expect(b.getByRole('link', { name: 'Open Rad Dad Arcade' })).toHaveAttribute('href', 'https://raddadband.com/play/');
         for (const page of [a, b]) await page.locator('.arcade-chess summary').click();
-        await a.getByRole('button', { name: 'Open Chess match' }).click();
-        await b.getByRole('button', { name: 'Join as Black' }).click();
+        await expect(chessPrimary(a)).toHaveText('Open');
+        await chessPrimary(a).click();
+        await expect(chessPrimary(b)).toHaveText('Join');
+        await chessPrimary(b).click();
         await expect(a.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
         await fit(a, 'desktop');
         const phoneChessboard = b.locator('.arcade-chess-board');
@@ -2439,8 +2489,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await a.getByRole('button', { name: 'Offer draw', exact: true }).click();
         await b.getByRole('button', { name: 'Accept draw', exact: true }).click();
         await expect(a.locator('[data-chess-status]')).toContainText('Draw by agreement');
-        await a.getByRole('button', { name: 'Request rematch' }).click();
-        await b.getByRole('button', { name: 'Accept rematch' }).click();
+        await expect(chessPrimary(a)).toHaveText('Rematch');
+        await chessPrimary(a).click();
+        await expect(chessPrimary(b)).toHaveText('Rematch');
+        await chessPrimary(b).click();
         await expect(b.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
         await expect(b.getByRole('button', { name: 'e2, White pawn' })).toBeAttached();
         await fit(a, 'desktop-rematch');
