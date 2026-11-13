@@ -798,6 +798,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await enterFromShell(host, radDad ? 'RadDadHost' : 'PreviewHost', true);
                 await expect(host.locator('[data-entry-label]').first()).toHaveText(`via ${brand}`);
                 await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+                const privateArcade = host.getByRole('button', { name: `Open ${brand} Arcade`, exact: true });
+                const roomUrl = host.url();
+                const tabs = host.context().pages().length;
+                await expect(host.locator('[data-game-arcade-external]')).not.toHaveAttribute('href', /./);
+                await expectUncoveredControl(privateArcade);
+                if (phone) await privateArcade.tap();
+                else await privateArcade.click();
+                const gamePicker = host.getByRole('combobox', { name: 'Switch game' });
+                await expect(gamePicker).toBeFocused();
+                await host.keyboard.press('Escape');
+                assert.equal(host.url(), roomUrl);
+                assert.equal(host.context().pages().length, tabs);
                 const invitePlayers = host.getByRole('button', { name: 'Invite players', exact: true });
                 await invitePlayers.click();
                 const invitePicker = host.locator('[data-invite-dialog]');
@@ -2394,7 +2406,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
         await a.getByRole('button', { name: /Game Night/ }).click();
         await inviteToGame(a, b, 'ChessGuest');
-        await expect(b.getByRole('link', { name: 'Open Rad Dad Arcade' })).toHaveAttribute('href', 'https://raddadband.com/play/');
+        await expect(b.getByRole('button', { name: 'Open Rad Dad Arcade', exact: true })).toBeVisible();
+        await expect(b.locator('[data-game-arcade-external]')).not.toHaveAttribute('href', /./);
         for (const page of [a, b]) await page.locator('.arcade-chess summary').click();
         await a.getByRole('button', { name: 'Open Chess match' }).click();
         await b.getByRole('button', { name: 'Join as Black' }).click();
