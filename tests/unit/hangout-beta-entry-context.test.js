@@ -412,6 +412,29 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
         } finally { dom.window.close(); }
     });
 
+    it('clears the invitation code when Retry confirms an admission with an unreadable unlock response', async () => {
+        let admitted = false;
+        const { dom, calls } = await portal(path => {
+            if (path === '/beta/state') return admitted ? state() : new Response(null, { status: 401 });
+            admitted = true;
+            return new Response('{', { status: 200 });
+        });
+        try {
+            const doc = dom.window.document;
+            const code = doc.querySelector('#code');
+            const retry = doc.querySelector('#retry');
+            await vi.waitFor(() => expect(doc.querySelector('#login').hidden).toBe(false));
+            code.value = 'synthetic invitation';
+            doc.querySelector('#unlock button').click();
+            await vi.waitFor(() => expect(retry.hidden).toBe(false));
+            expect(code.value).toBe('synthetic invitation');
+            retry.click();
+            await vi.waitFor(() => expect(doc.querySelector('#inside').hidden).toBe(false));
+            expect(code.value).toBe('');
+            expect(calls.map(call => call.method)).toEqual(['GET', 'POST', 'GET']);
+        } finally { dom.window.close(); }
+    });
+
     it('leaves focus where the guest moved it while the retry was pending', async () => {
         let release;
         const pending = new Promise(resolve => { release = resolve; });

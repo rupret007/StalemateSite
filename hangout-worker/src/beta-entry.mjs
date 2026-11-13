@@ -174,6 +174,7 @@ function render(phase, message, identity) {
     $('#unlock').setAttribute('aria-busy', String(operation === 'unlock'));
     logout?.setAttribute('aria-busy', String(operation === 'logout'));
     if (phase !== 'ready') return;
+    code.value = '';
     if (webJoinEntry) { location.reload(); return; }
     const roles = { owner: 'owner', band: 'band', moderator: 'moderator' };
     $('#identity').textContent = identity.kind === 'staff' ? 'Signed in as ' + roles[identity.role] + '.'
