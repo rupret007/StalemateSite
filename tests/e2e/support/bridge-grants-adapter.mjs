@@ -8,8 +8,10 @@
 // table has no seat holds (hook 1). See BRIDGE-HOOKS.md. So this file gives the
 // module the table port in-process:
 //   status      reads the table checkpoint, as arcade-transport.mjs `load` does
-//   seat        joins the real table with seat 'next' (hook 1 would move a hold)
-//   releaseHold records the holder only (hook 1 would clear the table hold)
+//   hold        keeps a { holder, until } beside the table, as hook 1 would
+//   seat        needs a live hold for `holder`, moves it to the guest session,
+//               then joins the real table with seat 'next'
+//   releaseHold clears that hold and records the holder
 // Tables are kept as checkpoints in the same record shape the Worker stores.
 
 import { GameNightChess } from '../../../hangout-worker/src/game-night-chess.mjs';
@@ -36,8 +38,10 @@ function memoryStorage() {
         async get(key) { return structuredClone(data.get(key)); },
         async put(key, record) { data.set(key, structuredClone(record)); },
         async delete(keys) { for (const key of [].concat(keys)) data.delete(key); },
-        async list({ prefix, limit = Infinity }) {
-            return new Map([...data].filter(([key]) => key.startsWith(prefix)).slice(0, limit).map(([key, record]) => [key, structuredClone(record)]));
+        // Durable Object semantics: key order, `limit` and `startAfter`.
+        async list({ prefix, limit = Infinity, startAfter }) {
+            const keys = [...data.keys()].filter(key => key.startsWith(prefix) && (startAfter === undefined || key > startAfter)).sort().slice(0, limit);
+            return new Map(keys.map(key => [key, structuredClone(data.get(key))]));
         }
     };
 }
@@ -46,6 +50,7 @@ function memoryStorage() {
 export function createChessBench({ now = () => Date.now() } = {}) {
     const storage = memoryStorage();
     const released = [];
+    const holds = new Map();
     const key = scope => TABLE_PREFIX + scope.ref;
     const load = scope => {
         const record = storage.data.get(key(scope));
@@ -61,19 +66,31 @@ export function createChessBench({ now = () => Date.now() } = {}) {
             const { seats, match } = found.game.checkpoint();
             return { waiting: !match, host: seats.w, hostSeat: 'w', free: 2 - found.game.subjects.length };
         },
-        async seat(scope, { subject, seat }) {
+        // Holds as hook 1 would keep them next to the checkpoint: holder -> until.
+        async hold(scope, { holder, until, now: at }) {
+            if (!load(scope) || holds.has(holder) || !(until > at)) return false;
+            holds.set(holder, until);
+            return true;
+        },
+        // Move the hold to the guest session, then that session's join takes the seat.
+        async seat(scope, { subject, holder, seat, until, now: at }) {
+            if (!(holds.get(holder) > at) || !(until > at)) return null;
+            holds.delete(holder);
+            holds.set(subject, until);
             const found = load(scope);
             if (!found || !found.game.join(subject, scope.match, now(), seat)) return null;
+            holds.delete(subject);
             save(scope, found.record, found.game);
             return found.game.seat(subject);
         },
-        async releaseHold(_scope, holder) { released.push(holder); }
+        async releaseHold(_scope, holder) { released.push(holder); holds.delete(holder); }
     };
     const grants = createRoomGrants({ storage, table: port });
 
     return {
         grants,
         released,
+        tableHolds: () => [...holds].map(([holder, until]) => ({ holder, until })),
         // The host is seated by their own session, the way the `open` action does it.
         openTable({ room, ref, match, host }) {
             if (storage.data.has(TABLE_PREFIX + ref)) return false;

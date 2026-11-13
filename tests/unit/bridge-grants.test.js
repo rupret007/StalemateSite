@@ -74,8 +74,12 @@ describe('bridge grants on the real Worker module and the real Chess table', () 
         const { bench, grants, time } = open();
         const value = fresh();
         await register(grants, time, [value]);
+        // The hold sits on the table from register until seat moves it to the guest.
+        expect(bench.tableHolds()).toEqual([{ holder: await hashGrant(value), until: time.now() + GRANT_TTL_MS }]);
         const first = await grants.redeemGrant({ value, now: time.now() });
         expect(first).toMatchObject({ ok: true, status: 200, seat: 'b' });
+        expect(bench.released).toEqual([]);
+        expect(bench.tableHolds()).toEqual([]);
         expect(bench.table(scope)).toMatchObject({ status: 'playing', seats: { w: table.host, b: first.body.sid } });
         expect(first.body.scope).toMatchObject({ game: 'chess', match: table.match, room: table.room, ref: table.ref, host: table.host });
         const replay = await grants.redeemGrant({ value, now: time.now() });
