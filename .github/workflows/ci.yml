@@ -52,12 +52,18 @@ jobs:
       - name: Run automated tests
         run: npm test
 
+      - name: Install local workerd test dependencies
+        run: npm ci --prefix tests/runtime/durable-records
+
+      - name: Exercise the private bridge preview
+        timeout-minutes: 5
+        run: npx playwright test --config tests/playwright.bridge.config.js
+
       - name: Exercise protected Game Night and rollback in workerd, Chromium and WebKit
         timeout-minutes: 5
         env:
           ARCADE_BROWSER_EVIDENCE: ${{ github.workspace }}/test-results/arcade-multiplayer
         run: |
-          npm ci --prefix tests/runtime/durable-records
           npm run package:beta
           node tests/runtime/arcade-transport.mjs --relay
           node tests/runtime/arcade-transport.mjs --rollback

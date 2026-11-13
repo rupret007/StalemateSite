@@ -37,6 +37,26 @@ describe('bridge room offer', () => {
         expect(calls).toHaveLength(1);
     });
 
+    it('reserves once when a second confirmation arrives during registration', async () => {
+        let finish;
+        const pending = new Promise(resolve => { finish = resolve; });
+        const calls = [];
+        const offer = createRoomOffer({ room: ROOM, register: async payload => {
+            calls.push(payload);
+            return pending;
+        } });
+        const members = [HOST, 'guest-1'];
+        const first = confirm(offer, { members });
+        const second = confirm(offer, { hash: 'd'.repeat(64) });
+        members.push('late-guest');
+        finish({ ok: true, status: 200, body: { granted: 1, standby: 0 } });
+        expect(await first).toMatchObject({ ok: true });
+        expect(await second).toMatchObject({ ok: false, status: 409, reason: 'already-confirmed' });
+        expect(calls).toHaveLength(1);
+        expect(offer.offerFor('guest-1')).not.toBeNull();
+        expect(offer.offerFor('late-guest')).toBeNull();
+    });
+
     it('shows one Join Chess button, at least 44px, only to people already in the room', async () => {
         const { offer } = harness();
         expect(offer.render(document, 'guest-1')).toBeNull();
@@ -67,6 +87,18 @@ describe('bridge room offer', () => {
         expect(await confirm(offer)).toMatchObject({ ok: false, shareSheet: false, secondRoom: false, room: ROOM });
         expect(offer.offerFor('guest-1')).toBeNull();
         expect(calls).toHaveLength(1);
+    });
+
+    it('can confirm again after registration fails', async () => {
+        let calls = 0;
+        const offer = createRoomOffer({ room: ROOM, register: async () => {
+            calls++;
+            if (calls === 1) throw new Error('fixture unavailable');
+            return { ok: true, status: 200, body: { granted: 1, standby: 0 } };
+        } });
+        expect(await confirm(offer)).toMatchObject({ ok: false, status: 503 });
+        expect(await confirm(offer)).toMatchObject({ ok: true });
+        expect(calls).toBe(2);
     });
 
     it('raises the existing in-room offer control to 44px', () => {

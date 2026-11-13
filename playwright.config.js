@@ -36,7 +36,7 @@ module.exports = defineConfig({
     projects: [
         {
             name: 'chromium',
-            testIgnore: /phones\.spec\.js/,
+            testIgnore: [/phones\.spec\.js$/, /bridge-slice1[^/]*\.spec\.js$/],
             use: { browserName: 'chromium' }
         },
         {

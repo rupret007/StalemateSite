@@ -33,19 +33,21 @@ function joinButton(document) {
 
 export function createRoomOffer({ room, register }) {
     if (!JAM_ROOM.test(room || '') || typeof register !== 'function') throw new TypeError('Play stays in the current WebJam room.');
-    let confirmed = false;
+    let confirming = false, confirmed = false;
     let roster = new Set();
     let hostId = null;
 
     return {
         async confirmPlay({ hostId: id, hostSubject, members, ref, match, hash, now }) {
-            if (confirmed) return { ok: false, status: 409, reason: 'already-confirmed', shareSheet: false, secondRoom: false, room };
+            if (confirming || confirmed) return { ok: false, status: 409, reason: 'already-confirmed', shareSheet: false, secondRoom: false, room };
             if (!Array.isArray(members) || !members.every(member => typeof member === 'string' && member.length > 0)
                 || !members.includes(id)) return refused('not-in-room');
             const guests = members.filter(member => member !== id);
             if (guests.length === 0) return refused('nobody-waiting');
             if (!SUBJECT.test(hostSubject || '') || !REF.test(ref || '') || !MATCH.test(match || '')
                 || !HASH.test(hash || '') || !Number.isFinite(now)) return refused('unavailable');
+            const offeredMembers = new Set(members);
+            confirming = true;
             let result;
             try {
                 result = await register({
@@ -53,11 +55,13 @@ export function createRoomOffer({ room, register }) {
                 });
             } catch {
                 return { ok: false, status: 503, reason: 'unavailable', shareSheet: false, secondRoom: false, room };
+            } finally {
+                confirming = false;
             }
             if (result?.ok === true && result.body?.granted === 1) {
                 confirmed = true;
                 hostId = id;
-                roster = new Set(members);
+                roster = offeredMembers;
             }
             return { ...result, shareSheet: false, secondRoom: false, room };
         },
