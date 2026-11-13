@@ -102,9 +102,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function sendGameInvite(host, nick, capture) {
         await host.getByRole('button', { name: 'Invite players' }).click();
         const dialog = host.locator('[data-invite-dialog]');
-        await expect(dialog.locator('form')).toBeHidden();
-        if (capture) await capture();
-        await dialog.getByRole('button', { name: `Invite ${nick}`, exact: true }).click();
+        if (await dialog.locator('[data-game-invite-picker]').isVisible()) {
+            if (capture) await capture();
+            await dialog.getByRole('button', { name: `Invite ${nick}`, exact: true }).click();
+        } else {
+            await dialog.getByRole('combobox').selectOption({ label: nick });
+            await dialog.getByRole('button', { name: 'Invite selected person' }).click();
+        }
     }
     async function inviteToGame(host, guest, nick) {
         await sendGameInvite(host, nick);

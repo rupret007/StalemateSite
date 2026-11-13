@@ -5,8 +5,8 @@ const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const ROOT = '/r/45662413410ed051/';
 
-async function sample(page, { text = [], fields = [], placeholders = [] }) {
-    return page.evaluate(({ text, fields, placeholders }) => {
+async function sample(page, { text = [], fields = [], placeholders = [], disabledLabels = [] }) {
+    return page.evaluate(({ text, fields, placeholders, disabledLabels }) => {
         const rgba = value => {
             const parts = String(value).match(/^rgba?\(([^)]+)\)$/)?.[1].split(',').map(Number);
             if (!parts || parts.length < 3 || parts.some(value => !Number.isFinite(value))) throw Error('Unsupported computed color');
@@ -26,20 +26,22 @@ async function sample(page, { text = [], fields = [], placeholders = [] }) {
             }
             return layers.reverse().reduce((b, a) => blend(a, b), [255, 255, 255, 1]);
         }
-        function target(selector) {
+        function target(selector, disabledLabel = false) {
             const node = document.querySelector(selector);
-            if (!node || !node.checkVisibility({ checkVisibilityCSS: true, checkOpacity: true }) || node.matches(':disabled'))
-                throw Error(`Requested active visible sample is missing: ${selector}`);
-            for (let ancestor = node; ancestor; ancestor = ancestor.parentElement)
+            if (!node || !node.checkVisibility({ checkVisibilityCSS: true, checkOpacity: true }) || node.matches(':disabled') !== disabledLabel)
+                throw Error(`Requested visible sample is missing: ${selector}`);
+            for (let ancestor = disabledLabel ? node.parentElement : node; ancestor; ancestor = ancestor.parentElement)
                 if (Number(getComputedStyle(ancestor).opacity) !== 1) throw Error('Opacity group needs separate qualification');
             return node;
         }
         const results = [];
-        for (const selector of text) {
-            const node = target(selector), style = getComputedStyle(node), bg = background(node);
+        for (const selector of [...text, ...disabledLabels]) {
+            const node = target(selector, disabledLabels.includes(selector)), style = getComputedStyle(node), bg = background(node);
+            const foreground = rgba(style.color);
+            foreground[3] *= Number(style.opacity);
             const large = parseFloat(style.fontSize) >= 24 || parseFloat(style.fontSize) >= 18.6667 && Number(style.fontWeight) >= 700;
             results.push({ kind: 'text', selector, foreground: style.color, background: bg,
-                ratio: ratio(blend(rgba(style.color), bg), bg), minimum: large ? 3 : 4.5 });
+                ratio: ratio(blend(foreground, bg), bg), minimum: large ? 3 : 4.5 });
         }
         for (const selector of placeholders) {
             const node = target(selector), style = getComputedStyle(node, '::placeholder'), bg = background(node);
@@ -55,7 +57,7 @@ async function sample(page, { text = [], fields = [], placeholders = [] }) {
                 ratio: Math.min(ratio(blend(color, outside), outside), ratio(blend(color, inside), inside)), minimum: 3 });
         }
         return results;
-    }, { text, fields, placeholders });
+    }, { text, fields, placeholders, disabledLabels });
 }
 async function check(page, testInfo, stage, samples) {
     const results = await sample(page, samples);
@@ -81,8 +83,11 @@ for (const width of [375, 390, 1280]) test(`active lobby text and authored field
         await page.click('[data-enter]'); await expect(page.locator('[data-connection]')).toHaveText('Connected');
         await page.fill('[data-text]', 'Readable local chat in the shared community'); await page.press('[data-text]', 'Enter');
         await expect(page.locator('[data-buffer]')).toContainText('Readable local chat');
-        // Own-author controls are intentionally disabled. Use another real live
-        // endpoint to qualify an active author button and its server correlation.
+        // Own-author controls stay disabled, but the message attribution is text people need to read.
+        const ownAuthor = page.locator('[data-buffer] .who:disabled');
+        await expect(ownAuthor).toHaveText('<ContrastVisitor>');
+        await expect(ownAuthor).toBeDisabled();
+        // Use another live endpoint to qualify the enabled author action too.
         const peer = await context.newPage();
         await peer.route(/youtube\.com|ytimg|googlevideo|goatcounter/, route => route.abort());
         await peer.goto(`${ROOT}lobby/?preview=local-preview-key-0001&via=rad-dad&relay=${encodeURIComponent(relay)}`);
@@ -95,6 +100,7 @@ for (const width of [375, 390, 1280]) test(`active lobby text and authored field
         await page.locator('[data-text]').blur();
         await check(page, testInfo, 'chat', {
             text: ['[data-topic]', '[data-buffer] .ts', '[data-buffer] .who:not(:disabled)', '[data-buffer] .entry-badge', '[data-connection]', '[data-send]', '.chat-status'],
+            disabledLabels: ['[data-buffer] .who:disabled'],
             fields: ['[data-say]'], placeholders: ['[data-text]']
         });
         await page.screenshot({ path: testInfo.outputPath(`chat-${width}.png`), fullPage: true });

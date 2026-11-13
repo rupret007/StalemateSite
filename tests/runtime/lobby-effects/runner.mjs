@@ -26,7 +26,7 @@ const sources = () => Object.fromEntries([
     ['fixture/runner.mjs', FILE], ['fixture/worker.mjs', join(HERE, 'worker.mjs')],
     ['fixture/source-catalogue.mjs', join(HERE, 'source-catalogue.mjs')],
     ...['lobby-core.mjs', 'lobby-effect-records.mjs', 'durable-record-storage.mjs', 'community-state.mjs', 'filter.mjs', 'lobby-act.mjs', 'message-receipts.mjs', 'transport-budget.mjs', 'participation-checkpoint.mjs', 'lobby-incident-sources.mjs', 'incident-cases.mjs'].map(name => [`application/${name}`, join(APP, 'hangout-worker/src', name)]),
-    ...['r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'r/45662413410ed051/lobby/game-night.mjs', 'package.json', 'package-lock.json', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
+    ...['r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'r/45662413410ed051/lobby/game-night.mjs', 'r/45662413410ed051/lobby/lobby-roster.mjs', 'package.json', 'package-lock.json', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
     ...['package.json', 'package-lock.json'].map(name => [`tools/${name}`, join(TOOLS, name)])
 ].map(([name, path]) => [name, hash(path)]));
 const group = pid => execFileSync('/bin/ps', ['-axo', 'pid=,ppid=,pgid=,stat=,comm='], { encoding: 'utf8', timeout: 3000 }).trim().split('\n').map(line => {

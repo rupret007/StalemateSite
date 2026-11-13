@@ -124,6 +124,46 @@ async function submitPrivate(h, who) {
 }
 
 describe('opt-in session authority through the actual beta gateway and Lobby', () => {
+    it('gives admitted guests a way back when browser audio is disabled, without serving Web Join code', async () => {
+        const h = await harness({ participation: true }), { cookie } = await h.guest();
+        const asset = vi.spyOn(h.env.ASSETS, 'fetch');
+        const lobbyPath = '/r/45662413410ed051/lobby/';
+        for (const path of ['/join', '/join/', '/join/index.html', '/%6aoin/index.html']) {
+            const response = await betaFetch(request(path + '?next=https://example.invalid/', { cookie }), h.env);
+            expect(response.status).toBe(503);
+            expect(response.headers.get('Content-Type')).toContain('text/html');
+            expect(response.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=()');
+            expect(response.headers.get('Content-Security-Policy')).toBe("default-src 'none'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+            expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
+            expect(response.headers.get('Cache-Control')).toBe('no-store');
+            expect(response.headers.has('Location')).toBe(false);
+            expect(response.headers.has('Set-Cookie')).toBe(false);
+            const body = await response.text();
+            expect(body).toContain('<h1>Browser audio is unavailable</h1>');
+            expect(body).toContain(`href="${lobbyPath}">Return to Hang Out</a>`);
+            expect(body).not.toMatch(/<script|<form|example\.invalid/);
+
+            const head = await betaFetch(request(path, { cookie, method: 'HEAD' }), h.env);
+            expect(head.status).toBe(503);
+            expect(head.headers.get('Content-Type')).toContain('text/html');
+            expect(await head.text()).toBe('');
+        }
+        for (const [path, options] of [['/join/app.js', {}], ['/join/handoff.html', {}], ['/join/', { upgrade: true }], ['/join/', { method: 'POST' }], ['/turn', {}], ['/room', {}]]) {
+            const denied = await betaFetch(request(path, { cookie, ...options }), h.env);
+            expect(denied.status).toBe(503);
+            expect(denied.headers.get('Content-Type')).toContain('text/plain');
+        }
+        const anonymous = await betaFetch(request('/join/'), h.env);
+        expect(anonymous.status).toBe(401);
+        expect(await anonymous.text()).toContain('Continue to audio check');
+        expect(asset).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+
+        const lobby = await betaFetch(request(lobbyPath, { cookie }), h.env);
+        expect(lobby.status).toBe(200);
+        expect(asset).toHaveBeenCalledOnce();
+    });
+
     it('does not clear a newer quarantine when a held migration export later refuses', async () => {
         const h = await harness(), who = await h.visitor('MigrationVisitor'), started = deferred(), exportReply = deferred();
         h.env.BETA_SESSIONS = { idFromName: name => name, get: () => ({ fetch: () => { started.resolve(); return exportReply.promise; } }) };

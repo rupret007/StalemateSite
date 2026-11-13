@@ -14,7 +14,7 @@ import { createPresenceProjections } from '../hangout-worker/src/presence-projec
 const DEV_HMAC = 'local-dev-only-hmac-key-not-a-secret-000';
 
 // devAdminKey: TEST-ONLY stand-in for Cloudflare Access. The real Worker has no such path (see lobby-do.mjs).
-export function createHangoutRelay({ previewKey = 'local-preview-key-0001', origins = '', connectionsPerDay, devAdminKey = '', lobbyLimits = {}, now, resolveIdentity = null, initialState = {}, persist = () => {} } = {}) {
+export function createHangoutRelay({ previewKey = 'local-preview-key-0001', origins = '', connectionsPerDay, devAdminKey = '', lobbyLimits = {}, directMusicInvites = true, now, resolveIdentity = null, initialState = {}, persist = () => {} } = {}) {
     const env = { HANGOUT_PREVIEW_KEY: previewKey, ROOMS: {}, QUOTA: {}, HANGOUT_CONNECTIONS_PER_DAY: connectionsPerDay };
     const limits = limitsFrom(env);
     const rooms = new Map();
@@ -47,6 +47,7 @@ export function createHangoutRelay({ previewKey = 'local-preview-key-0001', orig
     });
     const lobby = createLobby({
         gameNight: true,
+        directMusicInvites,
         now,
         limits: lobbyLimits,
         persist,
