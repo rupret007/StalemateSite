@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { rolldown } from 'rolldown';
 import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-duel.js';
 import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
@@ -13,6 +14,7 @@ import { createArcadePreviewSite } from './arcade-preview-site.mjs';
 
 const origin = 'https://local-fixture.invalid';
 const serve = process.argv.includes('--serve');
+const fourInvite = process.argv.includes('--verify-four-invite');
 const invite = serve ? process.env.ARCADE_PREVIEW_INVITATION : 'local-arcade-fixture-invitation-2026';
 if (serve && (typeof invite !== 'string' || invite.length < 32)) {
     throw new Error('Set ARCADE_PREVIEW_INVITATION to a local-only value with at least 32 characters.');
@@ -21,6 +23,7 @@ const preview = 'local-arcade-fixture-preview-key-2026';
 const nonce = randomBytes(16).toString('hex');
 const room = '#game-2ca9e1x1be34a';
 const browserName = process.argv.find(arg => arg.startsWith('--browser='))?.slice(10) || '';
+const browserFixture = !!browserName || serve || fourInvite;
 const browserMedia = process.argv.includes('--media');
 const webJamShare = process.argv.includes('--webjam-share');
 const siteGuest = process.argv.find(arg => arg.startsWith('--site-guest='))?.slice('--site-guest='.length);
@@ -29,6 +32,8 @@ const rollback = process.argv.includes('--rollback');
 const rollbackRef = process.argv.find(arg => arg.startsWith('--rollback-ref='))?.slice(15);
 const mixedRef = process.argv.find(arg => arg.startsWith('--mixed-ref='))?.slice('--mixed-ref='.length);
 assert.ok(!serve || !browserName && !rollback && !relay && !mixedRef, 'serve the private preview on its own');
+assert.ok(!fourInvite || !serve && !browserName && !rollback && !relay && !mixedRef,
+    'verify the Four invitation on its own');
 const fixtureIce = { urls: [process.env.ARCADE_TEST_TURN_URL || 'turn:fixture.invalid:3478'],
     username: 'arcade-fixture', credential: 'arcade-local-turn-only' };
 assert.ok(!webJamShare || browserName && !siteGuest && !relay && !mixedRef, 'the isolated WebJam share check needs one browser');
@@ -40,7 +45,7 @@ assert.ok(!rollbackRef || rollback && /^[a-f0-9]{40}$/.test(rollbackRef), 'use -
 assert.ok(mixedRef === undefined || browserName && !relay && /^[a-f0-9]{40}$/.test(mixedRef), 'use --mixed-ref with a browser and exact source revision');
 const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCADE_BROWSER_EVIDENCE) : null;
 const app = fileURLToPath(new URL('../../', import.meta.url));
-const previewSite = (browserName || serve) ? createArcadePreviewSite(app) : null;
+const previewSite = browserFixture ? createArcadePreviewSite(app) : null;
 const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
 const sharedSource = process.env.ARCADE_TEST_SOURCE ? resolve(process.env.ARCADE_TEST_SOURCE) : null;
 const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST_RAD_DAD) : null;
@@ -1019,18 +1024,18 @@ try {
     const options = {
         name: 'private-arcade-fixture', rootPath: directory, modulesRoot: directory,
         modules: [{ type: 'ESModule', path: join(directory, 'worker.mjs'), contents: bundled.output[0].code }],
-        compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: !!browserName || serve, telemetry: { enabled: false },
+        compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, https: browserFixture, telemetry: { enabled: false },
         durableObjects: { LOBBY: { className: 'FixtureLobby', useSQLite: true }, QUOTA: { className: 'HangoutQuota', useSQLite: true }, ROOMS: { className: 'HangoutRoom', useSQLite: true },
             ...(relay ? { TURN_BUDGET: { className: 'HangoutTurnBudget', useSQLite: true } } : {}) },
         bindings: { FIXTURE_NONCE: nonce, FIXTURE_ARCADE_REPORTS: '1', HANGOUT_SESSION_AUTHORITY: 'lobby-v1', HANGOUT_BETA_MODE: 'protected', ...arcadeFlags,
             HANGOUT_GAME_NIGHT_GUESTS: betaManifest.match(/^HANGOUT_GAME_NIGHT_GUESTS = "([01])"$/m)?.[1] || '0',
-            ...(browserName || serve ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
-            ...(!serve && (!browserName || browserMedia) ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
+            ...(browserFixture ? { FIXTURE_ARCADE_BROWSER: '1' } : {}),
+            ...(!browserFixture || !serve && browserMedia ? { HANGOUT_ARCADE_MEDIA: '1' } : {}),
             ...(relay ? { HANGOUT_ARCADE_TURN: '1', HANGOUT_CF_ACCOUNT_ID: 'f'.repeat(32), HANGOUT_TURN_MONTHLY_GB: '1',
                 HANGOUT_TURN_KEY_ID: 'arcade-fixture-key', HANGOUT_TURN_API_TOKEN: 'fixture', HANGOUT_TURN_ANALYTICS_TOKEN: 'fixture' } : {}),
             HANGOUT_HMAC_KEY: 'owned-arcade-fixture-hmac-not-for-deployment-2026', HANGOUT_BETA_INVITE_KEY: invite,
             HANGOUT_BETA_INVITE_VERSION: '1', HANGOUT_PREVIEW_KEY: preview, HANGOUT_OPEN: '1', HANGOUT_AI_ENABLED: '0', HANGOUT_TURN_ENABLED: '0' },
-        ...(browserName || serve ? { serviceBindings: { ASSETS: serveAsset } } : {}),
+        ...(browserFixture ? { serviceBindings: { ASSETS: serveAsset } } : {}),
         ...(rollback ? { durableObjectsPersist: join(directory, 'state') } : {}),
         outboundService: async request => {
             if (relay && request.url === 'https://api.cloudflare.com/client/v4/graphql') {
@@ -1058,6 +1063,15 @@ try {
             process.once('SIGINT', resolve);
             process.once('SIGTERM', resolve);
         });
+    } else if (fourInvite) {
+        const { origin: localOrigin } = await mf.ready;
+        const { stdout } = await promisify(execFile)(process.execPath, [
+            join(app, 'node_modules/playwright/cli.js'), 'test', 'tests/e2e/four-invite.spec.js',
+            '--project=chromium', '--workers=1', '--retries=0', '--reporter=list',
+            '--output=test-results/four-invite',
+        ], { cwd: app, env: { ...process.env, FOUR_INVITE_ORIGIN: localOrigin, FOUR_INVITE_CODE: invite }, timeout: 100_000 });
+        assert.match(stdout, /\b1 passed\b/, 'the dedicated Four invitation test must run and pass');
+        console.log(stdout);
     } else if (browserName) {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;

@@ -35,7 +35,7 @@ async function openFour(page) {
     await page.locator('[data-four-status]').filter({ hasText: /Waiting for someone/ }).waitFor({ timeout: 15000 });
 }
 
-test('a phone guest joins an open Four seat from one invite tap and drops a piece', async ({ browser }) => {
+test('a phone guest joins an open Four seat from one invite tap and drops a piece', async ({ browser }, testInfo) => {
     test.setTimeout(60000);
     test.skip(!origin || invitation.length < 32, 'local game night preview is required');
     const hostContext = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, ignoreHTTPSErrors: true });
@@ -80,6 +80,7 @@ test('a phone guest joins an open Four seat from one invite tap and drops a piec
         await expect(guest.getByText('FourHost invited you to play.')).toBeVisible();
         const join = guest.getByRole('button', { name: 'Join game', exact: true });
         await expect(join).toBeVisible();
+        await guest.screenshot({ path: testInfo.outputPath('four-invite-phone-390x844.png') });
         await join.tap();
         const columns = guest.locator('[data-four-columns] button');
         await expect(columns).toHaveCount(7);
@@ -89,6 +90,7 @@ test('a phone guest joins an open Four seat from one invite tap and drops a piec
         await guest.locator('[data-four-columns] button').nth(1).tap();
         await expect(guest.locator('[data-four-status]')).toContainText(/column 2/);
         expect(Date.now() - opened).toBeLessThan(30000);
+        await guest.screenshot({ path: testInfo.outputPath('four-first-move-phone-390x844.png') });
     } finally {
         await hostContext.close();
         await guestContext.close();
