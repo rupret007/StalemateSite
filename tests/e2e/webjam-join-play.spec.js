@@ -33,6 +33,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await page.screenshot({ path: testInfo.outputPath(`listen-ready-${width}x${height}.png`) });
         await listen.press('Enter');
         await expect(page.locator('#error-hint')).toHaveText('Check your connection, then select Retry to listen again.');
+        await expect(page.getByRole('button', { name: 'Check microphone' })).toBeHidden();
         const retry = page.getByRole('button', { name: 'Retry', exact: true });
         await expect(retry).toBeFocused();
         await expect(retry).toBeInViewport();
