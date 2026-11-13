@@ -1,10 +1,12 @@
 import { TUNING, act, advance, createRun, startRun, queueRushSwipe, rushSwipeAction } from './turdrush-core.js';
-import { ACTION_TICKS_PER_SECOND, ACTION_INPUT_BUFFER_MS, ACTION_BURST_CREDITS, ACTION_QUEUE_LIMIT, actionTick, acceptTimedInputs } from './arcade-action-clock.js';
+import { ACTION_TICKS_PER_SECOND, ACTION_BURST_CREDITS, ACTION_QUEUE_LIMIT, actionTick, acceptTimedInputs } from './arcade-action-clock.js';
 
 export const TURD_RUSH_RACE_VERSION = 1;
 export const RUSH_COURSE_METRES = 480;
 export const RUSH_COUNTDOWN_MS = 3000;
-export const RUSH_INPUT_BUFFER_MS = ACTION_INPUT_BUFFER_MS;
+// Preserve the predicted swipe while an input crosses the network and waits
+// for the browser's next frame and the room's serialized processing.
+export const RUSH_INPUT_BUFFER_MS = 480;
 export const RUSH_TICKS_PER_SECOND = ACTION_TICKS_PER_SECOND;
 export const RUSH_LIMIT_TICKS = 45 * RUSH_TICKS_PER_SECOND;
 const actions = ['left', 'right', 'jump', 'slide', 'swipe-left', 'swipe-right', 'cancel-swipe'];
