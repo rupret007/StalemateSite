@@ -483,6 +483,7 @@ async function verifyWebJamChess() {
             catch { throw new Error('Could not open the guest handoff'); }
             const joinGame = page.getByRole('button', { name: 'Join game' });
             await expect(joinGame).toBeVisible();
+            await expect(page.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
             await capture(page, 'accept-host-grant');
             const started = performance.now();
             await joinGame.tap();
@@ -491,6 +492,7 @@ async function verifyWebJamChess() {
             await capture(page, 'waiting-for-host');
             await page.reload();
             await expect(page.locator('[data-guest-status]')).toHaveText('Waiting for your host to reserve your Chess seat…');
+            await expect(page.getByRole('button', { name: 'Waiting for host…' })).toBeDisabled();
             await reserve.click();
             await expect(host.locator('[data-webjam-host-seat-status]')).toHaveText('Chess seat reserved. Your guest can join now.');
             await expect(reserve).toBeHidden();
@@ -513,6 +515,22 @@ async function verifyWebJamChess() {
             const firstMove = Math.round(performance.now() - started);
             assert.ok(firstMove < 30_000, 'first confirmed move is within 30 seconds in the fixture');
             await capture(page, 'first-host-grant-move');
+            const expiredGuest = await browser.newContext({ ignoreHTTPSErrors: true, hasTouch: true, reducedMotion: 'reduce',
+                viewport: { width: 390, height: 844 } });
+            const unconfirmed = await expiredGuest.newPage();
+            await unconfirmed.clock.install();
+            const unregistered = randomBytes(32).toString('base64url');
+            try { await unconfirmed.goto(browserOrigin + '/beta/game-night/webjam-guest#grant=' + unregistered + '&wait=1'); }
+            catch { throw new Error('Could not open the unconfirmed Chess fixture'); }
+            await unconfirmed.getByRole('button', { name: 'Join game' }).tap();
+            await expect(unconfirmed.getByRole('button', { name: 'Waiting for host…' })).toBeDisabled();
+            await unconfirmed.clock.fastForward(25_001);
+            const expired = unconfirmed.locator('[data-guest-status]');
+            await expect(expired).toHaveText('Your Chess seat wasn’t confirmed. Ask your host for a new WebJam invite.');
+            await expect(unconfirmed.getByRole('heading', { name: 'Royal Flush Chess' })).toBeFocused();
+            await capture(unconfirmed, 'host-did-not-confirm');
+            await unconfirmed.reload();
+            await expect(unconfirmed.getByRole('button', { name: 'Join game' })).toBeHidden();
             console.log('PASS one early tap and reload reach the exact Chess seat; first guest move in ' + firstMove + ' ms.');
             return;
         }
