@@ -26,6 +26,17 @@
             paintStart: $('[data-paint-start]'),
             tiles: $('[data-act-tiles]'), relayStatus: $('[data-act-relay-status]')
         };
+        // A tab can retain the older lobby markup while loading this module after a rollout.
+        if (!ui.loadStatus) {
+            ui.loadStatus = document.createElement('p');
+            ui.loadStatus.className = 'small op-only act-load-status';
+            ui.loadStatus.id = 'activity-lesson-status';
+            ui.loadStatus.setAttribute('data-act-load-status', '');
+            ui.loadStatus.setAttribute('role', 'status');
+            ui.loadStatus.setAttribute('aria-atomic', 'true');
+            ui.load.after(ui.loadStatus);
+            ui.url.setAttribute('aria-describedby', [ui.url.getAttribute('aria-describedby'), ui.loadStatus.id].filter(Boolean).join(' '));
+        }
         const state = {
             ch: null, kind: null, clock: H.createClock(), room: H.emptyState(),
             myId: null, names: new Map(), camOn: false, ice: null,

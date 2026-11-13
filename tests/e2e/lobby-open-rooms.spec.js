@@ -203,6 +203,45 @@ test('bob ross room: curated episodes and custom lesson links sync beside the sh
     await host.context().close();
 });
 
+test('cached lobby markup still supports Paint Along with the current room script', async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    try {
+        await context.route('https://www.youtube.com/iframe_api', route => route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));
+        await context.addInitScript(() => {
+            const observer = new MutationObserver(() => {
+                const status = document.querySelector('[data-act-load-status]');
+                if (!status) return;
+                document.querySelector('[data-act-url]').removeAttribute('aria-describedby');
+                status.remove();
+                observer.disconnect();
+            });
+            observer.observe(document, { childList: true, subtree: true });
+        });
+        const page = await context.newPage();
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.goto(lobbyUrl());
+        await expect(page.locator('[data-act-load-status]')).toHaveCount(0);
+        await page.getByLabel('Your nick').fill('CachedPaintHost');
+        await page.locator('[data-enter]').click();
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await page.click('[data-show="rooms"]');
+        await page.click('[data-start="bobross"]');
+        await expect(page.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'mT0RNrTDHkI');
+        const lesson = page.getByRole('textbox', { name: 'YouTube URL' });
+        await lesson.fill('https://example.com/lesson');
+        await lesson.press('Enter');
+        await expect(lesson).toHaveAttribute('aria-invalid', 'true');
+        await expect(lesson).toHaveAccessibleDescription('Enter a YouTube video link or video ID.');
+        await lesson.fill('https://youtu.be/vgbMONXc9Cs');
+        await lesson.press('Enter');
+        await expect(page.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'vgbMONXc9Cs');
+        expect(errors).toEqual([]);
+    } finally {
+        await context.close();
+    }
+});
+
 test('Paint Along keeps a custom link until Hang Out confirms the lesson', async ({ browser }) => {
     const host = await fan(browser, 'PaintLinkHost', { width: 375, height: 844 });
     const guest = await fan(browser, 'PaintLinkGuest');
