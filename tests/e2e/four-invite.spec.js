@@ -32,7 +32,7 @@ async function enterHost(page, nick) {
 async function openFour(page) {
     await page.getByRole('combobox', { name: 'Switch game' }).selectOption('four');
     await page.getByRole('button', { name: 'Open a match' }).click();
-    await page.locator('[data-four-status]').filter({ hasText: /Waiting for someone/ }).waitFor({ timeout: 15000 });
+    await page.locator('[data-four-status]').filter({ hasText: /Waiting for a friend to take the open seat/ }).waitFor({ timeout: 15000 });
 }
 
 test('a phone guest joins an open Four seat from one invite tap and drops a piece', async ({ browser }) => {

@@ -1,0 +1,43 @@
+/* Waiting and host-left treatment for the shared Four table. */
+[data-four-status][data-state="waiting"],
+[data-four-status][data-state="blocked"] {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: #121910;
+}
+
+[data-four-status][data-state="blocked"] {
+  border-color: #6f3f51;
+  background: #2c1b23;
+}
+
+.four-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 150px;
+  min-width: 0;
+  margin: 0;
+  color: var(--cream);
+}
+
+.four-presence-dot {
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--lime);
+}
+
+.four-presence[data-presence="gone"] .four-presence-dot {
+  background: var(--pink);
+}
+
+[data-four-own-game] {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+[data-four-own-game] a {
+  min-height: 44px;
+}

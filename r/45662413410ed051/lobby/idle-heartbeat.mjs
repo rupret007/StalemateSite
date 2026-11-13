@@ -1,5 +1,6 @@
 // Application keepalive, negotiated only with servers that meter transport controls.
 // This never renews authentication or changes a room's activity/ownership.
+import { installFourSeatPresence } from './four-seat-presence-client.mjs';
 export const LOBBY_IDLE_HEARTBEAT_MS = 5 * 60 * 1000;
 
 export function createIdleHeartbeat(socket, isCurrent = () => true, now = () => performance.now()) {
@@ -31,4 +32,10 @@ export function createIdleHeartbeat(socket, isCurrent = () => true, now = () => 
         received() { lastReceived = now(); },
         stop
     };
+}
+
+// The lobby page evaluates this module before it paints Four in a Row.
+// Waiting and host-left copy only rewrites that table. It does not open a socket.
+if (typeof document !== 'undefined' && document.querySelector?.('[data-four]')) {
+    installFourSeatPresence(document);
 }
