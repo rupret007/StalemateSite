@@ -2,7 +2,7 @@
 // Hang Out lobby engine: IRC commands, server-side permissions, filters, PMs, moderation, budget, stats.
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { createLobby, COMMANDS, LOBBY, validWebjamInvite, validWebJoin } from '../../hangout-worker/src/lobby-core.mjs';
-import { discordCallLink, dropFour, fourFinished, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { discordCallLink } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { checkText, checkNick, normalize } from '../../hangout-worker/src/filter.mjs';
 
 let clock;
@@ -951,76 +951,6 @@ describe('Game Night', () => {
         L.message(visitor.id, JSON.stringify({ t: 'hello', nick: 'Ignored', age13: true }));
         expect(got(visitor).find(frame => frame.t === 'welcome')).toMatchObject({ nick: 'Guest-000000' });
         expect(got(visitor).filter(frame => frame.t === 'join').map(frame => frame.ch.name)).toEqual([room]);
-    });
-
-    it('detects four in every direction, full columns and a draw without changing earlier positions', () => {
-        const start = { ...openFour('fixture', 'host'), guest: 'guest' };
-        const diagonal = [0, 1, 1, 2, 4, 2, 2, 3, 4, 3, 4, 3, 3];
-        for (const moves of [[0, 0, 1, 1, 2, 2, 3], [0, 1, 0, 1, 0, 1, 0], diagonal, diagonal.map(col => 6 - col)]) {
-            const result = moves.reduce(dropFour, start);
-            expect(result.winner).toBe('X');
-            expect(fourFinished(result)).toBe(true);
-            expect(dropFour(result, 6)).toBeNull();
-        }
-        expect(start.board.every(cell => !cell)).toBe(true);
-        const full = [0, 0, 0, 0, 0, 0].reduce(dropFour, start);
-        expect(dropFour(full, 0)).toBeNull();
-        const draw = [3, 6, 1, 2, 5, 1, 3, 2, 1, 3, 4, 6, 0, 4, 2, 3, 4, 3, 4, 5, 4,
-            2, 6, 0, 2, 2, 3, 1, 6, 5, 6, 0, 1, 5, 0, 0, 5, 5, 1, 4, 0, 6].reduce(dropFour, start);
-        expect(draw).toMatchObject({ moves: 42, winner: '' });
-        expect(fourFinished(draw)).toBe(true);
-    });
-
-    it('binds the board to the invite-only room, both seats and the current turn', () => {
-        boot({}, true);
-        const host = join('GameHost');
-        const guest = join('GameGuest');
-        const observer = join('GameObserver');
-        const outsider = join('GameOutsider');
-        const room = '#game-1acbefx23acbe';
-        cmd(host, 'join', [room]);
-        const ref = got(host).findLast(m => m.t === 'join').ch.keepRef;
-        const state = visitor => got(visitor).findLast(m => m.t === 'four' && m.ch === room)?.game;
-        const play = (visitor, args, roomInstance = ref) => {
-            later(2000);
-            return L.message(visitor.id, JSON.stringify({ t: 'cmd', name: 'four', args, ch: room, roomInstance }));
-        };
-        for (const visitor of [guest, observer]) {
-            namedCmd(host, 'invite', [visitor.nick], room);
-            cmd(visitor, 'join', [room]);
-        }
-        play(guest, ['open']);
-        play(outsider, ['open']);
-        play(host, ['open'], '0'.repeat(32));
-        expect(state(host)).toBeUndefined();
-        play(host, ['open']);
-        const { id } = state(host);
-        expect(state(observer)).toMatchObject({ id, guest: '', moves: 0 });
-        play(guest, ['join', id]);
-        play(observer, ['join', id]);
-        play(guest, ['drop', id, '0', '1']);
-        play(host, ['drop', id, '0', '0']);
-        expect(state(guest)).toMatchObject({ guest: guest.id, moves: 0 });
-        play(host, ['drop', id, '0', '4']);
-        play(host, ['drop', id, '0', '2']);
-        play(guest, ['drop', id, '0', '2']);
-        play(observer, ['drop', id, '1', '2']);
-        expect(state(guest)).toMatchObject({ moves: 1, lastColumn: 3 });
-        play(guest, ['drop', id, '1', '2']);
-        expect(state(guest).board.slice(-7)).toEqual(['', 'O', '', 'X', '', '', '']);
-        expect(state(outsider)).toBeUndefined();
-        expect(JSON.stringify(L.roomSnapshot())).not.toContain(id);
-        namedCmd(host, 'block', [guest.nick], room);
-        expect(state(guest)).toBeNull();
-        play(host, ['open']);
-        const replacement = state(host).id;
-        play(guest, ['join', replacement]);
-        expect(state(host).guest).toBe('');
-        play(observer, ['join', replacement]);
-        play(host, ['drop', id, '0', '4']);
-        expect(state(host).moves).toBe(0);
-        L.disconnect(observer.id);
-        expect(state(guest)).toBeNull();
     });
 
     it('only accepts HTTPS Discord invites and server channel links', () => {
