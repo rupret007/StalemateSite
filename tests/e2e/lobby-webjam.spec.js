@@ -207,7 +207,7 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         await expect(host.locator('[data-jam]')).toBeVisible();
         await expect(host.locator('[data-chat-context]')).toHaveText(/^#jam-/);
         const room = await host.locator('[data-chat-context]').textContent();
-        const invite = `https://webjam.example/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${Math.floor(Date.now() / 1000) + 120}`;
+        const invite = `https://webjam.example/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${Math.floor(Date.now() / 1000) + 120}`;
         // Intercept the system app launch. The real lobby still binds the
         // browser callback to the selected live guest and publishes it.
         await host.evaluate(() => {
