@@ -193,7 +193,15 @@ export function mountArcadeTurdRummy(container, onMatch) {
             if (result.laidOff) message += ` · ${result.laidOff} laid off`;
             if (seat) { command = 'next-round'; label = 'Next round'; }
         } else if (match) {
-            const turn = match.turn === seat ? (match.phase === 'draw' ? 'Draw a card' : 'Choose your discard') : name(match.turn) + ' to play';
+            let turn = seat ? 'Waiting for your opponent' : name(match.turn) + ' to play';
+            if (match.turn === seat) {
+                if (match.phase === 'draw') {
+                    turn = match.canDrawStock && match.canTakeDiscard ? 'Draw a card from the deck or take the face-up card.'
+                        : match.canDrawStock ? 'Draw a card from the deck.' : 'Take the face-up card.';
+                } else if (match.blocked !== null) {
+                    turn = 'Choose another card to discard. Keep the card you took for this turn.';
+                } else turn = 'Choose your discard.';
+            }
             message = `Round ${match.round} · ${turn}`;
         }
         if (status.textContent !== message) status.textContent = message;
