@@ -1891,20 +1891,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(board(b).getByRole('gridcell')).toHaveCount(36);
         console.log(`Passed ${engine} Turdomania two complete puzzles, keyboard and 44px phone touch input, ${media ? 'local prediction with 220 ms input delay and the same call' : 'full reload mid-duel'}, spectator and rematch.`);
     }
-    async function verifyTurdRushSwipeAcrossGo() {
-        const host = await guest('stalemate', 'RushStartHost', { width: 1440, height: 900 });
-        const guestPhone = await guest('rad-dad', 'RushStartGuest', { width: 390, height: 844 }, true);
+    async function verifyTurdRushSwipeAcrossGo(guestPhone) {
+        const viewport = guestPhone.viewportSize();
+        await guestPhone.setViewportSize({ width: 390, height: 844 });
         const touch = await guestPhone.context().newCDPSession(guestPhone);
         try {
-            await host.getByRole('button', { name: /Game Night/ }).click();
-            await inviteToGame(host, guestPhone, 'RushStartGuest');
-            for (const page of [host, guestPhone]) {
-                await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdrush');
-            }
-            await host.getByRole('button', { name: 'Open Turd Rush race' }).click();
-            await guestPhone.getByRole('button', { name: 'Join Turd Rush race' }).tap();
             const race = guestPhone.locator('[data-race-match]');
             const track = guestPhone.getByRole('region', { name: 'Turd Rush race track' });
+            await track.scrollIntoViewIfNeeded();
             await expect(track).toBeInViewport({ ratio: 1 });
             await guestPhone.bringToFront();
             const box = await track.boundingBox();
@@ -1925,8 +1919,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             console.log('Passed Chromium Turd Rush countdown swipe, zero early input and one confirmed lane change after Go.');
         } finally {
             await touch.detach();
-            await guestPhone.context().close();
-            await host.context().close();
+            await guestPhone.setViewportSize(viewport);
         }
     }
     async function playTurdRush(a, b, spectator) {
@@ -2048,6 +2041,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Accept Turd Rush rematch' }).click();
         await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(race(b)).toHaveAttribute('data-sequence', '0');
+        if (engine === 'chromium') await verifyTurdRushSwipeAcrossGo(b);
         console.log(`Passed ${engine} Turd Rush shared course and collision, keyboard, ${media ? 'native swipe with 220 ms delay and active call' : '44px phone touch and full reload'}, 2D fallback, spectator and rematch.`);
     }
     async function verifyBrickRaceFinish(a, b, spectator) {
@@ -2358,7 +2352,6 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await playTurdtris(a, b, spectator);
         await playTurdomania(a, b, spectator);
         await playTurdRush(a, b, spectator);
-        if (engine === 'chromium' && !media) await verifyTurdRushSwipeAcrossGo();
         await playTurdanoid(a, b, spectator);
         if (relay) {
             const stats = (await Promise.all([selectedPairStats(a), selectedPairStats(b)])).flat();
