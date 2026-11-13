@@ -4,7 +4,7 @@ import * as entrance from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
+import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -1540,7 +1540,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (!saved) {
             try { saved = JSON.parse(readTab(gameReturnKey)); } catch { /* Ignore stale tab data. */ }
         }
-        if (saved?.room && offerRoomName(saved.room) && roomNonce(saved.ref) && saved.until > Date.now()) return saved;
+        const hint = gameNightReturnHint(saved, offerRoomName);
+        if (hint) return hint;
         removeTab(gameReturnKey);
         return null;
     }
@@ -1895,8 +1896,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         const room = currentGameNight();
         drawGameWaiting(room);
         if (table.seatRef && room?.keepRef === table.seatRef) rememberGameReturn(room, game);
-        else if (sendMatch && scope?.ref === gameReturn?.ref && scope?.room === gameReturn?.room && gameReturn?.game === game) {
-            delete gameReturn.game;
+        else if (sendMatch && !state?.seat && room?.keepRef === scope?.ref && scope?.ref === gameReturn?.ref
+            && scope?.room === gameReturn?.room && gameReturn?.game === game) {
+            const { room, ref, until } = gameReturn;
+            gameReturn = { room, ref, until };
             writeTab(gameReturnKey, JSON.stringify(gameReturn));
         }
         table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
