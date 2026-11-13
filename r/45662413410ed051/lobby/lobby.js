@@ -1887,18 +1887,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (current && !amOp(current) && !current.jam?.web && !current.jam?.desktop && !current.jam?.invitation)
             $('[data-jam-actions]').hidden = accepted && !panel.hidden;
         const message = panel.hidden ? '' : ended ? 'This music invitation ended. Ask the host for a fresh one.'
-            : accepted ? 'You’re in the Jam room. Open the audio check when you’re ready.'
+            : accepted ? 'You’re in the Jam room. Open WebJam to listen or check your microphone.'
             : unconfirmed ? 'Hang Out hasn’t confirmed your Music invitation. Wait here or ask the host to send a fresh one.'
             : joining ? 'Waiting for Hang Out to confirm you joined.'
             : musicInvite.sendFailed ? 'Couldn’t send your reply. Check your connection and try again.'
-            : `${musicInvite.from} invited you to play in ${musicInvite.room}.`;
+            : `${musicInvite.from} invited you to join Music in ${musicInvite.room}.`;
         updateOfferStatus($('[data-music-invite-status]'), $('[data-music-invite-message]'), message);
         if (panel.hidden) return;
         dismiss.textContent = ended || unconfirmed ? 'Dismiss' : 'Not now';
         if ((ended || unconfirmed) && document.activeElement === action) dismiss.focus();
         action.hidden = ended || unconfirmed;
         action.setAttribute('aria-disabled', String(joining));
-        action.textContent = accepted ? 'Open audio check' : joining ? 'Joining…' : 'Accept and join';
+        action.textContent = accepted ? 'Open WebJam' : joining ? 'Joining…' : 'Accept and join';
     }
     $('[data-music-invite-action]').addEventListener('click', () => {
         const offer = musicInvite;

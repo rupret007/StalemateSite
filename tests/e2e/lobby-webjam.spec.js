@@ -249,8 +249,8 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         await expect(outcome).toHaveText('Music invitation sent to ChosenGuest. Waiting for a reply.');
         await expect(host.locator('[data-toast]')).toBeHidden();
         await expect(musicButton).toBeEnabled();
-        await expect(panel).toContainText('MusicHost invited you to play');
-        await expect(guestStatus).toHaveText(`MusicHost invited you to play in ${room}.`);
+        await expect(panel).toContainText('MusicHost invited you to join Music');
+        await expect(guestStatus).toHaveText(`MusicHost invited you to join Music in ${room}.`);
         await expect(guest.locator('[data-text]')).toBeFocused();
         await expect(other.locator('[data-music-invite]')).toBeHidden();
         await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
@@ -296,14 +296,14 @@ for (const { delayed, width, height, hostSite, guestSite } of [
             await guest.clock.fastForward(10_000);
             await expect(guestStatus).toContainText('Hang Out hasn’t confirmed your Music invitation');
             await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
-            await expect(panel.getByRole('button', { name: 'Open audio check' })).toBeHidden();
+            await expect(panel.getByRole('button', { name: 'Open WebJam' })).toBeHidden();
             expect(await guest.evaluate(() => window.musicReplies)).toBe(1);
             await guest.evaluate(() => window.releaseMusicAcceptance());
         }
-        await expect(guestStatus).toHaveText('You’re in the Jam room. Open the audio check when you’re ready.');
+        await expect(guestStatus).toHaveText('You’re in the Jam room. Open WebJam to listen or check your microphone.');
         await expect(outcome).toHaveText('ChosenGuest accepted and joined the Jam room.');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
-        const audio = panel.getByRole('button', { name: 'Open audio check' });
+        const audio = panel.getByRole('button', { name: 'Open WebJam' });
         await expect(delayed ? panel.getByRole('button', { name: 'Not now', exact: true }) : audio).toBeFocused();
         await expect(guest.locator('[data-jam-actions]')).toBeHidden();
         if (!delayed) await guest.screenshot({ path: testInfo.outputPath(`accepted-in-jam-${width}x${height}.png`) });
@@ -414,7 +414,7 @@ test('the host can cancel an unconfirmed Music invitation and retry with another
                 channel.close();
             }
         }, { retiredRequest, request, href });
-        await expect(second.locator('[data-music-invite]')).toContainText('MusicHost invited you to play');
+        await expect(second.locator('[data-music-invite]')).toContainText('MusicHost invited you to join Music');
         await expect(first.locator('[data-music-invite]')).toBeHidden();
         await expect(cancel).toBeHidden();
         await expect(status).toHaveText('Waiting for Hang Out to confirm delivery…');
