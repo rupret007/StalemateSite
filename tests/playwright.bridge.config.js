@@ -8,7 +8,7 @@ if (!process.env.BRIDGE_PREVIEW_INVITATION) process.env.BRIDGE_PREVIEW_INVITATIO
 const invitation = process.env.BRIDGE_PREVIEW_INVITATION;
 
 module.exports = defineConfig({
-    testDir: './tests/e2e',
+    testDir: './e2e',
     testMatch: 'bridge-slice1*.spec.js',
     timeout: 240000,
     expect: { timeout: 20000 },
@@ -25,6 +25,7 @@ module.exports = defineConfig({
     },
     webServer: {
         command: 'node tests/e2e/support/bridge-preview-launch.mjs',
+        cwd: require('node:path').join(__dirname, '..'),
         url: 'http://localhost:8792/ready',
         timeout: 240000,
         reuseExistingServer: false,

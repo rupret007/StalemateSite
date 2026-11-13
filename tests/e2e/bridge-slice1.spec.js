@@ -3,7 +3,7 @@ const { test, expect, chromium, webkit, devices } = require('@playwright/test');
 const iphone = devices['iPhone 13'];
 const ROUTE_MISSING = 'The grants module and the real Chess table run in-process above. No Worker route serves them on the preview yet (BRIDGE-HOOKS.md hook 2), and the table has no seat holds (hook 1).';
 
-const CHESS = { room: '#game-abcdefxabcdef', ref: 'r'.repeat(32), match: 'match-chess-0001', host: 'host-session-0001' };
+const CHESS = { room: '#game-abcdefxabcdef', ref: 'a'.repeat(32), match: 'match-chess-0001', host: 'host-session-0001' };
 const SCOPE = { room: CHESS.room, ref: CHESS.ref, game: 'chess', match: CHESS.match };
 
 async function realBench(now = () => 1_700_000_000_000) {

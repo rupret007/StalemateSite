@@ -24,14 +24,16 @@ Repeated after the `be1c46a` comparison below, with the module file restored to 
 
 - "Test Files  3 passed (3)", "Tests  41 passed (41)".
 - Start at 22:21:15, duration 1.13s.
-- That is 27 module tests, 9 bridge-adapter tests and 5 hook 1 proposal tests.
+- That run was 27 module tests, 9 bridge-adapter tests and 5 hook 1 proposal tests. This branch now has 29 module tests (a rejected `ref`, and the 128-key delete limit), the same 9 and 5, plus 1 screenshot-guard test.
 
 The same module test file with the `be1c46a` module copied in, then restored (the working tree matches `HEAD` again, and the 41-test run above is the one after the restore):
 
 - "Test Files  1 failed (1)", "Tests  15 failed | 12 passed (27)".
 - All 6 new tests fail: the surplus-guest case, both hold-lifetime cases, and the three past-the-first-page cases. The other 9 failures are earlier success paths. Against that module the first redeem returns 409 table-full and the hold list stays empty, so the guest is never seated.
 
-`npx playwright test -c playwright.bridge.config.js` (local preview only, `reuseExistingServer: false`)
+Prerequisite: `npm ci` in `tests/runtime/durable-records` (its `node_modules` is gitignored) before Playwright. Do not install from the repo root.
+
+`npx playwright test -c tests/playwright.bridge.config.js` (local preview only, `reuseExistingServer: false`)
 
 - "4 skipped", "7 passed (35.2s)".
 - The 7 passed are the 4 in-process grant cases plus the 3 local-preview profile tests. The 4 skipped are the live-route cases, still `test.fixme`.
@@ -59,7 +61,7 @@ So all 4 cases now run against the real code instead of the stand-in. The 4 live
 | 2 | 1254 |
 | 3 | 1647 |
 
-The preview was built at the start of the same Playwright process, before the host-page test, so none of these three joins is a cold server start. Run 3 was the slowest. RESULT.md records 860 / 476 / 458 from the earlier harness run. This flow is the existing stranger-invite Join, not a grant redeem, because no grant route exists yet. The host-page test asserts that no grant path was requested. Screenshots are written outside the repo, to `../shots/`, and the saver refuses a frame whose visible text contains a code. This run refreshed `bridge-slice1-phone-seated.png`, `bridge-slice1-host-seated.png` and `bridge-slice1-overflow.png`. The phone frame shows Black, "White to move", and a full board.
+The preview was built at the start of the same Playwright process, before the host-page test, so none of these three joins is a cold server start. Run 3 was the slowest. `hangout-internal/RESULT.md` records 860 / 476 / 458 from the earlier harness run. This flow is the existing stranger-invite Join, not a grant redeem, because no grant route exists yet. The host-page test asserts that no grant path was requested. Screenshots are written outside the repo, to `../shots/`, and the saver refuses a frame whose visible text contains a code. This run refreshed `bridge-slice1-phone-seated.png`, `bridge-slice1-host-seated.png` and `bridge-slice1-overflow.png`. The phone frame shows an empty board. The host frame shows two rows of pieces. The 32-piece DOM assertion passes. No codes, links or tokens are visible in the three frames.
 
 ## Fixes
 
@@ -76,7 +78,7 @@ The preview was built at the start of the same Playwright process, before the ho
 - **Tombstone lifetime.** A burned row keeps the grant's own `until` (2 minutes from register). Sweep deletes it after that, and a host who re-sends the same hash can register it again. Making tombstones last longer would mean changing the room cap to ignore burned rows. That was not done here.
 - **Rematch.** Standby is "table full" only while the same host's table is present for that match id. A two-seat rematch swaps seats and changes the match id, so a standby value for the old match gets 410, not "table full", after a rematch.
 - **Timing measures the stranger-invite Join**, not a grant redeem. A grant-redeem timing needs hook 2 and the guest page.
-- The open questions in RESULT.md (409 vs 410 for table full, invite version, value format agreed with the WebJam side, `ref`) are unchanged.
+- The open questions in `hangout-internal/RESULT.md` (409 vs 410 for table full, invite version, value format agreed with the WebJam side) are unchanged. `ref` is no longer optional: register refuses anything that is not 32 lowercase hex.
 - The full `npx vitest run` suite was not run this round. Nothing outside the bridge tests imports the module.
 
 ## Limits respected

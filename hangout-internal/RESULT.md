@@ -1,6 +1,6 @@
 # RESULT: Bridge slice 1
 
-This file keeps both slice-1 results as written by their runs. The integration result is in `RESULT-INT.md`.
+This file keeps both slice-1 results as written by their runs. The integration result is in `hangout-internal/RESULT-INT.md`. Counts and paths that drifted after that run are corrected below.
 
 ## Worker room grants (branch `grok/bridge-slice1-worker-20261112`)
 
@@ -15,8 +15,8 @@ This file keeps both slice-1 results as written by their runs. The integration r
 | File | What it is |
 |---|---|
 | `hangout-worker/src/game-night-room-grants.mjs` | Pure, storage-injected module: `registerGrants`, `redeemGrant`, `sweep` / `expire`, `revokeAll`, `holds`, plus reconnect helpers. No route wiring. |
-| `hangout-worker/tests/game-night-room-grants.test.js` | 20 vitest cases. They run against the real `createGameNightTable` class through a small adapter. |
-| `BRIDGE-HOOKS.md` | Two-hook spec for the Codex multiplayer thread, with signatures, proposed patches as text (not applied) and the threat table. |
+| `hangout-worker/tests/game-night-room-grants.test.js` | 29 vitest cases on this branch (20 in the original worker commit). They run against the real `createGameNightTable` class through a small adapter. |
+| `hangout-internal/BRIDGE-HOOKS.md` | Two-hook spec for the Codex multiplayer thread, with signatures, proposed patches as text (not applied) and the threat table. |
 
 Commits: `ed1c6d0` (module and tests), `f05a459` (hook spec), plus the commit that adds this file.
 
@@ -83,7 +83,7 @@ Files that failed in the baseline run:
 2. **Result status for table full.** I used 409. If the guest page would rather reuse the 410 path with different copy, it is a one-line change.
 3. **Invite version.** Grants are not tied to `HANGOUT_BETA_INVITE_VERSION` the way stranger invitations are. With a 2-minute TTL I judged it low risk. Say if you want parity.
 4. **Value format.** The module accepts 32 to 128 URL-safe characters and hashes them as UTF-8 with SHA-256, hex output. The WebJam side (task 2) must produce the same hash. This is not yet agreed with that branch.
-5. **`ref`.** The existing guest cookie mint (`gameGuestScope`) needs the room's `ref`. `registerGrants` takes it as an optional extra argument beyond the contract's signature and passes it through.
+5. **`ref`.** The existing guest cookie mint (`gameGuestScope`) needs the room's `ref`. `registerGrants` requires a 32-lowercase-hex `ref` and refuses null or any other text before storing. Hook 2 calls `gameGuestScope` before that store.
 6. **Route tests and the host confirm tap** are not covered here, because this slice has no routes or pages. They are listed in the threat table as tests to write with hook 2.
 
 ### Limits respected
@@ -103,14 +103,14 @@ Branch: `grok/bridge-slice1-e2e-20261112`. Local preview only. No deploy.
 
 - 9 passed, 0 failed. File: `tests/unit/bridge-grants.test.js`.
 
-`npx playwright test -c playwright.bridge.config.js`
+`npx playwright test -c tests/playwright.bridge.config.js`
 
 - 7 passed, 0 failed.
 - 4 worker-hook tests are `test.fixme`. Playwright's list reporter counts those as skipped (`4 skipped`). They did not run and were not passed against the stand-in.
 - Phone engine: WebKit (Playwright WebKit 27.2). Chromium iPhone emulation was not needed.
 - Profiles: phone WebKit 390×844, host Chromium 1440×900, third Chromium context 1440×900.
 
-The local preview is `npm run dev:game-night`, started by `tests/e2e/support/bridge-preview-launch.mjs`. Miniflare was missing, so `npm ci --ignore-scripts` was run in `tests/runtime/durable-records` (its `node_modules` is gitignored). That package asks for Node >= 24; this machine is Node v22.22.1 and npm printed an engine warning. The preview still started and the tests passed. Workerd logged `CertificateUnknown` during TLS handshakes; pages still loaded with `ignoreHTTPSErrors`, and those lines are not failures.
+The local preview is `npm run dev:game-night`, started by `tests/e2e/support/bridge-preview-launch.mjs`. Prerequisite: `npm ci` in `tests/runtime/durable-records` (its `node_modules` is gitignored) before the Playwright command above. Miniflare was missing on the first harness run, so `npm ci --ignore-scripts` was run there. That package asks for Node >= 24; that machine was Node v22.22.1 and npm printed an engine warning. The preview still started and the tests passed. Workerd logged `CertificateUnknown` during TLS handshakes; pages still loaded with `ignoreHTTPSErrors`, and those lines are not failures.
 
 ### Join tap to seated Chess board
 
@@ -135,7 +135,7 @@ Passing against the in-test stand-in (`USING_STAND_IN = true`):
 3. A hold older than 60 seconds is released by `sweep`. The table stays, status stays `waiting`, and the host remains in seat `w`.
 4. A second grant on the one free Chess seat returns "Table full, you're up next game" with `enabled: true` and `disabled: false`.
 
-The same four cases against the live Worker are `test.fixme` because `hangout-worker/src/game-night-room-grants.mjs` is not in this worktree and no grant route is registered. On the live preview, the third person (ExtraGuest) joins the room and is not seated as White or Black. The current lobby does not render the table-full sentence; the screenshot shows the room without a Chess board and without a disabled Chess button.
+The same four cases against the live Worker are `test.fixme` because no grant route is registered. The module is in this worktree at `hangout-worker/src/game-night-room-grants.mjs` (the e2e branch, before the merge, did not have it). On the live preview, the third person (ExtraGuest) joins the room and is not seated as White or Black. The current lobby does not render the table-full sentence; the screenshot shows the room without a Chess board and without a disabled Chess button.
 
 ### Point this at the real grants module
 

@@ -15,7 +15,7 @@
 // A grant's hold is placed on the table at register. `seat` moves it from the
 // grant hash to the new guest session. The grant is burned only once `seat` has
 // answered; if `seat` throws, the grant and its hold are left as they were.
-// See BRIDGE-HOOKS.md for the table hook this port maps onto.
+// See hangout-internal/BRIDGE-HOOKS.md for the table hook this port maps onto.
 
 export const ROOM_GRANT_PREFIX = 'game-night-room-grant:';
 export const GRANT_TTL = 2 * 60_000;
@@ -36,6 +36,10 @@ const LIMIT_COPY = 'Game invitation allowance reached. Try again in a few minute
 const hashPattern = /^[a-f0-9]{64}$/;
 const valuePattern = /^[A-Za-z0-9_-]{32,128}$/;
 const matchPattern = /^[a-zA-Z0-9-]{5,80}$/;
+// Same shape gameGuestScope requires of a room ref. Checked before any row is stored.
+const refPattern = /^[a-f0-9]{32}$/;
+// Durable Object storage.delete accepts at most 128 keys per call.
+const DELETE_CHUNK = 128;
 const text = value => typeof value === 'string' && !!value && value.length <= 200;
 
 export async function grantHash(value) {
@@ -96,7 +100,10 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
     };
     const drop = async (entries) => {
         for (const [, record] of entries) await release(record);
-        if (entries.length) await storage.delete(entries.map(([name]) => name));
+        const names = entries.map(([name]) => name);
+        for (let index = 0; index < names.length; index += DELETE_CHUNK) {
+            await storage.delete(names.slice(index, index + DELETE_CHUNK));
+        }
         return entries.length;
     };
     const burn = (name, record) => storage.put(name, { kind: 'burned', hash: record.hash, scope: record.scope, until: record.until });
@@ -114,7 +121,7 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
             if (!text(room) || !text(game) || !matchPattern.test(match || '') || !text(hostSubject) || !Number.isFinite(now)
                 || !Array.isArray(hashes) || !hashes.length || hashes.length > HASHES_PER_REQUEST
                 || !hashes.every(hash => hashPattern.test(hash || '')) || new Set(hashes).size !== hashes.length
-                || ref !== null && !text(ref)) return refused();
+                || typeof ref !== 'string' || !refPattern.test(ref)) return refused();
             const scope = { room, game, match, ref, host: hostSubject };
             // The host is seated by their own session before any grant exists.
             const state = await tableState(scope);

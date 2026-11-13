@@ -83,7 +83,7 @@ describe('hook 1 proposal: seat holds on the table', () => {
     });
 
     it('matches the patch text in BRIDGE-HOOKS.md line for line', () => {
-        const doc = readFileSync(new URL('../../BRIDGE-HOOKS.md', import.meta.url), 'utf8');
+        const doc = readFileSync(new URL('../../hangout-internal/BRIDGE-HOOKS.md', import.meta.url), 'utf8');
         const hook1 = doc.slice(doc.indexOf('## Hook 1'), doc.indexOf('## Hook 2'));
         const patch = hook1.slice(hook1.indexOf('```diff'), hook1.indexOf('```', hook1.indexOf('```diff') + 7));
         const added = patch.split('\n').filter(line => line.startsWith('+') && !line.startsWith('+++')).map(line => line.slice(1).trim()).filter(Boolean);

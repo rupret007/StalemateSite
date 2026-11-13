@@ -8,7 +8,7 @@ import { createGameNightTable } from '../src/game-night-table.mjs';
 import { gameInvitationRequest } from '../src/game-night-invitations.mjs';
 
 const ROOM = '#game-abcdefxabcdef', OTHER_ROOM = '#game-123456x123456';
-const MATCH = 'match-0001', HOST = 'host-session-0001', REF = 'r'.repeat(32);
+const MATCH = 'match-0001', HOST = 'host-session-0001', REF = 'a'.repeat(32);
 const NOW = Date.parse('2026-11-12T21:00:00Z');
 // Test-only stand-ins for the one-time values the desktop app would make.
 const value = index => `test-value-${index}-`.padEnd(43, 'x');
@@ -68,7 +68,12 @@ function memoryStorage() {
         data,
         async get(key) { await pause(); return structuredClone(data.get(key)); },
         async put(key, record) { await pause(); data.set(key, structuredClone(record)); },
-        async delete(keys) { await pause(); for (const key of [].concat(keys)) data.delete(key); },
+        async delete(keys) {
+            await pause();
+            const list = [].concat(keys);
+            if (list.length > 128) throw new Error('storage.delete accepts at most 128 keys');
+            for (const key of list) data.delete(key);
+        },
         // Durable Object semantics: key order, `limit` and `startAfter` are honoured.
         async list({ prefix, limit = Infinity, startAfter }) {
             await pause();
@@ -124,6 +129,14 @@ describe('registerGrants', () => {
         // Holds are not occupancy: the table is unchanged and still waiting.
         expect(table.game.subjects).toEqual([HOST]);
         expect(table.game.view(HOST, NOW).waiting).toBe(true);
+    });
+
+    it('rejects a missing or non-32-hex ref before storing', async () => {
+        for (const ref of [null, undefined, '', 'not-a-ref', 'r'.repeat(32), 'R'.repeat(32), 'a'.repeat(31), 'a'.repeat(33)]) {
+            expect((await register([1], { ref })).status, String(ref)).toBe(403);
+        }
+        expect(storage.data.size).toBe(0);
+        expect(table.holdsByHolder.size).toBe(0);
     });
 
     it('rejects malformed, duplicate and oversized hash lists', async () => {
@@ -384,12 +397,31 @@ describe('more rows than one list page', () => {
     });
 
     it('sweeps and revokes rows past the first page', async () => {
+        const sizes = [];
+        const realDelete = storage.delete.bind(storage);
+        storage.delete = async (keys) => {
+            const list = [].concat(keys);
+            sizes.push(list.length);
+            return realDelete(keys);
+        };
         filler(450, OTHER_ROOM, { until: NOW });
         expect(await grants.sweep(NOW)).toEqual({ expired: 450, released: 0 });
+        expect(sizes.length).toBeGreaterThan(1);
+        expect(Math.max(...sizes)).toBeLessThanOrEqual(128);
+        expect(sizes.reduce((sum, count) => sum + count, 0)).toBe(450);
+        sizes.length = 0;
         filler(450, OTHER_ROOM);
         await register([1]);
         expect(await grants.revokeAll(OTHER_ROOM)).toEqual({ revoked: 450 });
+        expect(Math.max(...sizes)).toBeLessThanOrEqual(128);
+        expect(sizes.reduce((sum, count) => sum + count, 0)).toBe(450);
         expect(kinds()).toEqual(['grant']);
+    });
+
+    it('refuses a storage.delete of more than 128 keys', async () => {
+        const keys = Array.from({ length: 129 }, (_, index) => `game-night-room-grant:${index}`);
+        await expect(storage.delete(keys)).rejects.toThrow(/128/);
+        expect(storage.data.size).toBe(0);
     });
 });
 

@@ -8,7 +8,7 @@ import {
 import * as worker from '../../hangout-worker/src/game-night-room-grants.mjs';
 
 const ROOM = '#game-abcdefxabcdef';
-const table = { room: ROOM, ref: 'r'.repeat(32), match: 'match-chess-0001', host: 'host-session-0001' };
+const table = { room: ROOM, ref: 'a'.repeat(32), match: 'match-chess-0001', host: 'host-session-0001' };
 const scope = { room: table.room, ref: table.ref, game: 'chess', match: table.match };
 const fresh = () => randomBytes(16).toString('hex');
 
