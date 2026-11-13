@@ -138,6 +138,7 @@ const entrySites = createEntrySiteRegistry(__ENTRY_SITES__);
 const $ = s => document.querySelector(s);
 const webJoinEntry = document.body.hasAttribute('data-web-join-entry');
 const inside = $('#inside'), logout = $('#logout'), retryLeave = $('#retry-leave');
+const code = $('#code');
 if (!webJoinEntry) {
     const params = new URLSearchParams(location.search);
     const source = entrySourceFromParams(params, entrySites);
@@ -192,10 +193,18 @@ function begin(kind) {
 }
 function finish(attempt, phase, message, identity) {
     if (attempt !== currentAttempt) return;
-    const retryCode = webJoinEntry && operation === 'unlock' && phase === 'invitation';
+    const retryCode = operation === 'unlock' && phase === 'invitation';
     operation = '';
     render(phase, message, identity);
-    if (retryCode) $('#code').focus();
+    if (retryCode) {
+        code.setAttribute('aria-invalid', 'true');
+        code.setAttribute('aria-describedby', 'status');
+        code.focus();
+    }
+}
+function clearCodeError() {
+    code.removeAttribute('aria-invalid');
+    code.removeAttribute('aria-describedby');
 }
 async function accessRequest(path, options = {}) {
     const controller = new AbortController();
@@ -243,12 +252,13 @@ async function unlock(key) {
     if (leavingUnconfirmed) return;
     const attempt = begin('unlock');
     if (!attempt) return;
+    clearCodeError();
     try {
         const result = await post('/beta/unlock', { key });
         if (attempt !== currentAttempt) return;
         if (!result.ok) return finish(attempt, result.status === 401 || result.status === 403 ? 'invitation' : 'unavailable',
             result.status === 401 || result.status === 403 ? 'The invitation was not accepted. Check the code or the house rules before trying again.' : unavailable);
-        $('#code').value = '';
+        code.value = '';
         operation = '';
         await draw();
     } catch { finish(attempt, 'unavailable', unavailable); }
@@ -269,7 +279,12 @@ async function leave() {
         await draw();
     } catch { finish(attempt, 'leave-unconfirmed', 'Leaving was not confirmed. Connections may still be closing. Choose Retry leaving.'); }
 }
-$('#unlock').addEventListener('submit', event => { event.preventDefault(); unlock($('#code').value); });
+code.addEventListener('input', () => {
+    if (!code.hasAttribute('aria-invalid')) return;
+    clearCodeError();
+    $('#status').textContent = '';
+});
+$('#unlock').addEventListener('submit', event => { event.preventDefault(); unlock(code.value); });
 logout?.addEventListener('submit', event => { event.preventDefault(); leave(); });
 $('#retry').addEventListener('click', draw);
 retryLeave?.addEventListener('click', leave);

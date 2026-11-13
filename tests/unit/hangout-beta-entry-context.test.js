@@ -382,6 +382,36 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
     }
     const state = () => Response.json({ kind: 'guest', role: 'fan', emailConfigured: true, staffConfigured: true });
 
+    it('returns focus to a rejected private invitation code and lets the guest correct it', async () => {
+        let admitted = false;
+        const { dom } = await portal((path, options) => {
+            if (path === '/beta/state') return admitted ? state() : new Response(null, { status: 401 });
+            admitted = JSON.parse(options.body).key === 'correct fixture code';
+            return admitted ? Response.json({ ok: true }) : new Response(null, { status: 401 });
+        });
+        try {
+            const doc = dom.window.document;
+            const code = doc.querySelector('#code');
+            const submit = doc.querySelector('#unlock button');
+            await vi.waitFor(() => expect(doc.querySelector('#login').hidden).toBe(false));
+            code.value = 'rejected fixture code';
+            submit.focus();
+            submit.click();
+            await vi.waitFor(() => expect(doc.querySelector('#status').textContent).toMatch(/not accepted/));
+            expect(code.value).toBe('rejected fixture code');
+            expect(doc.activeElement).toBe(code);
+            expect(code.getAttribute('aria-invalid')).toBe('true');
+            expect(code.getAttribute('aria-describedby')).toBe('status');
+            code.value = 'correct fixture code';
+            code.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+            expect(code.hasAttribute('aria-invalid')).toBe(false);
+            expect(code.hasAttribute('aria-describedby')).toBe(false);
+            submit.click();
+            await vi.waitFor(() => expect(doc.querySelector('#inside').hidden).toBe(false));
+            expect(code.value).toBe('');
+        } finally { dom.window.close(); }
+    });
+
     for (const operation of ['state', 'unlock', 'logout']) for (const stalledAt of ['headers', 'body']) {
         it(`recovers explicitly from stalled ${operation} ${stalledAt} and ignores its late result`, async () => {
             let release, bodyRead = false, recovering = false, nextTimer = 0;
