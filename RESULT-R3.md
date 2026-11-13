@@ -4,7 +4,8 @@
 
 - Branch: `grok/bridge-slice1-int-20261112`
 - Verified code head: `57d2aece9d07f5db7e8e80370d80ce0d541c0ffb`
-- This file is the commit on top of that head. `git rev-parse HEAD` after this commit is the branch head.
+- Result commit, which added this file: `7350266983b6a6ab146fe0a4229058325509f143`
+- The commit after that one only records the result SHA above. That commit is the branch head.
 
 ## What changed
 
