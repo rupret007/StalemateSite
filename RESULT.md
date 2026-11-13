@@ -68,3 +68,83 @@ Outside the repo, in `../hangout-homescreen-shots/`:
 - The worker is a module script (Safari 16.4 and later). Older iPhones can still use the Share hint without it.
 - Relative URLs are meant to work under `/StalemateSite/` as well as the site root. That prefix was not opened in a browser.
 - Not checked on a physical iPhone or Android device.
+
+## Phase 2
+
+Four additions on the same home screen. New files, plus head tags on the existing Hang Out room page. The never-edit list is unchanged. Nothing was pushed or deployed.
+
+### Invites open in the app
+
+The manifest still starts at `hangout/` and its scope is still the site root, so `/join/`, the Game Night guest page, and a room link sit inside the app. `handle_links` is `preferred`. `launch_handler.client_mode` is `navigate-existing`, then `auto`, so Android can open that invite in the window that is already running. Chrome’s installability check still reports no errors with those members and the shortcuts below.
+
+iPhone cannot do this. A Safari home-screen icon does not take https links. The in-browser card says so: invite links open in Safari, and the icon cannot take the link. On other browsers, when installation is unknown, the card says this page cannot tell and to switch to the Hang Out icon if the invite stayed in the browser. Standalone hides the card. `getInstalledRelatedApps` missing or empty counts as unknown. There is no `related_applications` list, because a fixed store URL would be wrong on the other hosts this site uses.
+
+The Hang Out room page carries the card in its own head: an invite-only marker, a place marker of `hangout`, the stylesheet, and an empty module tag for `hangout/open-in-app.mjs`. The script records the place name. It does not copy the hash or the query into the page.
+
+`/join/` is pinned, so the worker inserts the same card into a successful HTML navigation after Hang Out has been opened once and the worker is controlling the page. A cold visit to `/join/` before that has no card. Navigations whose path or query contains invite or grant are left alone. `/beta/`, including the Game Night guest page, is left alone, so that page has no card unless the beta shell is edited later. Android can still open those URLs in the installed app because they are in scope.
+
+The inserted script URL has to be the worker’s own origin, and only `https://stalemate.band`, `https://jeffstory.github.io`, `https://rupret007.github.io`, or loopback `http`. A page URL from the navigation can allow that same origin when the worker is the one asking.
+
+### Who’s here
+
+The entry reads `GET /beta/state` and nothing else. No new Worker route. That response is an identity object or a 401 today, not a directory, so the page says “No open rooms right now.”
+
+If a body later includes `rooms` or `tables`, the page shows at most eight open places. Open means a count from 1 up to, and not including, the max, with `key` false and `locked` false. A Game Night table may be locked and still show, because those tables are invite-only. Titles are text. Nicks, emails, secrets, and room ids are dropped. Links use the entry’s existing lobby, Game Night, and WebJam addresses. A browser test stubs that GET to prove the list. Production still shows the empty line.
+
+### Offline
+
+The offline page is the trinity mark, drawn in the page so it shows with no image request, and the heading “You’re offline, we’ll reconnect.” Try again reloads. A failed navigation gets that page, with a base URL so the retry module resolves. The probe is the path only. Any answer, including a 404, reloads. A failed probe waits 1.5 seconds and backs off to 15. The browser’s online event tries immediately. Opening `/hangout/offline.html` itself does not reload, so that visit does not loop.
+
+The worker precaches `hangout/offline.html` and `hangout/offline-retry.mjs` in `hangout-offline-v2`. It still leaves API, Worker, invite, and grant requests alone, and it still does not store ordinary successes. The phase 1 browser check now expects those two cache entries and nothing else.
+
+### Shortcuts
+
+The manifest lists Game Night, WebJam, and Last room. Their URLs are `hangout/?go=game-night`, `hangout/?go=webjam`, and `hangout/?go=last`. No hash and no token. Last room is `localStorage` key `hangout-last-room`, and the value is only `hangout`, `game-night`, or `webjam`. Choosing a link stores that name. The room page stores `hangout`. The join card stores `webjam`. The shortcut follows the matching link already on the entry page. With nothing stored, Last room stays on the entry.
+
+### Tests
+
+```
+npx vitest run tests/unit/hangout-phase2.test.js tests/unit/hangout-install-card.test.js tests/unit/hangout-hidden.test.js tests/unit/hangout-room-csp.test.js tests/unit/webjam-join-assets.test.js tests/unit/package-pages.test.js
+```
+
+```
+Test Files  6 passed (6)
+Tests  50 passed (50)
+```
+
+```
+npx playwright test tests/e2e/hangout-homescreen.spec.js tests/e2e/hangout-homescreen-phase2.spec.js --project=chromium
+```
+
+```
+14 passed
+```
+
+Checked at 390×844 with an iPhone Safari UA, 390×844 with an Android Chrome UA, and 1440×900. The entry shows the empty Who’s here line. The offline page shows the mark and the reconnect line. The room page shows Open in Hang Out, with the Safari limit on the iPhone UA. A stubbed directory shows Drawing room and Royal Flush Chess and hides the nick, the email, and the closed rooms. After the worker controls the page, `/join/` shows the same card. The shortcuts request WebJam and Game Night, and Last room repeats the stored place. Coming back online from a failed navigation loads the 404 page. Screenshot text was checked for a marker string before each shot. No invite or grant value was written into a shot.
+
+The full unit suite and the rest of the Playwright suite were not re-run.
+
+### Screenshots
+
+Outside the repo, in `../hangout-homescreen-shots/p2/`:
+
+- `iphone-390x844.png` — empty Who’s here, share hint, three choices
+- `iphone-390x844-offline.png` — trinity mark and the reconnect line
+- `iphone-390x844-invite.png` — room page, Safari limit
+- `android-chrome.png` — empty Who’s here and Install
+- `android-chrome-offline.png`
+- `android-chrome-invite.png` — room page, installed state unknown
+- `desktop-1440x900.png` — empty Who’s here, card hidden
+- `desktop-1440x900-offline.png`
+- `desktop-1440x900-invite.png`
+- `iphone-whos-here.png` — two open places from a stubbed read
+- `android-join-invite.png` — WebJam join with the card
+
+### Limits still open
+
+- Not checked on a physical iPhone or Android device. Android link capture is declared in the manifest; a device still has to be the one that honors `handle_links`.
+- The Game Night guest page and the rest of `/beta/` have no in-browser card.
+- `/join/` has the card only after a Hang Out visit has installed the worker.
+- Who’s here stays empty until `GET /beta/state` includes a room or table list. No directory route was added.
+- The lobby removes `?game-night=1` from the address after it loads. The shortcut still requests that URL. The test watches the request.
+- Last room with an empty store stays on the entry page.

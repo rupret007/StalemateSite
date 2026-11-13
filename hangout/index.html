@@ -38,6 +38,11 @@
             <p class="lede">Draw together, play a table, or join a jam.</p>
         </header>
         <div class="checker" aria-hidden="true"></div>
+        <section id="whos-here" class="here" data-whos-here data-reads="/beta/state" data-link-lobby="../r/45662413410ed051/lobby/" data-link-game="../r/45662413410ed051/lobby/?game-night=1" data-link-jam="../join/" aria-labelledby="whos-here-title">
+            <h2 id="whos-here-title">Who’s here</h2>
+            <p class="here__status" data-here-status role="status">No open rooms right now.</p>
+            <ul class="here__list" data-here-list hidden></ul>
+        </section>
         <aside id="add-home" class="install" data-install-card hidden></aside>
         <noscript>
             <aside class="install" role="region" aria-label="Add Hang Out to your home screen">
@@ -49,15 +54,15 @@
         <main id="choices">
             <h2 class="sr-only">Choose where to go</h2>
             <div class="choices">
-                <a class="choice" href="../r/45662413410ed051/">
+                <a class="choice" data-place="hangout" href="../r/45662413410ed051/">
                     <span class="choice__name">Hang Out</span>
                     <span class="choice__detail">Draw, watch, and talk.</span>
                 </a>
-                <a class="choice" href="../r/45662413410ed051/lobby/?game-night=1">
+                <a class="choice" data-place="game-night" href="../r/45662413410ed051/lobby/?game-night=1">
                     <span class="choice__name">Game Night</span>
                     <span class="choice__detail">Play a game with friends.</span>
                 </a>
-                <a class="choice" href="../join/">
+                <a class="choice" data-place="webjam" href="../join/">
                     <span class="choice__name">WebJam</span>
                     <span class="choice__detail">Join a music session.</span>
                 </a>

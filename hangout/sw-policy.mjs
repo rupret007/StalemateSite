@@ -1,11 +1,41 @@
 // What the home-screen worker is allowed to touch.
 // API, Worker, invite, and grant responses are never intercepted or stored.
 
-export const CACHE_NAME = 'hangout-offline-v1';
+export const CACHE_NAME = 'hangout-offline-v2';
 export const OFFLINE_PATH = 'hangout/offline.html';
+export const OFFLINE_ASSET_PATHS = Object.freeze([
+    'hangout/offline.html',
+    'hangout/offline-retry.mjs'
+]);
 
 export function offlineUrl(scope) {
     return new URL(OFFLINE_PATH, scope).href;
+}
+
+export function offlineAssetUrls(scope) {
+    return OFFLINE_ASSET_PATHS.map((path) => new URL(path, scope).href);
+}
+
+export function isOfflineAsset(url, scope) {
+    let href;
+    try {
+        href = (url instanceof URL ? url : new URL(String(url))).href;
+    } catch {
+        return false;
+    }
+    return offlineAssetUrls(scope).includes(href);
+}
+
+export function offlineDocument(html, scope) {
+    if (typeof html !== 'string') return '';
+    let base;
+    try {
+        base = new URL('hangout/', scope).href;
+    } catch {
+        return html;
+    }
+    if (!/^https?:\/\//.test(base) || /["'<>\s]/.test(base) || html.includes('<base ')) return html;
+    return html.replace('<head>', `<head><base href="${base}">`);
 }
 
 export function isSensitiveRequest(url, request = {}) {

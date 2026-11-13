@@ -5,6 +5,10 @@
   "description": "Hang Out, Game Night, and WebJam.",
   "start_url": "hangout/",
   "scope": "./",
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
   "display": "standalone",
   "background_color": "#171410",
   "theme_color": "#171410",
@@ -39,6 +43,47 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Game Night",
+      "short_name": "Game Night",
+      "description": "Play a game with friends.",
+      "url": "hangout/?go=game-night",
+      "icons": [
+        {
+          "src": "assets/hangout-app/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "WebJam",
+      "short_name": "WebJam",
+      "description": "Join a music session.",
+      "url": "hangout/?go=webjam",
+      "icons": [
+        {
+          "src": "assets/hangout-app/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Last room",
+      "short_name": "Last room",
+      "description": "Open the last Hang Out place on this device.",
+      "url": "hangout/?go=last",
+      "icons": [
+        {
+          "src": "assets/hangout-app/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }

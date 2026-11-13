@@ -222,7 +222,7 @@ test('choices open the existing pages and the worker does not cache sensitive re
         }
         return urls;
     });
-    expect(cached).toEqual(['/hangout/offline.html']);
+    expect(cached.sort()).toEqual(['/hangout/offline-retry.mjs', '/hangout/offline.html'].sort());
 
     const client = await context.newCDPSession(page);
     const installability = await client.send('Page.getInstallabilityErrors');

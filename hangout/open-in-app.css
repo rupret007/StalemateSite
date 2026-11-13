@@ -1,0 +1,32 @@
+.hoa {
+    box-sizing: border-box;
+    margin: 12px;
+    padding: 14px 16px 16px;
+    background: #27201b;
+    color: #f4f0e6;
+    border: 1px solid rgba(244, 240, 230, 0.36);
+    box-shadow: 4px 4px 0 #000;
+    font-family: "Source Sans 3", "Segoe UI", sans-serif;
+    font-size: 1.05rem;
+    line-height: 1.45;
+}
+
+.hoa h2 {
+    margin: 0;
+    color: #f4f0e6;
+    font-family: "Arial Narrow", "Barlow Condensed", Impact, sans-serif;
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.hoa p {
+    margin: 8px 0 0;
+    color: #f4f0e6;
+}
+
+.hoa :focus-visible {
+    outline: 3px solid #b5dc08;
+    outline-offset: 3px;
+}
