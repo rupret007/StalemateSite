@@ -1949,9 +1949,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         const race = page => page.locator('[data-race-match]');
         const track = page => page.getByRole('region', { name: 'Turd Rush race track' });
-        await a.getByRole('button', { name: 'Open Turd Rush race' }).click();
-        await b.getByRole('button', { name: 'Join Turd Rush race' }).click();
-        await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
+        let releaseRenderer;
+        const pendingRenderer = new Promise(resolve => { releaseRenderer = resolve; });
+        await b.route(url => url.pathname.endsWith('/turdrush-renderer.js'), async route => {
+            await pendingRenderer;
+            await route.abort();
+        });
+        try {
+            await a.getByRole('button', { name: 'Open Turd Rush race' }).click();
+            await b.getByRole('button', { name: 'Join Turd Rush race' }).click();
+            await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
+            await expect(race(b)).toHaveAttribute('data-renderer', '2d');
+        } finally { releaseRenderer(); }
         await expect(b.locator('[data-race-overlay]')).toHaveText(/^Starts in [1-9]$/);
         await expect(b.locator('[data-race-status]')).toContainText('Get ready.');
         await expect(b.getByRole('button', { name: 'Move left' })).toBeDisabled();
