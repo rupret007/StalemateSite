@@ -22,6 +22,7 @@ import {
 import {
     HOME_LABEL,
     HOST_ASK,
+    INVITE_LEDE,
     IPHONE_LIMIT,
     JUMP_LABEL,
     OPEN_IN_APP_TITLE,
@@ -35,6 +36,7 @@ import {
     mountOpenInApp,
     openInAppDecision,
     openInAppLines,
+    orangeMarkHref,
     safeHomeHref
 } from '../../hangout/open-in-app.mjs';
 import { isOfflineAsset, offlineAssetUrls, offlineDocument } from '../../hangout/sw-policy.mjs';
@@ -109,11 +111,15 @@ describe('invite links open in the installed app', () => {
         expect(openInAppLines({ ios: false, action: 'jump' })).toEqual([]);
         expect(openInAppLines({ ios: true, action: 'home', place: 'webjam', led: true, alreadyHome: true })).toEqual([]);
         expect(openInAppLines({ ios: true, action: 'home', place: 'webjam', led: true })).toEqual([IPHONE_LIMIT]);
-        const jump = fillOpenInApp(document, { ios: true, installed: 'unknown', action: 'jump', place: 'hangout' });
+        const mark = 'https://hangout.example/assets/hangout-app/webjam-mark.svg';
+        const jump = fillOpenInApp(document, { ios: true, installed: 'unknown', action: 'jump', place: 'hangout', markHref: mark });
         expect(jump.getAttribute('aria-label')).toBe(OPEN_IN_APP_TITLE);
-        expect(jump.querySelector('button').textContent).toBe(JUMP_LABEL);
+        expect(jump.querySelector('button')).toBeNull();
+        expect(jump.querySelector('img').getAttribute('src')).toBe(mark);
         expect(jump.querySelectorAll('p')).toHaveLength(1);
         expect(jump.querySelector('p').textContent).toBe(IPHONE_LIMIT);
+        expect(orangeMarkHref('https://hangout.example/hangout/open-in-app.mjs')).toBe(mark);
+        expect(orangeMarkHref('file:///app/hangout/open-in-app.mjs')).toBe('');
         const home = fillOpenInApp(document, {
             ios: false, action: 'home', place: 'webjam', homeHref: '/hangout/'
         });
@@ -425,7 +431,7 @@ describe('icon shortcuts and last room', () => {
         expect(inviteSignal('', webjam)).toBe(true);
         const validDoc = page(
             '<meta name="hangout-open-in-app" content="invite"><meta name="hangout-place" content="hangout">',
-            '<section data-gate><input data-name><button data-enter type="button">Jump in</button></section>'
+            '<header class="hang-head"><p class="tag">Yell at each other</p></header><section data-gate><label>Your name <input data-name></label><button data-enter type="button">Jump in</button><button type="button" data-dice>Roll</button></section>'
         );
         expect(await mountOpenInApp(validDoc, {
             userAgent: ANDROID,
@@ -435,21 +441,29 @@ describe('icon shortcuts and last room', () => {
             installed: 'unknown',
             search: '',
             hash: `#r=${secret}&h=${host}`,
-            homeHref: '/hangout/'
+            homeHref: '/hangout/',
+            moduleUrl: 'https://hangout.example/hangout/open-in-app.mjs'
         })).toBe(true);
         const guide = validDoc.querySelector('[data-open-in-app]');
-        expect(guide.querySelector('button').textContent).toBe(JUMP_LABEL);
-        expect(validDoc.querySelector('[data-enter]').hidden).toBe(true);
-        expect(validDoc.querySelectorAll('button:not([hidden])')).toHaveLength(1);
+        expect(guide.querySelector('button')).toBeNull();
+        expect(guide.querySelector('img').getAttribute('src')).toBe('https://hangout.example/assets/hangout-app/webjam-mark.svg');
+        const enter = validDoc.querySelector('[data-enter]');
+        expect(enter.hidden).toBe(false);
+        expect(enter.classList.contains('hoa__jump')).toBe(true);
+        expect(enter.previousElementSibling.tagName).toBe('LABEL');
+        expect(validDoc.querySelector('[data-name]').closest('label').nextElementSibling).toBe(enter);
+        expect(validDoc.querySelectorAll('button:not([hidden])').length).toBeGreaterThan(0);
+        expect([...validDoc.querySelectorAll('button')].filter((button) => button.textContent.trim() === JUMP_LABEL && !button.hidden)).toHaveLength(1);
+        expect(validDoc.documentElement.classList.contains('hoa-invite')).toBe(true);
+        expect(validDoc.querySelector('.tag').textContent).toBe(INVITE_LEDE);
         expect(guide.textContent).not.toContain(secret);
         expect(guide.textContent).not.toContain(host);
         expect(guide.querySelectorAll('p')).toHaveLength(0);
         const name = validDoc.querySelector('[data-name]');
         let focused = 0;
         name.focus = () => { focused += 1; };
-        guide.querySelector('button').click();
-        expect(focused).toBe(1);
         expect(jumpIn(validDoc)).toBe('name');
+        expect(focused).toBe(1);
         name.value = 'Ada';
         let clicked = 0;
         validDoc.querySelector('[data-enter]').addEventListener('click', () => { clicked += 1; });
@@ -474,6 +488,12 @@ describe('icon shortcuts and last room', () => {
         expect(entry).toContain('href="../join/"');
         expect(entry).toContain('href="door.html?kind=hangout"');
         expect(entry).toContain('href="door.html?kind=game-night&amp;game-night=1"');
+        expect(entry.indexOf('id="choices"')).toBeLessThan(entry.indexOf('id="whos-here"'));
+        expect(entry.indexOf('id="choices"')).toBeLessThan(entry.indexOf('data-install-card'));
+        expect(entry).toContain('Come on in');
+        const homeCss = readFileSync(join(repoRoot, 'hangout/home.css'), 'utf8');
+        expect(homeCss).toContain('#E87900');
+        expect(homeCss).toContain('hangout-alive');
         expect(entry).toContain('data-last-empty');
         expect(entry).not.toContain('45662413410ed051');
     });
@@ -496,12 +516,15 @@ describe('home screen doors', () => {
         return page('', [
             '<p data-door-kicker></p>',
             '<h1 data-door-title>Hang Out</h1>',
+            '<p data-door-lead role="status"></p>',
+            '<a data-door-home href="./">Hang Out home</a>',
             '<p data-door-step></p>',
             '<p data-door-meta hidden></p>',
+            '<div data-door-form>',
             '<input data-name>',
             '<button data-enter type="button">Jump in</button>',
             '<p data-door-status role="status"></p>',
-            '<a data-door-home href="./">Hang Out home</a>'
+            '</div>'
         ].join(''));
     }
 
@@ -519,13 +542,22 @@ describe('home screen doors', () => {
         expect(draw.querySelector('[data-door-meta]').textContent).toBe('2 here · Draw together');
         expect(draw.querySelector('[data-name]').hidden).toBe(false);
         expect(draw.querySelector('[data-enter]').hidden).toBe(false);
+        expect(draw.querySelector('[data-door-lead]').textContent).toBe(cannotOpenLine('Drawing room'));
+        expect(draw.querySelector('[data-enter]').classList.contains('door__enter--quiet')).toBe(true);
+        expect(draw.querySelector('[data-door-home]').classList.contains('door-home--lead')).toBe(true);
+        const order = [...draw.querySelectorAll('[data-door-lead], [data-door-home], [data-enter]')].map((node) => (
+            node.hasAttribute('data-door-lead') ? 'lead' : node.hasAttribute('data-door-home') ? 'home' : 'jump'
+        ));
+        expect(order).toEqual(['lead', 'home', 'jump']);
         draw.querySelector('[data-enter]').click();
         expect(draw.querySelector('[data-door-status]').textContent).toBe('Type a name to jump in.');
+        expect(draw.querySelector('[data-door-lead]').textContent).toBe(cannotOpenLine('Drawing room'));
         draw.querySelector('[data-name]').value = 'Ada';
         draw.querySelector('[data-enter]').click();
         expect(draw.querySelector('[data-name]').hidden).toBe(false);
         expect(draw.querySelector('[data-enter]').hidden).toBe(false);
         expect(draw.querySelector('[data-door-status]').textContent).toBe(cannotOpenLine('Drawing room'));
+        expect(draw.querySelector('[data-door-lead]').textContent).toBe(cannotOpenLine('Drawing room'));
         expect(draw.querySelector('[data-door-status]').textContent).not.toContain('\n');
         expect(draw.body.textContent).not.toContain('Name saved on this device.');
         expect(draw.querySelector('[data-door-home]').textContent).toBe('Hang Out home');
@@ -536,6 +568,11 @@ describe('home screen doors', () => {
         expect(html).toContain('webjam-mark.svg');
         expect(html).toContain('Hang Out home');
         expect(html).toContain('data-door-meta');
+        expect(html).toContain('data-door-lead');
+        expect(html).toContain('door-home--lead');
+        expect(html).toContain('door__enter--quiet');
+        expect(html.indexOf('data-door-lead')).toBeLessThan(html.indexOf('data-enter'));
+        expect(html.indexOf('door-home--lead')).toBeLessThan(html.indexOf('data-enter'));
         expect(html).not.toMatch(/<(?:input|button)\b[^>]*\bhidden\b/);
         expect(readFileSync(join(repoRoot, 'assets/hangout-app/webjam-mark.svg'), 'utf8')).toContain('#E87900');
     });

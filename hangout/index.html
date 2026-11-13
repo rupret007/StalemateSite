@@ -35,26 +35,12 @@
         <div data-webjam-host hidden></div>
         <header class="mast">
             <img class="brand-mark" src="../assets/hangout-app/webjam-mark.svg" alt="" width="72" height="72">
-            <p class="eyebrow">One home screen icon</p>
+            <p class="eyebrow">Come on in</p>
             <h1>Hang Out</h1>
             <p class="lede">Draw together, play a table, or join a jam.</p>
             <p class="last-empty" data-last-empty role="status" hidden></p>
         </header>
         <div class="checker" aria-hidden="true"></div>
-        <section id="whos-here" class="here" data-whos-here data-reads="/beta/state" aria-labelledby="whos-here-title">
-            <h2 id="whos-here-title">Who’s here</h2>
-            <p class="here__status" data-here-status role="status">No open rooms right now.</p>
-            <ul class="here__list" data-here-list hidden></ul>
-        </section>
-        <aside id="add-home" class="install" data-install-card hidden></aside>
-        <noscript>
-            <aside class="install" role="region" aria-label="Add Hang Out to your home screen">
-                <h2>Add Hang Out to your home screen</h2>
-                <p class="install__hint">Tap Share, then Add to Home Screen.</p>
-                <p class="install__hint">Tap ⋮, then Add to Home screen or Install app.</p>
-                <p class="install__hint">Use the install icon in the address bar, or the browser menu.</p>
-            </aside>
-        </noscript>
         <main id="choices">
             <h2 class="sr-only">Choose where to go</h2>
             <div class="choices">
@@ -72,6 +58,20 @@
                 </a>
             </div>
         </main>
+        <section id="whos-here" class="here" data-whos-here data-reads="/beta/state" aria-labelledby="whos-here-title">
+            <h2 id="whos-here-title">Who’s here</h2>
+            <p class="here__status" data-here-status role="status">No open rooms right now.</p>
+            <ul class="here__list" data-here-list hidden></ul>
+        </section>
+        <aside id="add-home" class="install" data-install-card hidden></aside>
+        <noscript>
+            <aside class="install" role="region" aria-label="Add Hang Out to your home screen">
+                <h2>Add Hang Out to your home screen</h2>
+                <p class="install__hint">Tap Share, then Add to Home Screen.</p>
+                <p class="install__hint">Tap ⋮, then Add to Home screen or Install app.</p>
+                <p class="install__hint">Use the install icon in the address bar, or the browser menu.</p>
+            </aside>
+        </noscript>
     </div>
     <script type="module" src="boot.mjs"></script>
 </body>

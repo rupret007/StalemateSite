@@ -7,6 +7,7 @@ export const JUMP_LABEL = 'Jump in';
 export const HOME_LABEL = 'Go to Hang Out home';
 export const IPHONE_LIMIT = 'iPhone opens this link in Safari.';
 export const HOST_ASK = 'Ask your host to send the invite; tap it and you\'re in.';
+export const INVITE_LEDE = 'Draw together, play a table, or join a jam.';
 
 const INVITE_KEYS = new Set(['invite', 'a', 'r', 'h', 'k', 's', 'g', 'e', 'grant']);
 const ROOM_SECRET = /^[A-Za-z0-9_-]{24}$/;
@@ -158,7 +159,40 @@ export function jumpIn(doc) {
     return 'focus';
 }
 
-export function fillOpenInApp(doc, { ios = false, installed = 'unknown', action = 'home', place = '', homeHref = '', alreadyHome = false } = {}) {
+export function orangeMarkHref(moduleUrl) {
+    let url;
+    try {
+        url = new URL('../assets/hangout-app/webjam-mark.svg', moduleUrl);
+    } catch {
+        return '';
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    if (url.username || url.password || url.search || url.hash) return '';
+    if (!url.pathname.endsWith('/assets/hangout-app/webjam-mark.svg')) return '';
+    return url.href;
+}
+
+// A real invite keeps one Jump in, and it sits with the name field.
+export function seatJumpWithName(doc) {
+    const enter = doc.querySelector('[data-enter], #join');
+    if (!enter || enter.closest('[data-open-in-app]')) return false;
+    enter.hidden = false;
+    if (enter.dataset.jumpDuplicate) delete enter.dataset.jumpDuplicate;
+    enter.classList.add('hoa__jump');
+    const name = doc.querySelector('[data-name]');
+    const anchor = name?.closest('label') || name;
+    if (anchor && enter !== anchor && !anchor.contains(enter)) anchor.after(enter);
+    return true;
+}
+
+export function showInviteMark(doc) {
+    doc.documentElement.classList.add('hoa-invite');
+    const tag = doc.querySelector('.hang-head .tag');
+    if (tag) tag.textContent = INVITE_LEDE;
+    return true;
+}
+
+export function fillOpenInApp(doc, { ios = false, installed = 'unknown', action = 'home', place = '', homeHref = '', alreadyHome = false, markHref = '' } = {}) {
     const region = doc.createElement('aside');
     region.className = 'hoa';
     region.dataset.openInApp = installed;
@@ -174,12 +208,15 @@ export function fillOpenInApp(doc, { ios = false, installed = 'unknown', action 
         region.append(lead);
     }
     if (action === 'jump') {
-        const button = doc.createElement('button');
-        button.type = 'button';
-        button.className = 'hoa__go';
-        button.textContent = JUMP_LABEL;
-        button.addEventListener('click', () => { jumpIn(doc); });
-        region.append(button);
+        if (markHref) {
+            const mark = doc.createElement('img');
+            mark.className = 'hoa__mark';
+            mark.alt = '';
+            mark.width = 72;
+            mark.height = 72;
+            mark.src = markHref;
+            region.append(mark);
+        }
     } else if (href && !alreadyHome) {
         const link = doc.createElement('a');
         link.className = webjamHome ? 'hoa__quiet' : 'hoa__go';
@@ -197,23 +234,7 @@ export function fillOpenInApp(doc, { ios = false, installed = 'unknown', action 
 }
 
 export function keepSingleJump(doc) {
-    const hideDuplicate = () => {
-        const lead = doc.querySelector('[data-open-in-app] button');
-        if (!lead || lead.textContent.trim() !== JUMP_LABEL) return;
-        for (const button of doc.querySelectorAll('button')) {
-            if (button === lead || button.closest('[data-open-in-app]')) continue;
-            if (button.textContent.trim() !== JUMP_LABEL || button.hidden) continue;
-            button.hidden = true;
-            button.dataset.jumpDuplicate = 'hidden';
-        }
-    };
-    hideDuplicate();
-    const enter = doc.querySelector('[data-enter]');
-    if (enter && typeof MutationObserver === 'function' && !enter.dataset.jumpWatch) {
-        enter.dataset.jumpWatch = '1';
-        const observer = new MutationObserver(hideDuplicate);
-        observer.observe(enter, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
-    }
+    return seatJumpWithName(doc);
 }
 
 export async function mountOpenInApp(doc, env) {
@@ -231,16 +252,21 @@ export async function mountOpenInApp(doc, env) {
         hostPreview: env.hostPreview === true || hostPreview(env.search)
     });
     if (!decision.show) return false;
+    const markHref = decision.action === 'jump' ? orangeMarkHref(env.moduleUrl || '') : '';
     const region = fillOpenInApp(doc, {
         ios: isIos(env.userAgent, env.maxTouchPoints || 0),
         installed: decision.installed,
         action: decision.action,
         place: place === 'webjam' ? 'webjam' : place,
-        homeHref: env.homeHref || ''
+        homeHref: env.homeHref || '',
+        markHref
     });
     const parent = doc.body || doc.documentElement;
     parent.insertBefore(region, parent.firstChild);
-    if (decision.action === 'jump') keepSingleJump(doc);
+    if (decision.action === 'jump') {
+        showInviteMark(doc);
+        seatJumpWithName(doc);
+    }
     if (!env.installed) {
         const detected = await detectInstalled(env.navigator);
         if (detected === 'installed') region.dataset.openInApp = detected;
@@ -278,7 +304,8 @@ if (marker && typeof navigator !== 'undefined' && typeof location !== 'undefined
         navigator,
         search: location.search,
         hash: location.hash,
-        homeHref
+        homeHref,
+        moduleUrl: import.meta.url
     }).catch(() => {
         // The invite page still works if this hint cannot render.
     });

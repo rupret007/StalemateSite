@@ -1,7 +1,8 @@
 import { HOST_ASK } from './open-in-app.mjs';
 
 // A door matches the row that opened it. The name field and the enter button stay visible.
-// This page has no public address for that room, so Jump in says so in one line.
+// This page has no public address for that room. The visit leads with that one line
+// and Hang Out home. Jump in stays, and it is not the loud control.
 
 export const DOOR_KINDS = Object.freeze(['hangout', 'game-night', 'draw', 'watch', 'jam']);
 
@@ -132,6 +133,42 @@ function showFields(name, enter) {
     if (enter) enter.hidden = false;
 }
 
+// The named room has no public address on this page, so the visit cannot open it.
+export function presentClosedDoor(doc, heading) {
+    const line = cannotOpenLine(heading);
+    let lead = doc.querySelector('[data-door-lead]');
+    const status = doc.querySelector('[data-door-status]');
+    if (!lead && status) {
+        status.dataset.doorLead = '';
+        status.classList.add('door-lead');
+        lead = status;
+    }
+    if (!lead) {
+        lead = doc.createElement('p');
+        lead.className = 'door-lead';
+        lead.dataset.doorLead = '';
+        lead.setAttribute('role', 'status');
+    }
+    lead.textContent = line;
+    const name = doc.querySelector('[data-name]');
+    const slot = doc.querySelector('[data-door-form]') || name;
+    const earlier = Boolean(slot && lead.parentElement && (slot.compareDocumentPosition(lead) & Node.DOCUMENT_POSITION_PRECEDING));
+    if (slot && !earlier) slot.before(lead);
+    else if (!lead.parentElement) doc.body.append(lead);
+    const home = doc.querySelector('[data-door-home]');
+    if (home) {
+        home.classList.add('door-home--lead');
+        if (home.previousElementSibling !== lead) lead.after(home);
+    }
+    const enter = doc.querySelector('[data-enter]');
+    if (enter) enter.classList.add('door__enter--quiet');
+    if (status && status !== lead) {
+        status.textContent = line;
+        status.hidden = true;
+    }
+    return line;
+}
+
 export function mountDoor(doc, env = {}) {
     const parsed = parseDoor(env.search || '');
     const title = doc.querySelector('[data-door-title]');
@@ -149,17 +186,27 @@ export function mountDoor(doc, env = {}) {
     const name = doc.querySelector('[data-name]');
     const enter = doc.querySelector('[data-enter]');
     showFields(name, enter);
+    presentClosedDoor(doc, parsed.heading);
     const submit = () => {
         showFields(name, enter);
         const typed = String(name?.value || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 24);
         const status = doc.querySelector('[data-door-status]');
+        const lead = doc.querySelector('[data-door-lead]');
         if (typed.length < 2) {
-            if (status) status.textContent = 'Type a name to jump in.';
+            if (status) {
+                status.hidden = false;
+                status.textContent = 'Type a name to jump in.';
+            }
             if (typeof name?.focus === 'function') name.focus();
             return;
         }
         try { env.storage?.setItem('hangout-nick', typed); } catch { /* private mode */ }
-        if (status) status.textContent = cannotOpenLine(parsed.heading);
+        const line = cannotOpenLine(parsed.heading);
+        if (lead && lead !== status) lead.textContent = line;
+        if (status) {
+            status.textContent = line;
+            status.hidden = Boolean(lead && lead !== status);
+        }
     };
     enter?.addEventListener('click', submit);
     name?.addEventListener('keydown', (event) => {

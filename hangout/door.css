@@ -20,16 +20,31 @@
     font: 1.05rem/1.4 var(--body);
 }
 
-.door__enter {
-    min-height: 52px;
-    border: 0;
-    background: var(--lime);
-    color: var(--ink);
+.door-lead {
+    margin: 14px 0 0;
+    max-width: 28rem;
+    color: var(--cream);
     font-family: var(--display);
-    font-size: 1.45rem;
+    font-size: clamp(1.7rem, 6vw, 2.15rem);
     font-weight: 800;
-    letter-spacing: 0.02em;
-    box-shadow: 3px 3px 0 #000;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+}
+
+.door-step {
+    margin-top: 16px;
+}
+
+.door__enter {
+    min-height: 44px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--body);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    box-shadow: none;
     cursor: pointer;
 }
 
@@ -54,4 +69,22 @@
     color: var(--lime);
     font-weight: 700;
     text-decoration: underline;
+}
+
+.door-home.door-home--lead {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(100%, 28rem);
+    min-height: 52px;
+    margin-top: 14px;
+    border: 0;
+    background: var(--lime);
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    box-shadow: 3px 3px 0 #000;
 }

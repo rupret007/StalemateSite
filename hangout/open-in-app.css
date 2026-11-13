@@ -62,3 +62,75 @@
     outline: 3px solid #b5dc08;
     outline-offset: 3px;
 }
+
+.hoa__mark {
+    width: 72px;
+    height: 72px;
+    margin: 0 0 8px;
+}
+
+html.hoa-invite body {
+    background: #171410;
+    color: #f4f0e6;
+    font-family: "Source Sans 3", "Segoe UI", sans-serif;
+}
+
+html.hoa-invite .hoa {
+    width: auto;
+    margin: 4px 18px 0;
+    padding: 8px 0 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
+
+html.hoa-invite .hang-head {
+    background: transparent;
+    border-bottom: 0;
+}
+
+html.hoa-invite .hang-head > img {
+    display: none;
+}
+
+html.hoa-invite .hang-head h1,
+html.hoa-invite .gate-card h2 {
+    color: #f4f0e6;
+    font-family: "Arial Narrow", "Barlow Condensed", Impact, sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+}
+
+html.hoa-invite .gate-card h2 {
+    font-size: clamp(2rem, 6vw, 2.6rem);
+}
+
+html.hoa-invite .namebox {
+    display: grid;
+    gap: 8px;
+}
+
+html.hoa-invite .namebox input {
+    width: 100%;
+    min-height: 48px;
+}
+
+html.hoa-invite .gate-card {
+    background: #27201b;
+    border: 1px solid rgba(244, 240, 230, 0.36);
+    border-radius: 0;
+    box-shadow: 4px 4px 0 #000;
+}
+
+html.hoa-invite .gate-card [data-enter].hoa__jump {
+    width: 100%;
+    min-height: 52px;
+    border: 0;
+    background: #b5dc08;
+    color: #171410;
+    font-family: "Arial Narrow", "Barlow Condensed", Impact, sans-serif;
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    box-shadow: 3px 3px 0 #000;
+}

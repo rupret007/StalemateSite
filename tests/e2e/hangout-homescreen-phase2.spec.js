@@ -211,8 +211,18 @@ test('a valid room link leads with Jump in', async ({ browser }) => {
     const host = 'd'.repeat(80);
     await page.goto(`${ROOM}#r=${secret}&h=${host}`);
     const guide = page.getByRole('region', { name: 'Open in Hang Out' });
-    await expect(guide.getByRole('button', { name: 'Jump in' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Jump in' })).toHaveCount(1);
+    await expect(guide.getByRole('button', { name: 'Jump in' })).toHaveCount(0);
+    await expect(guide.locator('.hoa__mark')).toBeVisible();
+    await expect(guide.locator('.hoa__mark')).toHaveAttribute('src', /webjam-mark\.svg$/);
+    const jump = page.getByRole('button', { name: 'Jump in' });
+    await expect(jump).toHaveCount(1);
+    await expect(jump).toBeVisible();
+    const nameBox = await page.locator('[data-name]').boundingBox();
+    const jumpBox = await jump.boundingBox();
+    expect(jumpBox.y).toBeGreaterThan(nameBox.y);
+    expect(jumpBox.y - (nameBox.y + nameBox.height)).toBeLessThan(180);
+    await expect(page.locator('html')).toHaveClass(/hoa-invite/);
+    await expect(page.locator('.tag')).toHaveText('Draw together, play a table, or join a jam.');
     await expect(guide).toContainText('iPhone opens this link in Safari.');
     const text = await page.locator('body').innerText();
     expect(text).not.toContain(secret);
@@ -316,10 +326,30 @@ test('phone screens show each home-screen fix', async ({ browser }) => {
     await expect(page.locator('h1')).toHaveText('Drawing room');
     await expect(page.locator('[data-door-step]')).toHaveText('Pick a name and draw together.');
     await expect(page.locator('[data-door-meta]')).toHaveText('2 here · Draw together');
+    await expect(page.locator('[data-door-lead]')).toHaveText('This visit can\'t open Drawing room.');
     await expect(page.locator('.brand-mark')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Hang Out home' })).toBeVisible();
+    const home = page.getByRole('link', { name: 'Hang Out home' });
+    const jumpIn = page.locator('[data-enter]');
+    await expect(home).toBeVisible();
     await expect(page.locator('[data-name]')).toBeVisible();
-    await expect(page.locator('[data-enter]')).toBeVisible();
+    await expect(jumpIn).toBeVisible();
+    const leadBox = await page.locator('[data-door-lead]').boundingBox();
+    const homeBox = await home.boundingBox();
+    const jumpBox = await jumpIn.boundingBox();
+    expect(leadBox.y).toBeLessThan(homeBox.y);
+    expect(homeBox.y).toBeLessThan(jumpBox.y);
+    const weight = await page.evaluate(() => {
+        const homeStyle = getComputedStyle(document.querySelector('[data-door-home]'));
+        const jumpStyle = getComputedStyle(document.querySelector('[data-enter]'));
+        return {
+            homeBg: homeStyle.backgroundColor,
+            jumpBg: jumpStyle.backgroundColor,
+            homeSize: parseFloat(homeStyle.fontSize),
+            jumpSize: parseFloat(jumpStyle.fontSize)
+        };
+    });
+    expect(weight.homeBg).not.toBe(weight.jumpBg);
+    expect(weight.homeSize).toBeGreaterThan(weight.jumpSize);
     await snap(page, 'iphone-door-draw.png');
     await page.locator('#door-name').fill('Ada');
     await page.locator('[data-enter]').click();
@@ -381,8 +411,12 @@ test('phone and desktop doors keep the mark, the count, and one way on', async (
         await page.goto('/hangout/');
         await page.getByRole('link', { name: /Drawing room/ }).click();
         await expect(page.locator('[data-door-meta]')).toHaveText('2 here · Draw together');
+        await expect(page.locator('[data-door-lead]')).toHaveText('This visit can\'t open Drawing room.');
         await expect(page.locator('.brand-mark')).toBeVisible();
         await expect(page.getByRole('link', { name: 'Hang Out home' })).toBeVisible();
+        const homeBox = await page.getByRole('link', { name: 'Hang Out home' }).boundingBox();
+        const jumpBox = await page.locator('[data-enter]').boundingBox();
+        expect(homeBox.y).toBeLessThan(jumpBox.y);
         await save('whos-here-door');
         await page.locator('#door-name').fill('Ada');
         await page.locator('[data-enter]').click();
@@ -399,6 +433,80 @@ test('phone and desktop doors keep the mark, the count, and one way on', async (
         if (frame.userAgent === IPHONE) await expect(page.getByRole('region', { name: 'Open in Hang Out' })).toContainText('iPhone opens this link in Safari.');
         expect(await page.locator('body').innerText()).not.toContain(secret);
         await save('room-invite');
+        await context.close();
+    }
+});
+
+const fix5Shots = path.resolve(__dirname, '../../../../homescreen-fix5/shots');
+
+test('the three choices are on the first phone screen, with rooms and without', async ({ browser }) => {
+    fs.mkdirSync(fix5Shots, { recursive: true });
+    const frames = [
+        { name: '390x844', width: 390, height: 844, userAgent: IPHONE, mobile: true },
+        { name: '1440x900', width: 1440, height: 900, userAgent: undefined, mobile: false }
+    ];
+    const rooms = {
+        rooms: [
+            { kind: 'art', title: 'Drawing room', count: 2, max: 8, locked: false, key: false },
+            { kind: 'watch', title: 'Watch party', count: 3, max: 8, locked: false, key: false },
+            { kind: 'game', title: 'Royal Flush Chess', count: 2, max: 8, locked: true, key: false }
+        ]
+    };
+    for (const frame of frames) {
+        const context = await browser.newContext({ ...contextOptions(frame), deviceScaleFactor: 1 });
+        const page = await context.newPage();
+        async function save(name) {
+            const file = path.join(fix5Shots, `${frame.name}-${name}.png`);
+            await page.screenshot({ path: file });
+            const bytes = fs.readFileSync(file);
+            expect(bytes.readUInt32BE(16)).toBe(frame.width);
+            expect(bytes.readUInt32BE(20)).toBe(frame.height);
+        }
+        async function choicesLead(expectOnScreen) {
+            await expect(page.locator('.choice')).toHaveCount(3);
+            const install = page.locator('[data-install-card]');
+            await expect(install).toBeVisible();
+            const last = await page.locator('.choice').nth(2).boundingBox();
+            const card = await install.boundingBox();
+            expect(last.y).toBeLessThan(card.y);
+            if (!expectOnScreen) return;
+            for (const choice of await page.locator('.choice').all()) {
+                const box = await choice.boundingBox();
+                expect(box.y).toBeGreaterThanOrEqual(0);
+                expect(box.y + box.height).toBeLessThanOrEqual(frame.height);
+            }
+        }
+        await page.goto('/hangout/');
+        await expect(page.getByText('Come on in')).toBeVisible();
+        await choicesLead(frame.mobile);
+        await save('home');
+        await page.route('**/beta/state', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(rooms)
+            });
+        });
+        await page.goto('/hangout/');
+        await expect(page.getByRole('link', { name: /Royal Flush Chess/ })).toBeVisible();
+        await choicesLead(frame.mobile);
+        await save('rooms');
+        await page.getByRole('link', { name: /Drawing room/ }).click();
+        await expect(page.locator('[data-door-lead]')).toHaveText('This visit can\'t open Drawing room.');
+        await expect(page.getByRole('link', { name: 'Hang Out home' })).toBeVisible();
+        await save('door');
+        const secret = 'e'.repeat(24);
+        const host = 'f'.repeat(80);
+        await page.goto(`${ROOM}#r=${secret}&h=${host}`);
+        await expect(page.locator('.hoa__mark')).toBeVisible();
+        await expect(page.locator('.hoa__mark')).toHaveAttribute('src', /webjam-mark\.svg$/);
+        await expect(page.getByRole('region', { name: 'Open in Hang Out' }).getByRole('button', { name: 'Jump in' })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Jump in' })).toHaveCount(1);
+        const nameBox = await page.locator('[data-name]').boundingBox();
+        const jumpBox = await page.getByRole('button', { name: 'Jump in' }).boundingBox();
+        expect(jumpBox.y).toBeGreaterThan(nameBox.y);
+        expect(await page.locator('body').innerText()).not.toContain(secret);
+        await save('invite');
         await context.close();
     }
 });
