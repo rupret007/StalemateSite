@@ -1,7 +1,6 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { classifyRushSwipe } from '/play/games/turdrush-core.js';
 import { advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer } from '/play/games/turdrush-race.js';
-import { TurdRushRenderer } from '/play/games/turdrush-renderer.js';
 
 const keys = { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'jump', w: 'jump', ' ': 'jump', ArrowDown: 'slide', s: 'slide' };
 const buttons = [['left', '←', 'Move left'], ['right', '→', 'Move right'], ['jump', '↑', 'Jump'], ['slide', '↓', 'Slide']];
@@ -99,7 +98,7 @@ export function mountArcadeTurdRush(container, onMatch) {
         canvas = $('[data-race-3d]'), flat = $('[data-race-2d]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
     let scope, model, canOpen, connection, connectionError, visual, receivedAt, renderer, fallback = false, raf = 0, previous = 0,
         lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, pending, gesture, redraw = true;
-    let buffer = [], flights = [];
+    let buffer = [], flights = [], rendererLoad, Renderer;
     const serverNow = time => model.match.at + Math.max(0, time - receivedAt);
     const clearInputs = () => { buffer = []; flights = []; gesture = null; };
     const clearPending = () => { clearTimeout(pending); pending = null; };
@@ -108,6 +107,13 @@ export function mountArcadeTurdRush(container, onMatch) {
         renderer?.dispose();
         renderer = null;
         redraw = true;
+    }
+    function loadRenderer() {
+        rendererLoad ??= import('/play/games/turdrush-renderer.js').then(module => {
+            Renderer = module.TurdRushRenderer;
+            redraw = true;
+            render();
+        }).catch(fallbackView);
     }
     function rebuild() {
         visual = model?.match ? unpackRushRacer(model.match.runner) : null;
@@ -147,6 +153,7 @@ export function mountArcadeTurdRush(container, onMatch) {
             connectionError = undefined;
             clearPending();
             rebuild();
+            if (state?.seat && !state.match?.result) loadRenderer();
             render();
             if (reveal) container.scrollTop = 0;
         },
@@ -228,11 +235,11 @@ export function mountArcadeTurdRush(container, onMatch) {
             if (progress.getAttribute('aria-label') !== label + ' progress') progress.setAttribute('aria-label', label + ' progress');
             if (Math.floor(progress.value) !== distance) progress.value = distance;
         }
-        const render3d = !!seat && !fallback;
+        const render3d = !!seat && !!Renderer && !fallback;
         canvas.hidden = !render3d;
         flat.hidden = render3d;
         if (render3d && !renderer) {
-            try { renderer = new TurdRushRenderer(canvas, { reducedMotion: motion.matches, onLost: fallbackView }); }
+            try { renderer = new Renderer(canvas, { reducedMotion: motion.matches, onLost: fallbackView }); }
             catch { fallbackView(); canvas.hidden = true; flat.hidden = false; }
         }
         const resized = renderer?.resize();
