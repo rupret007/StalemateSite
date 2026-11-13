@@ -4,8 +4,8 @@
 
 - Branch: `grok/bridge-slice1-int-20261112`
 - Fix commit: `24647d4428dbf762399df4c672d432da92c26f3c`
-- Result commit, which added this file: recorded in the following commit.
-- The commit after the result commit only records that SHA. That commit is the branch head.
+- Result commit, which added this file: `0c63752fe1f903e09e87fb6d3a81341fc78d5517`
+- The commit after the result commit records that SHA and the boundary re-run at the result commit. That commit is the branch head.
 
 ## What changed
 
@@ -32,6 +32,17 @@ Paths in the runner banner are omitted here. The boundary command was re-run aft
 ```
 
 Exit 0. 0 failed. Head `24647d4428dbf762399df4c672d432da92c26f3c`.
+
+The same command, re-run at the result commit `0c63752fe1f903e09e87fb6d3a81341fc78d5517`:
+
+```
+ Test Files  2 passed (2)
+      Tests  49 passed (49)
+   Start at  00:11:25
+   Duration  779ms (transform 96ms, setup 113ms, import 74ms, tests 412ms, environment 1ms)
+```
+
+Exit 0. 0 failed.
 
 `npx vitest run tests/unit/bridge-grants.test.js tests/unit/bridge-hook1-proposal.test.js tests/unit/bridge-shots.test.js hangout-worker/tests/game-night-room-grants.test.js`
 
