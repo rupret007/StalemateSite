@@ -44,7 +44,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const gameGuest = betaBootstrap?.gameGuest;
     const gameGuestQuery = gameGuest ? '?game-guest=1' : '';
     const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
-    let gameGuestExit = gameGuest && ['left', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
+    let gameGuestExit = gameGuest && ['left', 'canceled', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
     let gameGuestSeated = false;
     if (gameGuest) document.body.classList.add('game-guest');
     let gameEntry = betaShell ? gameNightEntry?.(params, location.hash) : null;
@@ -849,9 +849,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         show('chat'); $('#session-ended-title').focus({ preventScroll: true });
     }
     function gameGuestExitMessage(reason) {
-        return { left: 'You left Game Night.', closed: 'This Game Night room closed.', removed: 'You were removed from Game Night.' }[reason] || 'Your Game Night access ended.';
+        return { left: 'You left Game Night.', canceled: 'You canceled joining Game Night.', closed: 'This Game Night room closed.', removed: 'You were removed from Game Night.' }[reason] || 'Your Game Night access ended.';
     }
     function leaveGameGuest(reason) {
+        if (reason === 'canceled' && app.ws) {
+            app.ws.onclose = null;
+            app.ws.onmessage = null;
+            if (app.ws.readyState < WebSocket.CLOSING) app.ws.close(1000);
+        }
         gameGuestExit = reason;
         history.replaceState({ gameSessionRef: gameGuest.sessionRef, gameExit: reason }, '', location.pathname + gameGuestQuery);
         endSession(reason);
@@ -2854,6 +2859,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         } else if (gameGuestExit) leaveGameGuest(gameGuestExit);
         else {
             $('[data-game-guest-connecting]').hidden = false;
+            const cancel = $('[data-game-guest-cancel]');
+            cancel.hidden = false;
+            cancel.addEventListener('click', () => {
+                if (!gameGuestSeated && !sessionEnded) leaveGameGuest('canceled');
+            });
             $('[data-game-guest-retry]').addEventListener('click', () => connect(''));
             void connect('');
         }
