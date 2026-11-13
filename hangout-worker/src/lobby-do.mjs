@@ -20,6 +20,7 @@ import { lobbyIncidentSourceMode, incidentSourceConfigurationValid } from './lob
 import { arcadeEnabled, arcadeGame, arcadeGames, arcadePath, arcadeRoomRequest, arcadeSocketGame, createArcadeTransport, isArcadeSocket } from './arcade-transport.mjs';
 import { createGameNightMedia, isMediaSocket, mediaEnabled, mediaPath } from './game-night-media.mjs';
 import { GAME_INVITATION_PATH, gameGuestEnabled, gameInvitationRequest } from './game-night-invitations.mjs';
+import { GAME_ROOM_GRANT_PATH, gameRoomGrantsEnabled, lobbyRoomGrants } from './game-night-room-grant-routes.mjs';
 import { issueGameNightTurn } from './turn.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
@@ -257,6 +258,7 @@ export class HangoutLobby {
         this.liveBindings = new Map();
         this.arcadeDepartures = [];
         this.arcadeConfigurationReady = false;
+        this.roomGrants = lobbyRoomGrants(this);
         this.arcade = new Map(arcadeGames.map(name => [name, createArcadeTransport({
             name, state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
             charge: (socket, actor) => this.controlBudget.take(socket, actor),
@@ -518,6 +520,7 @@ export class HangoutLobby {
             await this.restoreArcadeConfiguration().catch(() => {});
         }
         for (const [name, service] of this.arcade) if (this.arcadeAvailable(name)) await service.maintain().catch(() => {});
+        if (gameRoomGrantsEnabled(this.env)) await this.roomGrants.sweep(Date.now()).catch(() => {});
     }
     async sessionActive(value) {
         if (!this.authorityMode) return activeBetaSession(this.env, value);
@@ -961,10 +964,12 @@ export class HangoutLobby {
         const { pathname: path, searchParams } = new URL(request.url);
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
-        if (path.startsWith(GAME_INVITATION_PATH + '/') && request.method === 'POST') {
+        const roomGrant = path.startsWith(GAME_ROOM_GRANT_PATH + '/');
+        if ((roomGrant || path.startsWith(GAME_INVITATION_PATH + '/')) && request.method === 'POST') {
             return retirementGate(this, async () => {
                 try {
                     const { body, session } = await request.json();
+                    if (roomGrant) return await this.roomGrants.request(path.slice(GAME_ROOM_GRANT_PATH.length + 1), body, session);
                     return await gameInvitationRequest(this, path.slice(GAME_INVITATION_PATH.length + 1), body, session);
                 } catch { return new Response('Game invitations are temporarily unavailable.', { status: 503 }); }
             });
