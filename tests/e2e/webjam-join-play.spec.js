@@ -1,5 +1,25 @@
 const { test, expect } = require('@playwright/test');
 
+test('the packaged website explains when browser audio is unavailable', async ({ page, baseURL }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => { window.AudioContext = undefined; });
+    const external = [];
+    await page.route('**/*', route => {
+        if (new URL(route.request().url()).origin === baseURL) return route.continue();
+        external.push(route.request().url());
+        return route.abort();
+    });
+    const expires = Math.floor(Date.now() / 1000) + 300;
+    await page.goto(`/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+    const status = page.locator('#status');
+    await expect(status).toHaveText('This browser can’t play WebJam audio.');
+    await expect(status).toHaveAccessibleDescription(/return to Hang Out to keep chatting/i);
+    await expect(page.locator('#error-hint')).toBeInViewport();
+    for (const id of ['listen', 'join', 'prejoin', 'retry']) await expect(page.locator(`#${id}`)).toBeHidden();
+    expect(external).toEqual([]);
+    await page.screenshot({ path: testInfo.outputPath('browser-audio-unavailable-390x844.png') });
+});
+
 for (const [width, height] of [[390, 844], [1440, 900]]) {
     test(`a browser guest can listen, retry and leave without capture at ${width}px`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
