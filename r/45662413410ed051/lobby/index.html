@@ -105,6 +105,7 @@
             <label class="nickrow">Your nick
                 <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a name — random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
             </label>
+            <p class="status" id="nickname-error" role="status"></p>
             <p class="small gate-hint">Remembered on this device, not reserved. Camera &amp; mic stay off.</p>
             <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span> beside my name</label><p class="small">Your entrance, not a verified identity. You can hide it in People.</p></div>
             <p class="small" data-entry-unavailable hidden>Entry-site badges aren’t available on this server. Your return link still works.</p>
@@ -113,7 +114,7 @@
             <details class="entry-details"><summary>How session scrollback works</summary><p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p></details>
             <p class="small gate-disclosure" data-ai-disclosure>When AI review is enabled, public text may go to OpenAI after posting to flag messages for our moderators. PMs, invite links, invite-only/key-protected/locked rooms, cameras and encrypted private rooms are excluded. Flagged, reported or held evidence stays up to 24 hours, separate from chat scrollback.</p>
             <button class="btn btn--ghost" data-gate-guest hidden>Continue as guest</button>
-            <p class="status" id="gate-status" data-gate-status role="status"></p>
+            <p class="status" data-gate-status role="status"></p>
             <a class="btn btn--ghost" data-gate-private-entry href="/beta/" hidden>Open private entry</a>
           </div>
         </div>
