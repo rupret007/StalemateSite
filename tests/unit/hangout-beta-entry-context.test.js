@@ -60,7 +60,7 @@ describe('entry context through the private beta shell', () => {
             expect(window.location.href).toBe(address);
             code.value = 'incorrect local invitation';
             form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
-            await vi.waitFor(() => expect(window.document.querySelector('#status').textContent).toContain('not accepted'));
+            await vi.waitFor(() => expect(form.querySelector('#code-error').textContent).toContain('not accepted'));
             expect(window.document.activeElement).toBe(code);
             expect(window.location.href).toBe(address);
             const calls = window.fetch.mock.calls;
@@ -425,15 +425,17 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
             code.value = 'rejected fixture code';
             submit.focus();
             submit.click();
-            await vi.waitFor(() => expect(doc.querySelector('#status').textContent).toMatch(/not accepted/));
+            const error = doc.querySelector('#unlock #code-error');
+            await vi.waitFor(() => expect(error.textContent).toMatch(/not accepted/));
             expect(code.value).toBe('rejected fixture code');
             expect(doc.activeElement).toBe(code);
             expect(code.getAttribute('aria-invalid')).toBe('true');
-            expect(code.getAttribute('aria-describedby')).toBe('status');
+            expect(code.getAttribute('aria-describedby')).toBe(error.id);
             code.value = 'correct fixture code';
             code.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
             expect(code.hasAttribute('aria-invalid')).toBe(false);
             expect(code.hasAttribute('aria-describedby')).toBe(false);
+            expect(error.textContent).toBe('');
             submit.click();
             await vi.waitFor(() => expect(doc.querySelector('#inside').hidden).toBe(false));
             expect(code.value).toBe('');
