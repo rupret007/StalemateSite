@@ -728,6 +728,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await captureArcadeInvite(host, viewport, step('02c-invite-picker'));
                 });
                 assert.equal((await friend.context().cookies()).length, 0, 'the invited profile is completely new');
+                const sockets = [];
+                let releaseReconnect;
+                const reconnect = new Promise(resolve => { releaseReconnect = resolve; });
+                await friend.routeWebSocket(url => url.pathname === '/lobby', async route => {
+                    const opening = sockets.length;
+                    sockets.push(route);
+                    if (opening === 1) {
+                        await reconnect;
+                        const server = route.connectToServer();
+                        server.onMessage(() => {});
+                        await route.close({ code: 1011, reason: 'fixture reconnect failed before welcome' });
+                        return;
+                    }
+                    route.connectToServer();
+                });
                 const attempts = [];
                 const acceptPath = '/beta/game-night/invitation/accept';
                 friend.on('request', request => {
@@ -774,6 +789,22 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 assert.ok(await friend.evaluate(() => !history.state?.gameNightInvite), 'the seated page retains no invitation state');
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                if (phone) {
+                    const started = performance.now();
+                    assert.equal(sockets.length, 1);
+                    try {
+                        await sockets[0].close({ code: 1011, reason: 'brief local connection interruption' });
+                        await expect(friend.locator('[data-connection]')).toHaveText('Reconnecting…');
+                        await expect.poll(() => sockets.length).toBe(2);
+                        await captureArcadeInvite(friend, viewport, step('04-connection-interrupted'));
+                    } finally { releaseReconnect(); }
+                    await expect(friend.locator('[data-connection]')).toHaveText('Connected');
+                    await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                    await expect(friend.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                    assert.equal(attempts.length, 2, 'reconnect requires no new Join');
+                    await captureArcadeInvite(friend, viewport, step('05-recovered-seat'));
+                    console.log('PASS exact-seat reconnect', brand, engine, Math.round(performance.now() - started));
+                }
                 await tapSquare(friend, 'd7', phone);
                 await tapSquare(friend, 'd5', phone);
                 await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();

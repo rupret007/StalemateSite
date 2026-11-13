@@ -761,13 +761,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                     return;
                 }
             }
-            if (!opened && app.me) return endSession('admission');
+            const retryGameGuest = !opened && gameGuestSeated && app.me && retry < 3 && [1006, 1011].includes(e.code);
+            if (!opened && app.me && !retryGameGuest) return endSession('admission');
             if (ownerSession && !opened) {
                 $('[data-gate]').hidden = false; $('[data-app]').hidden = true;
                 $('[data-gate-guest]').hidden = false;
                 return gateStatus('Email sign-in is unavailable or expired. Sign in again to manage your rooms, or continue as a guest.');
             }
-            if (!opened) return gateStatus('Couldn’t connect. Try again shortly, or ask the host if this continues.');
+            if (!opened && !retryGameGuest) return gateStatus('Couldn’t connect. Try again shortly, or ask the host if this continues.');
             if (savedMessages.size) {
                 clearTimeout(retryTimer);
                 gateStatus('A message may have arrived. Copy or discard saved text, then choose Try again. Reconnecting clears saved copies.');
