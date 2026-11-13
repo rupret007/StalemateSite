@@ -421,7 +421,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
                 const reused = await context.newPage();
                 await openGameNightLink(reused, link);
-                await expect(reused.getByRole('status')).toContainText('was used');
+                await expect(reused.getByRole('heading', { name: 'Game Night', exact: true })).toBeFocused();
+                await expect(reused.getByRole('status')).toHaveText('This invite can’t open the game anymore. Ask your host for a new invite.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
@@ -494,6 +495,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(join).toBeHidden();
                 assert.equal(await friend.evaluate(() => history.state), null, 'closed invitation was cleared');
                 await captureArcadeInvite(friend, viewport, 'guest-closed-01-explanation');
+                const preview = await context.newPage();
+                await openGameNightLink(preview, closingLink);
+                const previewTitle = preview.getByRole('heading', { name: 'Game Night', exact: true });
+                await expect(previewTitle).toBeFocused();
+                await expect(previewTitle).toHaveAccessibleDescription('This invite can’t open the game anymore. Ask your host for a new invite.');
+                await expect(preview.getByRole('button', { name: 'Join game', exact: true })).toBeHidden();
+                assert.equal(await preview.evaluate(() => history.state), null, 'closed preview was cleared');
+                await preview.close();
                 console.log(`Passed ${engine} ${viewport.width}x${viewport.height} Game Night Join retry and closed invitation recovery.`);
             } finally { await context.close(); }
         }

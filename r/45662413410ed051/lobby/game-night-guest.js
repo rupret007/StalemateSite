@@ -44,6 +44,16 @@ async function request(action, data, retryConnection = false) {
     return value;
 }
 
+function showUnavailableInvitation() {
+    clearInvitation();
+    invite.hidden = true;
+    inviter.hidden = true;
+    status.textContent = 'This invite can’t open the game anymore. Ask your host for a new invite.';
+    gameTitle.tabIndex = -1;
+    gameTitle.setAttribute('aria-describedby', status.id);
+    gameTitle.focus();
+}
+
 async function describe() {
     retry.hidden = true;
     if (!hasInvitation) {
@@ -61,9 +71,9 @@ async function describe() {
         invite.hidden = false;
         if (document.activeElement === document.body) join.focus({ preventScroll: true });
     } catch (error) {
-        status.textContent = error.status === 410 ? error.message : 'Couldn’t check the invitation. Try again.';
-        retry.hidden = error.status === 410;
-        if (error.status === 410) clearInvitation();
+        if (error.status === 410) return showUnavailableInvitation();
+        status.textContent = 'Couldn’t check the invitation. Try again.';
+        retry.hidden = false;
     }
 }
 
@@ -77,16 +87,7 @@ async function accept() {
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
         location.replace(next);
     } catch (error) {
-        if (error.status === 410) {
-            clearInvitation();
-            invite.hidden = true;
-            inviter.hidden = true;
-            status.textContent = 'This invite can’t open the game anymore. Ask your host for a new invite.';
-            gameTitle.tabIndex = -1;
-            gameTitle.setAttribute('aria-describedby', status.id);
-            gameTitle.focus();
-            return;
-        }
+        if (error.status === 410) return showUnavailableInvitation();
         status.textContent = [429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
         if (invite.hidden) {
             retry.hidden = false;
