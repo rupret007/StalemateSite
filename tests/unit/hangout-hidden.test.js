@@ -30,7 +30,7 @@ describe('hidden hangout room', () => {
         for (const file of publicFiles) {
             const rel = relative(repoRoot, file);
             if (rel === 'robots.txt' || rel === 'scripts/package-pages.cjs' || rel === 'scripts/hangout-relay-dev.mjs') continue;
-            if (rel === 'scripts/preview-hangout.cjs' || rel === 'hangout-internal/HANGOUT_IRC_PREVIEW.md') continue;
+            if (rel === 'scripts/preview-hangout.cjs' || rel === 'hangout-internal/HANGOUT_IRC_PREVIEW.md' || rel === 'hangout-internal/RESULT-HOMESCREEN.md') continue;
             const text = readFileSync(file, 'utf8');
             // The home-screen door is the one public page allowed to name the
             // existing Hang Out and Game Night pages. It is noindex and is not

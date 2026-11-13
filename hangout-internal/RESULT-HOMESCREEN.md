@@ -148,3 +148,25 @@ Outside the repo, in `../hangout-homescreen-shots/p2/`:
 - Who’s here stays empty until `GET /beta/state` includes a room or table list. No directory route was added.
 - The lobby removes `?game-night=1` from the address after it loads. The shortcut still requests that URL. The test watches the request.
 - Last room with an empty store stays on the entry page.
+
+## FIX1
+
+Moved this report from repository-root `RESULT.md` into `hangout-internal/RESULT-HOMESCREEN.md` so it stays behind the existing `.htaccess` deny on `hangout-internal` and is not a new public root entry. `manifest.json` and `sw.js` remain at the root as packaged public assets. `tests/unit/hangout-hidden.test.js` skips this internal note the same way it skips `HANGOUT_IRC_PREVIEW.md`.
+
+```
+npx vitest run tests/unit/apache-public-boundary.test.js tests/unit/hangout-hidden.test.js
+```
+
+```
+ Test Files  2 passed (2)
+      Tests  49 passed (49)
+```
+
+```
+npx vitest run tests/unit/hangout-phase2.test.js tests/unit/hangout-install-card.test.js tests/unit/hangout-hidden.test.js tests/unit/hangout-room-csp.test.js tests/unit/webjam-join-assets.test.js tests/unit/package-pages.test.js
+```
+
+```
+ Test Files  6 passed (6)
+      Tests  50 passed (50)
+```
