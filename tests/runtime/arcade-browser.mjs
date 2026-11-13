@@ -563,6 +563,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await host.setViewportSize(original);
         }
     }
+    async function verifyEmptyGameInvite() {
+        const host = await guest('rad-dad', 'InviteRecovery', { width: 1440, height: 900 }, false,
+            origin + '/beta/?game-night=1&via=rad-dad');
+        try {
+            await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+            await host.getByRole('button', { name: 'Invite players', exact: true }).click();
+            const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
+            await expect(dialog.getByRole('button', { name: 'Choose a game', exact: true })).toBeFocused();
+            await host.keyboard.press('Enter');
+            await expect(dialog).toBeHidden();
+            const picker = host.getByRole('combobox', { name: 'Switch game' });
+            await expect(picker).toBeFocused();
+            await expect(picker).toBeInViewport();
+        } finally { await host.context().close(); }
+    }
     async function verifyWebJamShare() {
         const viewport = { width: 1440, height: 900 };
         for (const webShare of [true, false]) {
@@ -2333,6 +2348,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     try {
         if (options.webJamShare) {
+            await verifyEmptyGameInvite();
             await verifyWebJamShare();
             assert.deepEqual(errors, []);
             console.log('Passed prepared Game Night invitation and trusted WebJam share.');

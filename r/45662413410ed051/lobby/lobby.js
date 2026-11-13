@@ -2697,11 +2697,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const inviteHint = $('[data-game-invite-empty]');
         inviteHint.hidden = !!target || (!canInviteNew && !!roster.childElementCount);
         inviteHint.textContent = canInviteNew ? 'Open a game with a free seat to invite a friend.' : 'Nobody else is in Hang Out yet.';
+        const chooseGame = $('[data-game-invite-choose]');
+        chooseGame.hidden = !canInviteNew || !!target || $('[data-arcade-game]').hidden;
         $('[data-game-invite-link]').hidden = !target;
         if (target) createGuestLink.textContent = `Invite a friend to ${gameLabel(target.game)}`;
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal();
-        if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
+        if (isGame) {
+            const connectedGuest = roster.querySelector('button:enabled');
+            const action = target ? createGuestLink : connectedGuest || (!chooseGame.hidden ? chooseGame : $('[data-game-invite-cancel]'));
+            action.focus();
+        }
         else $('[data-invite-nick]').focus();
     }
     function roomInviteArgs(nick, room) {
@@ -2827,6 +2833,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-jam-invite-room]').addEventListener('click', event => openInviteDialog(event.currentTarget));
     $('[data-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-game-invite-cancel]').addEventListener('click', closeInviteDialog);
+    $('[data-game-invite-choose]').addEventListener('click', () => {
+        const picker = $('[data-arcade-game]'), room = currentGameNight();
+        if (!room || room !== inviteContext || !amOp(room) || picker.hidden) return;
+        jamInviteOpener = { button: picker, room };
+        closeInviteDialog();
+        picker.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    });
     $('[data-invite-dialog]').addEventListener('close', () => {
         if ($('[data-invite-dialog]').open) return;
         const opener = jamInviteOpener;
