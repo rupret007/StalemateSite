@@ -1172,9 +1172,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (gameOfferAccepted) { joiningGameRoom = ''; joiningArcadeOffer = null; }
             if (returningToGame) gameReturnOffered = false;
             if (gameInvites.delete(c.name) || gameOfferAccepted || returningToGame || joiningLinkedGame) drawGameOffer();
+            const joinedFromChannelDialog = app.pendingChannel === m.ch.name && $('[data-channel-dialog]').open;
             if (app.pendingChannel === m.ch.name) {
                 app.pendingChannel = '';
-                $('[data-channel-dialog]').close();
+                if (joinedFromChannelDialog) $('[data-channel-dialog]').close();
             }
             app.chans.set(m.ch.name, c);
             if (c.kind === 'game' && invite?.arcade && invite.ref === c.keepRef) beginArcadeInvitation(c, invite.arcade);
@@ -1187,7 +1188,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
             if (gameGuest?.game === 'four' && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginFourInvitation(c);
-            if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
+            if (joinedFromChannelDialog) focusChannelTab(c.name, { preventScroll: false });
+            else if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
             followPendingRoomJoin();
             break;
         }
@@ -2754,6 +2756,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (app.chans.has(name)) {
             $('[data-channel-dialog]').close();
             switchTo(name);
+            focusChannelTab(name, { preventScroll: false });
             return;
         }
         if ((/^#(?:art|watch|bobross|jam)(?:-|$)/.test(name) || gameNightSupported && gameNightRoomName(name)) && !app.rooms.some((r) => r.name === name)) {

@@ -223,6 +223,7 @@ test('phone room creation keeps the name and shows a server rejection inside the
         await page.locator('[data-channel-form] button[type="submit"]').click();
         await expect(page.locator('[data-chat-context]')).toHaveText('#first-chat');
         await expect(page.locator('[data-channel-dialog]')).toBeHidden();
+        await expect(page.getByRole('tab', { name: '#first-chat', exact: true })).toBeFocused();
         await page.click('[data-show="rooms"]');
         await page.click('[data-start="chat"]');
         await page.fill('[data-channel-name]', '#another-chat');
@@ -247,6 +248,7 @@ test('phone room creation keeps the name and shows a server rejection inside the
         await page.locator('[data-channel-form] button[type="submit"]').click();
         await expect(page.locator('[data-channel-dialog]')).toBeHidden();
         await expect(page.locator('[data-chat-context]')).toHaveText('#first-chat');
+        await expect(page.getByRole('tab', { name: '#first-chat', exact: true })).toBeFocused();
         await expect(page.locator('[data-text]')).toBeInViewport();
     } finally { await page.context().close(); }
 });
