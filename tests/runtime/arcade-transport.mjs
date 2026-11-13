@@ -22,6 +22,7 @@ const nonce = randomBytes(16).toString('hex');
 const room = '#game-2ca9e1x1be34a';
 const browserName = process.argv.find(arg => arg.startsWith('--browser='))?.slice(10) || '';
 const browserMedia = process.argv.includes('--media');
+const webJamShare = process.argv.includes('--webjam-share');
 const siteGuest = process.argv.find(arg => arg.startsWith('--site-guest='))?.slice('--site-guest='.length);
 const relay = process.argv.includes('--relay');
 const rollback = process.argv.includes('--rollback');
@@ -30,6 +31,7 @@ const mixedRef = process.argv.find(arg => arg.startsWith('--mixed-ref='))?.slice
 assert.ok(!serve || !browserName && !rollback && !relay && !mixedRef, 'serve the private preview on its own');
 const fixtureIce = { urls: [process.env.ARCADE_TEST_TURN_URL || 'turn:fixture.invalid:3478'],
     username: 'arcade-fixture', credential: 'arcade-local-turn-only' };
+assert.ok(!webJamShare || browserName && !siteGuest && !relay && !mixedRef, 'the isolated WebJam share check needs one browser');
 assert.ok(!browserMedia || browserName === 'chromium', 'the synthetic device media test uses Chromium');
 assert.ok(['', 'chromium', 'webkit'].includes(browserName), 'choose --browser=chromium or --browser=webkit');
 assert.ok(!relay || !browserName || browserMedia && process.env.ARCADE_TEST_TURN_URL, 'browser relay test needs --media and a local TURN URL');
@@ -1067,7 +1069,7 @@ try {
             console.log(`Passed ${browserName} mixed lobby versions using source ${mixedRef}.`);
         } else {
             await runArcadeBrowser(browserName, browserOrigin, invite, evidence,
-                siteGuest ? null : await previewEntrances(browserOrigin), browserMedia, relay, { siteGuest });
+                siteGuest || webJamShare ? null : await previewEntrances(browserOrigin), browserMedia, relay, { siteGuest, webJamShare });
         }
     } else if (rollback) {
         await verifyRollback(async (bindings, revision) => {

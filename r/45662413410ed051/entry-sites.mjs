@@ -64,7 +64,9 @@ export function gameNightEntry(params, hash = '') {
         && gameNightRoomName(room) && /^[a-f0-9]{32}$/.test(ref || '') ? { room, ref } : null;
     const tables = params.getAll('table');
     const table = !target && tables.length === 1 && /^[a-z][a-z0-9]{2,15}$/.test(tables[0]) ? tables[0] : '';
-    return { target, ...(table ? { table } : {}) };
+    const deliveries = params.getAll('deliver');
+    const prepareShare = table && !hash && deliveries.length === 1 && deliveries[0] === 'share';
+    return { target, ...(table ? { table } : {}), ...(prepareShare ? { prepareShare: true } : {}) };
 }
 
 export function gameNightFragment(target) {

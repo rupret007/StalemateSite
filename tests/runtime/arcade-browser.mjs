@@ -259,13 +259,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }
         }
     }
-    async function shareGameNightLink(host, viewport, step, capturePicker) {
+    async function shareGameNightLink(host, viewport, step, capturePicker, useClipboard = false) {
         const original = host.viewportSize();
         await host.bringToFront();
-        await host.evaluate(() => {
+        await host.evaluate(copy => {
             window.testGameInvitation = '';
+            if (copy) {
+                Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+                Object.defineProperty(navigator.clipboard, 'writeText', { configurable: true, value: async url => {
+                    if (!window.allowTestGameInvitationCopy) throw new DOMException('Clipboard unavailable', 'NotAllowedError');
+                    window.testGameInvitation = url;
+                } });
+                return;
+            }
             Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ url }) => { window.testGameInvitation = url; } });
-        });
+        }, useClipboard);
         try {
             await host.setViewportSize(viewport);
             await host.getByRole('button', { name: 'Invite players' }).click();
@@ -273,14 +281,31 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(newGuest).toBeFocused();
             if (capturePicker) await capturePicker(newGuest);
             await newGuest.click();
-            await expect(host.getByRole('button', { name: 'Share invite' })).toBeVisible();
+            const deliver = host.getByRole('button', { name: useClipboard ? 'Copy invite' : 'Share invite' });
+            await expect(deliver).toBeFocused();
             await captureArcadeInvite(host, viewport, step);
-            await host.getByRole('button', { name: 'Share invite' }).click();
+            await deliver.click();
+            if (useClipboard) {
+                const status = host.locator('[data-game-invite-link-status]');
+                await expect(status).toHaveText('Couldn’t copy the invitation. You can still use Email invite.');
+                await expect(host.getByRole('button', { name: 'Email invite' })).toBeVisible();
+                await host.evaluate(() => { window.allowTestGameInvitationCopy = true; });
+                await deliver.click();
+                await expect(status).toContainText('Invitation copied.');
+                await host.getByRole('button', { name: 'Cancel' }).click();
+            }
             const link = new URL(await host.evaluate(() => window.testGameInvitation));
-            assert.ok(link.origin === origin && link.pathname === '/beta/game-night/guest' && /^#invite=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(link.hash), 'the share sheet receives one private game invitation');
+            assert.ok(link.origin === origin && link.pathname === '/beta/game-night/guest' && /^#invite=[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(link.hash), 'the delivery action receives one private game invitation');
             return link;
         } finally {
-            await host.evaluate(() => { delete window.testGameInvitation; delete navigator.share; });
+            await host.evaluate(copy => {
+                delete window.testGameInvitation;
+                delete navigator.share;
+                if (copy) {
+                    delete navigator.clipboard.writeText;
+                    delete window.allowTestGameInvitationCopy;
+                }
+            }, useClipboard);
             await host.setViewportSize(original);
         }
     }
@@ -423,7 +448,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
             await host.getByRole('button', { name: 'Open Chess match' }).click();
             await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
-            const link = await shareGameNightLink(host, viewport, 'guest-retry-00-share');
+            const link = await shareGameNightLink(host, viewport, 'guest-retry-00-share', undefined, !phone);
             const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
             try {
                 const friend = await context.newPage();
@@ -508,6 +533,49 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         } finally {
             await context.close();
             await host.setViewportSize(original);
+        }
+    }
+    async function verifyWebJamShare() {
+        const viewport = { width: 1440, height: 900 };
+        for (const webShare of [true, false]) {
+            const host = await guest('stalemate', webShare ? 'ShareHost' : 'EmailHost', viewport, false,
+                origin + '/beta/?game-night=1&table=chess&deliver=share&via=stalemate');
+            let issues = 0;
+            try {
+                host.on('request', request => {
+                    if (new URL(request.url()).pathname === '/beta/game-night/invitation/issue') issues++;
+                });
+                await host.evaluate(supported => {
+                    window.testGameShares = 0;
+                    Object.defineProperty(navigator, 'share', { configurable: true, value: supported ? async ({ title, url }) => {
+                        window.testGameShares++;
+                        if (!navigator.userActivation.isActive) throw new DOMException('No activation', 'NotAllowedError');
+                        if (title !== 'Join me for Royal Flush Chess' || new URL(url).pathname !== '/beta/game-night/guest')
+                            throw new DOMException('Unexpected destination', 'DataError');
+                        if (window.testGameShares === 1) throw new DOMException('Canceled', 'AbortError');
+                    } : undefined });
+                }, webShare);
+                await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+                const open = host.getByRole('button', { name: 'Open Chess match', exact: true });
+                await expect(open).toBeVisible();
+                assert.equal(issues, 0, 'the host opens a waiting match before preparing its invitation');
+                await open.click();
+                const share = host.getByRole('button', { name: webShare ? 'Share invite' : 'Email invite', exact: true });
+                await expect(share).toBeFocused();
+                await expect(share).toBeEnabled();
+                await expect(host.getByRole('button', { name: 'Copy invite', exact: true })).toBeVisible();
+                assert.equal(issues, 1, 'the WebJam handoff prepares exactly one invitation');
+                assert.equal(await host.evaluate(() => window.testGameShares), 0, 'table readiness never invokes Web Share');
+                assert.ok(!new URL(host.url()).searchParams.has('deliver'), 'the handoff is removed from the address');
+                if (webShare) {
+                    await share.click();
+                    await expect(share).toBeVisible();
+                    await share.click();
+                    await expect(share).toBeHidden();
+                    assert.equal(await host.evaluate(() => window.testGameShares), 2, 'both share calls came from trusted clicks');
+                }
+                assert.equal(issues, 1, 'sharing an already prepared invitation issues no extra link');
+            } finally { await host.context().close(); }
         }
     }
     async function verifyGameNightEntry() {
@@ -2234,6 +2302,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
+        if (options.webJamShare) {
+            await verifyWebJamShare();
+            assert.deepEqual(errors, []);
+            console.log('Passed prepared Game Night invitation and trusted WebJam share.');
+            return;
+        }
         if (options.siteGuest) {
             await verifyBrandGuestEntry(options.siteGuest);
             assert.deepEqual(errors, []);
