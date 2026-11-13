@@ -25,7 +25,7 @@ const markup = `
 <div class="arcade-card-actions" data-spades-seats hidden></div>
 <div data-card-table data-spades-table hidden>
     <div class="arcade-card-score" aria-label="Partnership scores"><span data-spades-score="0"></span><span data-spades-score="1"></span></div>
-    <ul class="spades-trick" aria-label="Bids and trick cards" data-spades-trick></ul>
+    <ul class="spades-trick" aria-label="Bids and trick cards" tabindex="-1" data-spades-trick></ul>
     <div class="arcade-card-actions" data-spades-bid hidden>
         <label for="spades-bid">Your bid</label><select id="spades-bid"></select>
         <button class="btn btn--small" type="button" data-spades-action="bid">Bid for me</button>
@@ -198,7 +198,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
         } else if (match?.result) {
             if (!seat) {
-                message = `${teams[match.result.winner]} win. You’re watching.`;
+                message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}. You’re watching.`;
                 command = 'watch';
                 label = 'Watch for the rematch';
             } else {
@@ -214,6 +214,11 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 if (result.bagPenalties) nil.push('bag penalty');
                 return `${teams[team]} ${signed}${nil.length ? ' · ' + nil.join(', ') : ''}`;
             }).join(' / ');
+            if (!seat) {
+                message += ' · Waiting for the next round.';
+                command = 'watch';
+                label = 'Keep watching';
+            }
         } else if (match) {
             const yourTurn = seat === match.turn;
             if (paired && match.phase === 'bid' && yourTurn && seat === 'west') {
@@ -303,7 +308,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         const action = main.dataset.command;
         if (action === 'retry') client.start(scope);
         else if (action === 'stay') { matchEnded = false; draw(); status.focus(); }
-        else if (action === 'watch') status.focus();
+        else if (action === 'watch') $('[data-spades-trick]').focus();
         else if (action) send(action);
     });
     partnerButton.addEventListener('click', () => send('open', { mode: 'partners' }));

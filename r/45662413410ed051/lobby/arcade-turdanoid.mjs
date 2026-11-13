@@ -265,7 +265,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
             message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
             if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect race'; }
         } else if (connection !== 'ready') {
-            if (match) message = seat && !match.result ? 'Reconnecting to your seat.' : 'Reconnecting to the race…';
+            if (match) message = seat && !match.result ? 'Reconnecting to your seat · race clock keeps running' : 'Reconnecting to the race…';
         } else if (!model) {
             if (raceEnded && !canOpen) {
                 message = 'This race ended. Wait here for the next race.';
@@ -281,7 +281,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         } else if (result) {
             const reason = { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
             if (!seat) {
-                message = (result.winner === null ? 'Draw' : result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins') + '. You can watch the next race.';
+                message = (result.winner === null ? 'Draw' : result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins') + ' · ' + reason;
                 action = 'watch';
                 label = 'Watch for the next race';
             } else {

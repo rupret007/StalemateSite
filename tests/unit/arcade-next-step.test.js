@@ -49,7 +49,7 @@ describe('Chess next step', () => {
             state: { id: 'chess-1', seat: null, waiting: false, rematch: null, match: { fen: FEN, turn: 'w', result: null, moves: [], revision: 1, clock: { w: 600000, b: 600000 } } },
             canOpen: false
         });
-        expect(status.textContent).toBe('Table full. You’re watching.');
+        expect(status.textContent).toBe('Table full. You’re watching. White to move.');
         expect(button.hidden).toBe(false);
         expect(button.textContent).toBe('Watch this game');
         button.click();
@@ -58,7 +58,7 @@ describe('Chess next step', () => {
             state: { id: 'chess-1', seat: null, waiting: false, rematch: null, match: { fen: FEN, turn: 'b', result: { winner: 'b', reason: 'Resignation' }, moves: [], revision: 2, clock: { w: 600000, b: 600000 } } },
             canOpen: false
         });
-        expect(status.textContent).toBe('Black wins. You can watch the next match.');
+        expect(status.textContent).toBe('Black wins · Resignation. You can watch the next match.');
         expect(button.textContent).toBe('Watch for the next game');
         state({
             state: { id: 'chess-1', seat: 'b', waiting: false, rematch: null, match: { fen: FEN, turn: 'b', result: { winner: 'b', reason: 'Resignation' }, moves: [], revision: 2, clock: { w: 600000, b: 600000 } } },
@@ -122,8 +122,17 @@ describe('Spades next step', () => {
             state: { version: 1, game: 'turdspades', id: 'spades-1', seat: null, mode: 'partners', waiting: false, occupied: ['south', 'west'], match: spadesMatch({ result: { winner: 1, reason: 'resigned' } }) },
             canOpen: false, partners: true
         });
-        expect(status.textContent).toBe('West + East CPU win. You’re watching.');
+        expect(status.textContent).toBe('West + East CPU win by resignation. You’re watching.');
         expect(button.textContent).toBe('Watch for the rematch');
+        const roundResult = [{ delta: 12, nil: [] }, { delta: -3, nil: [] }];
+        state({
+            state: { version: 1, game: 'turdspades', id: 'spades-1', seat: null, waiting: false, occupied: ['south', 'west', 'north', 'east'], match: spadesMatch({ roundResult }) },
+            canOpen: false, partners: true
+        });
+        expect(status.textContent).toContain('Waiting for the next round.');
+        expect(button.textContent).toBe('Keep watching');
+        button.click();
+        expect(view.ownerDocument.activeElement).toBe(view.querySelector('[data-spades-trick]'));
         state({
             state: { version: 1, game: 'turdspades', id: 'spades-1', seat: 'west', waiting: false, occupied: ['south', 'west', 'north', 'east'], match: spadesMatch({ result: { winner: 1, reason: 'resigned' } }) },
             canOpen: false, partners: true
@@ -168,12 +177,12 @@ describe('Turdanoid next step', () => {
         expect(client.sent).toEqual([]);
         state({ state: { version: 1, game: 'turdanoid', id: 'race-12345', seat: 'b', waiting: false, rematch: null, match }, canOpen: false });
         client.handlers.onStatus('reconnecting');
-        expect(status.textContent).toBe('Reconnecting to your seat.');
+        expect(status.textContent).toBe('Reconnecting to your seat · race clock keeps running');
         state({
             state: { version: 1, game: 'turdanoid', id: 'race-12345', seat: null, waiting: false, rematch: null, match: { ...match, result: { winner: 'a', reason: 'clear' } } },
             canOpen: false
         });
-        expect(status.textContent).toBe('Player 1 wins. You can watch the next race.');
+        expect(status.textContent).toBe('Player 1 wins · wall cleared');
         expect(button.textContent).toBe('Watch for the next race');
         state({
             state: { version: 1, game: 'turdanoid', id: 'race-12345', seat: 'b', waiting: false, rematch: null, match: { ...match, result: { winner: 'a', reason: 'clear' } } },

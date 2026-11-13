@@ -277,7 +277,7 @@ export function mountArcadeChess(container, onMatch) {
             button(seated ? 'Close waiting match' : 'Join as Black', seated ? 'leave' : 'join');
         } else if (match?.result) {
             if (!seated) {
-                status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'}. You can watch the next match.`;
+                status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}. You can watch the next match.`;
                 button('Watch for the next game', 'watch');
             } else {
                 status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
@@ -286,7 +286,7 @@ export function mountArcadeChess(container, onMatch) {
                     ? ' · Rematch requested. Waiting for your opponent.' : ' · Your opponent requested a rematch.';
             }
         } else if (!seated) {
-            status.textContent = 'Table full. You’re watching.';
+            status.textContent = `Table full. You’re watching. ${colorName(match.turn)} to move.`;
             button('Watch this game', 'watch');
         } else {
             const who = `You’re ${colorName(model.seat)}`;

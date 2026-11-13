@@ -2235,7 +2235,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(launchWait(b)).toBeHidden();
         if (pauseReconnect) {
             const returnBoard = await pauseReconnect();
-            await expect(a.locator('[data-brick-status]')).toHaveText('Reconnecting · race clock keeps running');
+            await expect(a.locator('[data-brick-status]')).toHaveText('Reconnecting to your seat · race clock keeps running');
             await expect(board(a)).toBeInViewport({ ratio: 1 });
             await expect(serve(a)).toBeDisabled();
             await board(a).press('Space');
