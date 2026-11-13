@@ -1,5 +1,6 @@
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { POOP_KINDS, findGroup, popGroup } from '/play/games/turdomania-core.js';
+import { findDuelSolution, locateDuelTile } from '/play/games/turdomania-duel.js';
 
 const sprite = '/play/assets/turdomania-tiles.svg#';
 const symbols = ['swirl', 'corn', 'splat', 'paper', 'bean', 'cheese'];
@@ -46,7 +47,7 @@ function setText(element, text) {
 function puzzle(root, select) {
     const document = root.ownerDocument, buttons = new Map(), rows = [];
     const interactive = !!select;
-    let board = [], key, active;
+    let board = [], key, active, showingStarter;
     if (interactive) for (let index = 0; index < 6; index++) {
         const row = document.createElement('div');
         row.setAttribute('role', 'row');
@@ -92,10 +93,14 @@ function puzzle(root, select) {
             if (next) mark(next, true);
         });
     }
-    return next => {
+    return (next, showStarter = false) => {
         const nextKey = next.map(col => col.map(tile => tile.id + ':' + tile.kind).join(',')).join('/');
-        if (nextKey === key) return;
+        if (nextKey === key && showStarter === showingStarter) return;
         key = nextKey;
+        showingStarter = showStarter;
+        const [first] = showStarter ? findDuelSolution(next) || [] : [];
+        const position = first === undefined ? null : locateDuelTile(next, first);
+        const starter = new Set(position ? findGroup(next, ...position).map(([col, row]) => next[col][row].id) : []);
         const focused = interactive && root.contains(document.activeElement);
         const oldNode = buttons.get(active?.id);
         const anchor = [Number(oldNode?.dataset.col) || 0, Number(oldNode?.dataset.row) || 0];
@@ -123,6 +128,7 @@ function puzzle(root, select) {
                 node.dataset.maniaTile = tile.id;
                 buttons.set(tile.id, node);
             }
+            node.classList.toggle('mania-starter', starter.has(tile.id));
             if (node.dataset.kind !== String(tile.kind)) {
                 node.dataset.kind = tile.kind;
                 node.querySelector('use').setAttribute('href', sprite + symbols[tile.kind]);
@@ -226,6 +232,8 @@ export function mountArcadeTurdomania(container, onMatch) {
         const waiting = !match.result && countdown > 0;
         const seconds = Math.max(0, Math.ceil((match.endsAt - Math.max(now, match.startsAt)) / 1000));
         table.dataset.phase = match.result ? 'finished' : waiting ? 'countdown' : 'play';
+        const disabled = String(connection !== 'ready' || waiting || seconds === 0 || !!match.result || !!match.players[model.seat]?.over);
+        if (ownBoard.getAttribute('aria-disabled') !== disabled) ownBoard.setAttribute('aria-disabled', disabled);
         const label = match.result ? 'Final' : waiting ? 'Starts in ' + countdown
             : Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
         setText($('[data-mania-clock]'), label);
@@ -259,7 +267,9 @@ export function mountArcadeTurdomania(container, onMatch) {
         } else if (match) {
             const own = match.players[seat];
             message = !seat ? 'Watching the duel' : own.cleared ? 'Puzzle cleared. Opponent still playing.'
-                : own.over ? 'No matches left. Opponent still playing.' : 'Pop matching groups of two or more.';
+                : own.over ? 'No matches left. Opponent still playing.'
+                : own.moves || prediction ? 'Pop matching groups of two or more.'
+                : 'Tap an outlined tile to pop its matching group.';
         }
         setText(status, message);
         status.classList.toggle('mania-playing', !!match && !result && !!seat && !match.players[seat].over);
@@ -270,12 +280,15 @@ export function mountArcadeTurdomania(container, onMatch) {
         leave.hidden = !seat || !!result;
         leave.disabled = connection !== 'ready' || !!busy;
         table.hidden = !match;
-        ownBoard.setAttribute('aria-disabled', String(connection !== 'ready'));
-        if (!match) return;
+        if (!match) {
+            ownBoard.setAttribute('aria-disabled', 'true');
+            return;
+        }
         table.dataset.move = seat ? match.players[seat].moves : '';
         $('[data-mania-own]').hidden = !seat;
         $('[data-mania-watching]').hidden = !!seat;
-        if (seat) drawOwn(prediction?.board || match.self.board);
+        if (seat) drawOwn(prediction?.board || match.self.board,
+            connection === 'ready' && !result && !match.players[seat].over && !match.players[seat].moves && !prediction);
         else ['a', 'b'].forEach((position, index) => drawWatch[index](match.boards[position]));
         for (const [index, position] of ['a', 'b'].entries()) {
             const score = $(`[data-mania-score="${position}"]`), data = match.players[position];
