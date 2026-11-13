@@ -216,7 +216,6 @@
                 <button class="btn btn--small btn--ghost op-only" type="button" data-roomtools>@ Host tools</button>
                 <select class="btn btn--small btn--ghost arcade-game-picker" data-arcade-game aria-label="Switch game" hidden>
                     <option value="">Games</option>
-                    <option value="four">Four in a Row</option>
                     <option value="chess" hidden disabled>Royal Flush Chess</option>
                     <option value="crapeights" hidden disabled>Crappy Eights</option>
                     <option value="turdrummy" hidden disabled>TurdRummy</option>
@@ -240,7 +239,6 @@
                 <div class="game-heading">
                     <h3 class="jam-title" id="game-night-title">Game Night</h3>
                     <p class="small game-note">Invite-only room</p>
-                    <p class="sr-only" role="status" data-four-availability></p>
                 </div>
                 <div class="jam-actions game-actions">
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
@@ -249,27 +247,6 @@
                     <span class="sr-only" id="game-arcade-tab-note">Opens in a new tab</span>
                     <a class="btn btn--small btn--ghost" data-game-open target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open Discord call</a>
                 </div>
-                <details class="four-match" data-four hidden>
-                    <summary>
-                        <span class="four-summary">
-                            <span>Four in a Row</span>
-                            <span class="four-seats" data-four-seats hidden>
-                                <span class="four-seat" data-seat="X"><b>X</b><span data-four-player="X"></span></span>
-                                <span class="four-seat" data-seat="O"><b>O</b><span data-four-player="O"></span></span>
-                            </span>
-                        </span>
-                    </summary>
-                    <div class="four-info">
-                        <p class="small game-note" data-four-status role="status" tabindex="-1"></p>
-                        <button class="btn btn--small" type="button" data-four-action hidden></button>
-                        <button class="btn btn--small arcade-invite-friend" type="button" data-four-invite hidden aria-haspopup="dialog">Invite a friend</button>
-                    </div>
-                    <div data-four-board hidden>
-                        <div class="four-columns" role="group" aria-label="Drop a piece" data-four-columns></div>
-                        <table class="four-board" aria-label="Four in a Row board" data-four-table></table>
-                    </div>
-                    <button class="btn btn--small btn--ghost four-leave" type="button" data-four-leave hidden></button>
-                </details>
                 <div class="game-call">
                     <section id="game-night-call" class="game-night-call" aria-labelledby="game-night-call-title" hidden>
                         <div class="game-call-heading">

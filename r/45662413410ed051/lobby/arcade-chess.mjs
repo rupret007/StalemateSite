@@ -330,11 +330,8 @@ export function mountArcadeChess(container, onMatch) {
         const rank = Math.max(1, Math.min(8, Number(focused[1]) + y * sign));
         squares.get(files[file] + rank)?.focus();
     });
-    const four = container.querySelector('[data-four]');
-    four?.addEventListener('toggle', () => { if (four.open) panel.open = false; });
     panel.addEventListener('toggle', () => {
         if (panel.open && scope) {
-            if (four) four.open = false;
             client.start(scope);
         } else stop();
     });

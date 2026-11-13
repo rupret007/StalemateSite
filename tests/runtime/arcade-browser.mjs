@@ -122,12 +122,6 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(player.locator('[data-arcade-game]')).toHaveCount(previousClient ? 0 : 1);
         await expect(player.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
         await expect(player.locator('[data-call-toggle]')).toBeHidden();
-        for (const page of [host, player]) await page.locator('[data-four] summary').click();
-        await host.getByRole('button', { name: 'Open a match' }).click();
-        await player.getByRole('button', { name: 'Join match' }).click();
-        await host.getByRole('button', { name: 'Drop in column 1' }).click();
-        await player.getByRole('button', { name: 'Drop in column 2' }).tap();
-        await expect(host.locator('[data-four-status]')).toContainText('Your turn');
         if (previousWorker) {
             await expect(host.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
             await expect(host.locator('[data-call-toggle]')).toBeHidden();
@@ -136,14 +130,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
             await host.getByRole('button', { name: 'Open Chess match' }).click();
             await expect(host.locator('[data-chess-status]')).toContainText('Waiting');
-            await expect(player.locator('[data-four-board]')).toBeVisible();
         }
         for (const [sender, recipient, message] of [[player, host, 'Hello from Rad Dad'], [host, player, 'Hello from Stalemate']]) {
             await sender.locator('[data-text]').fill(message);
             await sender.locator('[data-send]').click();
             await expect(recipient.getByRole('log', { name: 'Conversation' })).toContainText(message);
         }
-        console.log(`Passed ${engine} ${previousWorker ? 'current client with previous Worker' : 'previous and current clients together'}, invitation, Four in a Row and two-way room chat.`);
+        console.log(`Passed ${engine} ${previousWorker ? 'current client with previous Worker' : 'previous and current clients together'}, invitation and two-way room chat.`);
     }
     async function captureArcadeInvite(page, viewport, step, mask = []) {
         const output = process.env.ARCADE_INVITE_EVIDENCE || evidence;
@@ -689,7 +682,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         if (media && !relay) {
             await expect(player.locator('[data-chess-status]')).toHaveText('Return to your Game Night room and try again.');
             await expect(player.getByRole('button', { name: 'Reconnect to Chess' })).toBeHidden();
-            await playerGame.selectOption('four');
+            await playerGame.selectOption('crapeights');
             await playerGame.selectOption('chess');
         }
         await host.getByRole('button', { name: 'Open Chess match' }).click();
@@ -798,6 +791,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await enterFromShell(host, radDad ? 'RadDadHost' : 'PreviewHost', true);
                 await expect(host.locator('[data-entry-label]').first()).toHaveText(`via ${brand}`);
                 await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+                await expect(host.getByRole('combobox', { name: 'Switch game' }).locator('option:not([disabled])')).toHaveText([
+                    'Games', 'Royal Flush Chess', 'Crappy Eights', 'TurdRummy', 'TurdSpades', 'Crapjack 21',
+                    'Turdtris Sprint', 'Turdomania Duel', 'Turd Rush Race', 'Turdanoid Brick Race'
+                ]);
                 const invitePlayers = host.getByRole('button', { name: 'Invite players', exact: true });
                 await invitePlayers.click();
                 const invitePicker = host.locator('[data-invite-dialog]');
@@ -2089,7 +2086,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
             } finally { await connection.detach(); }
         } else await b.touchscreen.tap(controlBox.x + controlBox.width / 2, controlBox.y + controlBox.height / 2);
-        await a.keyboard.press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
+        await track(a).press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
         if (prediction) assert.equal(await prediction, true, 'native phone swipe moves locally before delayed confirmation');
         for (const page of [a, b]) {
             await expect(race(page)).toHaveAttribute('data-sequence', '1');
@@ -2422,12 +2419,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         if (media) await joinCalls(a, b);
         else await expect(b.locator('[data-call-toggle]')).toBeHidden();
         const beforeSwitch = media ? await packetCount(b, 'audio') : 0;
-        await b.locator('[data-four] summary').click();
-        await expect(b.locator('[data-four]')).toHaveAttribute('open', '');
+        await b.getByRole('combobox', { name: 'Switch game' }).selectOption('crapeights');
+        await expect(b.locator('.arcade-eights')).toHaveAttribute('open', '');
         await expect(b.locator('.arcade-chess')).not.toHaveAttribute('open', '');
         await b.locator('.arcade-chess summary').click();
         await expect(b.getByRole('button', { name: 'e5, Black pawn' })).toBeVisible();
-        await expect(b.locator('[data-four]')).not.toHaveAttribute('open', '');
+        await expect(b.locator('.arcade-eights')).not.toHaveAttribute('open', '');
         if (media) {
             await expect(b.locator('[data-call-toggle]')).toHaveText('Call joined');
             await waitForPackets(b, 'audio', beforeSwitch);

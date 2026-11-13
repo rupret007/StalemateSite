@@ -255,35 +255,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 /* A pending offer stays until answered. Let the transcript give up height so
    the composer and Send remain visible above it on a phone. */
 @media (min-height: 451px) { .irc:has(.game-offer:not([hidden])) .buffer { min-height: 48px; } }
-.game-night:has(.four-match[open]) { max-height: 52dvh; }
 .game-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-bottom: 8px; }
 .game-heading .jam-title, .game-heading .game-note { margin: 0; }
-.four-match { margin: 8px 0; border-block: 1px solid var(--line); }
-.game-night .four-match summary { width: 100%; min-height: 34px; padding: 8px 2px; color: var(--cream); }
-.four-summary { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: calc(100% - 16px); vertical-align: middle; }
-.four-summary > :first-child { flex: none; font-weight: 650; }
-.four-seats { display: inline-flex; min-width: 0; gap: 6px; }
-.four-seat { display: inline-flex; align-items: center; gap: 4px; min-width: 0; color: var(--muted); font: 10px var(--mono); }
-.four-seat b { font-size: 12px; }
-.four-seat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.four-seat[data-seat="X"] b { color: var(--lime); }
-.four-seat[data-seat="O"] b { color: var(--blue); }
-.four-info { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; }
-.four-info p { flex: 1; min-width: 150px; margin: 0; }
-.four-columns, .four-board { max-width: 336px; width: 100%; }
-.four-columns { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding-block: 3px; background: #171e15; }
-.four-leave { margin-block: 4px; }
-.four-columns .btn { min-width: 0; min-height: 36px; padding-inline: 0; }
-.four-columns .btn[aria-disabled="true"] { color: var(--muted); cursor: default; }
-.four-columns .btn[aria-disabled="false"] { border-color: #637943; color: var(--lime); }
-.four-board { table-layout: fixed; border-spacing: 4px; padding-bottom: 6px; text-align: center; }
-.four-board tr { scroll-margin-block-start: 44px; }
-.four-board td { padding: 0; border: 1px solid #394739; border-radius: 3px; background: var(--surface); }
-.four-board td span { display: grid; min-height: 22px; place-items: center; font: bold 14px var(--mono); }
-.four-board td[data-mark="X"] { color: var(--lime); background: #222b19; }
-.four-board td[data-mark="O"] { color: var(--blue); background: #17282b; }
-.four-board td[data-last] { border-color: #7d8877; }
-.four-board td[data-winning] { border-color: currentColor; }
 .arcade-game-picker { max-width: 9.5rem; min-width: 0; }
 .game-night:has(.arcade-card-table[open]) { max-height: 68dvh; overscroll-behavior: contain; overflow-anchor: none; }
 .arcade-card-table { margin: 6px 0; border-block: 1px solid var(--line); padding: 4px 0 8px; }
@@ -314,13 +287,15 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (min-width: 1100px) {
   .game-night:has(.arcade-card-table[open] [data-card-table]:not([hidden])) {
     display: grid;
-    grid-template: "cards heading" auto "cards actions" auto "cards four" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards tris" auto "cards mania" auto "cards rush" auto "cards brick" auto "cards call" 1fr /
+    grid-template: "cards heading" auto "cards actions" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards tris" auto "cards mania" auto "cards rush" auto "cards brick" auto "cards call" 1fr /
       minmax(0, 27rem) minmax(0, 1fr);
     gap: 4px 16px;
     align-items: start;
   }
   .game-night:has(.arcade-card-table[open]) > .arcade-card-table[open] { grid-area: cards; margin: 0; }
-  .game-night:has(.arcade-card-table[open]) > .four-match { grid-area: four; }
+  .game-night:has(.arcade-card-table[open]) > .game-heading { grid-area: heading; }
+  .game-night:has(.arcade-card-table[open]) > .game-actions { grid-area: actions; }
+  .game-night:has(.arcade-card-table[open]) > .game-call { grid-area: call; }
   .game-night:has(.arcade-card-table[open]) > .arcade-chess { grid-area: chess; }
   .game-night:has(.arcade-card-table[open]) > .arcade-eights:not([open]) { grid-area: eights; }
   .game-night:has(.arcade-card-table[open]) > .arcade-rummy:not([open]) { grid-area: rummy; }
@@ -372,6 +347,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   }
   .arcade-spades [data-spades-table][data-phase="bid"] :is(.spades-trick, .arcade-card-hand-label) {
     margin-block: 2px;
+  }
+  .arcade-spades [data-spades-table][data-phase="bid"] :is(.arcade-card-score, .arcade-card-hand-label) {
+    display: none;
   }
 }
 @media (max-width: 355px) {
@@ -480,6 +458,7 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .rush-race-controls .btn { min-height: 44px; padding: 3px; font: bold 1rem var(--mono); touch-action: manipulation; user-select: none; }
 .rush-race-controls small { font-size: .7rem; text-transform: capitalize; }
 @media (max-height: 750px) {
+  .rush-race-track { height: clamp(132px, calc(100dvh - 509px), 275px); }
   .rush-race-status.rush-race-playing { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 .arcade-brick-race { position: relative; }
@@ -505,6 +484,8 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .brick-race-rail [data-brick-power] { order: 4; }
 .brick-race-help { margin: 4px 0 0; }
 @media (max-height: 750px) {
+  .brick-race-rail { gap: 3px; }
+  .brick-race-rail > :is(time, div) { padding-block: 3px; }
   .brick-race-board { max-width: min(100%, calc(clamp(150px, 100dvh - 435px, 285px) * 1.2)); justify-self: center; }
   .brick-race-help { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
@@ -523,22 +504,6 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .game-call-recent .btn { min-height: 44px; }
 .game-call-peers video { display: block; width: min(100%, 150px); aspect-ratio: 16 / 9; object-fit: cover; }
 .game-call-peers video[hidden] { display: none; }
-@media (max-width: 1099px) {
-  .game-night:has(.four-match[open]) .game-call > :not(.game-night-call) { display: none; }
-  .game-night:has(.four-match[open]) .game-call:not(:has(.game-night-call:not([hidden]))) { display: none; }
-}
-@media (min-width: 1100px) {
-  .game-night:has(.four-match[open]) {
-    display: grid;
-    grid-template: "heading match" auto "actions match" auto "call match" 1fr / minmax(0, 1fr) minmax(0, 336px);
-    gap: 0 18px;
-    align-items: start;
-  }
-  .game-heading { grid-area: heading; }
-  .game-actions { grid-area: actions; }
-  .game-call { grid-area: call; }
-  .game-night .four-match[open] { grid-area: match; margin: 0; border-block: 0; }
-}
 .jam-paste .small { flex-basis: 100%; margin: 0; }
 [data-jam-share-status]:empty { display: none; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }
@@ -597,8 +562,6 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 [data-game-invite-link-status]:empty { display: none; }
 .game-guest [data-pane=rooms], .game-guest [data-show=rooms], .game-guest .chat .startroom,
 .game-guest .pmtoggle:has([data-pm-off]), .game-guest [data-game-arcade] { display: none !important; }
-.game-guest:not(.game-guest-four) [data-four] { display: none !important; }
-.game-guest-four .game-night:has(.four-match[open]) { max-height: none; }
 body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: none; }
 [data-game-guest-connecting].gate {
   place-items: start center; padding: 32px 20px; background: #101414;
@@ -693,10 +656,10 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .phonetabs button { min-height: 56px; border: 0; border-top: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 550; }
   .phonetabs button[aria-current=true] { border-top-color: var(--lime); color: var(--lime); background: #20271d; }
   .game-guest .phonetabs { grid-template-columns: repeat(2, 1fr); }
-  .irc:has(.game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess, .four-match)[open]) :is(.phonetabs, .phonetabs button) {
+  .irc:has(.game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) :is(.phonetabs, .phonetabs button) {
     min-height: 44px;
   }
-  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess, .four-match)[open]) .quick { display: none; }
+  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .quick { display: none; }
   .game-night { scroll-padding-block: 8px; }
   .tabs { min-height: 47px; padding: 4px 10px 0; }
   .tabs button { min-height: 42px; padding: 8px 12px; font-size: 11px; }
@@ -709,7 +672,6 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .conversation-starters button, .quiet-action { flex: none; min-height: 36px; font-size: 9px; padding: 5px 8px; }
   .buffer { padding: 10px 12px; font-size: 12px; line-height: 1.75; }
   .jam { padding: 12px; max-height: 40dvh; }
-  .game-guest-four .jam.game-night:has(.four-match[open]) { max-height: none; flex: 1 1 auto; }
   .buffer li { padding-inline: 0; }
   .who { font-size: 12px; }
   .ts { font-size: 9px; }
@@ -823,14 +785,12 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
-  .buffer:has(:focus-visible),
-  .chat:has(.four-match[open]) .buffer { min-height: 64px; flex-shrink: 0; }
-  .game-night:has(.four-match[open]) { min-height: 108px; }
+  .buffer:has(:focus-visible) { min-height: 64px; flex-shrink: 0; }
   .buffer li { padding-block: 0; }
   .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
   .chat:has(.buffer :focus-visible) .say,
-  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess, .four-match)[open]) .say { position: static; }
+  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .say { position: static; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   /* Send is shorter than its input. Leave room for the entire composer when
      native focus scrolling brings the button into a deeply zoomed viewport. */

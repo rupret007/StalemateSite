@@ -987,7 +987,7 @@ async function verifyRollback(reloadWorker) {
     async function reopen(label, mediaEnabled = false) {
         white = await connectGuest('FixtureWhite', 'stalemate', '192.0.2.11', white.cookie, white.dev);
         black = await connectGuest('FixtureBlack', 'rad-dad', '192.0.2.12', black.cookie, black.dev);
-        assert.equal(white.features.gameNight, 1, 'Game Night stays available for ordinary chat and Four in a Row');
+        assert.equal(white.features.gameNight, 1, 'Game Night stays available for ordinary room chat');
         assert.equal(white.features.arcadeMedia, mediaEnabled ? 1 : undefined);
         white.lobby.send({ t: 'say', ch: '#stalemate', text: label });
         await black.lobby.wait(frame => frame.t === 'line' && frame.text === label, 'chat after Worker restart');
@@ -1046,10 +1046,7 @@ async function verifyRollback(reloadWorker) {
         await rejoinRoom(white);
         await rejoinRoom(black);
         await allowNextCommand();
-        white.lobby.send({ t: 'cmd', name: 'four', args: ['open', ''], ch: room, roomInstance: ch.keepRef });
-        const four = await black.lobby.wait(frame => frame.t === 'four' && frame.game?.host === white.id, 'previous Worker Four in a Row');
-        assert.equal(four.game.moves, 0);
-        console.log(`Passed rollback to source ${rollbackRef} with the same protected storage, sessions, private room, Four in a Row and reports.`);
+        console.log(`Passed rollback to source ${rollbackRef} with the same protected storage, sessions, private room and reports.`);
     }
     await allowNextCommand();
     await reloadWorker({ ...arcadeFlags, HANGOUT_ARCADE_MEDIA: '1' });

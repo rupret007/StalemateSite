@@ -293,7 +293,7 @@ async function runtime(phase, state, nonce) {
         if (FANOUT_50 && admissionProfile) admissionProfile.serverHello = performance.now();
         assert.deepEqual(hello.features, { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1,
             personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, gameNight: 1, gameOpen: 1,
-            fourInARow: 1, discordLinks: !PARTICIPATION, transportPing: 1 });
+            discordLinks: !PARTICIPATION, transportPing: 1 });
         assert.equal(hello.role, 'fan');
         if (FANOUT_50 && admissionProfile) admissionProfile.clientHello = performance.now();
         visitor.send({ t: 'hello', nick: label, age13: true, entrySource: source, ...(transport ? { transport: 1 } : {}) });
@@ -1003,7 +1003,6 @@ async function runtime(phase, state, nonce) {
                 const gameRoom = '#game-2ca9e1x1be34a';
                 const joined = await joinRoom(c, gameRoom);
                 assert.equal(joined.ch.kind, 'game'); assert.equal(joined.ch.modes.i, true);
-                assert.equal(joined.ch.four, null);
                 const inviteAt = b.frames.length, hostInviteAt = c.frames.length;
                 const guestId = canvasC.ch.names.find(person => person.nick === b.label)?.id;
                 assert.match(guestId, /^c[a-f0-9]{32}$/);
@@ -1014,21 +1013,10 @@ async function runtime(phase, state, nonce) {
                     c.wait(f => f.t === 'notice' && f.text === `Invited ${b.label} to ${gameRoom}.`, 'Game Night invite confirmation', hostInviteAt),
                 ]);
                 await joinRoom(b, gameRoom);
-                const four = (from, to, args, accepts, label) => {
-                    const since = to.frames.length;
-                    from.send({ t: 'cmd', name: 'four', args, ch: gameRoom, roomInstance: joined.ch.keepRef });
-                    return to.wait(f => f.t === 'four' && f.ch === gameRoom && accepts(f.game), label, since);
-                };
-                const opened = await four(c, b, ['open'], game => !!game && !game.guest, 'native board open');
-                const id = opened.game.id;
-                await four(b, c, ['join', id], game => !!game?.guest, 'native board seat');
-                const moved = await four(c, b, ['drop', id, '0', '4'], game => game?.moves === 1, 'native board move');
-                assert.deepEqual(moved.game.board.slice(-7), ['', '', '', 'X', '', '', '']);
                 await a.command('join', [gameRoom], '#stalemate', f => f.t === 'notice' && /invite-only/.test(f.text), 'nonmember game refusal');
-                assert.ok(a.frames.every(f => f.t !== 'four' && !(f.t === 'join' && f.ch.name === gameRoom)));
-                await four(b, c, ['leave', id], game => game === null, 'native board end');
+                assert.ok(a.frames.every(f => !(f.t === 'join' && f.ch.name === gameRoom)));
                 await c.command('close', [], gameRoom, f => f.t === 'closed' && f.ch === gameRoom, 'close test Game Night room');
-                // The host spent five additional command tokens. Let the
+                // The host spent several additional command tokens. Let the
                 // production one-token-per-second bucket replenish before
                 // the existing camera, block and crash-recovery sequence.
                 await delay(5000);
