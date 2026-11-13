@@ -410,15 +410,27 @@ async function verifyWebJamChess() {
         assert.equal(await ticket(friend, '/beta/arcade-ticket', { ...hostRoom, actor: friendIdentity.actor }), 403,
             'an open table still denies community members outside the private room');
 
-        await host.evaluate(() => window.__lobby.cmd('invite', ['RoomChessFriend']));
-        await friend.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).tap();
-        await expect.poll(() => friend.evaluate(room => window.__lobby.active === room, hostRoom.room)).toBe(true);
-        const guestTable = friend.locator('[data-jam-chess]');
-        const join = guestTable.getByRole('button', { name: 'Join Chess', exact: true });
-        await expect(join).toBeVisible();
+        const standby = await open('RoomChessStandby', true);
+        async function inviteToChess(nick, guestPage) {
+            const roomInvite = host.getByRole('button', { name: 'Invite bandmate to room' });
+            const roster = host.locator('[data-invite-options]');
+            await expect.poll(() => host.evaluate(name =>
+                window.__lobby.chans.get('#stalemate')?.names.some(person => person.nick === name), nick)).toBe(true);
+            await roomInvite.click();
+            await roster.selectOption({ label: nick });
+            await host.getByRole('button', { name: 'Invite selected person' }).click();
+            const offer = guestPage.locator('[data-game-offer]');
+            await expect(offer).toContainText('RoomChessHost invited you to play Royal Flush Chess.');
+            return offer.getByRole('button', { name: 'Play Royal Flush Chess', exact: true });
+        }
+        const standbyPlay = await inviteToChess('RoomChessStandby', standby);
+        const join = await inviteToChess('RoomChessFriend', friend);
         assert.ok((await join.boundingBox()).height >= 44, 'the Chess offer is phone sized');
         await capture(friend, 'join');
+        const opened = performance.now();
         await join.tap();
+        await expect.poll(() => friend.evaluate(room => window.__lobby.active === room, hostRoom.room)).toBe(true);
+        const guestTable = friend.locator('[data-jam-chess]');
         await expect(guestTable.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
         await expect(hostTable.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
         for (const [page, squares] of [[host, ['e2', 'e4']], [friend, ['d7', 'd5']]]) {
@@ -434,6 +446,13 @@ async function verifyWebJamChess() {
             if (page === host) await expect(guestTable.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
         }
         await expect(hostTable.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
+        const firstPlayMs = Math.round(performance.now() - opened);
+        assert.ok(firstPlayMs < 30_000, 'first confirmed move is within 30 seconds in the fixture');
+        await standbyPlay.tap();
+        await expect.poll(() => standby.evaluate(room => window.__lobby.active === room, hostRoom.room)).toBe(true);
+        await expect(standby.locator('[data-toast]')).toHaveText('The Chess table is full. You can stay in the room for the next game.');
+        await expect(standby.locator('[data-jam-chess]').getByRole('button', { name: 'Join Chess' })).toHaveCount(0);
+        await capture(standby, 'table-full');
         assert.ok(await friend.evaluate(room => window.__lobby.active === room && ![...window.__lobby.chans.values()].some(c => c.kind === 'game'),
             hostRoom.room), 'the guest plays in the existing WebJam room without another room');
         await expect(friend.locator('[data-game-night]')).toBeHidden();
@@ -445,7 +464,7 @@ async function verifyWebJamChess() {
         await friend.locator('[data-leave]').tap();
         await expect.poll(() => friend.evaluate(() => window.__lobby.active)).toBe('#stalemate');
         assert.equal(await ticket(friend, '/beta/arcade-ticket', friendRoom), 403, 'leaving retires room membership');
-        console.log('PASS in-room WebJam Chess: one Join Chess action, same room, first moves, and room chat.');
+        console.log(`PASS direct WebJam Chess invite: one tap, same room, first move in ${firstPlayMs} ms, room chat, and full-table recovery.`);
     } finally {
         await browser.close();
     }

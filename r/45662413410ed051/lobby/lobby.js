@@ -1131,7 +1131,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 $('[data-channel-dialog]').close();
             }
             app.chans.set(m.ch.name, c);
-            if (c.kind === 'game' && invite?.arcade && invite.ref === c.keepRef) beginArcadeInvitation(c, invite.arcade);
+            if (invite?.arcade && invite.ref === c.keepRef && (c.kind === 'game' ||
+                webJamChessSupported && c.kind === 'jam' && invite.arcade.game === 'chess')) beginArcadeInvitation(c, invite.arcade);
             if (gameGuest && gameGuest.game !== 'four' && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginArcadeInvitation(c, gameGuest);
             if (pendingKeep?.stage === 'joining' && c.name === pendingKeep.room) {
                 if (c.keepRef === pendingKeep.ref) pendingKeep.stage = 'confirm';
@@ -1270,7 +1271,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                     if (!gameInvites.has(m.ch) && gameInvites.size === 5 && !joiningGameRoom)
                         gameInvites.delete(gameInvites.keys().next().value);
                     if (gameInvites.has(m.ch) || gameInvites.size < 5) {
-                        const arcade = gameNightRoomName(m.ch) && arcadeTables.get(m.arcade?.game)?.supported
+                        const jamChess = webJamChessSupported && jamRoomName(m.ch) && m.arcade?.game === 'chess' && roomNonce(m.roomInstance);
+                        const arcade = (gameNightRoomName(m.ch) || jamChess) && arcadeTables.get(m.arcade?.game)?.supported
                             ? gameNightInvite(m.arcade.game, m.arcade.match) : null;
                         gameInvites.set(m.ch, { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by, arcade });
                     }
@@ -1757,7 +1759,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function drawGameNight() {
         const c = currentGameNight();
-        if (arcadeInvitation && c?.keepRef !== arcadeInvitation.ref) finishArcadeInvitation();
+        const jam = webJamChessSupported ? currentJam() : null;
+        if (arcadeInvitation && c?.keepRef !== arcadeInvitation.ref && jam?.keepRef !== arcadeInvitation.ref) finishArcadeInvitation();
         const canCall = !gameGuest && discordLinksSupported && !shieldActive;
         const canManage = c && canCall && amOp(c) && roomNonce(c.keepRef);
         const editor = $('[data-game-editor]');
@@ -1949,7 +1952,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             return finishArcadeInvitation();
         }
         if (state?.id !== invite.match || !state.waiting || state.hasOpenSeat === false) {
-            return finishArcadeInvitation('This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
+            const message = currentJam()?.keepRef === invite.ref
+                ? state?.id === invite.match ? 'The Chess table is full. You can stay in the room for the next game.'
+                    : 'That Chess match has ended. You can still join an open match here.'
+                : 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.';
+            return finishArcadeInvitation(message);
         }
         if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
     }
@@ -2723,7 +2730,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         else $('[data-invite-nick]').focus();
     }
     function roomInviteArgs(nick, room) {
-        const target = room.kind === 'game' && arcadeInviteTarget();
+        const target = room.kind === 'game' ? arcadeInviteTarget()
+            : webJamChessSupported && room.kind === 'jam' ? arcadeTables.get('chess')?.invite : null;
         return target ? [nick, room.name, target.game, target.match] : [nick, room.name];
     }
     function arcadeInviteTarget() {

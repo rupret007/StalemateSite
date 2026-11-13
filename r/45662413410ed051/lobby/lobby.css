@@ -252,6 +252,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .game-offer { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 12px; border-block-end: 1px solid var(--line); background: var(--raised); }
 .game-offer p { flex: 1 1 180px; margin: 0; overflow-wrap: anywhere; color: var(--cream); font-size: 13px; }
 .game-offer .btn { flex: none; }
+.game-offer [data-game-offer-join] { min-height: 44px; }
 /* A pending offer stays until answered. Let the transcript give up height so
    the composer and Send remain visible above it on a phone. */
 @media (min-height: 451px) { .irc:has(.game-offer:not([hidden])) .buffer { min-height: 48px; } }
