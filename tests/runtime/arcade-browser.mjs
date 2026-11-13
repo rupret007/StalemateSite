@@ -750,18 +750,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 let firstStatus;
                 await friend.route(url => url.pathname === acceptPath, async route => {
                     const response = await route.fetch();
-                    firstStatus = response.status();
+                    firstStatus ??= response.status();
                     await response.dispose();
                     await route.abort();
-                }, { times: 1 });
+                }, { times: phone ? 1 : 2 });
                 await (phone ? joinGame.tap() : joinGame.click());
-                await expect(friend.locator('[data-guest-status]')).toHaveText('Couldn’t join just now. Try again.');
-                assert.equal(firstStatus, 200, 'the server accepted the invitation before its response was dropped');
-                await captureArcadeInvite(friend, viewport, step('03b-join-response-interrupted'));
-                await friend.context().clearCookies();
-                await friend.reload({ waitUntil: 'commit' });
+                if (!phone) {
+                    await expect(friend.locator('[data-guest-status]')).toHaveText('Couldn’t join just now. Try again.');
+                    await captureArcadeInvite(friend, viewport, step('03b-join-response-interrupted'));
+                    await friend.context().clearCookies();
+                    await friend.reload({ waitUntil: 'commit' });
+                }
                 await expect(friend.locator('[data-chess-status]')).toContainText('You’re Black');
-                assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'reload recovers the same accepted attempt');
+                assert.equal(firstStatus, 200, 'the server accepted the invitation before its response was dropped');
+                assert.equal(attempts.length, phone ? 2 : 3, 'one automatic retry before a manual recovery is needed');
+                assert.ok(attempts.every(attempt => attempt === attempts[0]), 'recovery reuses the accepted attempt');
                 assert.ok(await friend.evaluate(() => !history.state?.gameNightInvite), 'the seated page retains no invitation state');
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');

@@ -22,10 +22,16 @@ function clearInvitation() {
 if (hasInvitation) retainInvitation(confirmedGame);
 else if (location.hash || location.search || restored) clearInvitation();
 
-async function request(action, data) {
-    const response = await fetch('/beta/game-night/invitation/' + action, {
+async function request(action, data, retryConnection = false) {
+    const send = () => fetch('/beta/game-night/invitation/' + action, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, ...data }),
         signal: AbortSignal.timeout(10000)
+    });
+    const response = await send().catch(error => {
+        if (!retryConnection || !(error instanceof TypeError || error.name === 'TimeoutError')) throw error;
+        // The server may already have accepted. Reuse the same confirmation.
+        status.textContent = 'Reconnecting to confirm your seat…';
+        return send();
     });
     const value = await response.json();
     if (!response.ok) throw Object.assign(new Error(value.error), { status: response.status });
@@ -61,7 +67,7 @@ async function accept() {
     join.textContent = 'Joining…';
     status.textContent = 'Joining the game…';
     try {
-        const { next } = await request('accept', { age13: true, attempt });
+        const { next } = await request('accept', { age13: true, attempt }, true);
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
         location.replace(next);
     } catch (error) {
