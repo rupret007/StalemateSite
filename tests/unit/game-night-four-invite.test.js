@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
 import { gameNightInvite, gameNightLabels } from '../../r/45662413410ed051/lobby/game-night.mjs';
@@ -121,6 +121,27 @@ describe('Four invitation issue', () => {
         expect((await accepted.json()).scope).toMatchObject({ game: 'four', match: MATCH, room: ROOM, host: HOST_SID });
         const again = await gameInvitationRequest(lobby, 'accept', { code, age13: true, attempt: 'd'.repeat(32) }, null);
         expect(again.status).toBe(410);
+    });
+
+    it('expires demo game links after 72 hours and caps a late guest session', async () => {
+        const { lobby } = lobbyFor(true);
+        const now = Date.now();
+        vi.useFakeTimers();
+        try {
+            vi.setSystemTime(now);
+            const payload = { actor: ACTOR, room: ROOM, ref: REF, game: 'four', match: MATCH };
+            const issue = async demo => (await gameInvitationRequest(lobby, 'issue', payload, { betaSid: HOST_SID, demo })).json();
+            const ordinary = await issue(false);
+            const demo = await issue(true);
+            expect(ordinary.until - now).toBe(20 * 60_000);
+            expect(demo.until - now).toBe(72 * 60 * 60_000);
+            vi.setSystemTime(demo.until - 1000);
+            const accepted = await gameInvitationRequest(lobby, 'accept', { code: demo.code, age13: true, attempt: 'e'.repeat(32) }, null);
+            expect(accepted.status).toBe(200);
+            expect((await accepted.json()).exp).toBe(demo.until);
+            vi.setSystemTime(demo.until);
+            expect((await gameInvitationRequest(lobby, 'details', { code: demo.code }, null)).status).toBe(410);
+        } finally { vi.useRealTimers(); }
     });
 
     it('refuses a Four invite when the seat is taken and still checks Chess on its own table', async () => {

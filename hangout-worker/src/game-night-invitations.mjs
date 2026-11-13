@@ -1,4 +1,5 @@
 import { gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { DEMO_INVITE_TTL } from './beta-auth.mjs';
 import { arcadeRoomRequest } from './game-night-sockets.mjs';
 
 export const GAME_GUEST_PATH = '/beta/game-night/guest';
@@ -66,8 +67,8 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
             return reply({ error: 'Game invitation allowance reached. Try again in a few minutes.' }, 429);
         }
         const code = randomCode();
-        const until = now + LINK_TTL;
-        await storage.put(STORAGE_PREFIX + await digest(code), { scope: guest, until, version: host.betaInviteVersion });
+        const until = now + (session.demo === true ? DEMO_INVITE_TTL : LINK_TTL);
+        await storage.put(STORAGE_PREFIX + await digest(code), { scope: guest, until, version: host.betaInviteVersion, ...(session.demo === true ? { demo: true } : {}) });
         return reply({ code, until });
     }
 
@@ -93,7 +94,7 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         if (operation === 'details') return reply({ game: gameNightLabels[scope.game], host: binding.nick });
     }
     const sid = crypto.randomUUID();
-    const exp = now + GUEST_TTL;
+    const exp = record.demo ? Math.min(now + GUEST_TTL, record.until) : now + GUEST_TTL;
     const accepted = { ...record, sid, exp, redeemer: attempt };
     if (table) {
         if (!await table.reserveGuestSeat(scope, sid, now + CLAIM_TTL, key, accepted)) return unavailable();

@@ -1,3 +1,4 @@
+import { makeDemoInvite } from '../../hangout-worker/src/beta-auth.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
@@ -791,9 +792,19 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await online.click();
                 assert.equal(new URL(host.url()).pathname, '/beta/');
                 await expect(host.getByLabel('Invitation code')).toBeVisible();
-                await host.getByLabel('Invitation code').fill(invitation);
-                await host.getByRole('button', { name: 'Enter the community' }).click();
+                const demoUrl = new URL(host.url());
+                demoUrl.search = new URLSearchParams({ 'game-night': '1', via: source });
+                demoUrl.hash = new URLSearchParams({ invite: await makeDemoInvite(options.demoSigningKey, '1', Date.now() - 72 * 60 * 60_000) });
+                await host.goto('about:blank');
+                await host.goto(demoUrl.href);
+                await expect(host.getByRole('status').first()).toContainText('Ask your host for a new one.');
+                assert.equal(new URL(host.url()).hash, '');
+                assert.equal((await host.context().cookies()).length, 0);
+                demoUrl.hash = new URLSearchParams({ invite: await makeDemoInvite(options.demoSigningKey, '1') });
+                await host.goto('about:blank');
+                await host.goto(demoUrl.href);
                 await expect(host.getByRole('link', { name: /Enter Game Night/ })).toHaveCount(1);
+                assert.equal(new URL(host.url()).hash, '');
                 await captureArcadeInvite(host, viewport, step('01-game-night-entry'));
                 await enterFromShell(host, radDad ? 'RadDadHost' : 'PreviewHost', true);
                 await expect(host.locator('[data-entry-label]').first()).toHaveText(`via ${brand}`);
