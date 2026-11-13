@@ -296,14 +296,14 @@ for (const { delayed, width, height, hostSite, guestSite } of [
             await guest.clock.fastForward(10_000);
             await expect(guestStatus).toContainText('Hang Out hasn’t confirmed your Music invitation');
             await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
-            await expect(panel.getByRole('button', { name: 'Open WebJam' })).toBeHidden();
+            await expect(panel.getByRole('button', { name: 'Open WebJam in browser' })).toBeHidden();
             expect(await guest.evaluate(() => window.musicReplies)).toBe(1);
             await guest.evaluate(() => window.releaseMusicAcceptance());
         }
         await expect(guestStatus).toHaveText('You’re in the Jam room. Open WebJam to listen or check your microphone.');
         await expect(outcome).toHaveText('ChosenGuest accepted and joined the Jam room.');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
-        const audio = panel.getByRole('button', { name: 'Open WebJam' });
+        const audio = panel.getByRole('button', { name: 'Open WebJam in browser' });
         await expect(delayed ? panel.getByRole('button', { name: 'Not now', exact: true }) : audio).toBeFocused();
         await expect(guest.locator('[data-jam-actions]')).toBeHidden();
         if (!delayed) await guest.screenshot({ path: testInfo.outputPath(`accepted-in-jam-${width}x${height}.png`) });

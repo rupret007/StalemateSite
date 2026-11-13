@@ -1898,7 +1898,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if ((ended || unconfirmed) && document.activeElement === action) dismiss.focus();
         action.hidden = ended || unconfirmed;
         action.setAttribute('aria-disabled', String(joining));
-        action.textContent = accepted ? 'Open WebJam' : joining ? 'Joining…' : 'Accept and join';
+        action.textContent = accepted ? 'Open WebJam in browser' : joining ? 'Joining…' : 'Accept and join';
     }
     $('[data-music-invite-action]').addEventListener('click', () => {
         const offer = musicInvite;
