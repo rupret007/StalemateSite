@@ -304,10 +304,12 @@ for (const { delayed, width, height, hostSite, guestSite } of [
             expect(await guest.evaluate(() => window.musicReplies)).toBe(1);
             await guest.evaluate(() => window.releaseMusicAcceptance());
         }
-        await expect(guestStatus).toHaveText('You’re in the Jam room. Open WebJam to listen or check your microphone.');
+        const acceptedGuidance = 'You’re in the Jam room. WebJam opens in a new tab. Come back to this tab to chat.';
+        await expect(guestStatus).toHaveText(acceptedGuidance);
         await expect(outcome).toHaveText('ChosenGuest accepted and joined the Jam room.');
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
         const audio = panel.getByRole('button', { name: 'Open WebJam in browser' });
+        await expect(audio).toHaveAccessibleDescription(acceptedGuidance);
         await expect(delayed ? panel.getByRole('button', { name: 'Not now', exact: true }) : audio).toBeFocused();
         await expect(guest.locator('[data-jam-actions]')).toBeHidden();
         if (!delayed) await guest.screenshot({ path: testInfo.outputPath(`accepted-in-jam-${width}x${height}.png`) });
@@ -846,6 +848,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await summary.focus(); await summary.press('Enter');
         await expect(help).toHaveAttribute('open'); await expect(summary).toBeFocused();
         await expect(help).toContainText('Open WebJam in browser');
+        await expect(help).toContainText('WebJam opens in a new tab. Come back to this tab to chat.');
         await expect(help).toContainText('Invite bandmate to Music');
         await expect(help).toContainText('click Copy browser invite in WebJam. Wait for Link copied, then paste the link in Hang Out and choose Share with room.');
         await expect(help).toContainText('Sharing an invite does not turn on your microphone');

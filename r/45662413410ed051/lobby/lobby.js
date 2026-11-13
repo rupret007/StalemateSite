@@ -1887,7 +1887,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (current && !amOp(current) && !current.jam?.web && !current.jam?.desktop && !current.jam?.invitation)
             $('[data-jam-actions]').hidden = accepted && !panel.hidden;
         const message = panel.hidden ? '' : ended ? 'This music invitation ended. Ask the host for a fresh one.'
-            : accepted ? 'You’re in the Jam room. Open WebJam to listen or check your microphone.'
+            : accepted ? 'You’re in the Jam room. WebJam opens in a new tab. Come back to this tab to chat.'
             : unconfirmed ? 'Hang Out hasn’t confirmed your Music invitation. Wait here or ask the host to send a fresh one.'
             : joining ? 'Waiting for Hang Out to confirm you joined.'
             : musicInvite.sendFailed ? 'Couldn’t send your reply. Check your connection and try again.'
