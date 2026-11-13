@@ -5,6 +5,9 @@ import { TurdRushRenderer } from '/play/games/turdrush-renderer.js';
 
 const keys = { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'jump', w: 'jump', ' ': 'jump', ArrowDown: 'slide', s: 'slide' };
 const buttons = [['left', '←', 'Move left'], ['right', '→', 'Move right'], ['jump', '↑', 'Jump'], ['slide', '↓', 'Slide']];
+const raceControls = waiting => waiting
+    ? 'Get ready. Swipe the track or tap a control when the race starts.'
+    : 'Go! Swipe the track or tap a control.';
 const isLane = action => action === 'left' || action === 'right';
 const put = (node, text) => { if (node.textContent !== text) node.textContent = text; };
 const markup = `
@@ -198,10 +201,11 @@ export function mountArcadeTurdRush(container, onMatch) {
         }
         const run = visual.run;
         const overlay = $('[data-race-overlay]');
-        const shown = match.result ? '' : countdown > 0 ? String(countdown) : visual.status === 'running' ? ''
+        const shown = match.result ? '' : countdown > 0 ? 'Starts in ' + countdown : visual.status === 'running' ? ''
             : match.runner.status === 'running' ? 'Confirming run…' : visual.status === 'finished' ? 'Course complete' : 'Run ended';
         overlay.hidden = !shown;
         put(overlay, shown);
+        if (seat && connection === 'ready' && !match.result) put(status, raceControls(countdown > 0));
         table.dataset.phase = match.result ? 'finished' : countdown > 0 ? 'countdown' : 'play';
         table.dataset.lane = run.player.lane;
         table.dataset.sequence = seat ? match.runner.sequence : '';
@@ -260,7 +264,7 @@ export function mountArcadeTurdRush(container, onMatch) {
             if (result.reason === 'resign') message += ' · forfeit';
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turd Rush rematch' : 'Request Turd Rush rematch'; }
             if (seat && seat === model.rematch) message += ' · Rematch requested';
-        } else if (match) message = !seat ? 'Watching both runners' : 'Swipe or use arrows to move, jump and slide.';
+        } else if (match) message = !seat ? 'Watching both runners' : raceControls(serverNow(performance.now()) < match.startsAt);
         put(status, message);
         status.classList.toggle('rush-race-playing', !!match && !result);
         main.hidden = !action;
