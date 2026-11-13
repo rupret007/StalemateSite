@@ -53,7 +53,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await expect(leave).toBeFocused();
         await page.screenshot({ path: testInfo.outputPath(`listening-${width}x${height}.png`) });
         await leave.press('Enter');
-        await expect(page.locator('#error-hint')).toHaveText('Ask your host for a new browser invite to rejoin.');
+        await expect(page.locator('#status')).toHaveAccessibleDescription(/return to your Jam room to accept it/i);
         await expect(page.locator('#status')).toBeFocused();
         expect(await page.evaluate(() => window.captureRequests)).toBe(0);
     });

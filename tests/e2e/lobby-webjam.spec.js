@@ -343,7 +343,7 @@ for (const { delayed, width, height, hostSite, guestSite } of [
                 const listenerStatus = listener.locator('#status');
                 await expect(listenerStatus).toHaveText('You left the session.');
                 await expect(listenerStatus).toBeFocused();
-                await expect(listener.locator('#error-hint')).toHaveText('Ask your host for a new browser invite to rejoin.');
+                await expect(listenerStatus).toHaveAccessibleDescription(/return to your Jam room to accept it/i);
                 await listener.screenshot({ path: testInfo.outputPath(`listen-left-${width}x${height}.png`) });
                 expect(await listener.evaluate(() => ({ capture: window.audioRequests, copy: window.copiedInvite })))
                     .toEqual({ capture: 0, copy: '' });
