@@ -739,6 +739,7 @@ for (const width of [375, 390]) {
         const relay = hangoutRelayWsBase(baseURL, `directory-results-${randomUUID()}`), viewport = { width, height: width === 390 ? 844 : 667 };
         const host = await guest(browser, baseURL, 'SearchHost', viewport, relay);
         const visitor = await guest(browser, baseURL, 'SearchGuest', viewport, relay);
+        let arrival;
         try {
             const empty = visitor.page.locator('[data-rooms-empty]');
             await section(visitor.page, 'rooms');
@@ -770,11 +771,18 @@ for (const width of [375, 390]) {
             await expect(results).toHaveText('1 room shown.');
             await expect(card).toBeVisible();
             await expect(empty).toBeHidden();
+            await search.fill('missing-room');
+            await expect(results).toContainText('No rooms match');
+            arrival = await guest(browser, baseURL, 'SearchArrival', viewport, relay);
+            await send(arrival.page, '/join #missing-room');
+            await expect(visitor.page.locator('[data-roomlist] button[data-room="#missing-room"]')).toBeVisible();
+            await expect(results).toHaveText('1 room shown.');
+            await expect(search).toBeFocused();
             await filter.selectOption('registered');
             await visitor.page.evaluate(() => window.__lobby.ws.close(1000));
             await expect(visitor.page.locator('[data-connection]')).toHaveText('Offline');
             await expect(empty).toHaveText('Connect to see current rooms.');
-        } finally { await visitor.close(); await host.close(); }
+        } finally { await arrival?.close(); await visitor.close(); await host.close(); }
     });
 
     test(`a removed focused room returns to the visible directory filter at ${width}px`, async ({ browser, baseURL }) => {

@@ -2622,13 +2622,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
     }
 
-    function drawRooms() {
+    function drawRooms(announce = false) {
         const ul = $('[data-roomlist]');
         const focusedRoom = ul.contains(document.activeElement) && document.activeElement.matches('button.room') ? document.activeElement : null;
         const focusedName = focusedRoom?.dataset.room;
         const previous = new Map([...ul.children].filter(li => li.dataset.roomKey).map(li => [li.dataset.roomKey, li]));
-        const query = $('[data-room-search]').value.trim().toLowerCase();
-        const filter = $('[data-room-filter]').value;
+        const searchInput = $('[data-room-search]');
+        const filterInput = $('[data-room-filter]');
+        const query = searchInput.value.trim().toLowerCase();
+        const filter = filterInput.value;
         const rooms = Discovery.describeRooms(app.rooms.filter((r) =>
             (filter === 'mine' ? r.mine : filter === 'registered' ? r.persistent : r.count > 0 || !r.persistent)
             && (!query || `${r.name} ${r.title}`.toLowerCase().includes(query))), [...app.chans.keys()]);
@@ -2666,25 +2668,25 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         ul.replaceChildren(...rows);
         if (focusedRoom) {
             const current = rows.find(li => li.dataset.roomKey === focusedName)?.querySelector('button.room');
-            const target = current && !current.disabled ? current : $('[data-room-filter]');
+            const target = current && !current.disabled ? current : filterInput;
             if (target?.isConnected && target.getClientRects().length && document.activeElement !== target) {
                 target.focus({ preventScroll: target === current });
             }
         }
-    }
-
-    function updateRoomSearch() {
-        drawRooms();
         const status = $('[data-room-search-status]');
-        if (!status) return;
-        const empty = $('[data-rooms-empty]');
-        const count = $('[data-roomlist]').children.length;
-        const message = count ? `${count} ${count === 1 ? 'room shown' : 'rooms shown'}.` : empty.textContent;
-        if (status.textContent !== message) status.textContent = message;
+        if (status) {
+            // Include live directory changes while someone is searching, and
+            // avoid interrupting chat with background room activity.
+            const readingResults = announce || [searchInput, filterInput].includes(document.activeElement);
+            const message = !readingResults ? '' : rooms.length
+                ? `${rooms.length} ${rooms.length === 1 ? 'room shown' : 'rooms shown'}.`
+                : empty.textContent;
+            if (status.textContent !== message) status.textContent = message;
+        }
     }
 
-    $('[data-room-filter]').addEventListener('change', updateRoomSearch);
-    $('[data-room-search]').addEventListener('input', updateRoomSearch);
+    $('[data-room-filter]').addEventListener('change', () => drawRooms(true));
+    $('[data-room-search]').addEventListener('input', () => drawRooms(true));
     $('[data-owner-signin]').href = relayBase ? `${relayBase.replace(/^ws/, 'http')}/lobby-owner/login?entry-return=1` : '#';
     $('[data-owner-signin]').addEventListener('click', event => { if (!prepareOwnerSignin()) event.preventDefault(); });
     $('[data-keep-cancel]').addEventListener('click', () => clearKeep('Room not kept. You can keep it later from Host tools.'));
