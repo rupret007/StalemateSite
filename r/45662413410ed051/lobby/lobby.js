@@ -670,6 +670,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let retry = 0;
     let retryTimer;
     let connectionAttempt = 0;
+    let focusFirstChannel = false;
+    function focusAtNicknameGate() {
+        const focused = document.activeElement;
+        return focused === document.body || $('[data-gate]').contains(focused);
+    }
     function setConnection(state) {
         connectionState = state;
         if (state !== 'connected') {
@@ -1145,7 +1150,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
-            $('[data-gate]').hidden = true;
+            const gate = $('[data-gate]');
+            focusFirstChannel = !wasIn && !gameGuest && !gate.hidden && focusAtNicknameGate();
+            gate.hidden = true;
             if (gameGuest && !gameGuestSeated) gateStatus('Finding your seat…');
             else {
                 $('[data-app]').hidden = false;
@@ -1196,7 +1203,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (c.name !== '#stalemate' && toastKind === 'reconnect') dismissToast();
             if (gameGuest?.game === 'four' && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginFourInvitation(c);
             if (joinedFromChannelDialog) focusChannelTab(c.name, { preventScroll: false });
-            else if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
+            else if ((gameOfferAccepted && !arcadeInvitation) || (focusFirstChannel && focusAtNicknameGate()))
+                focusChannelTab(c.name);
+            focusFirstChannel = false;
             followPendingRoomJoin();
             break;
         }
