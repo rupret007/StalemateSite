@@ -331,6 +331,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
             const link = await shareGameNightLink(host, viewport, 'first-visit-00-host-share');
             const inviteFromTable = host.locator('.arcade-chess').getByRole('button', { name: 'Invite a friend', exact: true });
+            if (phone) {
+                await expect(inviteFromTable).toBeVisible();
+                await host.evaluate(() => window.dispatchEvent(new Event('offline')));
+                await expect(host.locator('[data-chess-status]')).toContainText('Reconnecting');
+                await expect(inviteFromTable).toBeHidden();
+                await host.evaluate(() => window.dispatchEvent(new Event('online')));
+                await expect(inviteFromTable).toBeVisible();
+            }
             await inviteFromTable.click();
             const picker = host.getByRole('dialog', { name: 'Invite a guest' });
             await expect(picker.getByRole('button', { name: 'Invite a friend to Royal Flush Chess' })).toBeFocused();
@@ -535,6 +543,30 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                         await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
                         assert.equal(requests, 3, 'a missing pong triggers one new match connection');
+
+                        let legacyReady = 0;
+                        await guest.routeWebSocket(url => url.pathname === '/beta/arcade-match', route => {
+                            const server = route.connectToServer();
+                            server.onMessage(message => {
+                                const frame = JSON.parse(message.toString());
+                                if (frame.t !== 'match-ready') return route.send(message);
+                                delete frame.ping;
+                                legacyReady++;
+                                route.send(JSON.stringify(frame));
+                            });
+                        });
+                        const legacyTicket = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        await guest.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+                        await legacyTicket;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        assert.equal(legacyReady, 1, 'the replacement socket advertised the legacy handshake');
+                        const legacyWakeTicket = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        assert.equal(await guest.evaluate(() => window.simulateMatchWake(false)), 0, 'a legacy Worker receives no ping');
+                        await legacyWakeTicket;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                        assert.equal(legacyReady, 2);
+                        assert.equal(requests, 5, 'legacy wake restores the same seat with exactly one new ticket');
                     } finally { guest.off('request', countTicket); }
                 }
                 await guest.locator('[data-text]').fill('First visit from the game invite');
