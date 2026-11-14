@@ -1178,36 +1178,62 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 for (const width of widths) {
                     const viewport = { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 };
                     await white.setViewportSize(viewport);
-                    const marker = await target.evaluate(square => {
-                        const indicator = getComputedStyle(square, '::after');
-                        const { width, height } = square.getBoundingClientRect();
-                        const luminance = color => {
-                            const rgb = color.match(/\d+/g).slice(0, 3).map(value => {
-                                const channel = Number(value) / 255;
-                                return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
+                    const hideArtwork = await white.addStyleTag({ content: '.arcade-chess-square img { visibility: hidden; }' });
+                    let painted, background;
+                    try {
+                        painted = await target.screenshot({ scale: 'css', animations: 'disabled' });
+                        await target.evaluate(square => {
+                            square.removeAttribute('data-capture');
+                            square.removeAttribute('data-legal');
+                        });
+                        try { background = await target.screenshot({ scale: 'css', animations: 'disabled' }); }
+                        finally {
+                            await target.evaluate(square => {
+                                square.setAttribute('data-legal', '');
+                                square.setAttribute('data-capture', '');
                             });
-                            return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+                        }
+                    } finally { await hideArtwork.evaluate(style => style.remove()); }
+                    const marker = await target.evaluate(async (square, images) => {
+                        const indicator = getComputedStyle(square, '::after');
+                        const pixels = async value => {
+                            const bitmap = await createImageBitmap(new Blob([Uint8Array.from(atob(value), byte => byte.charCodeAt(0))], { type: 'image/png' }));
+                            const canvas = document.createElement('canvas');
+                            canvas.width = bitmap.width;
+                            canvas.height = bitmap.height;
+                            const context = canvas.getContext('2d');
+                            context.drawImage(bitmap, 0, 0);
+                            bitmap.close();
+                            return context.getImageData(0, 0, canvas.width, canvas.height);
                         };
-                        const contrast = (a, b) => (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
-                        const border = luminance(indicator.borderTopColor);
-                        const shadowColor = indicator.boxShadow.match(/rgba?\([^)]*\)/)?.[0];
-                        const shadow = shadowColor ? luminance(shadowColor) : border;
-                        const board = luminance(getComputedStyle(square).backgroundColor);
-                        const inset = indicator.boxShadow.includes('inset');
-                        const spread = parseFloat(indicator.boxShadow.replace(shadowColor, '').trim().split(/\s+/)[3]) || 0;
-                        const thickness = parseFloat(indicator.borderTopWidth);
-                        const outerPadding = (indicator.boxSizing === 'border-box' ? 0 : thickness) + (inset ? 0 : spread);
-                        return {
-                            contrast: contrast(board, border),
-                            edgeContrast: contrast(border, shadow),
-                            inside: parseFloat(indicator.width) + 2 * outerPadding <= width &&
-                                parseFloat(indicator.height) + 2 * outerPadding <= height,
-                            inset, thickness, spread
-                        };
-                    });
-                    assert.ok(marker.inside && marker.contrast >= 3 && marker.edgeContrast >= 3 &&
-                        marker.inset && marker.thickness >= 2 && marker.spread >= 2,
-                    `capture marker at ${width}px stays inside the square with two contrasting edges: ${JSON.stringify(marker)}`);
+                        const luminance = ([r, g, b]) => [r, g, b].reduce((sum, value, index) => {
+                            const channel = value / 255;
+                            return sum + [.2126, .7152, .0722][index] *
+                                (channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4);
+                        }, 0);
+                        const [ring, bare] = await Promise.all(images.map(pixels));
+                        const border = indicator.borderTopColor.match(/\d+/g).slice(0, 3).map(Number);
+                        const edge = luminance(border);
+                        let samples = 0, minimum = Infinity, perimeterChanges = 0;
+                        for (let y = 0; y < ring.height; y++) for (let x = 0; x < ring.width; x++) {
+                            const index = (y * ring.width + x) * 4;
+                            const rgb = ring.data.slice(index, index + 3), underlying = bare.data.slice(index, index + 3);
+                            const changed = rgb.some((value, channel) => value !== underlying[channel]);
+                            if (changed && (x === 0 || y === 0 || x === ring.width - 1 || y === ring.height - 1)) perimeterChanges++;
+                            if (!changed || !border.every((value, channel) => rgb[channel] === value)) continue;
+                            const base = luminance(underlying);
+                            minimum = Math.min(minimum, (Math.max(edge, base) + .05) / (Math.min(edge, base) + .05));
+                            samples++;
+                        }
+                        const { width, height } = square.getBoundingClientRect();
+                        const [top, right, bottom, left] = ['top', 'right', 'bottom', 'left'].map(edge => parseFloat(indicator[edge]));
+                        return { samples, minimum, perimeterChanges, explicitInsets: [top, right, bottom, left].every(inset => inset > 0),
+                            fits: parseFloat(indicator.width) + left + right <= width + .05 &&
+                                parseFloat(indicator.height) + top + bottom <= height + .05 };
+                    }, [painted.toString('base64'), background.toString('base64')]);
+                    assert.ok(marker.samples >= 12 && marker.minimum >= 3 && !marker.perimeterChanges &&
+                        marker.explicitInsets && marker.fits,
+                    `painted ${step} edge at ${width}px has 3:1 contrast and stays inside its square: ${JSON.stringify(marker)}`);
                     if (evidence) await captureArcadeInvite(white, viewport, step);
                 }
             } finally { await white.setViewportSize(original); }
@@ -1224,7 +1250,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const darkCapture = white.getByRole('button', { name: 'g5, Black pawn' });
         await expect(darkCapture).toHaveAttribute('data-dark', '');
         await expect(darkCapture).toHaveAttribute('data-capture', '');
+        await expect(darkCapture).toHaveAttribute('data-last', '');
         await verifyCaptureMarker(darkCapture, 'chess-dark-capture', [375, 390, 1440]);
+        // A checked king is never a legal capture. Exercise the visual overlap independently.
+        await darkCapture.evaluate(square => square.setAttribute('data-check', ''));
+        try { await verifyCaptureMarker(darkCapture, 'chess-check-overlay-capture', [375, 390, 1440]); }
+        finally { await darkCapture.evaluate(square => square.removeAttribute('data-check')); }
         await tapSquare(white, 'g5');
         await expect(black.getByRole('button', { name: 'g5, White pawn' })).toBeVisible();
         console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
