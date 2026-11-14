@@ -12,7 +12,7 @@
 .list li{background:var(--ink);padding:8px;display:grid;gap:6px;border-left:2px solid var(--blue)}
 .list li .acts{display:flex;gap:6px;flex-wrap:wrap}
 .list .ctx{font:.85rem var(--mono);color:var(--muted);white-space:pre-wrap;margin:0}
-.ai-review{padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.ai-review{padding-top:16px;border-top:1px solid var(--line);margin-top:16px}
 .ai-state{font-weight:700;color:var(--amber)}
 .ai-state[data-ai-health=ready]{color:var(--lime)}
 .ai-state[data-ai-health=disabled]{color:var(--muted)}
