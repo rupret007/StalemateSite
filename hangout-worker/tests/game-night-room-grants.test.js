@@ -1,7 +1,8 @@
+import { GAME_NIGHT_LENGTH } from '../src/game-night-lifetime.mjs';
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-    CLAIM_WINDOW, EXPIRED_COPY, GRANT_TTL, GUEST_TTL, HASHES_PER_REQUEST, RECONNECT_WINDOW, ROOM_GRANT_PREFIX, TABLE_FULL_COPY,
+    CLAIM_WINDOW, EXPIRED_COPY, GRANT_TTL, HASHES_PER_REQUEST, RECONNECT_WINDOW, ROOM_GRANT_PREFIX, TABLE_FULL_COPY,
     createRoomGrants, grantHash, grantResponse, keepsSeat, reconnectDeadline
 } from '../src/game-night-room-grants.mjs';
 import { createGameNightTable } from '../src/game-night-table.mjs';
@@ -39,7 +40,7 @@ function realTable(sides, options = {}) {
         port: {
             status: async scope => game && game.view(HOST, NOW).id === scope.match ? {
                 waiting: game.view(HOST, NOW).waiting, host: game.checkpoint().seats[sides[0]], hostSeat: sides[0],
-                free: sides.length - game.subjects.length
+                free: sides.length - game.subjects.length, nightEndsAt: NOW + GAME_NIGHT_LENGTH
             } : null,
             hold: async (scope, { holder, until, now }) => {
                 if (!game || holdsByHolder.has(holder) || !(until > now)) return false;
@@ -165,7 +166,7 @@ describe('redeemGrant', () => {
         const result = await grants.redeemGrant({ value: value(1), now: NOW + 5 });
         expect(result).toEqual({
             ok: true, status: 200, seat: 'b', claimUntil: NOW + 5 + CLAIM_WINDOW,
-            body: { scope: { game: 'chess', match: MATCH, room: ROOM, ref: REF, host: HOST, nameSeed: 7 }, sid: 'guest-session-1', exp: NOW + 5 + GUEST_TTL }
+            body: { scope: { game: 'chess', match: MATCH, room: ROOM, ref: REF, host: HOST, nameSeed: 7 }, sid: 'guest-session-1', exp: NOW + GAME_NIGHT_LENGTH }
         });
         expect(JSON.stringify(result)).not.toContain(value(1));
         expect(table.game.seat('guest-session-1')).toBe('b');

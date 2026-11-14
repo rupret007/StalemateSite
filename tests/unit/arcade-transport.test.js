@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ARCADE_TAG, createArcadeTransport } from '../../hangout-worker/src/arcade-transport.mjs';
 import { readGameNightPass } from '../../hangout-worker/src/game-night-pass.mjs';
+import { GAME_NIGHT_LENGTH } from '../../hangout-worker/src/game-night-lifetime.mjs';
 
 const room = '#game-2ca9e1x1be34a';
 const ref = '0'.repeat(32);
@@ -11,8 +12,10 @@ const guest = 'c' + '2'.repeat(32);
 
 function fixture() {
     const records = new Map(), actors = new Map(), connections = [];
-    let now = 1000, matchCount = 0;
+    let now = 1000, matchCount = 0, alarm = null;
     const storage = {
+        getAlarm: async () => alarm,
+        setAlarm: async at => { alarm = at; },
         get: vi.fn(async key => structuredClone(records.get(key))),
         put: vi.fn(async (key, value) => {
             for (const [name, record] of typeof key === 'string' ? [[key, value]] : Object.entries(key)) {
@@ -34,7 +37,8 @@ function fixture() {
         return socket;
     }
     const a = player(actor, sid, true), b = player(guest, 'seat-black', false);
-    const transport = createArcadeTransport({ state: { storage, getWebSockets: () => connections },
+    const guestActivity = vi.fn(async () => {});
+    const transport = createArcadeTransport({ state: { storage, getWebSockets: () => connections }, guestActivity,
         now: () => now, uuid: () => 'c8eb7f10-e113-418f-9900-' + String(++matchCount).padStart(12, '0'),
         current: scope => actors.get(scope.actor), active: async () => true, approve: async () => true,
         charge: async () => true, allowed: () => true });
@@ -46,7 +50,7 @@ function fixture() {
         await send(b, 'join', { id });
         return { id, revision: 0, move: 'e2e4' };
     };
-    return { a, b, board, send, start, storage, actors, transport, advance: ms => { now += ms; } };
+    return { a, b, board, send, start, storage, actors, transport, guestActivity, advance: ms => { now += ms; } };
 }
 
 describe('Game Night match transport', () => {
@@ -194,11 +198,47 @@ describe('Game Night match transport', () => {
         const { id } = f.board(f.b);
         const scope = { room, ref, host: sid, match: id };
         expect(await f.transport.reserveGuestSeat(scope, 'invited-guest', 61000, 'invite', {})).toBe(true);
+        expect(await f.storage.getAlarm()).toBe(61000);
         f.advance(60000);
         await f.transport.maintain();
+        expect(await f.storage.getAlarm()).toBe(1000 + GAME_NIGHT_LENGTH);
         expect(f.board(f.a)).toMatchObject({ id, waiting: true, hasOpenSeat: true });
         await f.send(f.b, 'join', { id });
         expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
+    });
+
+    it('keeps the original night deadline through a rematch and host reopen', async () => {
+        const f = fixture(), { id } = await f.start();
+        const scope = { room, ref, tableId: id };
+        const end = 1000 + GAME_NIGHT_LENGTH;
+        expect(await f.transport.guestNightEndsAt(scope)).toBe(end);
+        f.advance(2000);
+        await f.send(f.b, 'resign', { id, revision: 0 });
+        await f.send(f.a, 'start-rematch', { id });
+        const next = f.board(f.a).id;
+        expect(next).not.toBe(id);
+        expect(await f.transport.guestNightEndsAt(scope)).toBe(end);
+        await f.send(f.a, 'leave', { id: next });
+        await f.send(f.a, 'open');
+        expect(f.board(f.a)).toMatchObject({ tableId: id, seat: 'w' });
+        expect(await f.storage.getAlarm()).toBe(end);
+        expect(await f.transport.guestNightEndsAt(scope)).toBe(end);
+        f.advance(GAME_NIGHT_LENGTH - 2000);
+        await f.transport.maintain();
+        expect(f.board(f.a)).toBeNull();
+        expect(f.board(f.b)).toBeNull();
+    });
+
+    it('counts confirmed guest play toward idle, while sync and refused moves leave it alone', async () => {
+        const f = fixture(), { id } = await f.start();
+        const binding = f.actors.get(guest);
+        binding.gameGuest = { room, ref, host: sid, match: id, tableId: id, game: 'chess' };
+        await f.send(f.b, 'sync');
+        await f.send(f.b, 'move', { id, revision: 0, move: 'e7e5' });
+        expect(f.guestActivity).not.toHaveBeenCalled();
+        await f.send(f.a, 'move', { id, revision: 0, move: 'e2e4' });
+        await f.send(f.b, 'move', { id, revision: 1, move: 'e7e5' });
+        expect(f.guestActivity).toHaveBeenCalledExactlyOnceWith(binding);
     });
 
     it('clears the host and guest match views when a read reaches the deadline before the alarm', async () => {

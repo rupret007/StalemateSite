@@ -7,7 +7,7 @@ import { createLobby, LOBBY_LIMITS } from './lobby-core.mjs';
 import { LOG_TTL } from './community-state.mjs';
 import { createAiModerator } from './ai-moderation.mjs';
 import { aiEligibility } from './ai-eligibility.mjs';
-import { activeBetaSession, validBetaSession } from './beta-session-client.mjs';
+import { activeBetaSession, registryRequest, validBetaSession } from './beta-session-client.mjs';
 import { INTERNAL_HEALTH_PATH, aiHealth, dailyUsage, healthJson } from './beta-ops.mjs';
 import { createPrivateReportQueue, privateReportRef, validatePrivateReportControl, LIMITS as PRIVATE_REPORT_LIMITS } from './private-reports.mjs';
 import { createSocketDelivery } from './socket-delivery.mjs';
@@ -262,6 +262,7 @@ export class HangoutLobby {
         this.roomGrants = lobbyRoomGrants(this);
         this.arcade = new Map(arcadeGames.map(name => [name, createArcadeTransport({
             name, state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
+            guestActivity: binding => this.gameNightActivity(binding),
             charge: (socket, actor) => this.controlBudget.take(socket, actor),
             approve: async actor => (await this.engine.approveArcade(actor))?.ok === true,
             allowed: () => this.arcadeAvailable(name) && !this.authorityUnavailable
@@ -523,6 +524,11 @@ export class HangoutLobby {
         for (const [name, service] of this.arcade) if (this.arcadeAvailable(name)) await service.maintain().catch(() => {});
         if (gameGuestEnabled(this.env)) await sweepGameNightPasses(this.state.storage, Date.now()).catch(() => {});
         if (gameRoomGrantsEnabled(this.env)) await this.roomGrants.sweep(Date.now()).catch(() => {});
+    }
+    async gameNightActivity(binding) {
+        const value = { sid: binding.betaSid, exp: binding.expiresAt, version: binding.betaInviteVersion };
+        if (this.authorityMode) await this.authority.gameNightActivity(value);
+        else await registryRequest(this.env, 'game-night-activity', value);
     }
     async sessionActive(value) {
         if (!this.authorityMode) return activeBetaSession(this.env, value);
@@ -894,7 +900,7 @@ export class HangoutLobby {
             };
             const schedule = async () => {
                 const earlier = this.pendingClosed.size ? await this.state.storage.getAlarm() : null;
-                await this.authority.schedule();
+                await this.authority.schedule({ afterAlarm: true });
                 if (Number.isFinite(earlier) && earlier > Date.now()) {
                     const next = await this.state.storage.getAlarm();
                     if (next === null || next === undefined || next > earlier) await this.state.storage.setAlarm(earlier);

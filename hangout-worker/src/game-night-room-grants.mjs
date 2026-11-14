@@ -1,5 +1,4 @@
 import { gameNightPassRecord } from './game-night-pass.mjs';
-import { BETA_TTL } from './beta-auth.mjs';
 // WebJam room -> Game Night seat grants.
 //
 // The host attests who is in their WebJam room by registering SHA-256 hashes of
@@ -18,7 +17,6 @@ export const ROOM_GRANT_PREFIX = 'game-night-room-grant:';
 export const GRANT_TTL = 2 * 60_000;
 export const CLAIM_WINDOW = 60_000;
 export const RECONNECT_WINDOW = 60_000;
-export const GUEST_TTL = 2 * 60 * 60_000;
 export const HASHES_PER_REQUEST = 16;
 export const ROWS_PER_ROOM = 32;
 const LIST_PAGE = 400;
@@ -191,7 +189,8 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
             const sid = uuid();
             const guest = { game: scope.game, match: scope.match, room: scope.room, ref: scope.ref, host: scope.host, nameSeed: seed(),
                 ...(state.tableId ? { tableId: state.tableId } : {}) };
-            const exp = record.accessUntil === undefined ? now + GUEST_TTL : Math.min(now + BETA_TTL, record.accessUntil);
+            const exp = Math.min(state.nightEndsAt, record.accessUntil ?? Infinity);
+            if (!Number.isFinite(exp) || exp <= now) return expired();
             const claimUntil = Math.min(now + CLAIM_WINDOW, exp);
             const access = { scope: guest, sid, exp };
             const tombstone = { kind: 'burned', hash, scope, until: record.until };

@@ -1,3 +1,4 @@
+import { GAME_NIGHT_LENGTH } from './game-night-lifetime.mjs';
 import { gameNightPassRecord, readGameNightPass } from './game-night-pass.mjs';
 import { GameNightChess } from './game-night-chess.mjs';
 import { GameNightCrapeights } from './game-night-crapeights.mjs';
@@ -13,15 +14,14 @@ export { arcadeRoomRequest } from './game-night-sockets.mjs';
 
 export const ARCADE_TAG = 'game-night-match';
 export const ARCADE_PROTOCOL = 'game-night.v1';
-const MATCH_TTL = 40 * 60000;
 const CONNECTED_CLAIM_TTL = 60_000;
 const MATCH_CAP = 60;
 const adapters = new Map([
     ['chess', { flag: 'HANGOUT_ARCADE_CHESS', Table: GameNightChess }],
-    ['crapeights', { flag: 'HANGOUT_ARCADE_CRAPEIGHTS', Table: GameNightCrapeights, renewOnAction: true }],
-    ['turdrummy', { flag: 'HANGOUT_ARCADE_TURDRUMMY', Table: GameNightTurdRummy, renewOnAction: true }],
-    ['turdspades', { flag: 'HANGOUT_ARCADE_TURDSPADES', Table: GameNightTurdSpades, PartnerTable: GameNightSpadesPartners, renewOnAction: true }],
-    ['turdjack', { flag: 'HANGOUT_ARCADE_TURDJACK', Table: GameNightTurdJack, renewOnAction: true }],
+    ['crapeights', { flag: 'HANGOUT_ARCADE_CRAPEIGHTS', Table: GameNightCrapeights }],
+    ['turdrummy', { flag: 'HANGOUT_ARCADE_TURDRUMMY', Table: GameNightTurdRummy }],
+    ['turdspades', { flag: 'HANGOUT_ARCADE_TURDSPADES', Table: GameNightTurdSpades, PartnerTable: GameNightSpadesPartners }],
+    ['turdjack', { flag: 'HANGOUT_ARCADE_TURDJACK', Table: GameNightTurdJack }],
     ['turdtris', { flag: 'HANGOUT_ARCADE_TURDTRIS', Table: GameNightTurdtris, tableCap: 4 }],
     ['turdomania', { flag: 'HANGOUT_ARCADE_TURDOMANIA', Table: GameNightTurdomania, tableCap: 8 }],
     ['turdrush', { flag: 'HANGOUT_ARCADE_TURDRUSH', Table: GameNightTurdRush, tableCap: 4 }],
@@ -46,8 +46,8 @@ export function arcadeEnabled(env = {}, game) {
 
 // Call from the same Durable Object's serialized lobby event path. The
 // callbacks resolve membership and participation against the committed lobby.
-export function createArcadeTransport({ state, current, active, approve, charge, allowed, name = 'chess', now = () => Date.now(), uuid = () => crypto.randomUUID() }) {
-    const { Table, PartnerTable, renewOnAction, tableCap = MATCH_CAP } = adapters.get(name);
+export function createArcadeTransport({ state, current, active, guestActivity = async () => {}, approve, charge, allowed, name = 'chess', now = () => Date.now(), uuid = () => crypto.randomUUID() }) {
+    const { Table, PartnerTable, tableCap = MATCH_CAP } = adapters.get(name);
     const tag = tagFor(name), prefix = name === 'chess' ? ARCADE_TAG + ':' : 'game-night-' + name + ':';
     const pendingRevocations = new Map();
     const { issue, upgrade, member, sockets, send, close } = createGameNightSockets({
@@ -58,6 +58,12 @@ export function createArcadeTransport({ state, current, active, approve, charge,
     const key = scope => prefix + scope.ref;
     const restore = record => (record.mode === 'partners' && PartnerTable ? PartnerTable : Table).restore(record);
     const liveClaims = (claims, time) => (claims || []).filter(claim => claim.until > time);
+    async function scheduleTableAlarm(expiresAt, claims, afterAlarm = false) {
+        if (typeof state.storage.getAlarm !== 'function') return;
+        const due = Math.min(expiresAt, ...claims.map(claim => claim.until));
+        const existing = await state.storage.getAlarm();
+        if (!Number.isFinite(existing) || existing > due || afterAlarm && existing <= now()) await state.storage.setAlarm(due);
+    }
     function savedRecord(scope, game, expiresAt, claims, seq) {
         return { room: scope.room, expiresAt, seq, [name]: game.checkpoint(), ...(claims.length ? { claims } : {}) };
     }
@@ -83,11 +89,16 @@ export function createArcadeTransport({ state, current, active, approve, charge,
     async function hasGuestSeat(scope, match, host) {
         return !!await guestTableId(scope, match, host);
     }
+    async function guestNightEndsAt(scope) {
+        const record = await load(scope);
+        return record && record.game.tableId === scope.tableId ? record.expiresAt : 0;
+    }
     async function reserveGuestSeat(scope, sid, until, invitationKey, accepted, passHash) {
         const record = await load(scope);
         if (!record?.game.hasGuestSeat(scope.match, scope.host, record.claims.length) ||
             scope.tableId && scope.tableId !== record.game.tableId) return false;
         const claims = [...record.claims, { sid, until }];
+        await scheduleTableAlarm(record.expiresAt, claims);
         // Commit the invitation redemption and its temporary seat together.
         await state.storage.put({
             [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims, record.seq + 1),
@@ -116,7 +127,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             const record = await grantTable(scope);
             if (!record) return null;
             return { host: scope.host, hostSeat: record.view.seat, waiting: record.view.waiting,
-                tableId: record.game.tableId, free: record.game.guestSeats(scope.match, scope.host).length };
+                tableId: record.game.tableId, nightEndsAt: record.expiresAt, free: record.game.guestSeats(scope.match, scope.host).length };
         },
         async hold(scope, { holder, until, write }) {
             const record = await grantTable(scope);
@@ -125,6 +136,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 .find(side => !record.claims.some(claim => claim.seat === side));
             if (!seat) return false;
             const claims = [...record.claims, { sid: holder, until, seat, grant: true }];
+            await scheduleTableAlarm(record.expiresAt, claims);
             await state.storage.put({ ...write, [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims, record.seq + 1) });
             publish(scope, record.game, null, claims, record.seq + 1);
             return true;
@@ -134,6 +146,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             const held = record?.claims.find(claim => claim.grant && claim.sid === holder);
             if (!held || !record.game.guestSeats(scope.match, scope.host).includes(held.seat)) return null;
             const claims = record.claims.map(claim => claim === held ? { sid: subject, until, seat: held.seat } : claim);
+            await scheduleTableAlarm(record.expiresAt, claims);
             await state.storage.put({ ...write, [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims, record.seq + 1) });
             publish(scope, record.game, null, claims, record.seq + 1);
             return held.seat;
@@ -255,10 +268,9 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                     else if (game?.closed && game.reopen(subject, uuid(), frame.mode, now())) {
                         claims = [];
                         changed = true;
-                        expiresAt = now() + MATCH_TTL;
                     } else if (game && !(game.closed && game.host === subject && game.subjects.length === 1)) error = 'unavailable';
                     else if (!game && (await state.storage.list({ prefix, limit: tableCap })).size >= tableCap) error = 'unavailable';
-                    else { game = new SelectedTable(uuid(), subject, game?.tableId); changed = true; expiresAt = now() + MATCH_TTL; }
+                    else { game = new SelectedTable(uuid(), subject, game?.tableId); changed = true; expiresAt ??= now() + GAME_NIGHT_LENGTH; }
                 } else if (!game || game.closed) error = 'match-changed';
                 else if (frame.action === 'join') {
                     const otherClaims = claims.filter(claim => claim.sid !== subject);
@@ -272,11 +284,11 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                     else if (!game.seat(subject)) {
                         if (!game.subjects.every(peer => binding.canJoin(peer)) ||
                             !game.join(subject, frame.id, now(), seat, otherClaims.length, heldSeats)) error = 'seat-unavailable';
-                        else { claims = otherClaims; changed = true; expiresAt = now() + MATCH_TTL; }
+                        else { claims = otherClaims; changed = true; }
                     }
                 } else if (frame.action === 'start') {
                     if (claims.length || !binding.canOpen || !game.start(subject, frame.id, now())) error = 'start-unavailable';
-                    else { changed = true; expiresAt = now() + MATCH_TTL; }
+                    else { changed = true; }
                 } else if (frame.action === 'leave') {
                     if (!game.seat(subject) || game.view(subject, now()).id !== frame.id) error = 'match-changed';
                     else {
@@ -293,13 +305,11 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                     } else {
                         if (game.view(subject, now()).id === candidate) nextMatch = candidate;
                         changed = true;
-                        expiresAt = now() + MATCH_TTL;
                     }
                 } else {
                     const outcome = game.command(subject, frame, now());
                     changed ||= outcome.ok || outcome.changed === true;
                     if (!outcome.ok) error = outcome.reason;
-                    else if (renewOnAction) expiresAt = now() + MATCH_TTL;
                 }
             }
             if (frame.action === 'sync' && !scope.synced) {
@@ -307,13 +317,16 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 if (claim && binding.gameGuest?.game === name &&
                     game?.hasGuestSeat(binding.gameGuest.match, binding.gameGuest.host, claims.length - 1)) {
                     claim.connected = true;
-                    claim.until = Math.max(claim.until, now() + CONNECTED_CLAIM_TTL);
+                    claim.until = Math.min(expiresAt, Math.max(claim.until, now() + CONNECTED_CLAIM_TTL));
                     changed = true;
                 }
             }
+            if (!error && binding.gameGuest && game?.seat(subject) && frame.action !== 'sync') await guestActivity(binding);
             if (changed) {
-                if (game) await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims, seq + 1));
-                else await state.storage.delete(key(scope));
+                if (game) {
+                    await scheduleTableAlarm(expiresAt, claims);
+                    await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims, seq + 1));
+                } else await state.storage.delete(key(scope));
                 publish(scope, game, null, claims, seq + 1, nextMatch);
             } else if (!record?.expired) publish(scope, game, resume ? null : socket, claims, seq);
             if (frame.action === 'sync' && !scope.synced) {
@@ -334,7 +347,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         const matchId = uuid();
         if (record.game.startReadyRematch(matchId, now(), connected)) {
             const seq = record.seq + 1;
-            await state.storage.put(key(scope), savedRecord(scope, record.game, now() + MATCH_TTL, record.claims, seq));
+            await state.storage.put(key(scope), savedRecord(scope, record.game, record.expiresAt, record.claims, seq));
             publish(scope, record.game, null, record.claims, seq, matchId);
         } else publish(scope, record.game, null, record.claims, record.seq);
     }
@@ -389,6 +402,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             } else {
                 const game = restore(record[name]);
                 const time = now(), claims = liveClaims(record.claims, time);
+                await scheduleTableAlarm(record.expiresAt, claims, true);
                 const expiredClaim = claims.length < (record.claims?.length || 0);
                 if (!game.expire(time) && !expiredClaim) continue;
                 await state.storage.put(storageKey, savedRecord(scope, game, record.expiresAt, claims, (record.seq ?? 0) + 1));
@@ -400,5 +414,5 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         const records = await state.storage.list({ prefix, limit: MATCH_CAP });
         if (records.size) await state.storage.delete([...records.keys()]);
     }
-    return { issue, upgrade, receive, reconcile, presenceChanged, revoke, maintain, retireDisabled, hasGuestSeat, guestTableId, reserveGuestSeat, releaseGuestClaim, roomGrants };
+    return { issue, upgrade, receive, reconcile, presenceChanged, revoke, maintain, retireDisabled, hasGuestSeat, guestTableId, guestNightEndsAt, reserveGuestSeat, releaseGuestClaim, roomGrants };
 }

@@ -1,13 +1,12 @@
 import { readGameNightPass, validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
 import { GAME_INVITE_UNAVAILABLE, gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
-import { BETA_TTL, DEMO_INVITE_TTL } from './beta-auth.mjs';
+import { DEMO_INVITE_TTL } from './beta-auth.mjs';
 import { arcadeRoomRequest } from './game-night-sockets.mjs';
 
 export const GAME_GUEST_PATH = '/beta/game-night/guest';
 export const GAME_INVITATION_PATH = '/beta/game-night/invitation';
 const STORAGE_PREFIX = 'game-night-invitation:';
 const CLAIM_TTL = 60_000;
-const GUEST_TTL = 2 * 60 * 60_000;
 const LINK_CAP = 100;
 const LINK_CAP_PER_HOST = 8;
 const codePattern = /^[a-f0-9]{32}$/;
@@ -113,8 +112,9 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     if (!tableId || scope.tableId && scope.tableId !== tableId) return unavailable();
     scope = { ...scope, tableId };
     const sid = crypto.randomUUID();
-    const exp = record.accessUntil !== undefined ? Math.min(now + BETA_TTL, record.accessUntil)
-        : record.demo ? Math.min(now + GUEST_TTL, record.until) : now + GUEST_TTL;
+    const nightEndsAt = await table.guestNightEndsAt(scope);
+    const exp = Math.min(nightEndsAt, record.accessUntil ?? (record.demo ? record.until : Infinity));
+    if (!Number.isFinite(exp) || exp <= now) return unavailable();
     const accepted = { ...record, scope, sid, exp, redeemer: attempt };
     if (!await table.reserveGuestSeat(scope, sid, Math.min(now + CLAIM_TTL, exp), key, accepted, body.passHash)) return unavailable();
     return reply({ scope, sid, exp });

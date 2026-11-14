@@ -71,21 +71,23 @@ async function child(state, nonce) {
             const initialNight = await call(backend, 'forward-night', 'seed-night');
             assert.equal(initialNight.status, 200);
             assert.equal(initialNight.body.records.length, 1);
-            for (const phase of ['check-night', 'revoke-night']) {
-                assert.equal((await call(backend, 'forward-night', phase)).status, 403);
-                const unchanged = await call(backend, 'forward-night', 'inspect');
-                assert.equal(unchanged.body.objectId, initialNight.body.objectId);
-                assert.deepEqual(unchanged.body.records, initialNight.body.records);
-            }
+            assert.equal((await call(backend, 'forward-night', 'check-night')).status, 200);
             assert.equal((await call(backend, 'forward-night', 'register')).status, 200);
             assert.equal((await call(backend, 'forward-night', 'check-ordinary')).status, 200);
-            checks.push({ name: `${backend}-forward-night-record-remains-readable-without-admission-or-mutation`, pass: true });
             const pending = await call(backend, 'forward-night', 'seed-pending-night');
             const afterAlarm = await call(backend, 'forward-night', 'run-alarm');
             assert.equal(afterAlarm.status, 200);
-            assert.deepEqual(afterAlarm.body.records, pending.body.records);
-            assert.equal(afterAlarm.body.control.disconnects ?? 0, 0);
-            checks.push({ name: `${backend}-rollback-alarm-does-not-retry-pending-game-night-closure`, pass: true });
+            assert.equal(afterAlarm.body.objectId, pending.body.objectId);
+            const [pendingKey] = pending.body.records.find(([, record]) => record.pending);
+            assert.equal(new Map(afterAlarm.body.records).get(pendingKey)?.pending, false);
+            assert.equal(afterAlarm.body.control.disconnects, 1);
+            assert.equal((await call(backend, 'forward-night', 'check-night')).status, 403);
+            checks.push({ name: `${backend}-night-record-admission-and-alarm-revocation-with-ordinary-access`, pass: true });
+            const idle = await call(backend, 'idle-night', 'seed-idle-night');
+            assert.equal(idle.status, 200);
+            assert.equal((await call(backend, 'idle-night', 'check-night')).status, 403);
+            assert.deepEqual((await call(backend, 'idle-night', 'inspect')).body.records, idle.body.records);
+            checks.push({ name: `${backend}-night-idle-denied-before-hard-expiry`, pass: true });
 
             for (const name of ['budget', 'session', 'alarm']) {
                 const initial = await call(backend, name, 'seed-alarm'); assert.equal(initial.status, 200); assert.equal(initial.body.sqlite, backend === 'SQLITE');

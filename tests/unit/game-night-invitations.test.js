@@ -61,6 +61,7 @@ it('caps demo Chess links and admitted guests at the demo host session deadline'
             arcade: { get: () => ({
                 hasGuestSeat: async () => true,
                 guestTableId: async (_scope, match) => match,
+                guestNightEndsAt: async () => now + 16 * 60 * 60_000,
                 reserveGuestSeat: async (_scope, _sid, _until, key, record) => {
                     rows.set(key, record);
                     accepted = record;
@@ -90,7 +91,7 @@ it('caps demo Chess links and admitted guests at the demo host session deadline'
         expect((await limited.json()).error).toBe('Too many invitations are still on record. Share a current link for this game or try again later.');
         expect((await accept(ordinary.code)).status).toBe(200);
         const guestDeadline = accepted.exp;
-        expect(guestDeadline - now).toBe(2 * 60 * 60_000);
+        expect(guestDeadline - now).toBe(16 * 60 * 60_000);
         expect(guestDeadline).toBeLessThan(ordinary.until);
         vi.setSystemTime(shortHostDeadline - 1000);
         expect((await accept(short.code)).status).toBe(200);
