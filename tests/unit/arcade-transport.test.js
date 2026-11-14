@@ -10,7 +10,7 @@ const guest = 'c' + '2'.repeat(32);
 
 function fixture() {
     const records = new Map(), actors = new Map(), connections = [];
-    let now = 1000;
+    let now = 1000, matchCount = 0;
     const storage = {
         get: vi.fn(async key => structuredClone(records.get(key))),
         put: vi.fn(async (key, value) => {
@@ -34,7 +34,7 @@ function fixture() {
     }
     const a = player(actor, sid, true), b = player(guest, 'seat-black', false);
     const transport = createArcadeTransport({ state: { storage, getWebSockets: () => connections },
-        now: () => now, uuid: () => 'c8eb7f10-e113-418f-9900-7e23f4072497',
+        now: () => now, uuid: () => 'c8eb7f10-e113-418f-9900-' + String(++matchCount).padStart(12, '0'),
         current: scope => actors.get(scope.actor), active: async () => true, approve: async () => true,
         charge: async () => true, allowed: () => true });
     const send = (socket, action, fields = {}) => transport.receive(socket, JSON.stringify({ version: 1, action, ...fields }));
@@ -160,6 +160,27 @@ describe('Game Night match transport', () => {
         f.actors.get(guest).gameGuest.match = id;
         await f.send(f.b, 'join', { id, seat: 'next' });
         expect(f.board(f.b)).toMatchObject({ id, seat: 'b', waiting: false });
+    });
+
+    it('lets an admitted guest join a replacement table from the same host only', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        const binding = f.actors.get(guest);
+        const invitation = { room, ref, host: sid, match: id, game: 'chess' };
+        binding.gameGuest = invitation;
+        await f.send(f.a, 'leave', { id });
+        await f.send(f.a, 'open');
+        const replacement = f.board(f.a).id;
+        expect(replacement).not.toBe(id);
+
+        for (const mismatch of [{ host: 'another-host' }, { ref: '9'.repeat(32) }, { game: 'turdspades' }]) {
+            binding.gameGuest = { ...invitation, ...mismatch };
+            await f.send(f.b, 'join', { id: replacement, seat: 'next' });
+            expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
+        }
+        binding.gameGuest = invitation;
+        await f.send(f.b, 'join', { id: replacement, seat: 'next' });
+        expect(f.board(f.b)).toMatchObject({ id: replacement, seat: 'b', waiting: false });
     });
 
     it('expires a room grant before opening a socket', async () => {
