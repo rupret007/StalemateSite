@@ -2580,6 +2580,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         pendingGuestLink = null;
         createGuestLink.hidden = false; createGuestLink.disabled = false;
         copyGuestLink.hidden = true; shareGuestLink.hidden = true; guestLinkStatus.textContent = '';
+        shareGuestLink.removeAttribute('aria-disabled');
     }
     function readyGuestLink() {
         const request = pendingGuestLink, target = arcadeInviteTarget();
@@ -2672,6 +2673,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         }
     });
     shareGuestLink.addEventListener('click', async () => {
+        if (shareGuestLink.getAttribute('aria-disabled') === 'true') return;
         const request = readyGuestLink();
         if (!request) return;
         const title = `Join me for ${gameLabel(request.target.game)}`;
@@ -2680,17 +2682,25 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             guestLinkStatus.textContent = 'Choose a friend in the email draft.';
             return;
         }
+        shareGuestLink.setAttribute('aria-disabled', 'true');
+        guestLinkStatus.textContent = 'Choose a friend in the share sheet…';
         try {
             await navigator.share({ title, url: request.link });
             if (pendingGuestLink === request) closeInviteDialog();
         } catch (error) {
-            if (pendingGuestLink !== request || error.name === 'AbortError') return;
+            if (pendingGuestLink !== request) return;
+            if (error.name === 'AbortError') {
+                guestLinkStatus.textContent = 'Invitation still ready. Choose Share invite when you’re ready to send it.';
+                return;
+            }
             shareGuestLink.textContent = 'Email invite';
             shareGuestLink.classList.toggle('btn--ghost', !request.preferEmail && !copyGuestLink.hidden);
             copyGuestLink.classList.toggle('btn--ghost', request.preferEmail);
             guestLinkStatus.textContent = copyGuestLink.hidden
                 ? 'Sharing didn’t open. You can send the invitation by email.'
                 : 'Sharing didn’t open. Copy or email the invitation.';
+        } finally {
+            if (pendingGuestLink === request) shareGuestLink.removeAttribute('aria-disabled');
         }
     });
     $('[data-jam-invite-room]').addEventListener('click', event => openInviteDialog(event.currentTarget));
