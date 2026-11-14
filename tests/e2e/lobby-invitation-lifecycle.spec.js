@@ -637,6 +637,41 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
     }
 });
 
+for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) test(`an Art host can invite directly from the room at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const host = await fixture.visitor('ArtHost', viewport, false, 'rad-dad');
+        const guest = await fixture.visitor('ArtGuest', viewport, false, 'stalemate');
+        const invite = host.getByRole('button', { name: 'Invite someone', exact: true });
+        await expect(invite).toBeHidden();
+        const rooms = host.locator('.phonetabs [data-show="rooms"]');
+        if (await rooms.isVisible()) await rooms.press('Enter');
+        await host.locator('[data-start="art"]').press('Enter');
+        await expect(host.locator('[data-chat-context]')).toHaveText(/^#art-/);
+        const room = await host.locator('[data-chat-context]').textContent();
+        await expect(invite).toBeInViewport({ ratio: 1 });
+        await invite.press('Enter');
+        const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
+        const recipient = dialog.getByRole('button', { name: 'Invite ArtGuest', exact: true });
+        await expect(recipient).toBeFocused();
+        await host.screenshot({ path: testInfo.outputPath('art-room-guest-picker.png') });
+        await recipient.press('Enter');
+        await expect(dialog).toBeHidden();
+        await expect(invite).toBeFocused();
+        const join = guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true });
+        await expect(join).toBeInViewport({ ratio: 1 });
+        await guest.screenshot({ path: testInfo.outputPath('art-room-invite.png') });
+        await join.press('Enter');
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await expect(guest.locator('[data-act-canvas]')).toBeVisible();
+        await expect(guest.getByRole('button', { name: 'Invite someone', exact: true })).toBeHidden();
+        expect(await guest.evaluate(() => window.copiedInvites)).toEqual([]);
+        await guest.screenshot({ path: testInfo.outputPath('art-room-joined.png') });
+    } finally {
+        await fixture.close();
+    }
+});
+
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) test(`a fresh cross-band room invite works after expiry at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
     const fixture = await community(browser, baseURL);
     try {

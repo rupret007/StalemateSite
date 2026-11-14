@@ -693,6 +693,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-connection]').textContent = label;
         $('[data-connection]').dataset.state = state;
         $('[data-send]').disabled = state !== 'connected';
+        $('[data-activity-invite]').disabled = state !== 'connected';
         $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting' || state === 'ended' && betaShell;
         if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline' && !gameGuestReloadOffered;
         $('[data-reconnect]').hidden = !(state === 'offline' || state === 'ended' && !betaShell) || !app.me;
@@ -1256,7 +1257,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (jamDraft && currentJam() === c && amOp(c)) $('[data-jam-link]').value = jamDraft;
                 const r = room();
                 if (r) r.onChan(c);
-                if (jamInviteOpener && (c.kind === 'lobby' || c === inviteContext)) drawQuickInvitePeople();
+                if (inviteOpener && (c.kind === 'lobby' || c === inviteContext)) drawQuickInvitePeople();
             }
             drawCommunity();
             break;
@@ -2568,6 +2569,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         drawGameNight();
         const showAct = !app.sharingStopped && !app.localMediaPaused && room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
+        $('[data-activity-invite]').hidden = !showAct || !amOp(c);
         $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'A little paint. A little Bob Ross.' : 'Watching together' : 'Shared activity';
         $('[data-act-stage]').hidden = !showAct;
         document.body.classList.toggle('am-op', !app.localMediaPaused && !!(c && amOp(c)));
@@ -3098,7 +3100,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-palette-close]').addEventListener('click', () => $('[data-palette]').close());
     $('[data-palette]').addEventListener('close', () => { if (!$('[data-palette]').open) paletteContext = null; });
 
-    let inviteInstance = '', invitePeople = new Map(), jamInviteOpener = null;
+    let inviteInstance = '', invitePeople = new Map(), inviteOpener = null;
     function drawSentRoomInvite(room) {
         const invite = sentRoomInvites.get(room.name);
         const status = $('[data-room-invite-status]');
@@ -3147,8 +3149,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         return online;
     }
     function drawQuickInvitePeople() {
-        if (!inviteContext || !jamInviteOpener || $('[data-invite-quick]').hidden) return;
-        const { music } = jamInviteOpener;
+        if (!inviteContext || !inviteOpener || $('[data-invite-quick]').hidden) return;
+        const { music } = inviteOpener;
         const list = $('[data-invite-people]');
         const error = $('[data-invite-quick-error]');
         const online = onlineInvitePeople(inviteContext, music);
@@ -3182,7 +3184,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function openInviteDialog(opener = null, { music = false, exactTable = null } = {}) {
         const current = store(app.active);
         if (connectionState !== 'connected' || !current || current.kind === 'lobby' || !amOp(current)) return;
-        jamInviteOpener = opener ? { button: opener, room: current, music } : null;
+        inviteOpener = opener ? { button: opener, room: current, music } : null;
         $('[data-invite-purpose]').textContent = music ? 'Invite someone to play or listen in' : 'Invite someone to';
         inviteContext = current; inviteInstance = current.keepRef; invitePeople.clear(); $('[data-invite-room]').textContent = current.name; $('[data-invite-error]').textContent = '';
         $('[data-game-invite-error]').textContent = '';
@@ -3233,6 +3235,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-jam-invite-room]').addEventListener('click', event => {
         if (event.currentTarget.getAttribute('aria-disabled') !== 'true') openInviteDialog(event.currentTarget);
     });
+    $('[data-activity-invite]').addEventListener('click', event => openInviteDialog(event.currentTarget));
     $('[data-jam-invite-music]').addEventListener('click', event => {
         if (!pendingMusicHandoff) openInviteDialog(event.currentTarget, { music: true });
     });
@@ -3336,8 +3339,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $('[data-game-invite-cancel]').addEventListener('click', closeInviteDialog);
     $('[data-invite-dialog]').addEventListener('close', () => {
         if ($('[data-invite-dialog]').open) return;
-        const opener = jamInviteOpener;
-        jamInviteOpener = null;
+        const opener = inviteOpener;
+        inviteOpener = null;
         closeInviteDialog();
         if (connectionState !== 'connected') return;
         // The native dialog dispatches close asynchronously. Manual sharing
@@ -3472,7 +3475,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             startMusicHandoff(current, context);
             return;
         }
-        if (current.kind === 'jam' && jamInviteOpener && roomInvitesSupported) {
+        if (current.kind === 'jam' && inviteOpener && roomInvitesSupported) {
             const request = crypto.randomUUID().replaceAll('-', '');
             if (send({ t: 'room-invite-request', request, ch: current.name, roomInstance: context.instance, peer: context.peer })) {
                 const invite = { request, room: current, nick: person.nick };
