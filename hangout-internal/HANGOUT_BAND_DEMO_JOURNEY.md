@@ -6,12 +6,30 @@ Keep the rehearsal private and use the build-specific invitation steps below.
 
 ## What to send the guest
 
+Use this message with the currently serving private beta.
+
 > Hey Che’, open the private Hang Out invite I send you in Chrome on your PC.
-> Pick a nickname and enter the lobby. Keep wired headphones handy. I’ll send
-> you the Music invite from inside Hang Out. Once you reach the audio check,
-> pick your drum interface as the microphone, click **Check microphone** and
-> play a few hits. When the meter responds, check the headphones box and click
-> **Join with microphone**. You can do this in Chrome without installing WebJam.
+> Pick a nickname and enter the lobby. Put on your wired headphones. I’ll
+> invite you to the Jam room. Click **Join room**, then **Join in browser**
+> when I share the Music invite. On the audio screen, click
+> **Check microphone**, allow Chrome to use it, and play a few drum hits.
+> If **Using** names the wrong input, select your drum interface under
+> **Microphone** when the picker appears, then play again. When you see
+> **Microphone detected.**, check the headphones box and click
+> **Join with microphone**. Chrome is all you need on the PC. If the invite
+> expires, stay in Hang Out and I’ll send another.
+
+After the selected-guest Music build is delivered and verified, use this version.
+
+> Hey Che’, open the private Hang Out invite I send you in Chrome on your PC.
+> Pick a nickname and wait in the lobby. When my Music invite appears, click
+> **Accept and join**, then **Open WebJam in browser**. You can **Join to listen**
+> with your mic off. When you’re ready to play, plug in wired headphones,
+> choose **Check microphone**, and hit the drums a few times. If Chrome shows
+> the wrong input, choose your drum interface under **Microphone**. When you
+> see **Microphone detected.**, check the headphones box and select
+> **Join with microphone**. Keep Hang Out open for chat. If an invite expires,
+> ask me there for a new one. Chrome is all you need on the PC.
 
 Send the private Hang Out invitation separately through the usual private
 channel. A guest opens it and reads the guest agreement before entering. A
@@ -20,34 +38,60 @@ the same lobby and can see each other in **People**.
 
 ## Host setup
 
-1. Open the verified WebJam rehearsal shortcut on the Mac. Choose **Music**
-   and **Host**, then **Start Session** if shown. Check the physical input,
-   wired headphones and intended network first. For the band's rehearsal,
-   verify the SSL 2+ guitar and vocal inputs and Che’s drum interface.
-2. In Hang Out, open **Rooms** and choose **Jam (WebJam)**. Keep the lobby
-   and native Music session open. An online guest can wait in the lobby
-   while the host prepares the invitation.
-3. Use the invitation path that matches the private build.
+1. For the currently serving beta, open **WebJam Private Rehearsal (c6eecdc)**
+   on the Mac Desktop and check **More → About WebJam** for build `c6eecdc`.
+   Once the rehearsal is scheduled, check the intended network, SSL 2+
+   guitar and vocal inputs, wired headphones and Che’s drum interface.
+2. In WebJam, choose **Music → Host**, then **Start Session** if shown.
+   In Hang Out, open **Rooms → Jam (WebJam)**. Keep both open.
+3. Use the invitation steps that match the serving website and Mac build.
 
 | Build | Host | Guest |
 | --- | --- | --- |
-| Current delivered rehearsal flow | Choose **Invite bandmate to room** if shown. If the room shows **Invite guest** under host controls, select the guest there. Once both guests are in the Jam room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it in the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** once the host has shared the Music invite. |
-| One-tap Music candidate, private fixture | Choose **Invite bandmate to Music**, select the guest's name, and confirm the invitation in WebJam. Wait for Hang Out to show that it was sent. | Choose **Accept and join**. If the audio check remains available in the room, choose **Open audio check**. The browser joins the Jam room and opens the audio check without exchanging a link. |
+| Serving private beta, source `dc77aef`, Worker version `8d76db40` | Choose **Invite bandmate to room** if shown, or **Invite guest** in Host tools. Once the guest joins the room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it into the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** when the host shares the Music invite. |
+| Selected-guest candidate, website `103827ff` and WebJam `424f2ed6` | After private delivery and launch verification, choose **Invite bandmate to Music**, select the guest, and confirm in WebJam. Wait for Hang Out to say the invitation was sent. | Choose **Accept and join**, then **Open WebJam in browser**. Choose **Join to listen** with your mic off, or check your input and join with a microphone. |
 
-The verified one-tap candidate used private website tree `5553434` and
-browser source `90331ff`. The isolated tests exercised native confirmation,
-Windows Chrome, fresh invites and mixer-loss recovery with generated audio.
-Use the one-tap instructions for an attended rehearsal once the corresponding
-site and native handoff are delivered and confirmed on the actual devices.
+### If WebJam doesn’t open from Hang Out
+
+On the selected-guest build, choose **Open** if the browser asks to open WebJam.
+If nothing opens, choose **Cancel Music invite** in Hang Out. Open the WebJam
+beta app, start **Music → Host**, then try again. If the return tab opens in a
+different browser profile, choose **End browser invite** in WebJam and retry
+from Hang Out in the return tab’s browser profile.
+
+If the direct invite still fails, use the room fallback after the selected-guest
+build has been delivered. Choose **Invite bandmate to room** in Hang Out, and
+have your bandmate choose **Join room**. In WebJam, choose **Copy browser invite**
+and wait for **Link copied**. Back in the Hang Out Jam room, open **Share a link
+manually**, paste the link, and choose **Share with room**. Wait for
+**Invitation shared.** Your bandmate can now choose **Join in browser**. If
+Hang Out rejects the paste, the link stays in the field so you can correct it.
+
+### What’s been verified
+
+The serving beta uses the first row. The selected-guest path passed in desktop
+Chromium and phone-size WebKit with the exact private website archive and WebJam
+Qt source. The guest recovered from a refused invitation, accepted a fresh one,
+listened and left. Those checks simulated audio. The manual fallback also passed across Stalemate
+and Rad Dad in local desktop Chromium and phone-size WebKit. The exact Apple
+Silicon package passed targeted warm and cold macOS launches. The Mini’s
+default private URL handler still selected `c6eecdc` at the latest check.
+A matching Intel package, normal browser-to-app launch and the live rehearsal
+still need verification.
+[Website review](https://github.com/rupret007/StalemateSite/pull/488) ·
+[Desktop review](https://github.com/rupret007/WebJam/pull/505)
 
 ## Audio check, recovery and ending the session
 
-- On Windows, choose the intended microphone if Chrome lists more than one.
-  Allow capture when prompted. Confirm that **Check microphone** responds to
-  that input and that headphones are connected before joining.
-- If the chosen input stays silent, check the interface in Windows Sound,
-  choose it in Chrome and retry the mic check. If the Music invitation expires
-  or the host ends the session, return to Hang Out and ask for a fresh invite.
+- Start with **Check microphone**. If **Microphone** appears, selecting an
+  interface starts another check. Read **Using** and play a few hits to verify
+  the input before checking the headphones box.
+- If the interface is missing or silent, check **Windows Settings → System →
+  Sound → Input** and select the drum interface. Then confirm Chrome has
+  microphone permission. Use **Try again** if shown and wait for
+  **Microphone detected.** before joining. If the invite expires or the host
+  ends the session, return to Hang Out and ask for a fresh invite.
+  [Microsoft microphone setup](https://support.microsoft.com/en-us/windows/hardware/drivers/how-to-set-up-and-test-microphones-in-windows)
 - After joining, each person should say a few words and confirm hearing the
   other. Play a short passage and check guitar, vocal and drum levels by
   listening together. Finish with **Leave session** in Chrome and **End Session**

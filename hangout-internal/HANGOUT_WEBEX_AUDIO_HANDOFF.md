@@ -1,18 +1,15 @@
 # Webex companion: current behavior and acceptance
 
 WebJam carries the music through Jamulus and browser Web Join. An optional
-Webex meeting can provide video or conversation separately. The current qualified native
-candidate source is `ae49c915070f2951db9ff441c23c7f0a9d90ce1b`; existing Desktop
-selections were preserved and may still open older builds. Use the
-[current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md) for actual package and
-website identities. This note does not qualify a real meeting.
+Webex meeting can provide video or conversation separately. Both Macs use
+**WebJam Private Rehearsal (c6eecdc)**. Use the
+[current private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+for package and website identities. The real meeting remains an attended check.
 
-**November 9 update:** the existing Personal Room was saved through normal
-Settings in the verified Mini build and remained correct after reopening, with
-the musician name unchanged. Only the Mini preference was qualified; MacBook
-setup and the attended meeting checks remain pending. Do not recover the same
-private URL again merely because the historical readiness notes below predate
-that setup. Private links and room numbers stay out of repository evidence.
+On November 12 both verified Mac builds had the same existing Personal Room
+saved. The MacBook change updated only its meeting field. A fresh readback
+confirmed the saved setting, valid package signature and absence of a conflicting
+environment override. Private links and room numbers stay out of the evidence.
 
 ## What the current application controls
 
@@ -42,16 +39,12 @@ Personal Room. The current vendor signature was valid. One HTTPS Webex Personal
 Room link was validated without saving its URL, room number or host fields to
 evidence; the client was quit normally. No meeting, camera or microphone started.
 
-That November 8 discovery did not configure WebJam or prove a meeting join.
-The November 9 Mini setup above supersedes its missing-preference state: do not
-recover or re-enter the Mini link again just because this dated section exists.
-MacBook setup remains unqualified; use normal existing-client/browser navigation
-and save only the validated existing meeting link when the device/resource gates
-permit. Do not ask Jeff to paste the private URL into chat. Do not create a new
-meeting, publish the link, enroll an SDK, or buy a license for this test. Use the
-supported external app/browser offered by the meeting; a native Show Webex App
-control requires a verified installed client. The read-only checks launched no
-meeting, microphone or camera and do not qualify video or audio switching.
+The November 12 saved settings supersede the November 8 device inventory.
+On the MacBook, choose **Join / Open Meeting** and use the external browser
+option if Webex offers it. **Show Webex App** requires a verified installed
+client. The MacBook has a listed camera. Windows has a software-enumerated
+image device and still needs a real camera-preview check. To undo the MacBook
+setup, clear its meeting link in WebJam Settings. Its original field was empty.
 
 ## Attended manual handoff check
 

@@ -185,10 +185,10 @@ redistribution-license qualification remains explicitly unfinished.
 
 ## Remaining band journey
 
-1. On either Mac, open **WebJam Private Band Demo** from the Desktop and
-   confirm build `23cfae6`. Both archives, signatures and isolated idle
-   startup checks passed. The Mini's previous link was preserved. Its target
-   is missing, so restoring AE49 would also require a verified earlier copy.
+1. On either Mac, open **WebJam Private Rehearsal (c6eecdc)** from the Desktop.
+   In the workspace, choose **More → About WebJam** to check the build ID.
+   The older **WebJam Private Band Demo** shortcut opens `23cfae6`.
+   [Exact private packaging run](https://github.com/rupret007/webjam/actions/runs/43168414538)
 2. Before hosting or copying an invite, connect the dock Ethernet and SSL 2+.
    Plug the guitar pedal into SSL input 1, the vocal mic into input 2 and wired
    headphones into the SSL. With Music idle, open macOS **Audio MIDI Setup**.
@@ -239,16 +239,17 @@ redistribution-license qualification remains explicitly unfinished.
    48 kHz files are staged on both Macs. The Mini's bundled decoder passed
    five seeks per file plus pause, restart and trim in memory. Keep the primary
    microphone and headphones on the physical route and verify the separate existing
-   BlackHole 16-channel 48 kHz backing route. Hear backing plus live
-   input together; check levels/mute, pause/restart/seek and stopping. Earlier
-   file decoding, locked controls and generated tones do not establish this mix.
+   BlackHole 16-channel 48 kHz backing route. Use the
+   [Shared Track listening checklist](HANGOUT_SHARED_TRACK_NEXT_CHECK_20261107.md)
+   to check the combined mix, source level, pause, seek, restart and stop.
+   The later dedicated **Mute** control requires its corresponding build.
    The current sender backend is Mac-only; Windows/Linux cannot send Shared Track
    until their routing isolation is qualified. A Windows browser guest can be the
    listening/playing participant; that full Mac-host-to-Windows mix is still pending.
-5. The Mini has the Webex app and a saved Personal Room link that passes
-   validation. The Intel Mac has no saved link, and Webex was absent from its
-   standard application folders. Use the normal setup or joining flow for the
-   test. Verify real Webex join, video, leave and Music→conversation→Music.
+5. Both verified Macs have the same existing Personal Room saved. The Mini has
+   the Webex app. Use the external browser option on the Intel Mac if Webex
+   offers it. Follow the [Webex audio handoff guide](HANGOUT_WEBEX_AUDIO_HANDOFF.md)
+   for the attended join, video, leave and Music→conversation→Music checks.
    The merged WebJam source labels the action **Open Webex for Audio** and
    explains how to choose **Don't connect to audio** for video only. Older
    packages may still show the previous label. Use Webex's meeting controls
