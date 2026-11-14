@@ -48,7 +48,7 @@ test('a failed chat shortcut can be retried without changing the composer draft'
     await expect(message).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('shortcut-after-failed-send.png') });
     await expect(status).toHaveText('Couldn’t send that shortcut. Try it again.');
-    await expect(status).toHaveAttribute('role', 'status');
+    await expect(page.locator('[data-toast-announcement]')).toHaveText('Couldn’t send that shortcut. Try it again.');
 
     await shortcut.press('Enter');
     await expect(message).toHaveCount(1);
@@ -82,7 +82,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
         await expect(composer).toBeFocused();
         await expect(log).not.toContainText(message);
         await expect(status).toHaveText('Couldn’t send your message. Your draft is still here. Try sending it again.');
-        await expect(status).toHaveAttribute('role', 'status');
+        await expect(page.locator('[data-toast-announcement]')).toHaveText('Couldn’t send your message. Your draft is still here. Try sending it again.');
         await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
         await page.screenshot({ path: testInfo.outputPath('send-failed-draft-retained.png') });
         await composer.press('Enter');
@@ -158,6 +158,7 @@ test('fullscreen rejection announces recovery without moving focus or losing the
     await expect(page.locator('[data-toast]')).toHaveText(message);
     await expect(page.locator('[data-toast]')).toHaveAttribute('aria-live', 'off');
     await expect(announcement).toHaveText(message);
+    await expect(page.getByRole('status').filter({ hasText: message })).toHaveCount(1);
     await expect(fullScreen).toHaveAttribute('aria-pressed', 'false');
     await expect(fullScreen).toBeFocused();
     await expect(page.locator('[data-text]')).toHaveValue('An unsent draft');
