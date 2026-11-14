@@ -300,7 +300,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (min-width: 1100px) {
   .game-night:has(.arcade-card-table[open] [data-card-table]:not([hidden])) {
     display: grid;
-    grid-template: "cards heading" auto "cards actions" auto "cards chess" auto "cards eights" auto "cards rummy" auto "cards spades" auto "cards jack" auto "cards tris" auto "cards mania" auto "cards rush" auto "cards brick" auto "cards call" 1fr /
+    grid-template: "cards heading" auto "cards actions" auto "cards chess" auto "cards spades" auto "cards brick" auto "cards eights" auto "cards rummy" auto "cards jack" auto "cards tris" auto "cards mania" auto "cards rush" auto "cards call" 1fr /
       minmax(0, 27rem) minmax(0, 1fr);
     gap: 4px 16px;
     align-items: start;

@@ -1376,8 +1376,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.locator('[data-entry-label]').first()).toHaveText(`via ${brand}`);
                 await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
                 await expect(host.getByRole('combobox', { name: 'Switch game' }).locator('option:not([disabled])')).toHaveText([
-                    'Games', 'Royal Flush Chess', 'Crappy Eights', 'TurdRummy', 'TurdSpades', 'Crapjack 21',
-                    'Turdtris Sprint', 'Turdomania Duel', 'Turd Rush Race', 'Turdanoid Brick Race'
+                    'Games', 'Royal Flush Chess', 'TurdSpades', 'Turdanoid Brick Race', 'Crappy Eights', 'TurdRummy',
+                    'Crapjack 21', 'Turdtris Sprint', 'Turdomania Duel', 'Turd Rush Race'
                 ]);
                 const privateArcade = host.getByRole('button', { name: `Open ${brand} Arcade`, exact: true });
                 const roomUrl = host.url();

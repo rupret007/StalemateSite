@@ -2,11 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
-import * as gameNightFunctions from '../../r/45662413410ed051/lobby/game-night.mjs';
-import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
-import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
-import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
-import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
+import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs';
 
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
@@ -37,8 +33,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; return this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, mountGameNightSound: vi.fn(), unlockGameNightAudio: vi.fn(), ...gameNightFunctions, createEntrySharing, createIdleHeartbeat,
-        createChatAnnouncements: (log) => createChatAnnouncements(log, { frame: (fn) => window.setTimeout(fn, 16), cancel: (id) => window.clearTimeout(id) }) };
+    window.HangoutClientTestModules = createHangoutClientTestModules(window);
     window.eval(discovery);
     // Execute the actual browser client, replacing only module loading, which
     // jsdom cannot perform. Real Chromium journeys cover native ESM loading.
