@@ -2621,14 +2621,18 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         pendingGuestLink = request;
         createGuestLink.disabled = true;
         guestLinkStatus.textContent = 'Preparing an invitation…';
+        const retryMessage = 'The invitation could not be prepared. Try again.';
         try {
             const response = await fetch('/beta/game-night/invitation/issue', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000),
                 body: JSON.stringify({ actor: app.selfId, room: room.name, ref: room.keepRef, ...target })
             });
-            const value = await response.json();
+            const value = await response.json().catch(() => null);
             if (pendingGuestLink !== request || room !== currentGameNight()) return;
-            if (!response.ok || !gameInviteCode(value.code)) throw new Error(value.error || 'The invitation could not be prepared. Try again.');
+            if (!response.ok || !gameInviteCode(value?.code)) {
+                guestLinkStatus.textContent = typeof value?.error === 'string' && value.error ? value.error : retryMessage;
+                return;
+            }
             request.link = new URL('/beta/game-night/guest#invite=' + value.code, location.origin).href;
             createGuestLink.hidden = true;
             const canShare = typeof navigator.share === 'function';
@@ -2644,9 +2648,12 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();
         } catch (error) {
             if (pendingGuestLink !== request) return;
-            guestLinkStatus.textContent = error.name === 'TimeoutError' ? 'The invitation took too long. Try again.' : error.message;
+            guestLinkStatus.textContent = error.name === 'TimeoutError' ? 'The invitation took too long. Try again.' : retryMessage;
         } finally {
-            if (pendingGuestLink === request) createGuestLink.disabled = false;
+            if (pendingGuestLink === request) {
+                createGuestLink.disabled = false;
+                if (inviteContext === currentGameNight() && !createGuestLink.hidden) createGuestLink.focus({ preventScroll: true });
+            }
         }
     }
     copyGuestLink.addEventListener('click', async () => {
