@@ -173,12 +173,25 @@ describe('Game Night match transport', () => {
         const replacement = f.board(f.a).id;
         expect(replacement).not.toBe(id);
 
-        for (const mismatch of [{ host: 'another-host' }, { ref: '9'.repeat(32) }, { game: 'turdspades' }]) {
+        for (const mismatch of [{ host: 'another-host' }, { ref: '9'.repeat(32) }, { room: '#game-418f99x990041' }, { game: 'turdspades' }]) {
             binding.gameGuest = { ...invitation, ...mismatch };
+            await f.send(f.b, 'sync');
+            expect(f.board(f.b)).not.toHaveProperty('replacementAvailable');
             await f.send(f.b, 'join', { id: replacement, seat: 'next' });
             expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
         }
         binding.gameGuest = invitation;
+        await f.send(f.b, 'sync');
+        expect(f.board(f.b)).toMatchObject({ id: replacement, waiting: true, replacementAvailable: true });
+        const scope = { room, ref, host: sid, match: replacement };
+        expect(await f.transport.reserveGuestSeat(scope, 'another-guest', 61000, 'invite', {})).toBe(true);
+        await f.send(f.b, 'sync');
+        expect(f.board(f.b).hasOpenSeat).toBe(false);
+        expect(f.board(f.b)).not.toHaveProperty('replacementAvailable');
+        await f.send(f.b, 'join', { id: replacement, seat: 'next' });
+        expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
+        await f.transport.releaseGuestClaim(scope, 'another-guest');
+        expect(f.board(f.b)).toMatchObject({ id: replacement, waiting: true, replacementAvailable: true });
         await f.send(f.b, 'join', { id: replacement, seat: 'next' });
         expect(f.board(f.b)).toMatchObject({ id: replacement, seat: 'b', waiting: false });
     });
