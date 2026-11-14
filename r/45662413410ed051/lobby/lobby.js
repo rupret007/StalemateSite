@@ -39,10 +39,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     const writeRemembered = (key, value) => { try { localStorage.setItem(key, value); } catch { /* Remembering this device is optional. */ } };
     // Only the protected shell adds this marker. Its current display/admission
     // hints also live in memory, independent of optional tab storage.
-    const betaShell = !!$('script[src="/beta/bootstrap.js"], script[src="/beta/bootstrap.js?game-guest=1"]');
+    const betaShell = !!$('script[src="/beta/bootstrap.js"], script[src^="/beta/bootstrap.js?game-guest=1"]');
     const betaBootstrap = betaShell && window.HangoutBootstrap;
     const gameGuest = betaBootstrap?.gameGuest;
-    const gameGuestQuery = gameGuest ? '?game-guest=1' : '';
+    const gameGuestQuery = gameGuest ? '?game-guest=1' + (gameGuest.tableId ? '&table=' + gameGuest.tableId : '') : '';
     const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
     let gameGuestExit = gameGuest && ['left', 'canceled', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
     let gameGuestSeated = false, gameGuestReloadOffered = false;
@@ -709,7 +709,11 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (attempt !== connectionAttempt) return;
         if (!ownerSession && siteKey && !tsToken) { setConnection('offline'); return gateStatus('The guest check couldn’t finish. Please try again.'); }
         const q = new URLSearchParams({ preview: previewKey, 'device-in-hello': '1' });
-        if (gameGuest) { q.set('game-guest', '1'); q.set('game-room', gameGuest.ref); }
+        if (gameGuest) {
+            q.set('game-guest', '1');
+            q.set('game-room', gameGuest.ref);
+            if (gameGuest.tableId) q.set('table', gameGuest.tableId);
+        }
         const dev = readRemembered('hangout-dev');
         if (dev) q.set('dev', dev);
         if (tsToken) q.set('ts', tsToken);
@@ -886,7 +890,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         status.textContent = `${message} Closing the invitation…`;
         try {
             const response = await fetch('/beta/game-night/invitation/leave', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionRef: gameGuest.sessionRef }), keepalive: true,
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionRef: gameGuest.sessionRef, tableId: gameGuest.tableId }), keepalive: true,
                 signal: AbortSignal.timeout(10000)
             });
             if (!response.ok || (await response.json()).ok !== true) throw new Error('Invitation close unconfirmed');

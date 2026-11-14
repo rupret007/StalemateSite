@@ -510,12 +510,27 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await guest.locator('[data-text]').fill('First visit from the game invite');
                 await guest.locator('[data-send]').click();
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
-                const reused = await context.newPage();
+                const reused = await browser.newPage({ viewport, hasTouch: phone, ignoreHTTPSErrors: true });
                 await openGameNightLink(reused, link);
                 await expect(reused.getByRole('status')).toHaveText('This invite is no longer available. Ask your host for a new one.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
                 if (phone) {
+                    const tableId = new URL(guest.url()).searchParams.get('table');
+                    assert.ok(tableId, 'a fresh admission identifies the table in the lobby address');
+                    assert.equal(await guest.evaluate(id => /^[a-f0-9]{64}$/.test(localStorage.getItem('gn:pass:' + id) || ''), tableId), true);
+                    const resume = guest.waitForResponse(response => new URL(response.url()).pathname === '/beta/game-night/invitation/resume');
+                    await context.clearCookies({ name: /^__Host-hangout-game-guest(?:-|$)/ });
+                    await guest.reload();
+                    assert.equal((await resume).status(), 200, 'the saved table pass restores the private session');
+                    await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                    await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                    const originalLink = await context.newPage();
+                    await openGameNightLink(originalLink, link);
+                    await expect(originalLink.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                    await originalLink.close();
+                    await guest.reload();
+                    await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                     await host.getByRole('button', { name: 'Leave match', exact: true }).click();
                     await host.getByRole('dialog', { name: 'Leave match?' }).getByRole('button', { name: 'Leave match', exact: true }).click();
                     await guest.reload();
@@ -2628,6 +2643,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
+        if (process.env.ARCADE_GUEST_RECOVERY_ONLY === '1') {
+            await verifyGameNightEntry();
+            assert.deepEqual(errors, []);
+            return;
+        }
         if (process.env.ARCADE_BRICK_DRAG_ONLY === '1') {
             const host = await guest('stalemate', 'ChessHost', { width: 1440, height: 900 });
             const player = await guest('rad-dad', 'ChessGuest', { width: 390, height: 844 }, true);

@@ -14,7 +14,7 @@ const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDI
 const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 const sources = () => Object.fromEntries([
     ['fixture/runner.mjs', FILE], ['fixture/worker.mjs', join(HERE, 'worker.mjs')],
-    ...['beta-sessions.mjs', 'beta-session-state.mjs', 'game-night-lifetime.mjs', 'core.mjs', 'beta-session-client.mjs', 'beta-ops.mjs', 'beta-auth.mjs', 'ai-eligibility.mjs', 'auth.mjs'].map(name => [`application/${name}`, join(APP, 'hangout-worker/src', name)]),
+    ...['beta-sessions.mjs', 'beta-session-state.mjs', 'game-night-lifetime.mjs', 'game-night-pass.mjs', 'core.mjs', 'beta-session-client.mjs', 'beta-ops.mjs', 'beta-auth.mjs', 'ai-eligibility.mjs', 'auth.mjs'].map(name => [`application/${name}`, join(APP, 'hangout-worker/src', name)]),
     ...['package.json', 'package-lock.json'].map(name => [`tools/${name}`, join(TOOLS, name)])
 ].map(([name, path]) => [name, hash(path)]));
 const group = pid => execFileSync('/bin/ps', ['-axo', 'pid=,ppid=,pgid=,stat=,comm='], { encoding: 'utf8', timeout: 3000 }).trim().split('\n').map(line => {
@@ -37,7 +37,7 @@ async function child(state, nonce) {
     const disconnected = () => kill(process.pid); process.on('disconnect', disconnected);
     const options = convertV4MiniflareOptions({
         name: 'webjam-beta-lifecycle-proof', rootPath: APP, modulesRoot: APP,
-        modules: [{ type: 'ESModule', path: join(HERE, 'worker.mjs') }, ...['beta-sessions.mjs', 'beta-session-state.mjs', 'game-night-lifetime.mjs', 'core.mjs', 'beta-session-client.mjs', 'beta-ops.mjs', 'beta-auth.mjs', 'ai-eligibility.mjs', 'auth.mjs'].map(name => ({ type: 'ESModule', path: join(APP, 'hangout-worker/src', name) }))],
+        modules: [{ type: 'ESModule', path: join(HERE, 'worker.mjs') }, ...['beta-sessions.mjs', 'beta-session-state.mjs', 'game-night-lifetime.mjs', 'game-night-pass.mjs', 'core.mjs', 'beta-session-client.mjs', 'beta-ops.mjs', 'beta-auth.mjs', 'ai-eligibility.mjs', 'auth.mjs'].map(name => ({ type: 'ESModule', path: join(APP, 'hangout-worker/src', name) }))],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, inspectorHost: '127.0.0.1', inspectorPort: 0,
         resourcePersistencePath: join(state, 'persist'), resourceTmpPath: join(state, 'runtime'),
         durableObjects: { SQLITE: { className: 'SqliteBeta', useSQLite: true }, LEGACY: { className: 'LegacyBeta', useSQLite: false } },

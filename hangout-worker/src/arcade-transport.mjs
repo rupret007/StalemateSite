@@ -1,3 +1,4 @@
+import { gameNightPassRecord, readGameNightPass } from './game-night-pass.mjs';
 import { GameNightChess } from './game-night-chess.mjs';
 import { GameNightCrapeights } from './game-night-crapeights.mjs';
 import { GameNightTurdRummy } from './game-night-turdrummy.mjs';
@@ -75,18 +76,23 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         }
         return { expiresAt: record.expiresAt, seq: record.seq ?? 0, game: restore(record[name]), claims: liveClaims(record.claims, time) };
     }
-    async function hasGuestSeat(scope, match, host) {
+    async function guestTableId(scope, match, host) {
         const record = await load(scope);
-        return !!record?.game.hasGuestSeat(match, host, record.claims.length);
+        return record?.game.hasGuestSeat(match, host, record.claims.length) ? record.game.tableId : null;
     }
-    async function reserveGuestSeat(scope, sid, until, invitationKey, accepted) {
+    async function hasGuestSeat(scope, match, host) {
+        return !!await guestTableId(scope, match, host);
+    }
+    async function reserveGuestSeat(scope, sid, until, invitationKey, accepted, passHash) {
         const record = await load(scope);
-        if (!record?.game.hasGuestSeat(scope.match, scope.host, record.claims.length)) return false;
+        if (!record?.game.hasGuestSeat(scope.match, scope.host, record.claims.length) ||
+            scope.tableId && scope.tableId !== record.game.tableId) return false;
         const claims = [...record.claims, { sid, until }];
         // Commit the invitation redemption and its temporary seat together.
         await state.storage.put({
             [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims, record.seq + 1),
-            [invitationKey]: accepted
+            [invitationKey]: accepted,
+            ...gameNightPassRecord({ scope: accepted.scope ?? scope, sid, exp: accepted.exp }, passHash, accepted.version)
         });
         publish(scope, record.game, null, claims, record.seq + 1);
         return true;
@@ -110,7 +116,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             const record = await grantTable(scope);
             if (!record) return null;
             return { host: scope.host, hostSeat: record.view.seat, waiting: record.view.waiting,
-                free: record.game.guestSeats(scope.match, scope.host).length };
+                tableId: record.game.tableId, free: record.game.guestSeats(scope.match, scope.host).length };
         },
         async hold(scope, { holder, until, write }) {
             const record = await grantTable(scope);
@@ -157,7 +163,8 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         const seated = !!game?.seat(binding.betaSid);
         const invitation = binding.gameGuest;
         if (game && invitation && (invitation.game !== name || invitation.room !== scope.room ||
-            invitation.ref !== scope.ref || invitation.host !== game.host)) return false;
+            invitation.ref !== scope.ref || invitation.host !== game.host ||
+            invitation.tableId && invitation.tableId !== game.tableId)) return false;
         return !game || game.subjects.every(subject =>
             binding.canSee(subject) || seated && binding.isPresent?.(subject) === false);
     }
@@ -208,6 +215,12 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         try { frame = JSON.parse(raw); } catch { return close(socket, 4400, 'bad match frame'); }
         try {
             if (frame?.version === 1 && frame.t === 'hello' && Number.isSafeInteger(frame.lastSeq) && frame.lastSeq >= 0) {
+                if (frame.pass !== undefined) {
+                    const pass = await readGameNightPass(state.storage, binding.gameGuest?.tableId, frame.pass);
+                    if (!pass || pass.sid !== binding.betaSid || pass.exp <= now() || pass.version !== String(binding.betaInviteVersion)) {
+                        return close(socket, 4403, 'table pass unavailable');
+                    }
+                }
                 socket.serializeAttachment({ ...scope, snapshot: true });
                 frame = { version: 1, action: 'sync' };
             }
@@ -383,5 +396,5 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         const records = await state.storage.list({ prefix, limit: MATCH_CAP });
         if (records.size) await state.storage.delete([...records.keys()]);
     }
-    return { issue, upgrade, receive, reconcile, presenceChanged, revoke, maintain, retireDisabled, hasGuestSeat, reserveGuestSeat, releaseGuestClaim, roomGrants };
+    return { issue, upgrade, receive, reconcile, presenceChanged, revoke, maintain, retireDisabled, hasGuestSeat, guestTableId, reserveGuestSeat, releaseGuestClaim, roomGrants };
 }

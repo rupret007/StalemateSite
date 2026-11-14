@@ -22,7 +22,8 @@ it('returns unavailable for an invitation replay after its guest session was rev
     const exp = Date.now() + 60_000;
     const grant = { sid: 'guest-fixture-session', exp, scope: {
         game: 'chess', match: '11111111-1111-4111-8111-111111111111',
-        room: '#game-1acbefx23acbe', ref: 'c'.repeat(32), host: 'host-fixture-session', nameSeed: 1
+        room: '#game-1acbefx23acbe', ref: 'c'.repeat(32), host: 'host-fixture-session', nameSeed: 1,
+        tableId: '11111111-1111-4111-8111-111111111111'
     } };
     config.LOBBY = { idFromName: name => name, get: () => ({ fetch: async () => Response.json(grant) }) };
     const values = new Map();
@@ -48,6 +49,12 @@ it('returns unavailable for an invitation replay after its guest session was rev
     const retry = await accept();
     expect(retry.status).toBe(200);
     expect(retry.headers.has('Set-Cookie')).toBe(true);
+    const resume = () => betaFetch(new Request(origin + '/beta/game-night/invitation/resume', {
+        method: 'POST', headers, body: JSON.stringify({ tableId: grant.scope.tableId, pass: 'c'.repeat(64) })
+    }), config);
+    const restored = await resume();
+    expect(restored.status).toBe(200);
+    expect(restored.headers.getSetCookie()).toHaveLength(2);
     const retired = await registry.fetch(new Request('https://beta-sessions/revoke', {
         method: 'POST', headers, body: JSON.stringify({ sid: grant.sid, exp, version: '1' })
     }));
@@ -56,6 +63,9 @@ it('returns unavailable for an invitation replay after its guest session was rev
     expect(replay.status).toBe(410);
     expect((await replay.json()).error).toBe('This invite is no longer available. Ask your host for a new one.');
     expect(replay.headers.has('Set-Cookie')).toBe(false);
+    const revokedPass = await resume();
+    expect(revokedPass.status).toBe(410);
+    expect(revokedPass.headers.has('Set-Cookie')).toBe(false);
 });
 
 it('serves the invitation copy module before admission only when guest invites are enabled', async () => {
@@ -87,6 +97,8 @@ it.each(['details', 'accept'])('uses the shared copy on a guest %s 410', async o
     const copy = GAME_INVITE_UNAVAILABLE + ' (updated for this test)';
     try {
         window.sharedGameNight = { GAME_INVITE_UNAVAILABLE: copy };
+        window.TextEncoder = TextEncoder;
+        Object.defineProperty(window.crypto, 'subtle', { value: crypto.subtle });
         window.fetch = vi.fn(async path => path.endsWith('/' + operation)
             ? Response.json({ error: 'Fixture server says the invitation expired.' }, { status: 410 })
             : Response.json({ game: 'Royal Flush Chess', host: 'Fixture host' }));
