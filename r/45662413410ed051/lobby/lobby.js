@@ -935,11 +935,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (app.sharingStopped || app.localMediaPaused) {
             if (obj.t !== 'report' && !safeCommand) return false;
         }
-        if (!app.ws || app.ws.readyState !== 1) {
+        if (!app.ws || app.ws.readyState !== 1 || (obj.t !== 'hello' && connectionState !== 'connected')) {
             onTransportFailure?.();
             return false;
         }
-        if (obj.t !== 'hello' && connectionState !== 'connected') return false;
         if (typeof obj.ch === 'string' && obj.ch.startsWith('pm:')) {
             const text = typeof obj.text === 'string' ? obj.text : '';
             const name = obj.t === 'cmd' ? String(obj.name || '').toLowerCase()
@@ -981,17 +980,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             return false;
         }
     };
-    const cmd = (name, args = [], ch = app.active, roomInstance) => send({ t: 'cmd', name, args, ch, ...(['msg', 'm'].includes(name) ? { pmExplicit: true } : {}), ...(roomInstance === undefined ? {} : { roomInstance }) });
+    const cmd = (name, args = [], ch = app.active, roomInstance, onTransportFailure) => send({ t: 'cmd', name, args, ch, ...(['msg', 'm'].includes(name) ? { pmExplicit: true } : {}), ...(roomInstance === undefined ? {} : { roomInstance }) }, onTransportFailure);
     // Named intent is explicit at prompt/API call sites, never added by the
     // generic command wrapper used by selected-person controls.
     const namedPersonCommands = new Set(['query', 'q', 'whois', 'w', 'ignore', 'unignore', 'block', 'unblock', 'accept', 'decline', 'deny', 'slap', 'invite', 'kick', 'ban', 'gban', 'mute', 'purge', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer', 'report']);
-    const namedCmd = (name, args = [], ch = app.active, roomInstance) => {
+    const namedCmd = (name, args = [], ch = app.active, roomInstance, onTransportFailure) => {
         const command = String(name).toLowerCase();
-        if (ch.startsWith('pm:') && command === 'slap') return send({ t: 'say', ch, text: `/slap ${args.join(' ')}` });
+        if (ch.startsWith('pm:') && command === 'slap') return send({ t: 'say', ch, text: `/slap ${args.join(' ')}` }, onTransportFailure);
         const rankMode = command === 'mode' && /[ov]/.test(String(/^#/.test(args[0] || '') ? args[1] || '' : args[0] || ''));
         return namedPersonCommands.has(command) || rankMode
-            ? send({ t: 'cmd', name, args, ch, personNamed: true, ...(roomInstance === undefined ? {} : { roomInstance }) })
-            : cmd(name, args, ch, roomInstance);
+            ? send({ t: 'cmd', name, args, ch, personNamed: true, ...(roomInstance === undefined ? {} : { roomInstance }) }, onTransportFailure)
+            : cmd(name, args, ch, roomInstance, onTransportFailure);
     };
     app.cmd = namedCmd;
     const personId = value => typeof value === 'string' && value.length > 0 && value.length <= 160 && !/\s|[\u0000-\u001f\u007f]/.test(value);
@@ -3042,7 +3041,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             (box.querySelector('button') || $('[data-palette-close]')).focus();
     }
     function openPalette(ops) {
+        const dialog = $('[data-palette]'), status = $('[data-palette-status]');
         const box = $('[data-palette-buttons]');
+        status.textContent = '';
+        const submit = (command, args) => {
+            status.textContent = '';
+            let transportFailed = false;
+            command(...args, () => { transportFailed = true; });
+            if (transportFailed) status.textContent = 'Couldn’t send that command. Check your connection and try again.';
+            else dialog.close();
+        };
         const current = store(app.active);
         const origin = paletteContext = { channel: app.active, instance: current?.keepRef, ops };
         const owner = current?.names?.find((n) => n.nick === app.me)?.owner;
@@ -3055,21 +3063,23 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (current?.kind === 'game' && name === 'mode' && ['+i', '-i'].includes(fixed?.[0])) continue;
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
             b.addEventListener('click', () => {
-                $('[data-palette]').close();
-                if (ops && (!roomNonce(origin.instance) || app.chans.get(origin.channel)?.keepRef !== origin.instance)) return toast('That room changed. Choose current Host tools before trying again.');
+                if (ops && (!roomNonce(origin.instance) || app.chans.get(origin.channel)?.keepRef !== origin.instance)) {
+                    dialog.close();
+                    return toast('That room changed. Reopen Host tools to try again.');
+                }
                 const channel = ops ? origin.channel : app.active, instance = ops ? origin.instance : undefined;
-                if (name === 'invite-guest') return openInviteDialog();
-                if (['deop', 'unregister', 'transfer', 'close'].includes(name) && !confirm(current?.persistent && ['close', 'unregister'].includes(name) ? `Permanently delete ${app.active} and release its registered name?` : `${label} in ${app.active}?`)) return;
-                if (name === 'register' && !app.verified) { if (prepareOwnerSignin(current)) location.assign($('[data-owner-signin]').href); return; }
-                if (name === 'register' && current?.keepRef) return cmd(name, [], origin.channel, origin.instance);
-                if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return; if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return; return namedCmd(name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()], channel, instance); }
-                if (fixed) return cmd(name, fixed, channel, instance);
-                if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return namedCmd(name, paletteArgs(name, v), channel, instance); }
-                return cmd(name, [], channel, instance);
+                if (name === 'invite-guest') { dialog.close(); return openInviteDialog(); }
+                if (['deop', 'unregister', 'transfer', 'close'].includes(name) && !confirm(current?.persistent && ['close', 'unregister'].includes(name) ? `Permanently delete ${app.active} and release its registered name?` : `${label} in ${app.active}?`)) return dialog.close();
+                if (name === 'register' && !app.verified) { dialog.close(); if (prepareOwnerSignin(current)) location.assign($('[data-owner-signin]').href); return; }
+                if (name === 'register' && current?.keepRef) return submit(cmd, [name, [], origin.channel, origin.instance]);
+                if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return dialog.close(); if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return dialog.close(); return submit(namedCmd, [name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()], channel, instance]); }
+                if (fixed) return submit(cmd, [name, fixed, channel, instance]);
+                if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return dialog.close(); return submit(namedCmd, [name, paletteArgs(name, v), channel, instance]); }
+                return submit(cmd, [name, [], channel, instance]);
             });
             box.append(b);
         }
-        $('[data-palette]').showModal();
+        dialog.showModal();
         refreshPaletteCohosts();
     }
     $('[data-palette-open]').addEventListener('click', () => openPalette(false));
