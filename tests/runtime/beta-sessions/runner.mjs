@@ -14,7 +14,7 @@ const ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'WINDI
 const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex');
 const sources = () => Object.fromEntries([
     ['fixture/runner.mjs', FILE], ['fixture/worker.mjs', join(HERE, 'worker.mjs')],
-    ...['beta-sessions.mjs', 'beta-session-state.mjs', 'core.mjs', 'beta-session-client.mjs', 'beta-ops.mjs', 'beta-auth.mjs', 'ai-eligibility.mjs', 'auth.mjs'].map(name => [`application/${name}`, join(APP, 'hangout-worker/src', name)]),
+    ...['beta-sessions.mjs', 'beta-session-state.mjs', 'game-night-lifetime.mjs', 'core.mjs', 'beta-session-client.mjs', 'beta-ops.mjs', 'beta-auth.mjs', 'ai-eligibility.mjs', 'auth.mjs'].map(name => [`application/${name}`, join(APP, 'hangout-worker/src', name)]),
     ...['package.json', 'package-lock.json'].map(name => [`tools/${name}`, join(TOOLS, name)])
 ].map(([name, path]) => [name, hash(path)]));
 const group = pid => execFileSync('/bin/ps', ['-axo', 'pid=,ppid=,pgid=,stat=,comm='], { encoding: 'utf8', timeout: 3000 }).trim().split('\n').map(line => {
@@ -37,7 +37,7 @@ async function child(state, nonce) {
     const disconnected = () => kill(process.pid); process.on('disconnect', disconnected);
     const options = convertV4MiniflareOptions({
         name: 'webjam-beta-lifecycle-proof', rootPath: APP, modulesRoot: APP,
-        modules: [{ type: 'ESModule', path: join(HERE, 'worker.mjs') }, ...['beta-sessions.mjs', 'beta-session-state.mjs', 'core.mjs', 'beta-session-client.mjs', 'beta-ops.mjs', 'beta-auth.mjs', 'ai-eligibility.mjs', 'auth.mjs'].map(name => ({ type: 'ESModule', path: join(APP, 'hangout-worker/src', name) }))],
+        modules: [{ type: 'ESModule', path: join(HERE, 'worker.mjs') }, ...['beta-sessions.mjs', 'beta-session-state.mjs', 'game-night-lifetime.mjs', 'core.mjs', 'beta-session-client.mjs', 'beta-ops.mjs', 'beta-auth.mjs', 'ai-eligibility.mjs', 'auth.mjs'].map(name => ({ type: 'ESModule', path: join(APP, 'hangout-worker/src', name) }))],
         compatibilityDate: '2026-10-01', host: '127.0.0.1', port: 0, inspectorHost: '127.0.0.1', inspectorPort: 0,
         resourcePersistencePath: join(state, 'persist'), resourceTmpPath: join(state, 'runtime'),
         durableObjects: { SQLITE: { className: 'SqliteBeta', useSQLite: true }, LEGACY: { className: 'LegacyBeta', useSQLite: false } },
@@ -68,6 +68,25 @@ async function child(state, nonce) {
         };
         for (const backend of ['SQLITE', 'LEGACY']) {
             results[backend] = {};
+            const initialNight = await call(backend, 'forward-night', 'seed-night');
+            assert.equal(initialNight.status, 200);
+            assert.equal(initialNight.body.records.length, 1);
+            for (const phase of ['check-night', 'revoke-night']) {
+                assert.equal((await call(backend, 'forward-night', phase)).status, 403);
+                const unchanged = await call(backend, 'forward-night', 'inspect');
+                assert.equal(unchanged.body.objectId, initialNight.body.objectId);
+                assert.deepEqual(unchanged.body.records, initialNight.body.records);
+            }
+            assert.equal((await call(backend, 'forward-night', 'register')).status, 200);
+            assert.equal((await call(backend, 'forward-night', 'check-ordinary')).status, 200);
+            checks.push({ name: `${backend}-forward-night-record-remains-readable-without-admission-or-mutation`, pass: true });
+            const pending = await call(backend, 'forward-night', 'seed-pending-night');
+            const afterAlarm = await call(backend, 'forward-night', 'run-alarm');
+            assert.equal(afterAlarm.status, 200);
+            assert.deepEqual(afterAlarm.body.records, pending.body.records);
+            assert.equal(afterAlarm.body.control.disconnects ?? 0, 0);
+            checks.push({ name: `${backend}-rollback-alarm-does-not-retry-pending-game-night-closure`, pass: true });
+
             for (const name of ['budget', 'session', 'alarm']) {
                 const initial = await call(backend, name, 'seed-alarm'); assert.equal(initial.status, 200); assert.equal(initial.body.sqlite, backend === 'SQLITE');
                 const failed = await call(backend, name, `fail-${name}`); assert.deepEqual(failed, { status: 503, body: { reason: 'beta session registry unavailable' } });

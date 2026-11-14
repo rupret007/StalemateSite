@@ -107,6 +107,39 @@ describe('explicit collocated lobby authority initialization and migration', () 
         const reopened = await f.reopen(); expect((await reopened.authority.load()).state).toEqual(f.state);
     });
 
+    it('reopens with forward Game Night records while preserving ordinary access and leaving saved guest records alone', async () => {
+        const f = await fixture();
+        const ordinary = f.registration('ordinary');
+        const guest = f.registration('game-night');
+        for (const request of [ordinary, guest]) expect((await f.authority.register(request)).status).toBe(200);
+        const key = 'authority-session:' + guest.sid;
+        const indexKey = 'authority-session-index:v1';
+        const exp = NOW + 16 * 60 * 60_000;
+        const idleUntil = NOW + 4 * 60 * 60_000;
+        const forward = await f.authority.records.transaction(async tx => {
+            const saved = { ...await tx.get(key), exp, idleUntil };
+            const index = await tx.get(indexKey);
+            index.entries.find(row => row.sid === guest.sid).exp = exp;
+            await tx.put(key, saved);
+            await tx.put(indexKey, index);
+            return saved;
+        });
+        const { authority } = await f.reopen();
+        expect((await authority.load()).state).toEqual(f.state);
+        expect(await authority.check(ordinary)).toMatchObject({ reason: 'active' });
+        const request = { ...guest, exp };
+        expect(await authority.check(request)).toBeNull();
+        expect(await authority.revoke(request)).toBeNull();
+        expect(await authority.records.transaction(tx => tx.get(key))).toEqual(forward);
+
+        const pending = { ...forward, revoked: true, pending: true, retryAt: NOW, closureRevision: 1 };
+        await authority.records.transaction(tx => tx.put(key, pending));
+        expect(await authority.due()).toEqual([]);
+        expect(await authority.retry(guest.sid)).toBeNull();
+        await authority.confirmClosed(pending);
+        expect(await authority.records.transaction(tx => tx.get(key))).toEqual(pending);
+    });
+
     it.each(['marker', 'alarm'])('rolls back actual initializer writes after %s failure and supports explicit retry', async boundary => {
         const f = await fixture({ initialize: false }); await f.rawPut('unrelated', { keep: 'existing' }); await f.rawPut(ALARM, NOW + 77);
         const before = fingerprint(f.driver); let injected = false;
