@@ -99,7 +99,12 @@ async function accept() {
     status.textContent = 'Joining the game…';
     try {
         const body = { age13: true, attempt, passHash: await sha256(pass) };
-        const { next, tableId } = await request('accept', body);
+        const confirm = () => request('accept', body);
+        const { next, tableId } = await confirm().catch(error => {
+            if (!['TypeError', 'SyntaxError', 'TimeoutError'].includes(error?.name)) throw error;
+            status.textContent = 'Reconnecting to confirm your seat…';
+            return confirm();
+        });
         if (next !== lobbyPath) throw new Error('Unexpected destination');
         if (tableIdPattern.test(tableId || '')) {
             try {
