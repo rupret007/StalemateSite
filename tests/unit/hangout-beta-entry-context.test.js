@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
+import { gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { BetaSessions } from '../../hangout-worker/src/beta-sessions.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
@@ -218,7 +219,7 @@ describe('optional storage in the actual private beta client', () => {
                 };
                 window.eval(await bootstrap.text());
                 expect(window.HangoutEntrySites).toContainEqual({ id: 'makers', label: 'Makers' });
-                window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
+                window.HangoutClientTestModules = { ...entryFunctions, gameNightReturnHint, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
                 window.eval(discovery);
                 const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
                 window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);

@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
+import { gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
 import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
@@ -36,7 +37,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; return this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createIdleHeartbeat,
+    window.HangoutClientTestModules = { ...entryFunctions, gameNightReturnHint, createEntrySharing, createIdleHeartbeat,
         createChatAnnouncements: (log) => createChatAnnouncements(log, { frame: (fn) => window.setTimeout(fn, 16), cancel: (id) => window.clearTimeout(id) }) };
     window.eval(discovery);
     // Execute the actual browser client, replacing only module loading, which
@@ -254,6 +255,16 @@ describe('browser client privacy and bounded delivery wiring', () => {
         ws.receive({ t: 'entry-source', source: '', accepted: true }); submit();
         expect(ws.sent.at(-1)).toMatchObject({ t: 'say', text: 'Wait for my hidden badge' });
     });
+    it('keeps both branded private lobby entrances inside the beta', async () => {
+        for (const brand of ['stalemate', 'rad-dad']) {
+            const { window } = await visitor(brand, { entrySources: 1 }, { beta: true });
+            for (const link of window.document.querySelectorAll('[data-entry-return]')) {
+                expect(link.hidden).toBe(true);
+                expect(link.hasAttribute('href')).toBe(false);
+            }
+        }
+    });
+
     it('keeps a rollback server usable without unsupported sharing frames or a false badge promise', async () => {
         const { window, ws, welcome, flush, join } = await visitor('rad-dad', null);
         const choice = window.document.querySelector('[data-entry-share]');
