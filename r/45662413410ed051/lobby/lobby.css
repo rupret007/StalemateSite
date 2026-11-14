@@ -327,6 +327,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .spades-trick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 4px 0; padding: 0; }
 .spades-trick li { min-width: 0; display: grid; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); padding: 2px 4px; }
 .spades-trick span { font-size: .66rem; overflow-wrap: anywhere; }
+.arcade-spades .arcade-card-hand [data-cannot-follow] { opacity: .52; }
 .spades-trick b { font: bold 1rem var(--mono); }
 [data-spades-table][data-phase="bid"] .spades-trick b { display: none; }
 .spades-trick [data-active="true"] { border-color: var(--lime); }

@@ -147,7 +147,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
     bid.value = '3';
     bid.addEventListener('change', () => { if (!applyingBid) bidEdited = true; });
 
-    function showHand(cards) {
+    function showHand(cards, choosingCard = false) {
         const old = new Map([...hand.children].map(button => [button.dataset.spadesCard, button]));
         const next = cards.map(card => {
             const key = String(card.id);
@@ -156,6 +156,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             button.dataset.spadesCard = key;
             button.dataset.red = String('HD'.includes(card.suit));
             button.setAttribute('aria-label', cardLabel(card));
+            button.toggleAttribute('data-cannot-follow', choosingCard && !card.playable);
             button.disabled = connection !== 'ready' || pending || !card.playable;
             if (!old.has(key)) {
                 const index = document.createElement('b');
@@ -238,7 +239,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
             const called = match.bids[position];
-            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${called === null ? '—' : called || 'Nil'}`;
+            const tricks = match.tricks[position];
+            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · Bid ${called === null ? '—' : called || 'Nil'} · ${tricks} ${tricks === 1 ? 'trick' : 'tricks'}`;
             card.textContent = entry ? face(entry) : '—';
             card.setAttribute('aria-label', entry ? cardLabel(entry) : 'No card played');
             row.dataset.active = String(!match.result && match.phase !== 'round-end' && match.turn === position);
@@ -271,7 +273,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
                     : action === 'resign' && !!match.result);
             control.disabled = connection !== 'ready' || pending;
         }
-        showHand(match.hand);
+        showHand(match.hand, connection === 'ready' && match.phase === 'play' && match.turn === seat && !match.result);
     }
 
     hand.addEventListener('click', event => {
