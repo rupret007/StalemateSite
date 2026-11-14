@@ -703,7 +703,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         setConnection(app.me ? 'reconnecting' : 'connecting');
         if (gameGuest && !gameGuestSeated) {
             gameGuestReloadOffered = false;
-            gateStatus('Joining the game…');
+            gateStatus(app.me ? 'Reconnecting…' : 'Connecting…');
             $('[data-game-guest-retry]').hidden = true;
         }
         const tsToken = ownerSession ? '' : await loadTurnstile();
@@ -1111,7 +1111,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
             $('[data-gate]').hidden = true;
-            if (gameGuest && !gameGuestSeated) gateStatus('Finding your seat…');
+            if (gameGuest && !gameGuestSeated) gateStatus('Connecting…');
             else {
                 $('[data-app]').hidden = false;
                 $('[data-game-guest-connecting]').hidden = true;
