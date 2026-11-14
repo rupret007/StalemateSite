@@ -139,7 +139,7 @@ test('fullscreen rejection gives recovery and preserves the unsent message', asy
     await enter(page, baseURL);
     await page.fill('[data-text]', 'An unsent draft');
     await page.locator('[data-fullscreen]').click();
-    await expect(page.locator('[data-toast]')).toContainText('Maximize this browser window');
+    await expect(page.locator('[data-toast]')).toHaveText('Full screen is unavailable here. You can keep chatting in this window.');
     await expect(page.locator('[data-fullscreen]')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('[data-text]')).toHaveValue('An unsent draft');
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
