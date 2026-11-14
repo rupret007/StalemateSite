@@ -5,11 +5,9 @@ import { readFileSync } from 'node:fs';
 import { signBeta } from '../../hangout-worker/src/beta-auth.mjs';
 import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
 import { GAME_INVITE_UNAVAILABLE, gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
-import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { BetaSessions } from '../../hangout-worker/src/beta-sessions.mjs';
-import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
-import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
 import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
+import { createHangoutClientTestModules, entryFunctions } from './hangout-lobby-client-stub.mjs';
 
 const root = '/r/45662413410ed051/';
 function env(extra = {}) {
@@ -345,7 +343,7 @@ describe('optional storage in the actual private beta client', () => {
                 };
                 window.eval(await bootstrap.text());
                 expect(window.HangoutEntrySites).toContainEqual({ id: 'makers', label: 'Makers' });
-                window.HangoutClientTestModules = { ...entryFunctions, gameNightReturnHint, createEntrySharing, createIdleHeartbeat, createChatAnnouncements, mountGameNightSound: vi.fn(), unlockGameNightAudio: vi.fn() };
+                window.HangoutClientTestModules = createHangoutClientTestModules(window, { createChatAnnouncements });
                 window.eval(discovery);
                 const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
                 window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
