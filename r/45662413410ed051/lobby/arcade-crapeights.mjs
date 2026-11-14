@@ -101,10 +101,10 @@ export function mountArcadeCrapeights(container, onMatch) {
             const focused = document.activeElement;
             const focusInTable = showingOutcome && panel.contains(focused);
             if (model?.id !== state?.id || previous?.revision !== match?.revision) closeChoices();
+            if (phase === 'ready' && state?.seat && match && match.id === previous?.id
+                && match.revision !== previous.revision) gameNightCue(match.action?.kind === 'draw' ? 'eights.draw' : 'eights.play');
             phase = 'ready';
             connectionError = undefined;
-            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
-                && state.match.revision !== model.match.revision) gameNightCue(state.match.action?.kind === 'draw' ? 'eights.draw' : 'eights.play');
             model = state;
             canOpen = host;
             clearPending();
