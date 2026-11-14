@@ -12,6 +12,7 @@ export const matchConnectionErrors = Object.freeze({
 export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1' ? '?game-guest=1' : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
+    let pausedForNetwork = false, terminalError = false;
     function reset() {
         generation++;
         onMatch?.(scope);
@@ -25,7 +26,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         if (prior && prior.readyState < WebSocket.CLOSING) prior.close(1000);
         ready = false;
     }
-    function stop() { reset(); scope = null; }
+    function stop() { reset(); scope = null; pausedForNetwork = false; }
     function send(frame) {
         if (!ready || socket?.readyState !== WebSocket.OPEN) return false;
         try { socket.send(JSON.stringify({ version: 1, ...frame })); return true; }
@@ -33,16 +34,19 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     }
     function retry(attempt, reason) {
         if (attempt !== generation || !scope) return;
+        if (!reason && navigator.onLine === false) return pauseForNetwork();
         reset();
         if (reason || failures >= 3) {
+            terminalError = !!reason;
             onStatus('unavailable', reason);
             return;
         }
         onStatus('reconnecting');
-        reconnectTimer = setTimeout(connect, 400 * 2 ** failures++);
+        reconnectTimer = setTimeout(connect, 400 * 2 ** failures++ * (0.75 + Math.random() / 2));
     }
     async function connect() {
         if (!scope || controller || socket) return;
+        if (navigator.onLine === false) return pauseForNetwork();
         const attempt = ++generation;
         const request = new AbortController();
         controller = request;
@@ -88,8 +92,29 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
             if (controller === request) controller = null;
         }
     }
+    function pauseForNetwork() {
+        if (!scope || terminalError || pausedForNetwork) return;
+        pausedForNetwork = true;
+        reset();
+        onStatus('reconnecting');
+    }
+    function reconnect() {
+        if (!scope || terminalError || pausedForNetwork) return;
+        failures = 1;
+        reset();
+        void connect();
+    }
+    window.addEventListener('offline', pauseForNetwork);
+    window.addEventListener('online', () => {
+        if (!pausedForNetwork) return;
+        pausedForNetwork = false;
+        reconnect();
+    });
+    window.addEventListener('pageshow', event => {
+        if (event.persisted) reconnect();
+    });
     return {
-        start(next) { reset(); scope = next; failures = 0; void connect(); },
+        start(next) { stop(); scope = next; terminalError = false; failures = 0; void connect(); },
         stop,
         send
     };
