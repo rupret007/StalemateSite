@@ -985,9 +985,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
     }
     async function verifyWebJamShare() {
-        const viewport = { width: 1440, height: 900 };
         for (const webShare of [true, false]) {
-            const host = await guest('stalemate', webShare ? 'ShareHost' : 'EmailHost', viewport, false,
+            const viewport = webShare ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+            const host = await guest('stalemate', webShare ? 'ShareHost' : 'EmailHost', viewport, webShare,
                 origin + '/beta/?game-night=1&table=chess&deliver=share&via=stalemate');
             let issues = 0;
             try {
@@ -996,6 +996,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 });
                 await host.evaluate(supported => {
                     window.testGameShares = 0;
+                    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+                        writeText: async url => {
+                            if (new URL(url).pathname !== '/beta/game-night/guest') {
+                                throw new DOMException('Unexpected destination', 'DataError');
+                            }
+                        }
+                    } });
                     Object.defineProperty(navigator, 'share', { configurable: true, value: supported ? async ({ title, url }) => {
                         window.testGameShares++;
                         if (!navigator.userActivation.isActive) throw new DOMException('No activation', 'NotAllowedError');
@@ -1020,9 +1027,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const localized = await host.evaluate(expires => new Intl.DateTimeFormat(undefined, {
                     dateStyle: 'medium', timeStyle: 'short'
                 }).format(expires), deadline);
-                await expect(host.locator('[data-game-invite-link-status]'))
-                    .toHaveText(`This link is for one guest. Send it now while your table has a seat available. Expires ${localized}.`);
-                await expect(host.getByRole('button', { name: 'Copy invite', exact: true })).toBeVisible();
+                const expiry = host.locator('[data-game-invite-expiry]');
+                const copy = host.getByRole('button', { name: 'Copy invite', exact: true });
+                await expect(expiry).toBeVisible();
+                await expect(expiry).toHaveText(`Expires ${localized}.`);
+                await expect(expiry.locator('time')).toHaveAttribute('datetime', new Date(deadline).toISOString());
+                if (webShare) await copy.tap();
+                else await copy.click();
+                await expect(host.locator('[data-game-invite-link-status]')).toContainText('Invitation copied.');
+                await expect(expiry).toBeVisible();
+                await expect(expiry).toHaveText(`Expires ${localized}.`);
                 assert.equal(issues, 1, 'the WebJam handoff prepares exactly one invitation');
                 assert.equal(await host.evaluate(() => window.testGameShares), 0, 'table readiness never invokes Web Share');
                 assert.ok(!new URL(host.url()).searchParams.has('deliver'), 'the handoff is removed from the address');

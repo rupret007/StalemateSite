@@ -2605,8 +2605,15 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     }
     const createGuestLink = $('[data-game-invite-new]'), shareGuestLink = $('[data-game-invite-share]');
     const copyGuestLink = $('[data-game-invite-copy]'), guestLinkStatus = $('[data-game-invite-link-status]');
+    const guestLinkExpiry = $('[data-game-invite-expiry]');
+    const guestLinkDeadline = guestLinkExpiry?.querySelector('time');
     let pendingGuestLink = null;
     function resetGuestLink() {
+        if (guestLinkDeadline) {
+            guestLinkExpiry.hidden = true;
+            guestLinkDeadline.removeAttribute('datetime');
+            guestLinkDeadline.textContent = '';
+        }
         pendingGuestLink = null;
         createGuestLink.hidden = false; createGuestLink.disabled = false;
         copyGuestLink.hidden = true; shareGuestLink.hidden = true; guestLinkStatus.textContent = '';
@@ -2669,13 +2676,18 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             const sharePrimary = canShare || preferEmail || copyGuestLink.hidden;
             copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
             shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
-            const inviteGuidance = 'This link is for one guest. Send it now while your table has a seat available.';
+            guestLinkStatus.textContent = 'This link is for one guest. Send it now while your table has a seat available.';
             const expiresAt = value.inviteExpiresAt ?? value.until;
-            guestLinkStatus.textContent = Number.isSafeInteger(expiresAt) && expiresAt > 0 && expiresAt <= 8.64e15
-                ? `${inviteGuidance} Expires ${new Intl.DateTimeFormat(undefined, {
+            if (Number.isSafeInteger(expiresAt) && expiresAt > 0 && expiresAt <= 8.64e15) {
+                const formatted = new Intl.DateTimeFormat(undefined, {
                     dateStyle: 'medium', timeStyle: 'short'
-                }).format(expiresAt)}.`
-                : inviteGuidance;
+                }).format(expiresAt);
+                if (guestLinkDeadline) {
+                    guestLinkDeadline.dateTime = new Date(expiresAt).toISOString();
+                    guestLinkDeadline.textContent = formatted;
+                    guestLinkExpiry.hidden = false;
+                } else guestLinkStatus.textContent += ` Expires ${formatted}.`;
+            }
             if (deliver && await deliverPreparedLink(request)) return;
             if (pendingGuestLink !== request) return;
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();
