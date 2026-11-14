@@ -1205,7 +1205,19 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             const summary = panel.locator('summary');
             await summary.tap();
             await expect(panel).not.toHaveAttribute('open', '');
-            await expect(player.locator('[data-game-waiting]')).toHaveText('Choose a game to see whether a table is open.');
+            await expect(player.locator('[data-game-waiting]')).toBeHidden();
+            const returnButton = player.locator('[data-game-seat-return]');
+            await expect(returnButton).toBeInViewport({ ratio: 1 });
+            await expectUncoveredControl(returnButton);
+            await captureArcadeInvite(player, player.viewportSize(), 'chess-collapsed-seat');
+            await returnButton.tap();
+            await expect(returnButton).toBeHidden();
+            await expect(summary).toBeFocused();
+            await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+            await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeInViewport();
+            await captureArcadeInvite(player, player.viewportSize(), 'chess-returned-seat');
+            await summary.tap();
+            await expect(returnButton).toBeVisible();
             assert.equal(await player.evaluate(() => JSON.parse(sessionStorage.getItem('hangout-game-return')).game), 'chess');
             await player.addInitScript(() => {
                 const focus = HTMLElement.prototype.focus;

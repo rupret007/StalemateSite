@@ -1798,9 +1798,18 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         for (const [game, table] of arcadeTables) drawArcadeTable(c, game, table);
         drawArcadeMedia(c);
     }
+    function seatReturnController(room) {
+        if (!room || gameReturn?.room !== room.name || gameReturn?.ref !== room.keepRef) return null;
+        const controller = arcadeTables.get(gameReturn.game)?.controller;
+        if (!controller || controller.panel.hidden || [...arcadeTables.values()].some(table => table.controller?.isOpen())) return null;
+        return controller;
+    }
     function drawGameWaiting(room) {
         const status = $('[data-game-waiting]');
-        const waiting = room && !gameGuest && !amOp(room)
+        const seat = seatReturnController(room);
+        const returnButton = $('[data-game-seat-return]');
+        if (returnButton) returnButton.hidden = !seat;
+        const waiting = room && !seat && !gameGuest && !amOp(room)
             && ![...arcadeTables.values()].some(table => table.matchRef === room.keepRef);
         const message = waiting ? room.names.some(member => member.prefix === '@')
             ? 'Choose a game to see whether a table is open.'
@@ -1850,6 +1859,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         table.load().then(mount => {
             table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting, snapshot, failed) =>
                 arcadeMatchState(game, table, room, state, sendMatch, reconnecting, snapshot, failed));
+            table.controller.panel.addEventListener('toggle', () => drawGameWaiting(currentGameNight()));
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn--small arcade-invite-friend';
@@ -1919,7 +1929,6 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         const seat = snapshot ? snapshot.yourSeat : state?.seat;
         table.seatRef = scope && seat ? scope.ref : null;
         const room = currentGameNight();
-        drawGameWaiting(room);
         if (table.seatRef && room?.keepRef === table.seatRef) rememberGameReturn(room, game);
         else if (sendMatch && !seat && scope?.ref === room?.keepRef && gameReturn?.ref === scope?.ref
             && gameReturn?.room === scope?.room && gameReturn?.game === game) {
@@ -1927,6 +1936,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             gameReturn = { room, ref, until };
             writeTab(gameReturnKey, JSON.stringify(gameReturn));
         }
+        drawGameWaiting(room);
         table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
         updateTableInvite(table, currentGameNight());
         const share = arcadeShareIntent;
@@ -1964,11 +1974,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         }
         if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
     }
+    $('[data-game-seat-return]')?.addEventListener('click', () => revealArcadeTable(seatReturnController(currentGameNight())));
     $('[data-arcade-game]').addEventListener('change', event => {
         const game = event.target.value;
         event.target.value = '';
-        if (!currentGameNight() || !game) return;
-        const controller = arcadeTables.get(game)?.controller;
+        if (currentGameNight() && game) revealArcadeTable(arcadeTables.get(game)?.controller);
+    });
+    function revealArcadeTable(controller) {
         const wasOpen = controller?.isOpen();
         const panel = controller?.open();
         if (!panel) return;
@@ -1989,7 +2001,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         });
         resize.observe(panel);
         heading.addEventListener('blur', () => resize.disconnect(), { once: true });
-    });
+    }
     window.addEventListener('pagehide', () => {
         const current = currentGameNight();
         const open = [...arcadeTables].find(([, table]) => table.controller?.isOpen());
