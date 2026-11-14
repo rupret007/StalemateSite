@@ -3252,8 +3252,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
         await expect(page.locator('[data-spades-trick]')).toContainText('West · No bid yet');
         await expect(page.locator('[data-spades-card]')).toHaveCount(0);
+        const lobbyAddress = new URL(page.url());
+        await page.locator('[data-leave]').tap();
+        await expect(page.locator('[data-session-reason]')).toHaveText('You left Game Night. Ask your host for a fresh invitation.');
+        assert.equal((await extra.request.get(origin + '/beta/state' + lobbyAddress.search)).status(), 401);
+        await page.reload();
+        await expect(page.locator('[data-spades-table]')).toBeHidden();
+        for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
         await extra.close();
-        console.log(`Passed ${engine} ${brand} full Spades table watch link, read-only commands, rematch, table pass and host reopen.`);
+        console.log(`Passed ${engine} ${brand} full Spades table watch link, read-only commands, rematch, table pass, host reopen and Leave.`);
     }
     try {
         if (process.env.ARCADE_SPADES_WATCH_BRAND) {
