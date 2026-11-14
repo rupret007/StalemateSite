@@ -3214,9 +3214,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await players[1].getByRole('button', { name: 'Bid for me' }).tap();
         await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
         await captureArcadeInvite(page, phone, brand + '-watch-live');
+        const passKey = await page.evaluate(() => 'gn:pass:' + window.HangoutBootstrap.gameGuest.tableId);
+        const originalPass = await page.evaluate(key => localStorage.getItem(key), passKey);
+        assert.match(originalPass, /^[a-f0-9]{64}$/);
+        await page.evaluate(key => localStorage.setItem(key, '0'.repeat(64)), passKey);
         await page.reload();
         await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
         await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
+        assert.equal(await page.evaluate(key => localStorage.getItem(key), passKey), null);
+        await page.evaluate(({ key, pass }) => localStorage.setItem(key, pass), { key: passKey, pass: originalPass });
         for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
         await extra.clearCookies();
         await page.reload();
