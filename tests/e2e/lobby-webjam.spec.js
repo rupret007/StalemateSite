@@ -663,6 +663,8 @@ for (const { width, height, label } of crowdedInviteViewports) test(`the crowded
     const f = await browserRoom(browser, baseURL, true, { width, height });
     try {
         const host = await f.join('RoomHost', false, 'rad-dad');
+        // Keep the generated room label and its line wrapping deterministic.
+        await host.evaluate(() => { Math.random = () => 0.8; });
         const busy = await f.join('BusyBandmate', false, 'stalemate');
         await busy.click('.phonetabs [data-show="rooms"]');
         await busy.click('[data-start="jam"]');
@@ -684,6 +686,7 @@ for (const { width, height, label } of crowdedInviteViewports) test(`the crowded
         await expect(list.getByRole('button', { name: 'Invite BusyBandmate · Busy' })).toHaveText('BusyBandmate · Busy');
         expect(await list.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
         await expect(cancel).toBeInViewport({ ratio: 1 });
+        expect((await cancel.boundingBox()).height).toBeGreaterThanOrEqual(44);
         const file = testInfo.outputPath(`invite-roster-${width}.png`);
         await host.screenshot({ path: file, animations: 'disabled' });
         await testInfo.attach('crowded invite roster', { path: file, contentType: 'image/png' });
