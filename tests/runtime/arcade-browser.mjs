@@ -472,6 +472,43 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                         await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
                         assert.equal(requests, 2, 'a restored history entry refreshes the match once');
+                        await guest.evaluate(() => {
+                            window.simulateMatchWake = dropPing => {
+                                const now = Date.now;
+                                const send = WebSocket.prototype.send;
+                                try {
+                                    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+                                    document.dispatchEvent(new Event('visibilitychange'));
+                                    Date.now = () => now() + 120_000;
+                                    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+                                    WebSocket.prototype.send = function (raw) {
+                                        if (typeof raw === 'string' && JSON.parse(raw).action === 'ping') {
+                                            if (dropPing) return;
+                                            this.addEventListener('message', function recordPong(event) {
+                                                if (JSON.parse(event.data).t !== 'pong') return;
+                                                window.receivedMatchPong = true;
+                                                this.removeEventListener('message', recordPong);
+                                            });
+                                        }
+                                        return send.call(this, raw);
+                                    };
+                                    document.dispatchEvent(new Event('visibilitychange'));
+                                } finally {
+                                    WebSocket.prototype.send = send;
+                                    Date.now = now;
+                                    delete document.hidden;
+                                }
+                            };
+                            window.simulateMatchWake(false);
+                        });
+                        await guest.waitForFunction(() => window.receivedMatchPong);
+                        assert.equal(requests, 2, 'a healthy match answers the foreground probe without a new ticket');
+                        const refreshed = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        await guest.evaluate(() => window.simulateMatchWake(true));
+                        await refreshed;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                        assert.equal(requests, 3, 'a missing pong triggers one new match connection');
                     } finally { guest.off('request', countTicket); }
                 }
                 await guest.locator('[data-text]').fill('First visit from the game invite');
