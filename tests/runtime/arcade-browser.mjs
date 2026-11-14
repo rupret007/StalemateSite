@@ -717,8 +717,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(player.locator('[data-connection]')).toHaveText('Connected');
             const returnToSeat = player.getByRole('button', { name: 'Back to my seat', exact: true });
             await expectUncoveredControl(returnToSeat);
+            await panel.locator('summary').evaluate(summary => {
+                const focus = summary.focus;
+                summary.focus = function (options) {
+                    this.dataset.returnFocusWithoutScroll = String(options?.preventScroll === true);
+                    return focus.call(this, options);
+                };
+            });
             await returnToSeat.tap();
             await expect(panel.locator('summary')).toBeFocused();
+            await expect(panel.locator('summary')).toHaveAttribute('data-return-focus-without-scroll', 'true');
             await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
             await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
             await tapSquare(player, 'd7');
