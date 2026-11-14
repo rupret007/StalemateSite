@@ -110,7 +110,9 @@ it('binds a creative invitation to the original room without admitting the guest
     expect(replacement.ch.keepRef).not.toBe(notice.roomInstance);
     L.message(guest.id, JSON.stringify({ t: 'cmd', name: 'join', args: [room], ch: LOBBY, roomInstance: notice.roomInstance }));
     expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
-    expect(got(guest).at(-1)).toMatchObject({ t: 'notice', kind: 'error', text: expect.stringContaining('changed or closed') });
+    expect(got(guest).at(-1)).toMatchObject({
+        t: 'notice', kind: 'error', text: 'That room changed or closed. Choose a room to continue.',
+    });
 });
 
 it('lets the same live guest accept a pending room invitation after engine recovery', () => {

@@ -207,7 +207,7 @@ test('a closed and recreated room refuses the original return instance', async (
         await expect(app.witness.locator('[data-chat-context]')).toHaveText('#stalemate');
         await command(app.witness, `/join ${app.room}`); await expect(app.witness.locator('[data-chat-context]')).toHaveText(app.room);
         expect(await app.witness.evaluate(room => window.__lobby.chans.get(room).keepRef, app.room)).not.toBe(app.ref);
-        await app.finish(); await expect(app.host.locator('[data-buffer]')).toContainText('That room changed or closed while you signed in.');
+        await app.finish(); await expect(app.host.locator('[data-buffer]')).toContainText('That room changed or closed.');
         await expect(app.host.locator('[data-chat-context]')).toHaveText('#stalemate');
         await expect(app.host.locator('[data-keep-prompt]')).toBeHidden();
         expect(await app.host.evaluate(() => window.__keepSent.filter(frame => frame.name === 'register'))).toEqual([]);
