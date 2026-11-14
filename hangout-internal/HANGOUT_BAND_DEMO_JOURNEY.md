@@ -38,31 +38,38 @@ the same lobby and can see each other in **People**.
 
 ## Host setup
 
-1. Open **WebJam Private Rehearsal (c6eecdc)** from the Mac Desktop. Check
-   **More → About WebJam** for build `c6eecdc`. Choose **Music** and **Host**,
-   then **Start Session** if shown. Check the physical input,
-   wired headphones and intended network first. For the band's rehearsal,
-   verify the SSL 2+ guitar and vocal inputs and Che’s drum interface.
-2. In Hang Out, open **Rooms** and choose **Jam (WebJam)**. Keep the lobby
-   and native Music session open. An online guest can wait in the lobby
-   while the host prepares the invitation.
-3. Use the invitation path that matches the private build.
+1. For the currently serving beta, open **WebJam Private Rehearsal (c6eecdc)**
+   on the Mac Desktop and check **More → About WebJam** for build `c6eecdc`.
+   Once the rehearsal is scheduled, check the intended network, SSL 2+
+   guitar and vocal inputs, wired headphones and Che’s drum interface.
+2. In WebJam, choose **Music → Host**, then **Start Session** if shown.
+   In Hang Out, open **Rooms → Jam (WebJam)**. Keep both open.
+3. Use the invitation steps that match the serving website and Mac build.
 
 | Build | Host | Guest |
 | --- | --- | --- |
-| Last verified private site, `8d76db40` | Choose **Invite bandmate to room** if shown. If the room shows **Invite guest** under host controls, select the guest there. Once both people are in the Jam room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it in the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** once the host has shared the Music invite. |
-| Selected-guest Music candidate, private fixture | Choose **Invite bandmate to Music**, select the guest, and confirm in WebJam. Wait for Hang Out to show the invitation was sent. | Choose **Accept and join**, then **Open WebJam in browser**. Choose **Join to listen** to keep the microphone off, or follow the microphone check to play. |
+| Serving private beta, source `dc77aef`, Worker version `8d76db40` | Choose **Invite bandmate to room** if shown, or **Invite guest** in Host tools. Once the guest joins the room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it into the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** when the host shares the Music invite. |
+| Selected-guest candidate, website `02a74e73` and WebJam `424f2ed6` | After private delivery and launch verification, choose **Invite bandmate to Music**, select the guest, and confirm in WebJam. Wait for Hang Out to say the invitation was sent. | Choose **Accept and join**, then **Open WebJam in browser**. Choose **Join to listen** with your mic off, or check your input and join with a microphone. |
 
-Use the `8d76db40` instructions for the staged rehearsal. Both Mac
-shortcuts point to `c6eecdc`. The latest paired walkthrough used website source `d199ea3` and WebJam
-source `424f2ed`. In desktop Chromium and phone WebKit, guests from both
-band entrances accepted a selected-guest invite, recovered from a failed
-verification with a fresh invite, listened with the mic off, and left.
-The walkthrough used an offscreen Qt host and simulated audio. The local
-Apple Silicon `424f2ed` package passed startup and launcher controls.
-Browser-to-app dispatch on the intended installed build and live Music
-remain open. Check **Build** in **About WebJam** before using a candidate
-so an older Desktop shortcut does not open the wrong build.
+### If WebJam doesn’t open from Hang Out
+
+On the selected-guest build, choose **Open** if the browser asks to open WebJam.
+If nothing opens, choose **Cancel Music invite** in Hang Out. Open the WebJam
+beta app, start **Music → Host**, then try again. If the return tab opens in a
+different browser profile, choose **End browser invite** in WebJam and retry
+from Hang Out in the return tab’s browser profile.
+
+### What’s been verified
+
+The serving beta uses the first row. The selected-guest path passed in desktop
+Chromium and phone-size WebKit with the exact private website archive and WebJam
+Qt source. The guest recovered from a refused invitation, accepted a fresh one,
+listened and left. Those checks simulated audio. The exact Apple Silicon package
+passed targeted warm and cold launches. The Mini’s default private URL handler
+still selected `c6eecdc` at the latest check. A matching Intel package, actual
+browser-to-app launch and the live rehearsal still need verification.
+[Website review](https://github.com/rupret007/StalemateSite/pull/487) ·
+[Desktop review](https://github.com/rupret007/WebJam/pull/505)
 
 ## Audio check, recovery and ending the session
 
