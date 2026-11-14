@@ -278,7 +278,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await newGuest.click();
             const deliver = host.getByRole('button', { name: useClipboard ? 'Copy invite' : 'Share invite' });
             await expect(deliver).toBeFocused();
-            await expect(host.locator('[data-game-invite-link-status]')).toHaveText('This link is for one guest. Send it now while your table has a seat available.');
+            await expect(host.locator('[data-game-invite-link-status]')).toContainText('This link is for one guest. Send it now while your table has a seat available.');
             await captureArcadeInvite(host, viewport, step);
             await deliver.click();
             if (useClipboard) {
@@ -450,6 +450,19 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(reused.getByRole('status')).toHaveText('This invite is no longer available. Ask your host for a new one.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
+                if (phone) {
+                    await host.getByRole('button', { name: 'Leave match', exact: true }).click();
+                    await host.getByRole('dialog', { name: 'Leave match?' }).getByRole('button', { name: 'Leave match', exact: true }).click();
+                    await host.getByRole('button', { name: 'Open Chess match', exact: true }).click();
+                    await guest.reload();
+                    await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
+                    await expect(guest.locator('[data-chess-status]')).toHaveText('Black is open. Join to play.');
+                    await guest.getByRole('button', { name: 'Join as Black', exact: true }).tap();
+                    await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                    await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
+                    await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
+                    console.log(`Passed ${engine} same-host replacement Chess table using the original admitted guest session.`);
+                }
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
                 assert.equal((await context.request.get(origin + '/beta/state?game-guest=1')).status(), 200, 'an obsolete tab cannot close a different invitation');
                 if (!phone) await guest.route('**/beta/game-night/invitation/leave', route => route.fulfill({ status: 503 }), { times: 1 });
@@ -602,10 +615,20 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const open = host.getByRole('button', { name: 'Open Chess match', exact: true });
                 await expect(open).toBeVisible();
                 assert.equal(issues, 0, 'the host opens a waiting match before preparing its invitation');
+                const deadline = Date.UTC(2031, 3, 6, 18, 15);
+                await host.route('**/beta/game-night/invitation/issue', async route => {
+                    const response = await route.fetch();
+                    await route.fulfill({ response, json: { ...(await response.json()), inviteExpiresAt: deadline } });
+                }, { times: 1 });
                 await open.click();
                 const share = host.getByRole('button', { name: webShare ? 'Share invite' : 'Email invite', exact: true });
                 await expect(share).toBeFocused();
                 await expect(share).toBeEnabled();
+                const localized = await host.evaluate(expires => new Intl.DateTimeFormat(undefined, {
+                    dateStyle: 'medium', timeStyle: 'short'
+                }).format(expires), deadline);
+                await expect(host.locator('[data-game-invite-link-status]'))
+                    .toHaveText(`This link is for one guest. Send it now while your table has a seat available. Expires ${localized}.`);
                 await expect(host.getByRole('button', { name: 'Copy invite', exact: true })).toBeVisible();
                 assert.equal(issues, 1, 'the WebJam handoff prepares exactly one invitation');
                 assert.equal(await host.evaluate(() => window.testGameShares), 0, 'table readiness never invokes Web Share');

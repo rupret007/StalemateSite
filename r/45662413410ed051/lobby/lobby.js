@@ -1917,7 +1917,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         }
         const invite = arcadeInvitation;
         if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
-        if (state?.seat && (state.id === invite.match || gameGuest)) {
+        const canSeeReplacement = gameGuest && state?.replacementAvailable === true;
+        if (canSeeReplacement || state?.seat && (state.id === invite.match || gameGuest)) {
             if (gameGuest && !gameGuestSeated) {
                 gameGuestSeated = true;
                 gameGuestReloadOffered = false;
@@ -2638,7 +2639,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             const sharePrimary = canShare || preferEmail || copyGuestLink.hidden;
             copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
             shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
-            guestLinkStatus.textContent = 'This link is for one guest. Send it now while your table has a seat available.';
+            const inviteGuidance = 'This link is for one guest. Send it now while your table has a seat available.';
+            const expiresAt = value.inviteExpiresAt ?? value.until;
+            guestLinkStatus.textContent = Number.isSafeInteger(expiresAt) && expiresAt > 0 && expiresAt <= 8.64e15
+                ? `${inviteGuidance} Expires ${new Intl.DateTimeFormat(undefined, {
+                    dateStyle: 'medium', timeStyle: 'short'
+                }).format(expiresAt)}.`
+                : inviteGuidance;
             if (deliver && await deliverPreparedLink(request)) return;
             if (pendingGuestLink !== request) return;
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();
