@@ -460,11 +460,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await guest.reload();
                     await expect(waiting.getByRole('status')).toHaveText(waitingText);
                     const ticketPath = url => url.pathname === '/beta/arcade-ticket';
-                    await guest.route(ticketPath, route => route.fulfill({ status: 503 }));
+                    let failedTickets = 0;
+                    await guest.route(ticketPath, route => {
+                        failedTickets++;
+                        return route.fulfill({ status: 503 });
+                    });
                     await guest.reload();
                     const retry = waiting.getByRole('button', { name: 'Try again', exact: true });
                     await expect(retry).toBeFocused();
                     await expect(waiting.getByRole('status')).toHaveText('Couldn’t reconnect to your seat. Try again.');
+                    assert.equal(failedTickets, 4, 'terminal seat retry follows the initial request and three automatic retries');
                     await guest.unroute(ticketPath);
                     await retry.tap();
                     await expect(waiting.getByRole('status')).toHaveText(waitingText);
