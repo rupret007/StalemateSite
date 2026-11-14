@@ -89,7 +89,7 @@ export class BetaSessions {
                     const key = `session:${body.sid}`;
                     let record = await this.state.storage.get(key);
                     if (record && !validRecord(record, body.sid)) throw new Error('record');
-                    if (!record || record.exp <= now || record.version !== body.version || body.exp > record.exp) return reply(403, 'expired or revoked');
+                    if (!record || record.idleUntil !== undefined || record.exp <= now || record.version !== body.version || body.exp > record.exp) return reply(403, 'expired or revoked');
                     if (operation === '/check') return reply(!record.revoked || body.allowRevoked === true ? 200 : 403, record.revoked ? 'revoked' : 'active');
                     if (operation === '/room') {
                         if (record.revoked) return reply(403, 'revoked');
