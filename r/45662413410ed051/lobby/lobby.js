@@ -2664,8 +2664,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
     }
 
-    $('[data-room-filter]').addEventListener('change', drawRooms);
-    $('[data-room-search]').addEventListener('input', drawRooms);
+    function updateRoomSearch() {
+        drawRooms();
+        const status = $('[data-room-search-status]');
+        if (!status) return;
+        const empty = $('[data-rooms-empty]');
+        const count = $('[data-roomlist]').children.length;
+        const message = count ? `${count} ${count === 1 ? 'room shown' : 'rooms shown'}.` : empty.textContent;
+        if (status.textContent !== message) status.textContent = message;
+    }
+
+    $('[data-room-filter]').addEventListener('change', updateRoomSearch);
+    $('[data-room-search]').addEventListener('input', updateRoomSearch);
     $('[data-owner-signin]').href = relayBase ? `${relayBase.replace(/^ws/, 'http')}/lobby-owner/login?entry-return=1` : '#';
     $('[data-owner-signin]').addEventListener('click', event => { if (!prepareOwnerSignin()) event.preventDefault(); });
     $('[data-keep-cancel]').addEventListener('click', () => clearKeep('Room not kept. You can keep it later from Host tools.'));
