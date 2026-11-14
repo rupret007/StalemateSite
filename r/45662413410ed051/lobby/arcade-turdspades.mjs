@@ -155,8 +155,9 @@ export function mountArcadeTurdSpades(container, onMatch) {
             button.type = 'button';
             button.dataset.spadesCard = key;
             button.dataset.red = String('HD'.includes(card.suit));
-            button.setAttribute('aria-label', cardLabel(card));
-            button.toggleAttribute('data-cannot-follow', choosingCard && !card.playable);
+            const unavailable = choosingCard && !card.playable;
+            button.setAttribute('aria-label', cardLabel(card) + (unavailable ? ', cannot play this turn' : ''));
+            button.toggleAttribute('data-cannot-follow', unavailable);
             button.disabled = connection !== 'ready' || pending || !card.playable;
             if (!old.has(key)) {
                 const index = document.createElement('b');

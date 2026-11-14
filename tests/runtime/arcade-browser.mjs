@@ -1779,7 +1779,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 checkedFollowSuit = true;
                 await expect(page.locator('[data-spades-card][data-cannot-follow]')).toHaveCount(await restricted.count());
                 await expect(restricted.first()).toHaveCSS('opacity', '0.52');
-                await expect(page.locator('[data-spades-card]:enabled').first()).not.toHaveAttribute('data-cannot-follow');
+                await expect(restricted.first()).toHaveAccessibleName(/cannot play this turn$/);
+                const playable = page.locator('[data-spades-card]:enabled').first();
+                await expect(playable).not.toHaveAttribute('data-cannot-follow');
+                await expect(playable).not.toHaveAccessibleName(/cannot play this turn$/);
             }
             await page.locator('[data-spades-card]:enabled').first().click();
             await expect(page.locator('[data-spades-card]')).toHaveCount(12);
