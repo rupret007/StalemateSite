@@ -958,9 +958,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect.poll(() => sounds.filter(event => event === 'spades.trick').length).toBe(tricksAtReload);
                     await friend.reload();
                     await expect(cards(friend)).toHaveCount(remaining[1]);
-                    // Resume the new document's audio through a trusted interaction.
-                    await friend.locator('details.arcade-spades > summary').tap();
-                    await friend.locator('details.arcade-spades > summary').tap();
+                    // A tap on the hand label resumes audio without closing the table.
+                    await friend.locator('[data-spades-hand-label]').tap();
+                    await expect(friend.locator('details.arcade-spades')).toHaveAttribute('open', '');
                 }
             }
             assert.ok(checkedUnavailableCard, 'the scored round exercises a card that cannot follow suit');
@@ -1034,9 +1034,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(expiry).toBeVisible();
                 await expect(expiry).toHaveText(`Expires ${localized}.`);
                 await expect(expiry.locator('time')).toHaveAttribute('datetime', new Date(deadline).toISOString());
+                const liveStatus = host.getByRole('dialog').getByRole('status').filter({ has: expiry });
+                await expect(liveStatus).toHaveAttribute('aria-atomic', 'true');
                 if (webShare) await copy.tap();
                 else await copy.click();
-                await expect(host.locator('[data-game-invite-link-status]')).toContainText('Invitation copied.');
+                await expect(liveStatus).toContainText('Invitation copied.');
+                await expect(liveStatus).toContainText(`Expires ${localized}.`);
                 await expect(expiry).toBeVisible();
                 await expect(expiry).toHaveText(`Expires ${localized}.`);
                 assert.equal(issues, 1, 'the WebJam handoff prepares exactly one invitation');
@@ -1607,13 +1610,29 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(claim(white)).toBeHidden();
         await expect(claim(black)).toBeVisible();
         await claim(black).tap();
-        await black.getByRole('dialog', { name: 'Claim a draw' }).getByRole('button', { name: /Ng8.*Threefold repetition/ }).tap();
-        for (const page of [white, black]) await expect(page.locator('[data-chess-status]')).toContainText('Draw · Threefold repetition');
-        await white.getByRole('button', { name: 'Request rematch' }).click();
-        await black.getByRole('button', { name: 'Accept rematch' }).click();
-        await expect(white.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
-        await expect(claim(white)).toBeHidden();
-        console.log(`Passed ${engine} Chess claim visibility and intended threefold draw.`);
+        const intended = black.getByRole('dialog', { name: 'Claim a draw' });
+        await expect(intended).toContainText('Choose the move that qualifies for a draw.');
+        await intended.getByRole('button', { name: /Ng8.*Threefold repetition/ }).tap();
+        const rematch = async () => {
+            for (const page of [white, black]) await expect(page.locator('[data-chess-status]')).toContainText('Draw · Threefold repetition');
+            await white.getByRole('button', { name: 'Request rematch' }).click();
+            await black.getByRole('button', { name: 'Accept rematch' }).click();
+            await expect(white.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+            await expect(claim(white)).toBeHidden();
+        };
+        await rematch();
+
+        for (const [page, from, to] of [...cycle, ...cycle]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
+        }
+        await expect(claim(black)).toBeHidden();
+        await claim(white).click();
+        const current = white.getByRole('dialog', { name: 'Claim a draw' });
+        await expect(current).toContainText('Confirm the draw based on the current position.');
+        await current.getByRole('button', { name: 'Threefold repetition', exact: true }).click();
+        await rematch();
+        console.log(`Passed ${engine} Chess claim visibility and both threefold draw paths.`);
     }
 
     async function playChessCheckmate(black, white) {
