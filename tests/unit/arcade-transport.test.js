@@ -50,7 +50,8 @@ function fixture(name = 'chess') {
         await send(b, 'join', { id });
         return { id, revision: 0, move: 'e2e4' };
     };
-    return { a, b, board, send, start, storage, actors, transport, guestActivity, advance: ms => { now += ms; } };
+    const connect = (id, betaSid, canOpen = false) => player(id, betaSid, canOpen);
+    return { a, b, board, send, start, storage, actors, transport, guestActivity, connect, advance: ms => { now += ms; } };
 }
 
 describe('Game Night match transport', () => {
@@ -89,6 +90,39 @@ describe('Game Night match transport', () => {
         await f.send(f.b, 'resign', { id, revision: 0 });
         expect(f.a.frames.at(-1)).toMatchObject({
             t: 'snapshot', phase: 'finished', currentMatchId: id, yourSeat: null, state: null
+        });
+    });
+
+    it('keeps a blocked spectator hidden so reconcile cannot send a lobby snapshot', async () => {
+        const f = fixture();
+        const watch = 'c' + '3'.repeat(32);
+        const spectator = f.connect(watch, 'seat-watch');
+        const move = await f.start();
+        await f.send(spectator, undefined, { t: 'hello', lastSeq: 0 });
+        f.actors.get(watch).canSee = () => false;
+        await f.send(f.a, 'move', move);
+        expect(spectator.frames.at(-1)).toMatchObject({
+            t: 'snapshot', phase: 'playing', currentMatchId: move.id, yourSeat: null, turn: null, state: null
+        });
+        const blocked = spectator.deserializeAttachment();
+        // A privacy block must leave the redacted match on the socket. reconcile()
+        // does not load the table and replays only this summary.
+        expect(blocked.hidden).toEqual({ phase: 'playing', id: move.id });
+        spectator.serializeAttachment({ ...blocked, subjects: [sid, 'seat-black'] });
+        f.transport.reconcile();
+        expect(spectator.frames.at(-1)).toMatchObject({
+            t: 'snapshot', phase: 'playing', currentMatchId: move.id, yourSeat: null, turn: null, state: null
+        });
+        expect(spectator.deserializeAttachment().hidden).toEqual({ phase: 'playing', id: move.id });
+        const lateId = 'c' + '4'.repeat(32);
+        const late = f.connect(lateId, 'seat-late');
+        f.actors.get(lateId).canSee = () => false;
+        await f.send(late, undefined, { t: 'hello', lastSeq: 0 });
+        expect(late.deserializeAttachment().hidden).toEqual({ phase: 'playing', id: move.id });
+        late.serializeAttachment({ ...late.deserializeAttachment(), subjects: [sid] });
+        f.transport.reconcile();
+        expect(late.frames.at(-1)).toMatchObject({
+            t: 'snapshot', phase: 'playing', currentMatchId: move.id, state: null, yourSeat: null
         });
     });
 
