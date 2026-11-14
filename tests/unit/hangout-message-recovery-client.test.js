@@ -256,3 +256,21 @@ it('starts a fresh received PM transcript on a new socket while preserving only 
     replacement.receive({ t: 'pm-open', with: 'Friend', peer: 'new-peer', ref: nextRef });
     expect(f.$('[data-text]').value).toBe(''); expect(f.$('[data-buffer]').textContent).not.toContain('An old received private transcript');
 });
+
+it('marks an invalid channel name and clears the error when the guest edits it', async () => {
+    const f = await visitor();
+    f.$('[data-start="chat"]').click();
+    const input = f.$('[data-channel-name]'), status = f.$('[data-channel-error]');
+    const submit = () => f.$('[data-channel-form]').dispatchEvent(new f.window.Event('submit', { cancelable: true }));
+    input.value = '#art-test';
+    submit();
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(status.textContent).toContain('starts an activity room');
+    expect(f.window.document.activeElement).toBe(input);
+    input.value = '#night-owls';
+    input.dispatchEvent(new f.window.Event('input'));
+    expect(input.hasAttribute('aria-invalid')).toBe(false);
+    expect(status.textContent).toBe('');
+    submit();
+    expect(f.ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: ['#night-owls'] });
+});

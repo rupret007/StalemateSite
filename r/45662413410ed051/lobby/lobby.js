@@ -699,7 +699,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });
         if (state === 'offline' && app.pendingChannel) {
             app.pendingChannel = '';
-            $('[data-channel-error]').textContent = 'Connection lost. Reconnect and try this channel again.';
+            updateChannelStatus('Connection lost. Reconnect and try this channel again.');
         }
         drawCommunity(); drawRooms(); drawMessageRecovery(); refreshPaletteCohosts();
     }
@@ -1311,7 +1311,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (pendingKeep) clearKeep();
                 resetPendingReports();
                 if (app.pendingChannel && $('[data-channel-dialog]').open) {
-                    $('[data-channel-error]').textContent = m.text;
+                    updateChannelStatus(m.text);
                     const field = $('[data-channel-name]');
                     if (document.activeElement === field) $('[data-channel-field]')?.scrollIntoView({ block: 'center' });
                     app.pendingChannel = '';
@@ -2783,12 +2783,23 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         input.value = draft; input.focus();
     });
 
+    const channelName = $('[data-channel-name]');
+    const channelStatus = $('[data-channel-error]');
+    const updateChannelStatus = (message = '', invalid = false) => {
+        if (invalid) channelName.setAttribute('aria-invalid', 'true');
+        else channelName.removeAttribute('aria-invalid');
+        if (channelStatus.textContent !== message) channelStatus.textContent = message;
+    };
+    channelName.addEventListener('input', () => {
+        if (channelName.hasAttribute('aria-invalid')) updateChannelStatus();
+    });
+
     // Activity tiles pick a name; plain chat lets guests name their own channel.
     $$('[data-start]').forEach((b) => b.addEventListener('click', () => {
         if (b.dataset.start === 'chat') {
-            $('[data-channel-error]').textContent = '';
+            updateChannelStatus();
             $('[data-channel-dialog]').showModal();
-            $('[data-channel-name]').focus();
+            channelName.focus();
             return;
         }
         const kind = b.dataset.start;
@@ -2810,10 +2821,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     });
     $('[data-channel-form]').addEventListener('submit', (e) => {
         e.preventDefault();
-        const name = `#${$('[data-channel-name]').value.trim().replace(/^#/, '').toLowerCase()}`;
+        const name = `#${channelName.value.trim().replace(/^#/, '').toLowerCase()}`;
         if (!/^#[a-z0-9-]{2,30}$/.test(name)) {
-            $('[data-channel-error]').textContent = 'Use 2–30 letters, numbers or dashes.';
-            $('[data-channel-name]').focus();
+            updateChannelStatus('Use 2–30 letters, numbers or dashes.', true);
+            channelName.focus();
             return;
         }
         if (app.chans.has(name)) {
@@ -2823,16 +2834,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             return;
         }
         if ((/^#(?:art|watch|bobross|jam)(?:-|$)/.test(name) || gameNightSupported && gameNightRoomName(name)) && !app.rooms.some((r) => r.name === name)) {
-            $('[data-channel-error]').textContent = 'That name starts an activity room. Choose another name for chat, or use the activity buttons.';
-            $('[data-channel-name]').focus();
+            updateChannelStatus('That name starts an activity room. Choose another name for chat, or use the activity buttons.', true);
+            channelName.focus();
             return;
         }
         if (!cmd('join', [name])) {
-            $('[data-channel-error]').textContent = 'Reconnect before joining a channel. Your name stays here.';
+            updateChannelStatus('Reconnect before joining a channel. Your name stays here.');
             return;
         }
         app.pendingChannel = name;
-        $('[data-channel-error]').textContent = 'Joining…';
+        updateChannelStatus('Joining…');
         count('room-start-chat');
     });
     $('[data-private]').addEventListener('click', () => count('room-start-private'));

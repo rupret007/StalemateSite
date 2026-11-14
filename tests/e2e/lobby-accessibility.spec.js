@@ -178,6 +178,11 @@ test('keyboard guest can join, recover a named-room error, chat, navigate tabs a
         await page.keyboard.type('#art-keyboard'); await page.keyboard.press('Enter');
         await expect(page.locator('[data-channel-error]')).toContainText('starts an activity room');
         await expect(page.locator('[data-channel-name]')).toHaveAttribute('aria-describedby', /channel-name-error/);
+        await expect(page.locator('[data-channel-name]')).toHaveAttribute('aria-invalid', 'true');
+        await expect(page.locator('[data-channel-name]')).toHaveAccessibleDescription(/starts an activity room/);
+        await replaceText(page, '#keyboard-studio');
+        await expect(page.locator('[data-channel-name]')).not.toHaveAttribute('aria-invalid');
+        await expect(page.locator('[data-channel-error]')).toBeEmpty();
         await expect(page.locator('[data-channel-name]')).toBeFocused();
         await page.keyboard.press('Escape'); await expect(dialog).toBeHidden(); await expect(opener).toBeFocused();
         await page.keyboard.press('Enter'); await replaceText(page, '#keyboard-studio'); await page.keyboard.press('Enter');

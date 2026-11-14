@@ -940,3 +940,6 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
 [data-sharing-confirm][hidden] { display: none; }
 .chat:has([data-sharing-controls][open]) .lobby-welcome { display: none; }
 .chat:has([data-sharing-controls][open]) .buffer { min-height: 48px; }
+
+/* Keep the room-name live region present before a validation error. */
+.sheet .status[data-channel-error]:empty { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
