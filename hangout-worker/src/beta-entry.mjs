@@ -283,7 +283,10 @@ async function gameInvitation(request, env, path, body) {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true, exp: session.access.exp } })
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
-    if (path === 'issue' && response.ok) return json({ code: await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY) });
+    if (path === 'issue' && response.ok) {
+        const code = await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY);
+        return json({ code, until: data.until, inviteExpiresAt: data.until });
+    }
     if (path !== 'accept' || !response.ok) return json(data, response.status);
     return gameGuestAccess(request, env, data);
 }
@@ -364,6 +367,10 @@ async function betaRequest(request, env, deps = {}) {
         .replace('STALEMATE / INVITATION ONLY', 'HANG OUT / INVITATION ONLY')
         .replace('<script defer src="/beta/client.js">', '<script type="module" src="/beta/client.js">'), 200, 'text/html; charset=utf-8');
     if (url.pathname === '/beta/style.css') return reply(STYLE + GAME_GUEST_STYLE, 200, 'text/css');
+    if (url.pathname === LOBBY_PAGE + 'game-night.mjs' && gameGuestEnabled(env) && ['GET', 'HEAD'].includes(request.method)) {
+        const asset = await env.ASSETS.fetch(request);
+        return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript; charset=utf-8');
+    }
     if (url.pathname === GAME_GUEST_PATH || url.pathname === GAME_GUEST_PATH + '.js') {
         if (!gameGuestEnabled(env) || !['GET', 'HEAD'].includes(request.method)) return reply('Game invitations are unavailable.', 404);
         if (url.pathname === GAME_GUEST_PATH) return reply(request.method === 'HEAD' ? null : GAME_GUEST_ENTRANCE, 200, 'text/html; charset=utf-8');

@@ -1,11 +1,10 @@
-import { gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
-import { BETA_TTL } from './beta-auth.mjs';
+import { GAME_INVITE_UNAVAILABLE, gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { BETA_TTL, DEMO_INVITE_TTL } from './beta-auth.mjs';
 import { arcadeRoomRequest } from './game-night-sockets.mjs';
 
 export const GAME_GUEST_PATH = '/beta/game-night/guest';
 export const GAME_INVITATION_PATH = '/beta/game-night/invitation';
 const STORAGE_PREFIX = 'game-night-invitation:';
-const LINK_TTL = 20 * 60_000;
 const CLAIM_TTL = 60_000;
 const GUEST_TTL = 2 * 60 * 60_000;
 const LINK_CAP = 100;
@@ -17,7 +16,7 @@ const digest = async value => Array.from(new Uint8Array(await crypto.subtle.dige
     byte => byte.toString(16).padStart(2, '0')).join('');
 export const gameGuestSessionRef = sid => digest('game-guest-session:' + sid);
 const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-export const GAME_INVITE_UNAVAILABLE = 'This invite is no longer available. Ask your host for a new one.';
+export { GAME_INVITE_UNAVAILABLE };
 const unavailable = () => reply({ error: GAME_INVITE_UNAVAILABLE }, 410);
 
 async function waitingGuestSeat(lobby, roomScope, game, match, hostSid) {
@@ -69,7 +68,7 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         const accessUntil = demo ? session.exp : null;
         if (demo && (!Number.isFinite(accessUntil) || accessUntil <= now)) return unavailable();
         const code = randomCode();
-        const until = demo ? Math.min(now + LINK_TTL, accessUntil) : now + LINK_TTL;
+        const until = demo ? Math.min(now + DEMO_INVITE_TTL, accessUntil) : now + DEMO_INVITE_TTL;
         await storage.put(STORAGE_PREFIX + await digest(code), { scope: guest, until, version: host.betaInviteVersion,
             ...(demo ? { demo, accessUntil } : {}) });
         return reply({ code, until });
