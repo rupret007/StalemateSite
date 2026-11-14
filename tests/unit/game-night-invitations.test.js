@@ -87,12 +87,20 @@ it('caps demo Chess links and admitted guests at the demo host session deadline'
         const limited = await gameInvitationRequest(lobby, 'issue', payload, { betaSid: host });
         expect(limited.status).toBe(429);
         expect((await limited.json()).error).toBe('Too many invitations are still on record. Share a current link for this game or try again later.');
+        expect((await accept(ordinary.code)).status).toBe(200);
+        const guestDeadline = accepted.exp;
+        expect(guestDeadline - now).toBe(2 * 60 * 60_000);
+        expect(guestDeadline).toBeLessThan(ordinary.until);
         vi.setSystemTime(shortHostDeadline - 1000);
         expect((await accept(short.code)).status).toBe(200);
         expect(accepted.exp).toBe(shortHostDeadline);
         vi.setSystemTime(shortHostDeadline);
         expect((await accept(short.code)).status).toBe(410);
         expect((await gameInvitationRequest(lobby, 'details', { code: short.code })).status).toBe(410);
+        vi.setSystemTime(guestDeadline - 1);
+        expect((await accept(ordinary.code)).status).toBe(200);
+        vi.setSystemTime(guestDeadline);
+        expect((await accept(ordinary.code)).status).toBe(410);
     } finally {
         vi.useRealTimers();
     }
