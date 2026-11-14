@@ -2633,7 +2633,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     function readyGuestLink() {
         const request = pendingGuestLink, target = arcadeInviteTarget();
         if (request?.link && request.room === currentGameNight() &&
-            request.target.game === target?.game && request.target.match === target.match) return request;
+            request.target.game === target?.game && request.target.match === target.match) {
+            if (request.expiresAt === undefined || request.expiresAt > Date.now()) return request;
+            resetGuestLink();
+            guestLinkStatus.textContent = 'This invitation expired. Create a new one to share.';
+            createGuestLink.focus();
+            return;
+        }
         resetGuestLink();
         guestLinkStatus.textContent = 'The table changed. Prepare a new invitation.';
     }
@@ -2691,6 +2697,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             guestLinkStatus.textContent = 'This link is for one guest. Send it now while your table has a seat available.';
             const expiresAt = value.inviteExpiresAt ?? value.until;
             if (Number.isSafeInteger(expiresAt) && expiresAt > 0 && expiresAt <= 8.64e15) {
+                request.expiresAt = expiresAt;
                 const formatted = new Intl.DateTimeFormat(undefined, {
                     dateStyle: 'medium', timeStyle: 'short'
                 }).format(expiresAt);
@@ -2700,6 +2707,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                     guestLinkExpiry.hidden = false;
                 } else guestLinkStatus.textContent += ` Expires ${formatted}.`;
             }
+            if (!readyGuestLink()) return;
             if (deliver && await deliverPreparedLink(request)) return;
             if (pendingGuestLink !== request) return;
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();

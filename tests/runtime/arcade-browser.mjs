@@ -996,11 +996,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 });
                 await host.evaluate(supported => {
                     window.testGameShares = 0;
+                    window.testInviteCopies = 0;
                     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
                         writeText: async url => {
                             if (new URL(url).pathname !== '/beta/game-night/guest') {
                                 throw new DOMException('Unexpected destination', 'DataError');
                             }
+                            window.testInviteCopies++;
                         }
                     } });
                     Object.defineProperty(navigator, 'share', { configurable: true, value: supported ? async ({ title, url }) => {
@@ -1040,6 +1042,27 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 assert.equal(issues, 1, 'the WebJam handoff prepares exactly one invitation');
                 assert.equal(await host.evaluate(() => window.testGameShares), 0, 'table readiness never invokes Web Share');
                 assert.ok(!new URL(host.url()).searchParams.has('deliver'), 'the handoff is removed from the address');
+
+                await host.evaluate(at => {
+                    window.realInviteClock = Date.now;
+                    Date.now = () => at;
+                }, deadline);
+                if (webShare) await share.tap();
+                else await copy.click();
+                const renew = host.locator('[data-game-invite-new]');
+                await expect(renew).toBeFocused();
+                await expect(share).toBeHidden();
+                await expect(copy).toBeHidden();
+                await expect(expiry).toBeHidden();
+                await expect(host.locator('[data-game-invite-link-status]')).toHaveText('This invitation expired. Create a new one to share.');
+                assert.deepEqual(await host.evaluate(() => [window.testGameShares, window.testInviteCopies]), [0, 1]);
+                assert.equal(issues, 1, 'no background invitation is issued');
+                await host.evaluate(() => { Date.now = window.realInviteClock; });
+                await renew.click();
+                await expect(share).toBeEnabled();
+                await expect(expiry).toBeVisible();
+                await expect(expiry.locator('time')).not.toHaveAttribute('datetime', new Date(deadline).toISOString());
+                assert.equal(issues, 2, 'the host requested a fresh invitation');
                 if (webShare) {
                     await share.click();
                     await expect(share).toBeVisible();
@@ -1047,7 +1070,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(share).toBeHidden();
                     assert.equal(await host.evaluate(() => window.testGameShares), 2, 'both share calls came from trusted clicks');
                 }
-                assert.equal(issues, 1, 'sharing an already prepared invitation issues no extra link');
+                assert.equal(issues, 2, 'sharing an already prepared invitation issues no extra link');
             } finally { await host.context().close(); }
         }
     }
