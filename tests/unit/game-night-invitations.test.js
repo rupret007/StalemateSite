@@ -123,10 +123,12 @@ it.each([
         sid: 'guest-session-bbbb', exp: Date.now() + 60000
     };
     const rows = gameNightPassRecord(access, hash, '1');
+    const guestNightEndsAt = vi.fn(async () => access.exp);
     const lobby = {
         env: { HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1' },
         state: { storage: { get: async key => rows[key] } },
-        arcadeAvailable: game => game === 'chess'
+        arcadeAvailable: game => game === 'chess',
+        arcade: new Map([['chess', { guestNightEndsAt }]])
     };
     const resume = (table = tableId, candidate = pass) => gameInvitationRequest(lobby, 'resume', { tableId: table, pass: candidate });
     if (webJam) {
@@ -134,6 +136,9 @@ it.each([
         lobby.env.HANGOUT_GAME_NIGHT_ROOM_GRANTS = '1';
     }
     expect(await (await resume()).json()).toEqual(access);
+    expect(guestNightEndsAt).toHaveBeenCalledExactlyOnceWith(access.scope);
+    guestNightEndsAt.mockResolvedValueOnce(0);
+    expect((await resume()).status).toBe(410);
     expect((await resume('22222222-2222-4222-8222-222222222222')).status).toBe(410);
     expect((await resume(tableId, 'a'.repeat(64))).status).toBe(410);
     lobby.env.HANGOUT_BETA_INVITE_VERSION = '2';

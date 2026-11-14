@@ -55,6 +55,8 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         const scope = gameGuestScope(record?.scope, lobby.env.HANGOUT_GAME_NIGHT_ROOM_GRANTS === '1');
         if (!scope || scope.tableId !== body.tableId || !sidPattern.test(record.sid || '') || record.exp <= now ||
             record.version !== String(lobby.env.HANGOUT_BETA_INVITE_VERSION || '1') || !lobby.arcadeAvailable(scope.game)) return unavailable();
+        const nightEndsAt = await lobby.arcade.get(scope.game).guestNightEndsAt(scope);
+        if (nightEndsAt <= now) return unavailable();
         return reply({ scope, sid: record.sid, exp: record.exp });
     }
     if (operation === 'issue') {

@@ -91,7 +91,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
     }
     async function guestNightEndsAt(scope) {
         const record = await load(scope);
-        return record && record.game.tableId === scope.tableId ? record.expiresAt : 0;
+        return record && record.game.tableId === scope.tableId && record.game.host === scope.host ? record.expiresAt : 0;
     }
     async function reserveGuestSeat(scope, sid, until, invitationKey, accepted, passHash) {
         const record = await load(scope);
@@ -258,6 +258,8 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 }
                 return send(socket, { t: 'match-error', reason: 'unavailable' });
             }
+            // Lost join replies can be retried after the host closes or reopens the table.
+            if (frame.action === 'join' && game?.seat(subject)) frame = { version: 1, action: 'sync' };
             let changed = game?.expire(now()) || false;
             const resume = frame.action === 'sync' && game?.seat(subject) && !scope.synced;
             let expiresAt = record?.expiresAt;
@@ -279,15 +281,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                     const held = claims.find(claim => claim.sid === subject);
                     const heldSeats = otherClaims.flatMap(claim => claim.seat ? [claim.seat] : []);
                     const seat = held?.seat ?? frame.seat;
-                    const invitation = binding.gameGuest;
-                    const invited = !invitation || invitation.game === name && invitation.room === scope.room && invitation.ref === scope.ref
-                        && invitation.host === game.host && (invitation.match === frame.id || !held);
-                    if (!invited) error = 'seat-unavailable';
-                    else if (!game.seat(subject)) {
-                        if (!game.subjects.every(peer => binding.canJoin(peer)) ||
-                            !game.join(subject, frame.id, now(), seat, otherClaims.length, heldSeats)) error = 'seat-unavailable';
-                        else { claims = otherClaims; changed = true; }
-                    }
+                    if ((binding.gameGuest && held && binding.gameGuest.match !== frame.id) ||
+                        !game.subjects.every(peer => binding.canJoin(peer)) ||
+                        !game.join(subject, frame.id, now(), seat, otherClaims.length, heldSeats)) error = 'seat-unavailable';
+                    else { claims = otherClaims; changed = true; }
                 } else if (frame.action === 'start') {
                     if (claims.length || !binding.canOpen || !game.start(subject, frame.id, now())) error = 'start-unavailable';
                     else { changed = true; }

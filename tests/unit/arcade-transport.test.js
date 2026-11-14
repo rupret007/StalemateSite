@@ -209,9 +209,10 @@ describe('Game Night match transport', () => {
 
     it('keeps the original night deadline through a rematch and host reopen', async () => {
         const f = fixture(), { id } = await f.start();
-        const scope = { room, ref, tableId: id };
+        const scope = { room, ref, tableId: id, host: sid };
         const end = 1000 + GAME_NIGHT_LENGTH;
         expect(await f.transport.guestNightEndsAt(scope)).toBe(end);
+        expect(await f.transport.guestNightEndsAt({ ...scope, host: 'different-host' })).toBe(0);
         f.advance(2000);
         await f.send(f.b, 'resign', { id, revision: 0 });
         await f.send(f.a, 'start-rematch', { id });
@@ -353,6 +354,10 @@ describe('Game Night match transport', () => {
         expect(f.b.frames.at(-1)).toMatchObject({
             t: 'snapshot', phase: 'lobby', currentMatchId: null, yourSeat: 'b', turn: null, state: null
         });
+        const writes = f.storage.put.mock.calls.length;
+        await f.send(f.b, 'join', { id, seat: 'next' });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'snapshot', phase: 'lobby', yourSeat: 'b', currentMatchId: null });
+        expect(f.storage.put.mock.calls).toHaveLength(writes);
         await f.send(f.a, 'open');
         const replacement = f.board(f.a).id;
         expect(replacement).not.toBe(id);

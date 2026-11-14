@@ -740,7 +740,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                     await host.getByRole('button', { name: 'Leave match', exact: true }).click();
                     await host.getByRole('dialog', { name: 'Leave match?' }).getByRole('button', { name: 'Leave match', exact: true }).click();
+                    await expect(host.getByRole('button', { name: 'Open Chess match', exact: true })).toBeVisible();
+                    const closedTableResume = guest.waitForResponse(response => new URL(response.url()).pathname === '/beta/game-night/invitation/resume');
+                    await context.clearCookies({ name: /^__Host-hangout-game-guest(?:-|$)/ });
                     await guest.reload();
+                    assert.equal((await closedTableResume).status(), 200, 'the table pass still works between matches');
                     await expect(guest.locator('[data-game-guest-status]')).toHaveText('Waiting for the host to open the table. This link still works.');
                     await host.getByRole('button', { name: 'Open Chess match', exact: true }).click();
                     await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
