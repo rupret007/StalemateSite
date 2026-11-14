@@ -1,9 +1,10 @@
 const requestErrors = { 401: 'sign-in', 403: 'room', 404: 'disabled', 429: 'rate-limited' };
-const socketErrors = { 4403: 'room', 4409: 'room', 4429: 'rate-limited' };
+const socketErrors = { 4403: 'room', 4409: 'replaced', 4429: 'rate-limited' };
 
 export const matchConnectionErrors = Object.freeze({
     'sign-in': 'Sign in to the private beta again, then return to this room.',
     'room': 'Return to your Game Night room and try again.',
+    'replaced': 'This match is open in another tab. Continue there, or reload to play here.',
     'disabled': 'This game is unavailable in this room right now.',
     'rate-limited': 'This match reached a connection or activity limit. Try again later.'
 });
@@ -92,7 +93,8 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                         claimTimer = setTimeout(() => send({ action: 'sync' }), wait);
                     }
                     onState(frame);
-                    if (attempt === generation) onMatch?.(scope, frame.state, send);
+                    if (attempt === generation) onMatch?.(scope, frame.state, send, false,
+                        stateFrameType === 'snapshot' ? frame : undefined);
                 } else if (frame?.t === 'pong' && frame.nonce === pingNonce) clearTimeout(pongTimer);
                 else if (frame?.t === 'match-error') onError(frame.reason);
             });

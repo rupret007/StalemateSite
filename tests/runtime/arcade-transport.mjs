@@ -411,7 +411,7 @@ async function verifyEights(white, black, ref, chess) {
     await returning.wait(frame => frame.state?.rematch === 'a', 'Eights rematch invitation');
     returning.send({ version: 1, action: 'rematch', id });
     const rematch = await a.wait(frame => frame.state?.id && frame.state.id !== id, 'fresh Eights rematch');
-    assert.equal(rematch.state.seat, 'b');
+    assert.equal(rematch.state.seat, 'a');
     assert.equal(rematch.state.match.hand.length, 7);
     assert.ok(chess.frames.every(frame => frame.state?.game !== 'crapeights'));
     assert.ok(watch.frames.every(frame => !frame.state?.match?.hand?.length));
@@ -469,7 +469,7 @@ async function verifyRummy(white, black, spectator, ref) {
     await back.wait(frame => frame.state?.rematch === 'a', 'Rummy rematch offer');
     send(back, 'rematch');
     const rematch = await a.wait(frame => frame.state?.id && frame.state.id !== id, 'fresh Rummy rematch');
-    assert.equal(rematch.state.seat, 'b');
+    assert.equal(rematch.state.seat, 'a');
     assert.equal(rematch.state.match.hand.length, 10);
     assert.ok(watch.frames.every(frame => !frame.state?.match?.hand?.length));
     return a;
@@ -711,7 +711,7 @@ async function verifyTurdtris(white, black, spectator, ref) {
     await guest.wait(frame => frame.state?.rematch === 'a', 'Turdtris rematch vote');
     send(guest, 'rematch');
     const fresh = await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turdtris rematch');
-    assert.equal(fresh.state.seat, 'a');
+    assert.equal(fresh.state.seat, 'b');
     assert.equal(fresh.state.match.self.sequence, 0);
     timings.sort((a, b) => a - b);
     console.log(`Turdtris local workerd paired input confirmation, ${timings.length} samples: median ${timings[6].toFixed(1)} ms, max ${timings.at(-1).toFixed(1)} ms.`);
@@ -778,7 +778,7 @@ async function verifyTurdomania(white, black, spectator, ref) {
     await guest.wait(frame => frame.state?.rematch === 'a', 'Turdomania rematch vote');
     send(guest, 'rematch');
     const fresh = await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turdomania rematch');
-    assert.equal(fresh.state.seat, 'a');
+    assert.equal(fresh.state.seat, 'b');
     assert.equal(fresh.state.match.players.a.left, 36);
     console.log(`Passed native Turdomania complete shared puzzle (${path.length} legal moves per player), independent boards, spectator permissions, reconnect, draw and rematch.`);
     return host;
@@ -838,7 +838,7 @@ async function verifyTurdRush(white, black, spectator, ref) {
     await guest.wait(frame => frame.state?.rematch === 'a', 'Turd Rush rematch vote');
     send(guest, 'rematch');
     const fresh = await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turd Rush rematch');
-    assert.equal(fresh.state.seat, 'a');
+    assert.equal(fresh.state.seat, 'b');
     assert.equal(fresh.state.match.runner.sequence, 0);
     console.log(`Passed native Turd Rush same course, both verified collisions, equal result, spectator refusal, reconnect and rematch. Player snapshot ${Buffer.byteLength(JSON.stringify(recovered))} bytes.`);
     return host;
@@ -897,7 +897,7 @@ async function verifyTurdanoid(white, black, spectator, ref) {
     await guest.wait(frame => frame.state?.rematch === 'a', 'Turdanoid rematch vote');
     send(guest, 'rematch');
     const fresh = (await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turdanoid rematch')).state;
-    assert.equal(fresh.seat, 'a');
+    assert.equal(fresh.seat, 'b');
     assert.equal(fresh.match.runner.sequence, 0);
     assert.equal(fresh.match.players.a.score + fresh.match.players.b.score, 0);
     console.log(`Passed native Turdanoid same wall, verified brick hits on both seats, spectator refusal, reconnect, forfeit and rematch. Player snapshot ${Buffer.byteLength(JSON.stringify(recovered))} bytes.`);

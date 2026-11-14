@@ -13,6 +13,7 @@ const markup = `
 <p class="small arcade-card-error" data-brick-error role="status"></p>
 <div class="arcade-card-actions brick-race-actions">
     <button class="btn btn--small" type="button" data-brick-main hidden></button>
+    <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
     <button class="btn btn--small btn--ghost" type="button" data-brick-leave hidden>Leave race</button>
 </div>
 <div data-card-table data-brick-match hidden>
@@ -270,6 +271,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (!match.result) raf = requestAnimationFrame(drawFrame);
     }
 
+    const startRematch = $('[data-start-rematch]');
+
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
@@ -291,7 +294,12 @@ export function mountArcadeTurdanoid(container, onMatch) {
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
             if (seat && seat === model.rematch) message += ' · Rematch requested';
         } else if (match) message = match.wall.name;
+        if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
+            message += ` · Waiting for ${'your rival'}, link still works.`;
+        }
         put(status, message);
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = !!pending;
         main.hidden = !action;
         main.dataset.command = action;
         put(main, label);
@@ -304,6 +312,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
     }
 
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
     const hitsLaunch = event => launch.contains(document.elementFromPoint(event.clientX, event.clientY));
     launch.addEventListener('pointerdown', event => {

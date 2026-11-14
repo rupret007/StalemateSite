@@ -18,6 +18,7 @@ const markup = `
 <p class="small arcade-card-error" data-jack-error role="status"></p>
 <div class="arcade-card-actions" data-jack-lobby>
     <button class="btn btn--small" type="button" data-jack-main hidden></button>
+    <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
     <button class="btn btn--small btn--ghost" type="button" data-jack-lobby-leave hidden></button>
     <div class="arcade-card-actions" data-jack-seats hidden></div>
 </div>
@@ -196,6 +197,8 @@ export function mountArcadeTurdJack(container, onMatch) {
         }
     }
 
+    const startRematch = $('[data-start-rematch]');
+
     function draw() {
         const seat = model?.seat, match = model?.match, occupied = model?.occupied || [];
         let action = '', label = '', message = 'Connecting to the table…';
@@ -228,7 +231,12 @@ export function mountArcadeTurdJack(container, onMatch) {
         if (connection === 'ready' && model?.waiting && canOpen && model.pendingGuestMs) {
             message = `${occupied.length}/4 seated. An invited player is connecting…`;
         }
+        if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
+            message += ` · Waiting for ${model.disconnectedSeats.map(seatName).join(', ')}, link still works.`;
+        }
         if (status.textContent !== message) status.textContent = message;
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = !!pending;
         main.hidden = !action;
         main.dataset.command = action;
         main.textContent = label;
@@ -244,6 +252,7 @@ export function mountArcadeTurdJack(container, onMatch) {
         else $('[data-jack-hands]').replaceChildren();
     }
 
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => {
         const action = main.dataset.command;
         if (action === 'retry') client.start(scope);

@@ -624,15 +624,29 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (phone) {
                     await host.getByRole('button', { name: 'Leave match', exact: true }).click();
                     await host.getByRole('dialog', { name: 'Leave match?' }).getByRole('button', { name: 'Leave match', exact: true }).click();
-                    await host.getByRole('button', { name: 'Open Chess match', exact: true }).click();
                     await guest.reload();
+                    await expect(guest.locator('[data-game-guest-status]')).toHaveText('Waiting for the host to open the table. This link still works.');
+                    await host.getByRole('button', { name: 'Open Chess match', exact: true }).click();
                     await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
-                    await expect(guest.locator('[data-chess-status]')).toHaveText('Black is open. Join to play.');
-                    await guest.getByRole('button', { name: 'Join as Black', exact: true }).tap();
-                    await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                    await expect(guest.locator('[data-chess-status]')).toContainText('You’re Black · White to move');
                     await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                     await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
-                    console.log(`Passed ${engine} same-host replacement Chess table using the original admitted guest session.`);
+                    const secondTab = await context.newPage();
+                    await secondTab.goto(guest.url());
+                    await expect(secondTab.locator('[data-chess-status]')).toContainText('You’re Black · Your turn');
+                    await expect(guest.locator('[data-chess-status]')).toContainText('This match is open in another tab');
+                    await guest.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+                    await expect(guest.locator('[data-chess-status]')).toContainText('This match is open in another tab');
+                    await secondTab.getByRole('button', { name: 'Resign', exact: true }).click();
+                    await secondTab.getByRole('dialog', { name: 'Resign match?' }).getByRole('button', { name: 'Resign', exact: true }).click();
+                    await expect(host.getByRole('button', { name: 'Start now', exact: true })).toBeVisible();
+                    await host.getByRole('button', { name: 'Request rematch', exact: true }).click();
+                    await secondTab.close();
+                    await expect(host.locator('[data-chess-status]')).toHaveText('You’re White · Your turn · Waiting for Black, link still works.');
+                    await guest.reload();
+                    await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                    await expect(guest.getByRole('button', { name: 'e2, White pawn' })).toBeVisible();
+                    console.log(`Passed ${engine} same-seat Chess reopen, newest-tab takeover and rematch after the phone closes.`);
                 }
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
                 assert.equal((await context.request.get(origin + '/beta/state?game-guest=1')).status(), 200, 'an obsolete tab cannot close a different invitation');
@@ -1278,7 +1292,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             [white, 'f1', 'c4'], [black, 'g8', 'f6'], [white, 'h5', 'f7']
         ]) {
             await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
-            if (page === white) {
+            if (page === black) {
                 await tapSquare(page, from);
                 await tapSquare(page, to);
             } else {
@@ -1298,8 +1312,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         await black.getByRole('button', { name: 'Request rematch' }).click();
         await white.getByRole('button', { name: 'Accept rematch' }).click();
-        await expect(black.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
-        for (const [page, from, to] of [[black, 'd2', 'd4'], [white, 'e7', 'e5'], [black, 'h2', 'h3'], [white, 'f8', 'b4']]) {
+        await expect(black.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+        for (const [page, from, to] of [[white, 'd2', 'd4'], [black, 'e7', 'e5'], [white, 'h2', 'h3'], [black, 'f8', 'b4']]) {
             await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
             for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
         }
@@ -1594,7 +1608,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(a.locator('[data-eights-status]')).toContainText('You won the match by resignation');
         await a.getByRole('button', { name: 'Request Eights rematch' }).click();
         await b.getByRole('button', { name: 'Accept Eights rematch' }).click();
-        await expect(b.locator('[data-eights-status]')).toContainText('Round 1 · Your turn');
+        await expect(a.locator('[data-eights-status]')).toContainText('Round 1 · Your turn');
         await expect(bCards).toHaveCount(7);
         if (views) await playEightsToTarget([a, b], views);
         if (evidence) {
@@ -1746,7 +1760,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(a.locator('[data-rummy-status]')).toContainText('You won the match by resignation');
         await a.getByRole('button', { name: 'Request Rummy rematch' }).click();
         await b.getByRole('button', { name: 'Accept Rummy rematch' }).click();
-        await expect(a.locator('[data-rummy-status]')).toContainText('Round 1 · Draw a card');
+        await expect(b.locator('[data-rummy-status]')).toContainText('Round 1 · Draw a card');
         await expect(bCards).toHaveCount(10);
         if (views) await playRummyToTarget([a, b], views);
         if (evidence) {
@@ -2801,7 +2815,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(a.locator('[data-chess-status]')).toContainText('Draw by agreement');
         await a.getByRole('button', { name: 'Request rematch' }).click();
         await b.getByRole('button', { name: 'Accept rematch' }).click();
-        await expect(b.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+        await expect(b.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
         await expect(b.getByRole('button', { name: 'e2, White pawn' })).toBeAttached();
         await fit(a, 'desktop-rematch');
         await fit(b, 'phone-rematch');
@@ -2814,7 +2828,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.setViewportSize({ width: 390, height: 844 });
         await fit(b, 'phone-tall');
         await b.setViewportSize({ width: 375, height: 667 });
-        await playChessCheckmate(a, b);
+        await playChessCheckmate(b, a);
         await playEights(a, b);
         await playRummy(a, b);
         const spectator = await playSpades(a, b);

@@ -18,7 +18,7 @@ function sameSession(a, b) {
 
 // Each channel gets its own ticket store, subprotocol and socket tag. A grant
 // for one connection cannot authorize a different channel or room instance.
-export function createGameNightSockets({ state, tag, protocol, readyType, readyFeatures, snapshots = false, current, active, charge, allowed,
+export function createGameNightSockets({ state, tag, protocol, readyType, readyFeatures, snapshots = false, replaceByPlayer = false, current, active, charge, allowed,
     now = () => Date.now(), uuid = () => crypto.randomUUID() }) {
     const tickets = new Map();
     const sockets = () => state.getWebSockets(tag).filter(ws => ws.readyState === 1 && ws.deserializeAttachment()?.kind === tag);
@@ -56,7 +56,10 @@ export function createGameNightSockets({ state, tag, protocol, readyType, readyF
         const binding = member(scope);
         if (!binding || !await active(binding)) return result({ error: 'Room membership required.' }, 403);
         const peers = sockets();
-        const existing = peers.filter(ws => ws.deserializeAttachment()?.actor === scope.actor);
+        const existing = peers.filter(ws => {
+            const previous = ws.deserializeAttachment();
+            return previous?.actor === scope.actor || replaceByPlayer && previous?.ref === scope.ref && sameSession(previous, scope);
+        });
         if (peers.length - existing.length >= SOCKET_CAP) return result({ error: 'Room connection capacity unavailable.' }, 429);
         const pair = new WebSocketPair();
         const { until: _until, ...attachment } = scope;

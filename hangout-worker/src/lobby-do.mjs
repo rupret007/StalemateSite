@@ -1153,11 +1153,20 @@ export class HangoutLobby {
     async webSocketClose(ws, code) {
         const replyCode = Number.isInteger(code) && (code >= 1000 && code <= 1014 && ![1004, 1005, 1006].includes(code)
             || code >= 3000 && code <= 4999) ? code : 1000;
-        if (isArcadeSocket(ws) || isMediaSocket(ws)) {
+        const game = arcadeSocketGame(ws);
+        if (game || isMediaSocket(ws)) {
+            const scope = ws.deserializeAttachment();
+            if (game) {
+                try { ws.serializeAttachment({ ...scope, retired: true }); } catch { /* already closed */ }
+            }
             try { ws.close(replyCode); } catch { /* already closed */ }
             if (isMediaSocket(ws)) {
                 await this.ready;
                 return retirementGate(this, () => this.gameMedia.reconcile());
+            }
+            if (game) {
+                await this.ready;
+                if (this.arcadeAvailable(game)) return retirementGate(this, () => this.arcade.get(game).presenceChanged(scope));
             }
             return;
         }

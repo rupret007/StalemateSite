@@ -20,6 +20,7 @@ const markup = `
 <p class="small arcade-chess-status" data-chess-status role="status"></p>
 <p class="small arcade-chess-feedback" data-chess-error role="status"></p>
 <button type="button" class="btn btn--small" data-chess-primary hidden></button>
+<button type="button" class="btn btn--small btn--ghost" data-chess-start-rematch hidden>Start now</button>
 <div class="arcade-chess-playing" data-chess-playing hidden>
     <div class="arcade-chess-clocks" aria-label="Chess clocks">
         <div data-clock-side="w"><span data-clock-label>White</span><time data-clock="w">10:00</time></div>
@@ -58,7 +59,7 @@ export function mountArcadeChess(container, onMatch) {
     container.append(panel);
     appendStyle(document, new URL('./arcade-chess.css', import.meta.url));
     const $ = selector => panel.querySelector(selector);
-    const primary = $('[data-chess-primary]');
+    const primary = $('[data-chess-primary]'), startRematch = $('[data-chess-start-rematch]');
     const status = $('[data-chess-status]');
     const feedback = $('[data-chess-error]');
     const boardHost = $('#board');
@@ -291,6 +292,11 @@ export function mountArcadeChess(container, onMatch) {
             status.textContent = `${who} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
             if (chess?.isCheck()) status.textContent += ` · ${colorName(match.turn)} is in check`;
         }
+        if (connection === 'ready' && seated && match && model.disconnectedSeats?.length) {
+            status.textContent += ` · Waiting for ${colorName(model.disconnectedSeats[0])}, link still works.`;
+        }
+        startRematch.hidden = !(connection === 'ready' && seated && match?.result && model.canStartRematch);
+        startRematch.disabled = pending;
         for (const control of actions) {
             const active = seated && match && !match.result;
             const offer = active && match.drawOffer && match.drawOffer !== model.seat;
@@ -312,6 +318,7 @@ export function mountArcadeChess(container, onMatch) {
         showChoice('Claim a draw', entries.length ? 'Select a claim to send to the server.' : 'There is no claim available from this position.', entries);
     }
 
+    startRematch.addEventListener('click', () => send('start-rematch'));
     primary.addEventListener('click', () => {
         if (primary.dataset.command === 'retry') client.start(scope);
         else if (primary.dataset.command) send(primary.dataset.command);

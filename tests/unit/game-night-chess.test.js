@@ -41,7 +41,7 @@ describe('Game Night Chess seat and rematch lifecycle', () => {
         expect(send(restored, black, 'move', 'c7c5').ok).toBe(true);
     });
 
-    it('requires both seated players to agree to a rematch and swaps their colors', () => {
+    it('requires both seated players to agree to a rematch and keeps their colors', () => {
         const game = new GameNightChess('chess-one', white);
         game.join(black, 'chess-one', now);
         expect(game.requestRematch(white, 'chess-one', 'chess-two', now)).toBe(false);
@@ -52,9 +52,9 @@ describe('Game Night Chess seat and rematch lifecycle', () => {
         expect(restored.requestRematch('member-three', 'chess-one', 'chess-two', now)).toBe(false);
         expect(restored.requestRematch(black, 'chess-one', 'chess-two', now + 500)).toBe(true);
         expect(restored.view(black, now + 500)).toMatchObject({
-            id: 'chess-two', seat: 'w', rematch: null, match: { moves: [], result: null, turn: 'w' }
+            id: 'chess-two', tableId: 'chess-one', seat: 'b', rematch: null, match: { moves: [], result: null, turn: 'w' }
         });
-        expect(restored.seat(white)).toBe('b');
+        expect(restored.seat(white)).toBe('w');
         expect(restored.command(black, { version: 1, id: 'chess-one', revision: 0, action: 'move', move: 'e2e4' }, now + 500).reason)
             .toBe('match-changed');
     });

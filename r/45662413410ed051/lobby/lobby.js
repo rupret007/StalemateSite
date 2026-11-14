@@ -1841,8 +1841,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (!scope || table.loading) return;
         table.loading = true;
         table.load().then(mount => {
-            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting) =>
-                arcadeMatchState(game, table, room, state, sendMatch, reconnecting));
+            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting, snapshot) =>
+                arcadeMatchState(game, table, room, state, sendMatch, reconnecting, snapshot));
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn--small arcade-invite-friend';
@@ -1893,18 +1893,19 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (table.inviteButton)
             table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
-    function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting) {
+    function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting, snapshot) {
         if (reconnecting) {
             table.invite = null;
             updateTableInvite(table, currentGameNight());
             return;
         }
         table.matchRef = scope && state?.id ? scope.ref : null;
-        table.seatRef = scope && state?.seat ? scope.ref : null;
+        const seat = snapshot ? snapshot.yourSeat : state?.seat;
+        table.seatRef = scope && seat ? scope.ref : null;
         const room = currentGameNight();
         drawGameWaiting(room);
         if (table.seatRef && room?.keepRef === table.seatRef) rememberGameReturn(room, game);
-        else if (sendMatch && !state?.seat && scope?.ref === room?.keepRef && gameReturn?.ref === scope?.ref
+        else if (sendMatch && !seat && scope?.ref === room?.keepRef && gameReturn?.ref === scope?.ref
             && gameReturn?.room === scope?.room && gameReturn?.game === game) {
             const { room, ref, until } = gameReturn;
             gameReturn = { room, ref, until };
@@ -1923,6 +1924,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         }
         const invite = arcadeInvitation;
         if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
+        if (gameGuest && !state && snapshot?.phase === 'lobby' && !snapshot.currentMatchId) {
+            clearTimeout(invite.timer);
+            gameGuestReloadOffered = false;
+            $('[data-game-guest-retry]').hidden = true;
+            gateStatus('Waiting for the host to open the table. This link still works.');
+            return;
+        }
         const canSeeReplacement = gameGuest && state?.replacementAvailable === true;
         if (canSeeReplacement || state?.seat && (state.id === invite.match || gameGuest)) {
             if (gameGuest && !gameGuestSeated) {
