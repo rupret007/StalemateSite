@@ -22,6 +22,41 @@ test('chat shortcuts explain what they do and can send from the keyboard', async
     await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('🤘 SHRED');
 });
 
+test('a failed chat shortcut can be retried without changing the composer draft', async ({ page, baseURL }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await enter(page, baseURL);
+    const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+    const shortcut = page.getByRole('button', { name: 'Send rock horns and SHRED', exact: true });
+    const status = page.locator('[data-toast]');
+    const message = page.getByRole('log', { name: 'Conversation' }).getByRole('listitem').filter({ hasText: '🤘 SHRED' });
+    await composer.fill('Keep my draft here.');
+    await page.evaluate(() => {
+        const socket = window.__lobby.ws;
+        const send = socket.send;
+        socket.send = function (data) {
+            if (JSON.parse(data).t === 'say') {
+                socket.send = send;
+                throw new Error('Synthetic shortcut transport failure');
+            }
+            return send.call(this, data);
+        };
+    });
+
+    await shortcut.press('Enter');
+    await expect(composer).toHaveValue('Keep my draft here.');
+    await expect(shortcut).toBeFocused();
+    await expect(message).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('shortcut-after-failed-send.png') });
+    await expect(status).toHaveText('Couldn’t send that shortcut. Try it again.');
+    await expect(status).toHaveAttribute('role', 'status');
+
+    await shortcut.press('Enter');
+    await expect(message).toHaveCount(1);
+    await expect(status).toBeHidden();
+    await expect(composer).toHaveValue('Keep my draft here.');
+    await page.screenshot({ path: testInfo.outputPath('shortcut-retried.png') });
+});
+
 for (const [width, height] of [[1440, 900], [390, 844]]) {
     test(`a chat send failure is explained and can be retried at ${width}px`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
