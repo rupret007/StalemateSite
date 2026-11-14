@@ -419,7 +419,7 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
         await join.press('Enter');
         await expect(roomTab).toBeFocused();
         await expect(offer).toBeHidden();
-        await expect(guest.getByText('Wait for your host to open a game.', { exact: true })).toBeInViewport();
+        await expect(guest.getByText('Choose a game to see whether a table is open.', { exact: true })).toBeInViewport();
         fixture.disconnect('ReturnGuest', 1012);
         await expect(offer).toContainText('Game Night disconnected. Return to the room to check your match.');
         await offer.getByRole('button', { name: 'Return to room' }).click();

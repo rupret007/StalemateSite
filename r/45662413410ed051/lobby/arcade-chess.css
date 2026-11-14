@@ -39,7 +39,9 @@
     --board-light: #e4eadb;
     --board-dark: #486b76;
     --board-selection: #cbdf94;
-    position: relative;
+    display: grid;
+    grid-template: repeat(8, minmax(0, 1fr)) / repeat(8, minmax(0, 1fr));
+    overflow: hidden;
     box-sizing: border-box;
     width: min(100%, 25rem);
     aspect-ratio: 1;
@@ -48,16 +50,56 @@
     isolation: isolate;
     box-shadow: 0 4px 12px #0007;
 }
-.arcade-chess #board cg-board { background-size: 25% 25%; }
 .arcade-chess-square {
-    pointer-events: none;
+    position: relative;
     appearance: none;
     min-width: 0;
     min-height: 0;
+    display: grid;
+    place-items: center;
+    touch-action: manipulation;
+    cursor: pointer;
     border: 0;
     border-radius: 0;
     padding: 0;
+    background: var(--board-light);
+}
+.arcade-chess-square[data-dark] { background: var(--board-dark); }
+.arcade-chess-square[data-last] { box-shadow: inset 0 0 0 2px #382c13, inset 0 0 0 4px #ffe096; }
+.arcade-chess-square[aria-pressed="true"] { background: var(--board-selection); box-shadow: inset 0 0 0 2px #385717; }
+.arcade-chess-square[data-check] {
+    background-image: radial-gradient(ellipse at center, #ee5266 0%, #bd274b 58%, #8d163b 100%);
+    box-shadow: inset 0 0 0 2px #2b0a1c, inset 0 0 0 4px #fff0dc;
+}
+.arcade-chess-square img { width: 86%; height: 86%; pointer-events: none; }
+.arcade-chess-square[data-piece^="b"] img { filter: drop-shadow(0 0 1.25px #fff6dc) drop-shadow(0 1.5px 1px #08121d66); }
+.arcade-chess-square[data-legal]::after {
+    content: "";
+    position: absolute;
+    width: 22%;
+    aspect-ratio: 1;
+    border: 2px solid #173538;
+    border-radius: 50%;
+    background: #f5fff4;
+    pointer-events: none;
+}
+.arcade-chess-square[data-capture]::after {
+    box-sizing: border-box;
+    inset: 6px;
+    width: auto;
+    aspect-ratio: auto;
+    border-radius: 35%;
+    border-color: #173538;
     background: transparent;
+    box-shadow: inset 0 0 0 2px #e4ffaf;
+}
+.arcade-chess-square[data-dark][data-capture]::after {
+    border-color: #e4ffaf;
+    box-shadow: inset 0 0 0 2px #173538;
+}
+.arcade-chess-square[data-check][data-capture]::after {
+    border-color: #fff;
+    box-shadow: inset 0 0 0 2px #173538;
 }
 .arcade-chess-square:focus-visible {
     outline: 3px solid #101d2a;
@@ -134,6 +176,11 @@
     .arcade-chess #board { width: min(100%, 25rem, max(12.5rem, calc(100dvh - 465px))); }
     .arcade-chess-clocks { width: min(100%, 25rem, max(16.5rem, calc(100dvh - 454px))); }
     .arcade-chess-clocks > div { padding: .25rem .35rem; font-size: .8rem; white-space: nowrap; }
+}
+@media (max-width: 900px) and (max-height: 720px) and (orientation: portrait) {
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 24px; }
+    .arcade-chess-actions { grid-template-columns: repeat(auto-fit, minmax(4.4rem, 1fr)); }
+    .arcade-chess-actions .btn { min-height: 44px; }
 }
 @media (max-width: 359px) {
     body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .connection { font-size: 0; gap: 0; }

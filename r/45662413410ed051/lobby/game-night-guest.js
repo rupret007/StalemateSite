@@ -1,8 +1,20 @@
+import { GAME_INVITE_UNAVAILABLE } from '/r/45662413410ed051/lobby/game-night.mjs';
+import { unlockGameNightAudio } from '/r/45662413410ed051/lobby/game-night-audio.mjs';
+
 const status = document.querySelector('[data-guest-status]');
 const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
 const retry = document.querySelector('[data-guest-retry]');
 const gameTitle = document.querySelector('[data-guest-game]');
+const resumeGuest = document.querySelector('[data-resume-guest]') !== null;
+const passPrefix = 'gn:pass:';
+const joinedInvitePrefix = 'gn:joined-invite:';
+const lastTableKey = 'gn:last-table';
+const tableIdPattern = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
+const passPattern = /^[a-f0-9]{64}$/;
+const lobbyPath = '/r/45662413410ed051/lobby/?game-guest=1';
+const gameDestination = tableId => lobbyPath + (typeof tableId === 'string' && tableIdPattern.test(tableId) ? '&table=' + tableId : '');
+const requestedTable = resumeGuest ? new URLSearchParams(location.search).get('table') : null;
 const inviter = document.querySelector('[data-guest-inviter]');
 const returnToRoom = document.querySelector('[data-guest-return]');
 const webJam = document.querySelector('[data-webjam-guest]') !== null;
@@ -13,13 +25,18 @@ const code = restored?.code ?? fragment.get(webJam ? 'grant' : 'invite');
 // Only WebJam's pre-reservation offer requests waiting. A refresh keeps the original deadline.
 let waitUntil = webJam ? restored?.waitUntil ?? (fragment.get('wait') === '1' ? -1 : 0) : 0;
 const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
+const pass = restored?.pass ?? Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
 const confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
-const closedInvitation = 'This invite is no longer available. Ask your host for a new one.';
 const hasInvitation = typeof code === 'string' && (webJam ? /^[A-Za-z0-9_-]{32,128}$/.test(code) : code.length > 0 && code.length <= 250);
+
+async function sha256(value) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
 
 function retainInvitation(confirmedGame) {
     // A refresh can use this history entry, without putting the link back in the address.
-    history.replaceState({ [historyKey]: { code, attempt, confirmedGame, waitUntil } }, '', location.pathname);
+    history.replaceState({ [historyKey]: { code, attempt, pass, confirmedGame, waitUntil } }, '', location.pathname);
 }
 
 function clearInvitation() {
@@ -27,7 +44,7 @@ function clearInvitation() {
 }
 
 if (hasInvitation) retainInvitation(confirmedGame);
-else if (location.hash || location.search || restored) clearInvitation();
+else if (!resumeGuest && (location.hash || location.search || restored)) clearInvitation();
 
 async function request(action, data) {
     const path = webJam ? '/beta/game-night/room-grant/redeem' : '/beta/game-night/invitation/' + action;
@@ -42,12 +59,12 @@ async function request(action, data) {
 }
 
 async function acceptInvitation() {
-    const body = { age13: true, attempt };
+    const body = { age13: true, attempt, passHash: await sha256(pass) };
     let retriedConnection = false;
     for (;;) {
         try { return await request('accept', body); }
         catch (error) {
-            if (webJam && !retriedConnection && error.status === undefined) {
+            if (!retriedConnection && ['TypeError', 'SyntaxError', 'TimeoutError'].includes(error?.name)) {
                 retriedConnection = true;
                 status.textContent = 'Reconnecting to confirm your seat…';
                 continue;
@@ -68,6 +85,13 @@ async function describe() {
         if (returnToRoom) returnToRoom.hidden = false;
         return;
     }
+    try {
+        const tableId = localStorage.getItem(joinedInvitePrefix + await sha256(code));
+        if (tableIdPattern.test(tableId || '') && passPattern.test(localStorage.getItem(passPrefix + tableId) || '')) {
+            location.replace(gameDestination(tableId));
+            return;
+        }
+    } catch { /* Browsers without local storage can return using the saved lobby address. */ }
     if (webJam) {
         if (waitUntil !== 0) gameTitle.textContent = 'Royal Flush Chess';
         status.textContent = 'You were invited from WebJam.';
@@ -85,7 +109,7 @@ async function describe() {
         invite.hidden = false;
         if (document.activeElement === document.body) join.focus({ preventScroll: true });
     } catch (error) {
-        status.textContent = error.status === 410 ? closedInvitation : 'Couldn’t check the invitation. Try again.';
+        status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE : 'Couldn’t check the invitation. Try again.';
         retry.hidden = error.status === 410;
         if (error.status === 410) {
             clearInvitation();
@@ -100,10 +124,18 @@ async function accept() {
     join.disabled = true;
     status.textContent = 'Joining the game…';
     try {
-        const { next } = await acceptInvitation();
-        if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
-        if (webJam) clearInvitation();
-        location.replace(next);
+        const { next, tableId } = await acceptInvitation();
+        if (next !== lobbyPath) throw new Error('Unexpected destination');
+        if (tableIdPattern.test(tableId || '')) {
+            try {
+                localStorage.setItem(passPrefix + tableId, pass);
+                localStorage.setItem(joinedInvitePrefix + await sha256(code), tableId);
+                localStorage.setItem(lastTableKey, tableId);
+                sessionStorage.setItem(lastTableKey, tableId);
+            } catch { /* The session cookie still admits the guest. */ }
+        }
+        clearInvitation();
+        location.replace(gameDestination(tableId));
     } catch (error) {
         const tableFull = webJam && error.status === 409 && error.tableFull;
         const closed = tableFull || error.status === 410;
@@ -111,7 +143,7 @@ async function accept() {
         if (tableFull) status.textContent = returnToRoom ? 'This table is full. Return to your room for the next game.'
             : 'This table is full. Ask your host for a new invite when a seat opens.';
         else if (closed) status.textContent = webJam && waitUntil > 0
-            ? 'Your Chess seat wasn’t confirmed. Ask your host for a new WebJam invite.' : closedInvitation;
+            ? 'Your Chess seat wasn’t confirmed. Ask your host for a new WebJam invite.' : GAME_INVITE_UNAVAILABLE;
         else if ([429, 503].includes(error.status)) status.textContent = error.message;
         if (closed) {
             clearInvitation();
@@ -120,7 +152,7 @@ async function accept() {
             if (webJam) {
                 gameTitle.tabIndex = -1;
                 gameTitle.setAttribute('aria-describedby', status.id);
-                gameTitle.focus({ preventScroll: true });
+                gameTitle.focus();
             } else {
                 status.tabIndex = -1;
                 status.focus({ preventScroll: true });
@@ -136,14 +168,60 @@ async function accept() {
     }
 }
 
-join.addEventListener('click', () => {
+join.addEventListener('click', event => {
+    unlockGameNightAudio(event);
     if (waitUntil === -1) waitUntil = Date.now() + 25_000;
     retainInvitation(gameTitle.textContent);
     void accept();
 });
 
-retry.addEventListener('click', () => void (confirmedGame ? accept() : describe()));
-if (hasInvitation && confirmedGame) {
+function showClosedInvitation() {
+    status.textContent = GAME_INVITE_UNAVAILABLE;
+    status.tabIndex = -1;
+    status.focus({ preventScroll: true });
+}
+
+async function resume() {
+    let tableId, savedPass;
+    retry.hidden = true;
+    try {
+        tableId = requestedTable || sessionStorage.getItem(lastTableKey) || localStorage.getItem(lastTableKey);
+        if (tableIdPattern.test(tableId || '')) savedPass = localStorage.getItem(passPrefix + tableId);
+    } catch { /* This browser may block local storage. */ }
+    if (!passPattern.test(savedPass || '')) {
+        showClosedInvitation();
+        return;
+    }
+    status.textContent = 'Connecting…';
+    try {
+        const response = await fetch('/beta/game-night/invitation/resume', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tableId, pass: savedPass }),
+            signal: AbortSignal.timeout(10000)
+        });
+        if (response.status === 410) {
+            showClosedInvitation();
+            try {
+                localStorage.removeItem(passPrefix + tableId);
+                if (localStorage.getItem(lastTableKey) === tableId) localStorage.removeItem(lastTableKey);
+                if (sessionStorage.getItem(lastTableKey) === tableId) sessionStorage.removeItem(lastTableKey);
+            } catch { /* The rejected pass cannot authorize a session. */ }
+            return;
+        }
+        const { next } = response.ok ? await response.json() : {};
+        if (next !== lobbyPath) throw new Error('Could not resume');
+        location.replace(gameDestination(tableId));
+    } catch {
+        status.textContent = 'Couldn’t reconnect. Try again.';
+        retry.hidden = false;
+        retry.focus({ preventScroll: true });
+    }
+}
+
+retry.addEventListener('click', () => void (resumeGuest ? resume() : confirmedGame ? accept() : describe()));
+if (resumeGuest) {
+    void resume();
+} else if (hasInvitation && confirmedGame) {
     // Resume only an accept attempt already confirmed by this guest.
     gameTitle.textContent = confirmedGame;
     if (webJam) invite.hidden = false;

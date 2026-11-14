@@ -66,6 +66,12 @@ jobs:
           node tests/runtime/arcade-transport.mjs --browser=chromium --webjam-share
           node tests/runtime/arcade-transport.mjs --browser=webkit --webjam-share
 
+      - name: Verify independent Game Night guest tables
+        timeout-minutes: 2
+        env:
+          ARCADE_GUEST_TABLE_ISOLATION_ONLY: '1'
+        run: node tests/runtime/arcade-transport.mjs --browser=webkit
+
       - name: Exercise private WebJam room grants in workerd
         timeout-minutes: 6
         env:

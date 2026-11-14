@@ -14,13 +14,15 @@ if (target === 'beta') {
         fs.copyFileSync(path.join(chessJoin, file), path.join(out, 'join', file));
     }
     const play = path.join(root, 'play');
+    fs.mkdirSync(path.join(out, 'play/assets'), { recursive: true });
+    fs.copyFileSync(path.join(play, 'assets/suite-sound.js'), path.join(out, 'play/assets/suite-sound.js'));
     const matchReceipt = path.join(root, 'hangout-worker/arcade/VENDORED.txt');
     if (fs.existsSync(matchReceipt)) {
         const source = fs.readFileSync(matchReceipt, 'utf8').trim();
         if (!/^Turdanoid@[a-f0-9]{40}$/.test(source) || !fs.readFileSync(path.join(play, 'VENDORED.txt'), 'utf8').split('\n')[0].includes(source))
             throw Error('The protected match and arcade imports must use the same revision.');
         const files = [
-            'games/chess-core.js', 'games/chess-board.js', 'assets/chess/chess.js',
+            'games/chess-core.js', 'assets/chess/chess.js',
             'games/turdrummy-rules.js', 'games/turdspades-engine.js',
             'games/turdtris-sprint.js', 'games/turdtris_logic.js', 'games/turdtris-presentation.js',
             'games/turdtris-modes.js', 'games/turdtris-art.js',
@@ -29,10 +31,7 @@ if (target === 'beta') {
             'games/arcade-action-clock.js', 'games/turdanoid-race.js', 'games/turdanoid-physics-core.js',
             'games/turdanoid-levels.js', 'games/turdanoid-levels-core.js', 'games/turdanoid-sprites-core.js',
             'assets/vendor/three/three.module.js', 'assets/vendor/three/three.core.js', 'assets/vendor/three/LICENSE',
-            'assets/chess/chessground.js', 'assets/chess/chessground.base.css', 'assets/chess/chess-board.css',
-            'assets/chess/chessground-10.5.0-source.tar.gz',
-            'assets/chess/Chessground-LICENSE.txt', 'assets/chess/chessjs-LICENSE.txt',
-            'assets/chess/Spatial-LICENSE.txt', 'assets/chess/GPL-3.0.txt'
+            'assets/chess/chessjs-LICENSE.txt', 'assets/chess/Spatial-LICENSE.txt', 'assets/chess/GPL-3.0.txt'
         ];
         for (const color of ['w', 'b']) for (const piece of 'prnbqk') files.push(`assets/chess/pieces/spatial-${color}${piece}.svg`);
         for (const file of files) {

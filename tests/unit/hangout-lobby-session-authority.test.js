@@ -2,6 +2,7 @@
 // Actual application codec/authority/effect writer on disk-backed SQLite. The
 // native alarm API is represented by one key in that SAME SQL transaction;
 // these tests do not qualify hosted alarms, ingress identity proofs or release.
+import { GAME_NIGHT_IDLE, GAME_NIGHT_LENGTH } from '../../hangout-worker/src/game-night-lifetime.mjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -105,6 +106,40 @@ describe('explicit collocated lobby authority initialization and migration', () 
         await expect(initializeLobbySessionAuthority({ storage: f.storage, env: f.env, state: f.state, now: NOW })).rejects.toThrow();
         expect(fingerprint(f.driver)).toBe(before);
         const reopened = await f.reopen(); expect((await reopened.authority.load()).state).toEqual(f.state);
+    });
+
+    it('reopens saved Game Night records, preserves ordinary access and processes pending guest closure', async () => {
+        const f = await fixture();
+        const ordinary = f.registration('ordinary');
+        const guest = f.registration('game-night');
+        for (const request of [ordinary, guest]) expect((await f.authority.register(request)).status).toBe(200);
+        const key = 'authority-session:' + guest.sid;
+        const indexKey = 'authority-session-index:v1';
+        const exp = NOW + 16 * 60 * 60_000;
+        const idleUntil = NOW + 4 * 60 * 60_000;
+        const forward = await f.authority.records.transaction(async tx => {
+            const saved = { ...await tx.get(key), exp, idleUntil };
+            const index = await tx.get(indexKey);
+            index.entries.find(row => row.sid === guest.sid).exp = exp;
+            await tx.put(key, saved);
+            await tx.put(indexKey, index);
+            return saved;
+        });
+        const { authority } = await f.reopen();
+        expect((await authority.load()).state).toEqual(f.state);
+        expect(await authority.check(ordinary)).toMatchObject({ reason: 'active' });
+        const request = { ...guest, exp };
+        expect(await authority.check(request)).toMatchObject({ reason: 'active' });
+        expect(await authority.records.transaction(tx => tx.get(key))).toEqual(forward);
+
+        const pending = { ...forward, revoked: true, pending: true, retryAt: NOW, closureRevision: 1 };
+        await authority.records.transaction(tx => tx.put(key, pending));
+        expect(await authority.check(request)).toBeNull();
+        expect(await authority.due()).toEqual([pending]);
+        const retried = await authority.retry(guest.sid);
+        expect(retried).toMatchObject({ sid: guest.sid, closureRevision: 2 });
+        await authority.confirmClosed(retried);
+        expect(await authority.records.transaction(tx => tx.get(key))).toMatchObject({ pending: false, idleUntil });
     });
 
     it.each(['marker', 'alarm'])('rolls back actual initializer writes after %s failure and supports explicit retry', async boundary => {
@@ -335,6 +370,34 @@ describe('production retention on the actual authority codec and SQLite', () => 
         await expect(f.authority.maintainParticipation()).rejects.toThrow(); expect(fingerprint(f.driver)).toBe(before);
         expect(await f.authority.records.transaction(tx => tx.get(partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY))).toBeUndefined();
     });
+});
+
+it('slides Game Night idle on activity without extending or resurrecting the session', async () => {
+    const f = await fixture();
+    const request = f.registration('night-guest', { gameNight: true, exp: f.now() + GAME_NIGHT_LENGTH });
+    const holdAlarm = f.now() + 5000;
+    await f.rawPut(ALARM, holdAlarm);
+    expect((await f.authority.register(request)).status).toBe(200);
+    expect(await f.rawGet(ALARM)).toBe(holdAlarm);
+    expect((await f.authority.room({ ...request, room: 'other-room' })).status).toBe(403);
+
+    f.advance(GAME_NIGHT_IDLE - 1);
+    expect(await f.authority.gameNightActivity(request)).toBe(true);
+    f.advance(GAME_NIGHT_IDLE - 1);
+    expect(await f.authority.check(request)).toMatchObject({ reason: 'active' });
+    f.advance(1);
+    expect(await f.authority.check(request)).toBeNull();
+    expect(await f.authority.gameNightActivity(request)).toBe(false);
+
+    const later = f.registration('night-later', { gameNight: true, exp: f.now() + GAME_NIGHT_LENGTH });
+    expect((await f.authority.register(later)).status).toBe(200);
+    for (let i = 0; i < 5; i++) {
+        f.advance(3 * GAME_NIGHT_IDLE / 4);
+        expect(await f.authority.gameNightActivity(later)).toBe(true);
+    }
+    f.advance(GAME_NIGHT_IDLE / 4);
+    expect(await f.authority.check(later)).toBeNull();
+    expect(await f.authority.gameNightActivity(later)).toBe(false);
 });
 
 describe('actual SQLite session issuance, binding and lobby effect fence', () => {

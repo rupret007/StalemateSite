@@ -1,10 +1,12 @@
+import { GAME_NIGHT_LENGTH } from './game-night-lifetime.mjs';
+
 // Shared metadata-only lifecycle checks. Frame handlers use validBetaSession without an RPC.
 export const BETA_TTL = 8 * 3600 * 1000;
 export const betaVersion = (env) => String(env.HANGOUT_BETA_INVITE_VERSION || '1');
 export function validBetaSession(value, env, now = Date.now()) {
     return env.HANGOUT_BETA_MODE === 'protected' && /^[a-z0-9-]{16,64}$/.test(value?.betaSid || '') &&
         /^[A-Za-z0-9._-]{1,64}$/.test(value?.betaInviteVersion || '') && value.betaInviteVersion === betaVersion(env) &&
-        Number.isFinite(value.expiresAt) && value.expiresAt > now && value.expiresAt <= now + BETA_TTL;
+        Number.isFinite(value.expiresAt) && value.expiresAt > now && value.expiresAt <= now + (value.gameGuest ? GAME_NIGHT_LENGTH : BETA_TTL);
 }
 export function registryRequest(env, operation, data) {
     const collocated = env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1';

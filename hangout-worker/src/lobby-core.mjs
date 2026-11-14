@@ -542,7 +542,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return !!(peer?.nick && !peer.safetyOnly && peer.dev !== c.dev && chan.members.has(peer.id) &&
                 !c.blocks.has(peer.dev) && !peer.blocks.has(c.dev));
         };
-        return { canOpen: isOp(c, chan), canSee, canCall, nick: c.nick,
+        return { canOpen: isOp(c, chan), canSee, canCall, isPresent: subject => peers(subject).length > 0, nick: c.nick,
             canJoin: subject => subject !== c.betaSid && canSee(subject) && peers(subject).some(peer => peer.dev !== c.dev),
             canPlay: budgetLevel() === 'ok' && net.lock !== 'readonly' && !chan.modes.Q
                 && Math.max(net.mutes[c.dev] || 0, net.mutes[c.account] || 0) <= now()

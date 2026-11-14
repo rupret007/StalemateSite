@@ -1,5 +1,5 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { Chess, claimReason, colorName, intendedClaims, pieceName } from '/play/games/chess-core.js';
-import { ChessBoard } from '/play/games/chess-board.js';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
 const files = 'abcdefgh', ranks = '87654321';
@@ -21,6 +21,7 @@ const markup = `
 <p class="small arcade-chess-status" data-chess-status role="status"></p>
 <p class="small arcade-chess-feedback" data-chess-error role="status"></p>
 <button type="button" class="btn btn--small" data-chess-primary hidden></button>
+<button type="button" class="btn btn--small btn--ghost" data-chess-start-rematch hidden>Start now</button>
 <div class="arcade-chess-playing" data-chess-playing hidden>
     <div class="arcade-chess-clocks" aria-label="Chess clocks">
         <div data-clock-side="w"><span data-clock-label>White</span><time data-clock="w">10:00</time></div>
@@ -31,11 +32,10 @@ const markup = `
         <button type="button" class="btn btn--small btn--ghost" data-action="offer-draw">Offer draw</button>
         <button type="button" class="btn btn--small" data-action="accept-draw" hidden>Accept draw</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="decline-draw" hidden>Decline draw</button>
-        <button type="button" class="btn btn--small btn--ghost" data-action="claim-draw" hidden>Claim draw</button>
+        <button type="button" class="btn btn--small btn--ghost" data-action="claim-draw">Claim draw</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="resign">Resign</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="leave">Leave match</button>
     </div>
-    <a class="small" href="/play/assets/chess/chessground-10.5.0-source.tar.gz" download>Chess board source</a>
 </div>
 <dialog class="sheet" aria-labelledby="arcade-chess-choice-title" data-chess-choice>
     <h3 id="arcade-chess-choice-title"></h3>
@@ -58,11 +58,9 @@ export function mountArcadeChess(container, onMatch) {
     panel.hidden = true;
     panel.innerHTML = markup;
     container.append(panel);
-    appendStyle(document, '/play/assets/chess/chessground.base.css');
-    appendStyle(document, '/play/assets/chess/chess-board.css');
     appendStyle(document, new URL('./arcade-chess.css', import.meta.url));
     const $ = selector => panel.querySelector(selector);
-    const primary = $('[data-chess-primary]');
+    const primary = $('[data-chess-primary]'), startRematch = $('[data-chess-start-rematch]');
     const status = $('[data-chess-status]');
     const feedback = $('[data-chess-error]');
     const boardHost = $('#board');
@@ -71,9 +69,8 @@ export function mountArcadeChess(container, onMatch) {
     const squares = new Map();
     let scope, pendingTimer, clockTimer;
     let pending = false, canOpen = false, connection = 'connecting', connectionError;
-    let model = null, chess = null, board = null, selected = null, focused = 'e2';
+    let model = null, chess = null, selected = null, claimOptions, focused = 'e2';
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
-    let drawClaims;
     const client = createGameNightMatchClient({
         onMatch,
         prefix: '/beta/arcade',
@@ -84,7 +81,6 @@ export function mountArcadeChess(container, onMatch) {
             clearPending();
             closeChoice();
             selected = null;
-            board?.cancel();
             draw();
         },
         onState(frame) {
@@ -133,18 +129,21 @@ export function mountArcadeChess(container, onMatch) {
         clearInterval(clockTimer); clockTimer = null;
         clearPending(); closeChoice();
         connection = 'connecting'; connectionError = undefined;
-        model = null; chess = null; selected = null; canOpen = false; drawClaims = undefined;
-        board?.cancel();
+        model = null; chess = null; selected = null; canOpen = false;
     }
 
     function applyState(frame) {
         const prior = model?.match, next = frame.state?.match;
         const enteringBoard = next && next.id !== prior?.id;
+        if (connection === 'ready' && next && !enteringBoard && frame.state.seat && next.moves.length === prior.moves.length + 1) {
+            gameNightCue('chess.move');
+        }
         if (model?.id !== frame.state?.id || prior?.revision !== next?.revision) {
             selected = null; closeChoice(); feedback.textContent = '';
         }
         clearPending();
         if (next?.fen !== prior?.fen || !chess) chess = next ? new Chess(next.fen) : null;
+        if (next?.id !== prior?.id || next?.moves.length !== prior?.moves.length) claimOptions = undefined;
         model = frame.state; canOpen = frame.canOpen === true;
         receivedAt = performance.now(); deadlineSynced = false;
         connection = 'ready'; connectionError = undefined;
@@ -179,7 +178,8 @@ export function mountArcadeChess(container, onMatch) {
         const options = chess.moves({ square: from, verbose: true }).filter(option => option.to === to);
         if (!options.length) return;
         if (options[0].promotion) {
-            board.cancel(); selected = null; draw();
+            selected = null;
+            draw();
             showChoice('Promote pawn', 'Choose the piece to place on the board.',
                 options.map(option => [pieceName(option.promotion), () => send('move', { move: option.lan })]));
         } else send('move', { move: options[0].lan });
@@ -193,7 +193,6 @@ export function mountArcadeChess(container, onMatch) {
 
     function drawBoard() {
         if (!chess || !model?.match) return;
-        if (!board) board = new ChessBoard(boardHost, { select, move, cancel: () => { selected = null; draw(); } });
         const flipped = model.seat === 'b';
         if (flipped !== lastOrientation) {
             lastOrientation = flipped;
@@ -210,18 +209,39 @@ export function mountArcadeChess(container, onMatch) {
                     arranged.append(button);
                 }
             }
-            board.grid.replaceChildren(arranged);
+            boardHost.replaceChildren(arranged);
             focused = flipped ? 'e7' : 'e2';
         }
+        const last = model.match.moves.at(-1);
+        const lastSquares = last ? [last.slice(0, 2), last.slice(2, 4)] : [];
+        const moves = selected && isTurn() ? chess.moves({ square: selected, verbose: true }) : [];
+        const targets = new Set(moves.map(move => move.to));
+        const captures = new Set(moves.filter(move => move.isCapture() || move.isEnPassant()).map(move => move.to));
+        const checkedSide = chess.isCheck() ? chess.turn() : null;
         for (const [square, button] of squares) {
             const piece = chess.get(square);
+            const art = piece ? piece.color + piece.type : '';
+            if (button.dataset.piece !== art) {
+                button.dataset.piece = art;
+                button.replaceChildren();
+                if (piece) {
+                    const image = document.createElement('img');
+                    image.alt = '';
+                    image.draggable = false;
+                    image.src = '/play/assets/chess/pieces/spatial-' + art + '.svg';
+                    button.append(image);
+                }
+            }
+            button.toggleAttribute('data-dark', (files.indexOf(square[0]) + Number(square[1])) % 2 === 1);
+            button.toggleAttribute('data-legal', targets.has(square));
+            button.toggleAttribute('data-capture', captures.has(square));
+            button.toggleAttribute('data-last', lastSquares.includes(square));
+            button.toggleAttribute('data-check', piece?.type === 'k' && piece.color === checkedSide);
             button.setAttribute('aria-label', piece ? `${square}, ${colorName(piece.color)} ${pieceName(piece.type)}` : `${square}, empty`);
             button.setAttribute('aria-pressed', String(square === selected));
             button.tabIndex = square === focused ? 0 : -1;
         }
-        const last = model.match.moves.at(-1);
-        board.update({ chess, id: model.id, view: 'live', flipped, selected, allowed: isTurn(),
-            last: last && { from: last.slice(0, 2), to: last.slice(2, 4) } });
+
     }
 
     function drawClocks() {
@@ -277,43 +297,45 @@ export function mountArcadeChess(container, onMatch) {
         } else {
             const who = seated ? `You’re ${colorName(model.seat)}` : 'Watching';
             status.textContent = `${who} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
+            if (chess?.isCheck()) status.textContent += ` · ${colorName(match.turn)} is in check`;
         }
-        const active = seated && match && !match.result;
-        const offer = active && match.drawOffer && match.drawOffer !== model.seat;
-        const canClaim = active && model.seat === match.turn && availableDrawClaims(match).length > 0;
+        if (connection === 'ready' && seated && match && model.disconnectedSeats?.length) {
+            status.textContent += ` · Waiting for ${colorName(model.disconnectedSeats[0])}, link still works.`;
+        }
+        startRematch.hidden = !(connection === 'ready' && seated && match?.result && model.canStartRematch);
+        startRematch.disabled = pending;
         for (const control of actions) {
+            const active = seated && match && !match.result;
+            const offer = active && match.drawOffer && match.drawOffer !== model.seat;
             const action = control.dataset.action;
             control.disabled = pending || connection !== 'ready';
             control.hidden = action === 'leave' ? !seated
                 : action === 'accept-draw' || action === 'decline-draw' ? !offer
-                    : !active || action === 'offer-draw' && !!match.drawOffer || action === 'claim-draw' && !canClaim;
+                    : !active || action === 'offer-draw' && !!match.drawOffer || action === 'claim-draw' && (model.seat !== match.turn || !availableClaims().length);
         }
         if (match && panel.open) { drawBoard(); drawClocks(); }
     }
 
-    function availableDrawClaims(match) {
-        // The shared match starts from the standard position. Seven plies
-        // is the earliest point at which an intended move can repeat it a third time.
-        if (match.moves.length < 7) return [];
-        const key = match.id + ':' + match.moves.length;
-        if (drawClaims?.key !== key) {
-            const full = new Chess();
-            for (const move of match.moves) full.move(move);
-            const current = claimReason(full);
-            const entries = current ? [{ reason: current }] : intendedClaims(full);
-            drawClaims = { key, entries };
-        }
-        return drawClaims.entries;
+    function availableClaims() {
+        if (claimOptions) return claimOptions;
+        const full = new Chess();
+        for (const move of model.match.moves) full.move(move);
+        const current = claimReason(full);
+        claimOptions = current ? [{ reason: current }] : intendedClaims(full);
+        return claimOptions;
     }
 
     function chooseClaim() {
-        if (!isTurn()) return;
-        const entries = availableDrawClaims(model.match).map(({ reason, move, san }) => move
-            ? [`${san} · ${reason}`, () => send('claim-draw', { move })]
-            : [reason, () => send('claim-draw')]);
-        if (entries.length) showChoice('Claim a draw', 'Select a claim to send to the server.', entries);
+        const claims = availableClaims();
+        if (!claims.length) return;
+        const entries = claims.map(({ san, reason, move }) => [
+            san ? `${san} · ${reason}` : reason, () => send('claim-draw', move ? { move } : undefined)
+        ]);
+        showChoice('Claim a draw', claims[0].move
+            ? 'Choose the move that qualifies for a draw.' : 'Confirm the draw based on the current position.', entries);
     }
 
+    startRematch.addEventListener('click', () => send('start-rematch'));
     primary.addEventListener('click', () => {
         if (primary.dataset.command === 'retry') client.start(scope);
         else if (primary.dataset.command) send(primary.dataset.command);
@@ -329,7 +351,7 @@ export function mountArcadeChess(container, onMatch) {
     choice.addEventListener('close', () => { if (!choice.open) choiceContext = null; });
     boardHost.addEventListener('click', event => {
         const target = event.target.closest('[data-square]')?.dataset.square;
-        if (!target || event.detail !== 0) return;
+        if (!target || !isTurn()) return;
         if (selected && chess.moves({ square: selected, verbose: true }).some(option => option.to === target)) move(selected, target);
         else select(target);
     });
@@ -340,7 +362,7 @@ export function mountArcadeChess(container, onMatch) {
     });
     boardHost.addEventListener('keydown', event => {
         if (!model?.match) return;
-        if (event.key === 'Escape') { selected = null; board.cancel(); draw(); return; }
+        if (event.key === 'Escape') { selected = null; draw(); return; }
         if (!directions[event.key]) return;
         event.preventDefault();
         const [x, y] = directions[event.key], sign = model.seat === 'b' ? -1 : 1;

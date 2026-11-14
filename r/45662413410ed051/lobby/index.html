@@ -60,11 +60,13 @@
                 <button class="btn" type="button" data-game-invite-new autofocus>Invite a friend</button>
                 <button class="btn" type="button" data-game-invite-copy hidden>Copy invite</button>
                 <button class="btn" type="button" data-game-invite-share hidden>Share invite</button>
-                <p class="small" data-game-invite-link-status role="status"></p>
+                <div role="status" aria-atomic="true">
+                    <p class="small" data-game-invite-link-status></p>
+                    <p class="small" data-game-invite-expiry hidden>Expires <time></time>.</p>
+                </div>
             </div>
             <div class="sheet-buttons" data-game-invite-people></div>
             <p class="small" data-game-invite-empty hidden></p>
-            <button class="btn" type="button" data-game-invite-choose hidden>Choose a game</button>
             <button class="btn btn--ghost" type="button" data-game-invite-cancel>Cancel</button>
         </div>
         <form data-invite-form>
@@ -133,7 +135,7 @@
         <div class="gate-card">
             <p class="eyebrow">Private Game Night</p>
             <h1 data-game-guest-title>Game Night</h1>
-            <p data-game-guest-status role="status">Joining the game…</p>
+            <p data-game-guest-status role="status">Connecting…</p>
             <button class="btn" type="button" data-game-guest-retry hidden>Try again</button>
             <button class="btn btn--ghost" type="button" data-game-guest-cancel hidden>Cancel joining</button>
         </div>
@@ -241,13 +243,15 @@
                     <h3 class="jam-title" id="game-night-title">Game Night</h3>
                     <p class="small game-note">Invite-only room</p>
                     <p class="small game-note" role="status" data-game-waiting hidden></p>
+                    <button class="btn btn--small" type="button" data-game-seat-return hidden>Back to my seat</button>
                 </div>
                 <div class="jam-actions game-actions">
+                    <button class="btn btn--small btn--ghost" type="button" data-game-sound aria-pressed="false" hidden>Game sound <span aria-hidden="true">Off</span></button>
                     <button class="btn btn--small" type="button" data-game-invite hidden>Invite players</button>
                     <button class="btn btn--small btn--ghost" type="button" data-game-share hidden>Room address</button>
                     <button class="btn btn--small btn--ghost" type="button" data-game-arcade hidden>Open Stalemate Arcade</button>
                     <a class="btn btn--small btn--ghost" data-game-arcade-external target="_blank" rel="noopener noreferrer" aria-describedby="game-arcade-tab-note" hidden><span data-game-arcade-label>Open Stalemate Arcade</span> <span aria-hidden="true">↗</span></a>
-                    <span class="sr-only" id="game-arcade-tab-note" hidden>Opens in a new tab</span>
+                    <span class="sr-only" id="game-arcade-tab-note">Opens in a new tab</span>
                     <a class="btn btn--small btn--ghost" data-game-open target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" hidden>Open Discord call</a>
                 </div>
                 <div class="game-call">

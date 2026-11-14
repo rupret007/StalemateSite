@@ -241,6 +241,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam-actions, .jam-paste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .jam-actions .btn { flex: 1 1 145px; min-width: 0; max-width: 260px; padding-inline: 10px; overflow-wrap: anywhere; }
 .jam-actions [data-jam-wait] { flex-basis: 100%; }
+.game-actions [data-game-sound][aria-pressed="true"] { border-color: var(--lime); color: var(--lime); }
 .jam-actions [data-jam-invite-copy] { border-color: var(--lime); background: #242f1c; color: var(--lime); font-weight: 550; }
 .jam-invite-qr { flex-basis: 100%; display: grid; justify-items: start; gap: 6px; margin-top: 4px; }
 .jam-invite-qr canvas { display: block; width: min(200px, 100%); height: auto; background: #f4f0e6; border: 1px solid var(--line); border-radius: 4px; }
@@ -258,6 +259,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (min-height: 451px) { .irc:has(.game-offer:not([hidden])) .buffer { min-height: 48px; } }
 .game-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-bottom: 8px; }
 .game-heading .jam-title, .game-heading .game-note { margin: 0; }
+[data-game-seat-return] { min-height: 44px; margin-block-start: 4px; }
 .arcade-game-picker { max-width: 9.5rem; min-width: 0; }
 .game-night:has(.arcade-card-table[open]) { max-height: 68dvh; overscroll-behavior: contain; overflow-anchor: none; }
 .arcade-card-table { margin: 6px 0; border-block: 1px solid var(--line); padding: 4px 0 8px; }
@@ -328,6 +330,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .spades-trick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 4px 0; padding: 0; }
 .spades-trick li { min-width: 0; display: grid; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); padding: 2px 4px; }
 .spades-trick span { font-size: .66rem; overflow-wrap: anywhere; }
+.arcade-spades .arcade-card-hand [data-cannot-follow] { opacity: .52; }
 .spades-trick b { font: bold 1rem var(--mono); }
 [data-spades-table][data-phase="bid"] .spades-trick b { display: none; }
 .spades-trick [data-active="true"] { border-color: var(--lime); }

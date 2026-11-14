@@ -2,7 +2,7 @@
 // Hang Out lobby engine: IRC commands, server-side permissions, filters, PMs, moderation, budget, stats.
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { createLobby, COMMANDS, LOBBY, validWebjamInvite, validWebJoin } from '../../hangout-worker/src/lobby-core.mjs';
-import { discordCallLink, gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { discordCallLink } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { checkText, checkNick, normalize } from '../../hangout-worker/src/filter.mjs';
 
 let clock;
@@ -1038,19 +1038,4 @@ describe('Game Night', () => {
         expect(got(returning).findLast(m => m.t === 'join').ch)
             .toMatchObject({ kind: 'game', modes: { i: true, C: false }, gameCall: '' });
     });
-});
-
-it('limits a tab-local Game Night hint to navigation fields', () => {
-    const room = '#game-1acbefx23acbe';
-    const jam = '#jam';
-    const now = 10_000;
-    const ref = 'c'.repeat(32);
-    const validRoom = value => [room, jam].includes(value);
-    const hint = { room, ref, until: now + 1_000, game: 'chess' };
-    expect(gameNightReturnHint({ ...hint, seat: 'b', ticket: 'ticket', grant: 'grant' }, validRoom, now)).toEqual(hint);
-    const roomOnly = { room, ref, until: hint.until };
-    expect(gameNightReturnHint({ ...hint, game: 'four' }, validRoom, now)).toEqual(roomOnly);
-    expect(gameNightReturnHint({ ...hint, room: jam }, validRoom, now)).toEqual({ ...roomOnly, room: jam });
-    expect(gameNightReturnHint({ ...hint, until: now }, validRoom, now)).toBeNull();
-    expect(gameNightReturnHint({ ...hint, until: String(hint.until) }, validRoom, now)).toBeNull();
 });

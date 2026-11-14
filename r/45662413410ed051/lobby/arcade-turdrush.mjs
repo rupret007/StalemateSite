@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { classifyRushSwipe } from '/play/games/turdrush-core.js';
 import { advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer } from '/play/games/turdrush-race.js';
@@ -13,6 +14,7 @@ const markup = `
 <p class="small arcade-card-error" data-race-error role="status"></p>
 <div class="arcade-card-actions rush-race-actions">
     <button class="btn btn--small" type="button" data-race-main hidden></button>
+    <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
     <button class="btn btn--small btn--ghost" type="button" data-race-leave hidden>Leave race</button>
 </div>
 <div data-card-table data-race-match hidden>
@@ -93,7 +95,7 @@ export function mountArcadeTurdRush(container, onMatch) {
         canvas = $('[data-race-3d]'), flat = $('[data-race-2d]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
     let scope, model, canOpen, connection, connectionError, visual, receivedAt, renderer, fallback = false, raf = 0, previous = 0,
         lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, pending, gesture, redraw = true;
-    let buffer = [], flights = [];
+    let buffer = [], flights = [], slowFrames = 0;
     const serverNow = time => model.match.at + Math.max(0, time - receivedAt);
     const clearInputs = () => { buffer = []; flights = []; gesture = null; };
     const clearPending = () => { clearTimeout(pending); pending = null; };
@@ -134,6 +136,8 @@ export function mountArcadeTurdRush(container, onMatch) {
             } else if (state?.match) {
                 flights = flights.filter(flight => flight.sequence > state.match.runner.sequence);
             }
+            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
+                && state.match.players?.[state.seat]?.picks > model.match.players?.[state.seat]?.picks) gameNightCue('shared.ding');
             model = state;
             canOpen = host;
             receivedAt = performance.now();
@@ -227,6 +231,15 @@ export function mountArcadeTurdRush(container, onMatch) {
             try { renderer = new TurdRushRenderer(canvas, { reducedMotion: motion.matches, onLost: fallbackView }); }
             catch { fallbackView(); canvas.hidden = true; flat.hidden = false; }
         }
+        if (renderer && previous && !document.hidden) {
+            // Keep input responsive if the 3D renderer repeatedly stalls the race.
+            slowFrames = time - previous > 180 ? slowFrames + 1 : 0;
+            if (slowFrames >= 3) {
+                fallbackView();
+                canvas.hidden = true;
+                flat.hidden = false;
+            }
+        }
         const resized = renderer?.resize();
         if (redraw || resized || visual.tick !== oldTick) {
             if (renderer) {
@@ -239,6 +252,8 @@ export function mountArcadeTurdRush(container, onMatch) {
         previous = time;
         if (!match.result) raf = requestAnimationFrame(drawFrame);
     }
+
+    const startRematch = $('[data-start-rematch]');
 
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
@@ -261,8 +276,13 @@ export function mountArcadeTurdRush(container, onMatch) {
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turd Rush rematch' : 'Request Turd Rush rematch'; }
             if (seat && seat === model.rematch) message += ' · Rematch requested';
         } else if (match) message = !seat ? 'Watching both runners' : 'Swipe or use arrows to move, jump and slide.';
+        if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
+            message += ` · Waiting for ${'your rival'}, link still works.`;
+        }
         put(status, message);
         status.classList.toggle('rush-race-playing', !!match && !result);
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = !!pending;
         main.hidden = !action;
         main.dataset.command = action;
         put(main, label);
@@ -275,6 +295,7 @@ export function mountArcadeTurdRush(container, onMatch) {
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
     }
 
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
     leave.addEventListener('click', () => {
         put($('[data-race-confirm-text]'), model?.waiting ? 'The open seat will close.' : 'Leaving forfeits your race.');
@@ -321,7 +342,7 @@ export function mountArcadeTurdRush(container, onMatch) {
         clearPending();
         clearInputs();
         cancelAnimationFrame(raf);
-        raf = previous = 0;
+        raf = previous = slowFrames = 0;
         renderer?.dispose();
         renderer = null;
         model = visual = null;

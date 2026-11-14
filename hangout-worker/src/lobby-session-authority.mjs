@@ -3,6 +3,7 @@
 // policy/guardian qualification. Deployment/drain remains the release owner's job.
 import { accountId, roleForEmail } from './auth.mjs';
 import { validRoomId } from './core.mjs';
+import { GAME_NIGHT_IDLE, GAME_NIGHT_LENGTH, nextGameNightIdle, nightIdleExpired, validNightSession } from './game-night-lifetime.mjs';
 import { BETA_TTL, betaVersion } from './beta-session-client.mjs';
 import { validBetaRecord } from './beta-session-state.mjs';
 import { createDurableRecordStorage } from './durable-record-storage.mjs';
@@ -34,9 +35,10 @@ export const lobbyAuthorityMode = env => env?.HANGOUT_SESSION_AUTHORITY === LOBB
 const profileValid = value => value === null || exact(value, ['kind', 'account', 'role', 'admin', 'expiresAt'])
     && ['owner', 'staff'].includes(value.kind) && ACCOUNT.test(value.account) && integer(value.expiresAt)
     && (value.kind === 'owner' ? value.role === 'fan' && value.admin === false : ['owner', 'band', 'moderator'].includes(value.role) && value.admin === true);
-const recordValid = value => exact(value, ['v', 'sid', 'version', 'generation', 'createdAt', 'exp', 'revoked', 'pending', 'attempt', 'retryAt', 'rooms', 'profile', 'closureRevision'])
+const recordValid = value => exact(value, ['v', 'sid', 'version', 'generation', 'createdAt', 'exp', 'revoked', 'pending', 'attempt', 'retryAt', 'rooms', 'profile', 'closureRevision',
+    ...(value?.idleUntil === undefined ? [] : ['idleUntil'])])
     && value.v === 2 && SID.test(value.sid) && version(value.version) && integer(value.createdAt) && integer(value.exp)
-    && value.exp > value.createdAt && value.exp <= value.createdAt + BETA_TTL && typeof value.revoked === 'boolean' && typeof value.pending === 'boolean'
+    && value.exp > value.createdAt && (value.idleUntil === undefined ? value.exp <= value.createdAt + BETA_TTL : validNightSession(value)) && typeof value.revoked === 'boolean' && typeof value.pending === 'boolean'
     && (!value.pending || value.revoked) && integer(value.attempt) && value.attempt <= 20 && integer(value.retryAt) && value.retryAt <= value.exp
     && Array.isArray(value.rooms) && value.rooms.length <= ROOM_LIMIT && value.rooms.every(validRoomId) && new Set(value.rooms).size === value.rooms.length
     && Number.isSafeInteger(value.generation) && value.generation > 0 && integer(value.closureRevision) && profileValid(value.profile)
@@ -181,7 +183,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         }
         return roleMap;
     }
-    const active = record => !!record && record.exp > now() && record.version === betaVersion(env) && !record.revoked;
+    const active = (record, at = now()) => !!record && record.exp > at && record.version === betaVersion(env) && !record.revoked && !nightIdleExpired(record, at);
     async function configuredMarker(tx) {
         const current = await marker(tx), mode = env.HANGOUT_PARTICIPATION_AUTHORITY;
         ensure(mode === undefined || mode === 'c3-v1');
@@ -228,11 +230,13 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         if (Object.keys(kept).length !== Object.keys(oldRates).length) await tx.put(RATES, kept);
         return rows;
     }
-    async function schedule(tx, raw, at) {
+    async function schedule(tx, raw, at, afterAlarm = false) {
         const rows = await index(tx), budgets = await rates(tx);
         // Lobby tick/log/private-report maintenance always requires a future
         // alarm, even when the SID registry and mint rates are empty.
-        await raw.setAlarm(Math.min(at + INTERVAL, ...rows.entries.map(row => Math.max(at + 1, row.exp)), ...Object.values(budgets).map(row => Math.max(at + 1, row.until))));
+        const currentAlarm = await raw.getAlarm();
+        const existing = Number.isFinite(currentAlarm) && (!afterAlarm || currentAlarm > at) ? currentAlarm : Infinity;
+        await raw.setAlarm(Math.min(existing, at + INTERVAL, ...rows.entries.map(row => Math.max(at + 1, row.exp)), ...Object.values(budgets).map(row => Math.max(at + 1, row.until))));
     }
     const transact = operation => records.transaction(async (tx, raw) => {
         await initialized(tx); ensure((await configuredMarker(tx)).inviteVersion === betaVersion(env));
@@ -374,24 +378,34 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         check: value => transact(async tx => {
             const record = await session(tx, value.sid);
             return record && record.exp > now() && record.generation === (await marker(tx)).generation && record.version === value.version && value.version === betaVersion(env) && value.exp <= record.exp
-                && (!record.revoked || value.allowRevoked === true) ? { reason: record.revoked ? 'revoked' : 'active', profile: clone(record.profile) } : null;
+                && ((!record.revoked && !nightIdleExpired(record, now())) || value.allowRevoked === true) ? { reason: record.revoked ? 'revoked' : 'active', profile: clone(record.profile) } : null;
         }),
         async register(body) {
             return transact(async (tx, raw) => {
                 const at = now(); ensure(SID.test(body.sid || '') && version(body.version) && integer(body.exp));
-                if (body.version !== betaVersion(env) || body.exp <= at || body.exp > at + BETA_TTL) return { status: 403, reason: 'expired or revoked' };
+                if (body.version !== betaVersion(env) || body.exp <= at || body.exp > at + (body.gameNight === true ? GAME_NIGHT_LENGTH : BETA_TTL)) return { status: 403, reason: 'expired or revoked' };
                 if (await session(tx, body.sid)) return { status: 409, reason: 'session already exists' };
                 ensure(/^[A-Za-z0-9_-]{22}$/.test(body.iph || '') && profileValid(body.profile ?? null));
                 const profile = body.profile ?? null;
+                if (body.gameNight === true && profile) return { status: 403, reason: 'identity denied' };
                 if (profile && (profile.expiresAt > body.exp || profile.expiresAt <= at || profile.admin && (await currentRoles()).get(profile.account) !== profile.role)) return { status: 403, reason: 'identity denied' };
                 const rows = await prune(tx, at), budgets = await rates(tx), rate = budgets[body.iph] || { until: at + 3600000, count: 0 };
                 if (rows.entries.length >= LIMIT || rate.count >= 20 || !budgets[body.iph] && Object.keys(budgets).length >= LIMIT) return { status: 429, reason: 'beta session allowance reached' };
                 budgets[body.iph] = { ...rate, count: rate.count + 1 }; await tx.put(RATES, budgets);
-                const record = { v: 2, sid: body.sid, version: body.version, generation: (await marker(tx)).generation, createdAt: at, exp: body.exp, revoked: false, pending: false, attempt: 0, retryAt: 0, rooms: [], profile: clone(profile), closureRevision: 0 };
+                const record = { v: 2, sid: body.sid, version: body.version, generation: (await marker(tx)).generation, createdAt: at, exp: body.exp, revoked: false, pending: false, attempt: 0, retryAt: 0, rooms: [], profile: clone(profile), closureRevision: 0,
+                    ...(body.gameNight === true ? { idleUntil: Math.min(body.exp, at + GAME_NIGHT_IDLE) } : {}) };
                 await tx.put(SESSION + body.sid, record); rows.entries.push({ sid: body.sid, exp: body.exp }); await tx.put(SESSION_INDEX, rows); await schedule(tx, raw, at);
                 return { status: 200, reason: 'registered' };
             });
         },
+        gameNightActivity: value => transact(async tx => {
+            const at = now(), record = await session(tx, value.sid);
+            if (!active(record, at) || record.generation !== (await marker(tx)).generation
+                || value.version !== record.version || record.idleUntil === undefined) return false;
+            const idleUntil = nextGameNightIdle(record, at);
+            if (idleUntil !== null) await tx.put(SESSION + value.sid, { ...record, idleUntil });
+            return true;
+        }),
         bind: value => transact(async tx => {
             const binding = bindingFrom(value); ensure(bindingValid(binding)); const ids = await connections(tx);
             ensure(!ids.ids.includes(binding.id) && ids.ids.length < CONNECTION_LIMIT && await tx.get(CONNECTION + binding.id) === undefined);
@@ -403,7 +417,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             await tx.delete(CONNECTION + id); ids.ids = ids.ids.filter(value => value !== id); await tx.put(CONNECTION_INDEX, ids);
         }),
         room: body => transact(async tx => {
-            const record = await session(tx, body.sid); if (!active(record) || record.version !== body.version || body.exp > record.exp) return { status: 403, reason: 'revoked' };
+            const record = await session(tx, body.sid); if (!active(record) || record.idleUntil !== undefined || record.version !== body.version || body.exp > record.exp) return { status: 403, reason: 'revoked' };
             if (!validRoomId(body.room)) return { status: 400, reason: 'room' };
             if (!record.rooms.includes(body.room)) {
                 if (record.rooms.length >= ROOM_LIMIT) return { status: 429, reason: 'private room allowance reached' };
@@ -423,7 +437,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             const record = await session(tx, attempt.sid);
             if (record?.revoked && record.closureRevision === attempt.closureRevision) await tx.put(SESSION + record.sid, { ...record, pending: false });
         }),
-        schedule: () => transact((tx, raw) => schedule(tx, raw, now())),
+        schedule: ({ afterAlarm = false } = {}) => transact((tx, raw) => schedule(tx, raw, now(), afterAlarm)),
         due: () => transact(async tx => {
             const rows = await prune(tx, now()), due = [];
             for (const item of rows.entries) {
