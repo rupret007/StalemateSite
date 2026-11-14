@@ -84,11 +84,12 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 closeConfirmation();
                 feedback.textContent = '';
             }
-            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
-                && state.match.revision !== model.match.revision) {
-                if (state.match.phase === 'bid') gameNightCue('spades.bid');
-                else if (state.match.lastTrick?.map(card => card.id).join() !== model.match.lastTrick?.map(card => card.id).join()) gameNightCue('spades.trick');
-                else if (state.match.trick?.length !== model.match.trick?.length) gameNightCue('spades.card');
+            const next = state?.match, prior = model?.match;
+            if (connection === 'ready' && state?.seat && next && next.id === prior?.id && next.revision !== prior.revision) {
+                if (next.phase === 'bid') gameNightCue('spades.bid');
+                else if (next.round === prior.round && Object.entries(next.tricks).some(([seat, count]) => count > prior.tricks[seat])) {
+                    gameNightCue('spades.trick');
+                } else if (next.trick.length !== prior.trick.length) gameNightCue('spades.card');
             }
             model = state;
             canOpen = host;

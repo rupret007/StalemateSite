@@ -767,6 +767,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (!phone) {
                     const sound = guest.getByRole('button', { name: 'Game sound', exact: true });
                     await expect(sound).toHaveAttribute('aria-pressed', 'true');
+                    await expect(sound).toHaveText('Game sound On');
                     assert.equal(await guest.evaluate(() => window.gameAudioCues), 0, 'joining and receiving a snapshot stay quiet');
                     await tapSquare(guest, 'e7', phone);
                     // Select and move only from the guest's own board.
@@ -775,6 +776,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect.poll(() => guest.evaluate(() => window.gameAudioCues)).toBeGreaterThan(0);
                     await sound.click();
                     await expect(sound).toHaveAttribute('aria-pressed', 'false');
+                    await expect(sound).toHaveText('Game sound Off');
                     const cuesBeforeMute = await guest.evaluate(() => window.gameAudioCues);
                     await tapSquare(host, 'g1', false);
                     await tapSquare(host, 'f3', false);
@@ -839,6 +841,22 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const context = await browser.newContext({ viewport: phone, hasTouch: true, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
         const friend = await context.newPage();
         friend.on('pageerror', error => errors.push(`Spades partners: ${error.message}`));
+        const sounds = [];
+        await friend.exposeFunction('recordSpadesSound', event => { sounds.push(event); });
+        await friend.route('**/play/assets/suite-sound.js', async route => {
+            const response = await route.fetch();
+            const source = (await response.text()).replace('export function createStudioAudio', 'function createStudioAudio');
+            await route.fulfill({ response, body: source + `
+                export { observeStudioAudio as createStudioAudio };
+                function observeStudioAudio(options) {
+                    const player = createStudioAudio(options);
+                    return { ...player, playEvent(event) {
+                        window.recordSpadesSound(event);
+                        return player.playEvent(event);
+                    }};
+                }
+            ` });
+        });
         const status = page => page.locator('[data-spades-status]');
         const cards = page => page.locator('[data-spades-card]');
         const table = page => page.locator('[data-spades-table]');
@@ -908,6 +926,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 }
             }
             assert.ok(checkedUnavailableCard, 'the scored round exercises a card that cannot follow suit');
+            await expect.poll(() => sounds.filter(event => event === 'spades.trick').length,
+                { message: 'distinct completed tricks each use the trick cue' }).toBeGreaterThan(1);
             for (const page of players) await expect(table(page)).toHaveAttribute('data-phase', 'round-end');
             assert.deepEqual(await host.locator('[data-spades-score]').allTextContents(), await friend.locator('[data-spades-score]').allTextContents());
             await friend.locator('[data-spades-action="resign"]').click();

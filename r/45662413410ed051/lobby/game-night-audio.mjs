@@ -26,7 +26,11 @@ export function unlockGameNightAudio(event) {
 }
 
 export function mountGameNightSound(button, gameSurface) {
-    const draw = () => button.setAttribute('aria-pressed', String(!muted));
+    const label = button.querySelector('span');
+    const draw = () => {
+        button.setAttribute('aria-pressed', String(!muted));
+        label.textContent = muted ? 'Off' : 'On';
+    };
     const toggle = event => {
         muted = !muted;
         try { localStorage.setItem(muteKey, muted ? '1' : '0'); } catch { /* In-memory mute still applies. */ }
