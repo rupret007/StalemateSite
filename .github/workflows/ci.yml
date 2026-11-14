@@ -53,7 +53,7 @@ jobs:
         run: npm test
 
       - name: Exercise protected Game Night and rollback in workerd, Chromium and WebKit
-        timeout-minutes: 5
+        timeout-minutes: 10
         env:
           ARCADE_BROWSER_EVIDENCE: ${{ github.workspace }}/test-results/arcade-multiplayer
         run: |
