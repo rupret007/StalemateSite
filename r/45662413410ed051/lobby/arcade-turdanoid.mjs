@@ -342,7 +342,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
         event.preventDefault();
         if (event.repeat) return;
         if (event.key === ' ') { requestServe(); return; }
-        desiredAim = null;
+        desiredAim = retryAim = null;
+        canRetryAim = false;
         keys.add(event.key);
         if (!updateAxis()) keys.delete(event.key);
     });
@@ -395,7 +396,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
     for (const name of ['pointercancel', 'lostpointercapture']) board.addEventListener(name, event => {
         if (pointer !== event.pointerId) return;
         pointer = null;
-        desiredAim = null;
+        desiredAim = retryAim = null;
+        canRetryAim = false;
         if (name === 'pointercancel') pointerStart = null;
     });
 
