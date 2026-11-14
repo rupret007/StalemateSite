@@ -1,4 +1,4 @@
-import { readGameNightPass, validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
+import { gameNightPassRecord, readGameNightPass, validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
 import { GAME_INVITE_UNAVAILABLE, gameNightInvite, gameNightLabels, gameNightRoomName, webJamRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { DEMO_INVITE_TTL } from './beta-auth.mjs';
 import { arcadeRoomRequest } from './game-night-sockets.mjs';
@@ -19,9 +19,8 @@ const reply = (data, status = 200) => new Response(JSON.stringify(data), { statu
 export { GAME_INVITE_UNAVAILABLE };
 const unavailable = () => reply({ error: GAME_INVITE_UNAVAILABLE }, 410);
 
-async function waitingGuestSeat(lobby, roomScope, game, match, hostSid) {
-    if (!lobby.arcadeAvailable(game)) return false;
-    return lobby.arcade.get(game).hasGuestSeat(roomScope, match, hostSid);
+function invitationTableId(table, scope) {
+    return scope.watch ? table.watchTableId(scope) : table.guestTableId(scope, scope.match, scope.host);
 }
 
 export function gameGuestEnabled(env) {
@@ -35,7 +34,9 @@ export function gameGuestScope(value, allowWebJamChess = false) {
     if (!game || !validRoom || !codePattern.test(value.ref || '') || !sidPattern.test(value.host || '')
         || !Number.isInteger(value.nameSeed) || value.nameSeed < 0 || value.nameSeed > 0xffffffff) return null;
     if (value.tableId !== undefined && !validGameNightTableId(value.tableId)) return null;
+    if (value.watch !== undefined && (value.watch !== true || game.game !== 'turdspades')) return null;
     return { ...game, room: value.room, ref: value.ref, host: value.host, nameSeed: value.nameSeed,
+        ...(value.watch ? { watch: true } : {}),
         ...(value.tableId === undefined ? {} : { tableId: value.tableId }) };
 }
 
@@ -44,7 +45,7 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     if (operation === 'release') {
         const scope = gameGuestScope(body.scope, true);
         if (!scope || !sidPattern.test(body.sid || '')) return reply({ ok: false }, 400);
-        await lobby.arcade.get(scope.game).releaseGuestClaim(scope, body.sid);
+        if (!scope.watch) await lobby.arcade.get(scope.game).releaseGuestClaim(scope, body.sid);
         return reply({ ok: true });
     }
     if (!gameGuestEnabled(lobby.env)) return reply({ error: 'Game invitations are unavailable.' }, 404);
@@ -60,17 +61,19 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         return reply({ scope, sid: record.sid, exp: record.exp });
     }
     if (operation === 'issue') {
-        const { actor, room, ref, game, match } = body;
+        const { actor, room, ref, game, match, watch } = body;
         const scope = arcadeRoomRequest({ actor, room, ref });
         const host = scope && lobby.arcadeBinding(scope);
         const [nameSeed] = crypto.getRandomValues(new Uint32Array(1));
-        const guest = gameGuestScope({ room, ref, game, match, host: host?.betaSid, nameSeed });
+        const guest = gameGuestScope({ room, ref, game, match, host: host?.betaSid, nameSeed, watch });
+        const issueError = watch === true ? 'Open a full four-player Spades table before inviting someone to watch.'
+            : 'Open a game table with an available seat before inviting a friend.';
         if (!guest || !host.canOpen || !host.canPlay || host.gameGuest || session?.betaSid !== host.betaSid
             || !await lobby.sessionActive(host) || !lobby.arcadeAvailable(game)) {
-            return reply({ error: 'Open a game table with an available seat before inviting a friend.' }, 403);
+            return reply({ error: issueError }, 403);
         }
-        const tableId = await lobby.arcade.get(game).guestTableId(scope, match, host.betaSid);
-        if (!tableId) return reply({ error: 'Open a game table with an available seat before inviting a friend.' }, 403);
+        const tableId = await invitationTableId(lobby.arcade.get(game), guest);
+        if (!tableId) return reply({ error: issueError }, 403);
         if (!await lobby.controlBudget.take(host.socket, actor)) return reply({ error: 'Game invitation allowance reached. Try again in a few minutes.' }, 429);
         const rows = await storage.list({ prefix: STORAGE_PREFIX, limit: LINK_CAP });
         const expired = [...rows].filter(([, record]) => record.until <= now).map(([key]) => key);
@@ -108,18 +111,21 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     if (!binding?.canPlay || !await lobby.sessionActive(binding)) return unavailable();
     const table = lobby.arcade.get(scope.game);
     if (!table || !lobby.arcadeAvailable(scope.game)) return unavailable();
-    if (operation === 'details') {
-        if (!await waitingGuestSeat(lobby, scope, scope.game, scope.match, scope.host)) return unavailable();
-        return reply({ game: gameNightLabels[scope.game], host: binding.nick });
-    }
-    const tableId = await table.guestTableId(scope, scope.match, scope.host);
+    const tableId = await invitationTableId(table, scope);
     if (!tableId || scope.tableId && scope.tableId !== tableId) return unavailable();
+    if (operation === 'details') {
+        return reply({ game: gameNightLabels[scope.game], host: binding.nick, ...(scope.watch ? { watch: true } : {}) });
+    }
     scope = { ...scope, tableId };
     const sid = crypto.randomUUID();
     const nightEndsAt = await table.guestNightEndsAt(scope);
     const exp = Math.min(nightEndsAt, record.accessUntil ?? (record.demo ? record.until : Infinity));
     if (!Number.isFinite(exp) || exp <= now) return unavailable();
     const accepted = { ...record, scope, sid, exp, redeemer: attempt };
-    if (!await table.reserveGuestSeat(scope, sid, Math.min(now + CLAIM_TTL, exp), key, accepted, body.passHash)) return unavailable();
+    if (scope.watch) {
+        await storage.put({ [key]: accepted, ...gameNightPassRecord(accepted, body.passHash, record.version) });
+    } else if (!await table.reserveGuestSeat(scope, sid, Math.min(now + CLAIM_TTL, exp), key, accepted, body.passHash)) {
+        return unavailable();
+    }
     return reply({ scope, sid, exp });
 }

@@ -43,6 +43,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const betaShell = !!$('script[src="/beta/bootstrap.js"], script[src^="/beta/bootstrap.js?game-guest=1"]');
     const betaBootstrap = betaShell && window.HangoutBootstrap;
     const gameGuest = betaBootstrap?.gameGuest;
+    const watchingGuest = gameGuest?.watch === true;
     const gameGuestQuery = gameGuest ? '?game-guest=1' + (gameGuest.tableId ? '&table=' + gameGuest.tableId : '') : '';
     const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
     let gameGuestExit = gameGuest && ['left', 'canceled', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
@@ -1980,7 +1981,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         finishArcadeInvitation();
         arcadeInvitation = { ...target, room: room.name, ref: room.keepRef, sent: false,
             timer: setTimeout(() => {
-                if (gameGuest && !gameGuestSeated) offerGameGuestReload('Still waiting for your seat. Try again.');
+                if (gameGuest && !gameGuestSeated) offerGameGuestReload(watchingGuest ? 'Still connecting to the table. Try again.' : 'Still waiting for your seat. Try again.');
                 else finishArcadeInvitation('The seat could not be confirmed. Ask the host for a fresh game invitation.');
             }, 15000) };
     }
@@ -2011,7 +2012,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const pendingInvite = arcadeInvitation?.game === game && arcadeInvitation.room === scope?.room && arcadeInvitation.ref === scope?.ref;
         if (failed && pendingInvite && gameGuest && !gameGuestSeated) {
             clearTimeout(arcadeInvitation.timer);
-            offerGameGuestReload('Couldn’t reconnect to your seat. Try again.');
+            offerGameGuestReload(watchingGuest ? 'Couldn’t reconnect to the table. Try again.' : 'Couldn’t reconnect to your seat. Try again.');
         }
         if (reconnecting) {
             if (pendingInvite) {
@@ -2019,6 +2020,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 if (gameGuest && !gameGuestSeated) gateStatus('Reconnecting…');
             }
             table.invite = null;
+            table.watchInvite = null;
             updateTableInvite(table, currentGameNight());
             return;
         }
@@ -2034,7 +2036,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             writeTab(gameReturnKey, JSON.stringify(gameReturn));
         }
         drawGameWaiting(room);
-        table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
+        const inviteTarget = scope && state?.seat ? gameNightInvite(game, state.id) : null;
+        table.invite = state?.waiting && state.hasOpenSeat !== false ? inviteTarget : null;
+        table.watchInvite = inviteTarget && game === 'turdspades' && state.seat === 'south' &&
+            !state.waiting && state.occupied?.length === 4 ? { ...inviteTarget, watch: true } : null;
         updateTableInvite(table, currentGameNight());
         if (game === 'chess') {
             webJamWaitingTable = table.invite && state.seat === 'w' && jamRoomName(scope.room) ? { ...scope, ...table.invite } : null;
@@ -2062,7 +2067,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             return;
         }
         const canSeeReplacement = gameGuest && state?.replacementAvailable === true;
-        if (canSeeReplacement || state?.seat && (state.id === invite.match || gameGuest)) {
+        if (watchingGuest && state?.tableId === gameGuest.tableId || canSeeReplacement || state?.seat && (state.id === invite.match || gameGuest)) {
             if (gameGuest && !gameGuestSeated) {
                 gameGuestSeated = true;
                 gameGuestReloadOffered = false;
@@ -2080,7 +2085,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 : 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.';
             return finishArcadeInvitation(message);
         }
-        if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
+        if (!watchingGuest && !invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
     }
     $('[data-game-seat-return]')?.addEventListener('click', () => revealArcadeTable(seatReturnController(currentGameNight())));
     $('[data-arcade-game]').addEventListener('change', event => {
@@ -2705,12 +2710,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
         }
         const canInviteNew = isGame && gameGuestInvitesSupported;
-        const target = canInviteNew && (exactTable || arcadeInviteTarget());
+        const target = canInviteNew && (exactTable || guestLinkTarget());
         const inviteHint = $('[data-game-invite-empty]');
         inviteHint.hidden = !!target || (!canInviteNew && !!roster.childElementCount);
         inviteHint.textContent = canInviteNew ? 'Open a game with a free seat to invite a friend.' : 'Nobody else is in Hang Out yet.';
         $('[data-game-invite-link]').hidden = !target;
-        if (target) createGuestLink.textContent = `Invite a friend to ${gameLabel(target.game)}`;
+        if (target) createGuestLink.textContent = target.watch ? 'Invite a friend to watch' : `Invite a friend to ${gameLabel(target.game)}`;
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal();
         if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
@@ -2723,6 +2728,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     }
     function arcadeInviteTarget() {
         return [...arcadeTables.values()].find(table => table.invite && table.controller?.isOpen())?.invite;
+    }
+    function guestLinkTarget() {
+        const spades = arcadeTables.get('turdspades');
+        return arcadeInviteTarget() || (spades?.controller?.isOpen() ? spades.watchInvite : null);
     }
     const createGuestLink = $('[data-game-invite-new]'), shareGuestLink = $('[data-game-invite-share]');
     const copyGuestLink = $('[data-game-invite-copy]'), guestLinkStatus = $('[data-game-invite-link-status]');
@@ -2740,9 +2749,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         copyGuestLink.hidden = true; shareGuestLink.hidden = true; guestLinkStatus.textContent = '';
     }
     function readyGuestLink() {
-        const request = pendingGuestLink, target = arcadeInviteTarget();
+        const request = pendingGuestLink, target = guestLinkTarget();
         if (request?.link && request.room === currentGameNight() &&
-            request.target.game === target?.game && request.target.match === target.match) {
+            request.target.game === target?.game && request.target.match === target.match && request.target.watch === target.watch) {
             if (request.expiresAt === undefined || request.expiresAt > Date.now()) return request;
             resetGuestLink();
             guestLinkStatus.textContent = 'This invitation expired. Create a new one to share.';
@@ -2752,9 +2761,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         resetGuestLink();
         guestLinkStatus.textContent = 'The table changed. Prepare a new invitation.';
     }
-    createGuestLink.addEventListener('click', () => void prepareGuestLink(arcadeInviteTarget()));
+    createGuestLink.addEventListener('click', () => void prepareGuestLink(guestLinkTarget()));
     async function deliverPreparedLink(request) {
-        const title = `Join me for ${gameLabel(request.target.game)}`;
+        const title = `${request.target.watch ? 'Watch' : 'Join me for'} ${gameLabel(request.target.game)}`;
         if (typeof navigator.share === 'function') {
             try {
                 await navigator.share({ title, url: request.link });
@@ -2803,7 +2812,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             const sharePrimary = canShare || preferEmail || copyGuestLink.hidden;
             copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
             shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
-            guestLinkStatus.textContent = 'This link is for one guest. Send it now while your table has a seat available.';
+            guestLinkStatus.textContent = target.watch ? 'This link lets one friend watch this table.'
+                : 'This link is for one guest. Send it now while your table has a seat available.';
             const expiresAt = value.inviteExpiresAt ?? value.until;
             if (Number.isSafeInteger(expiresAt) && expiresAt > 0 && expiresAt <= 8.64e15) {
                 request.expiresAt = expiresAt;
@@ -2842,7 +2852,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     shareGuestLink.addEventListener('click', async () => {
         const request = readyGuestLink();
         if (!request) return;
-        const title = `Join me for ${gameLabel(request.target.game)}`;
+        const title = `${request.target.watch ? 'Watch' : 'Join me for'} ${gameLabel(request.target.game)}`;
         if (shareGuestLink.textContent === 'Email invite') {
             location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(request.link)}`;
             guestLinkStatus.textContent = 'Choose a friend in the email draft.';

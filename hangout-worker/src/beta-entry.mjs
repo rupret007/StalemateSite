@@ -518,7 +518,7 @@ async function betaRequest(request, env, deps = {}) {
     if (url.pathname === '/beta/state') return json({ kind: session.identity?.kind || 'guest', role: session.identity?.role || 'fan', emailConfigured: betaAccessConfigured(env), staffConfigured: betaAccessConfigured(env) });
     if (url.pathname === '/beta/bootstrap.js') {
         const bootstrap = { preview: env.HANGOUT_PREVIEW_KEY, owner: session.identity?.kind === 'owner' };
-        if (guest) bootstrap.gameGuest = { room: guest.room, ref: guest.ref, game: guest.game, match: guest.match, tableId: guest.tableId, sessionRef: await gameGuestSessionRef(session.access.sid) };
+        if (guest) bootstrap.gameGuest = { room: guest.room, ref: guest.ref, game: guest.game, match: guest.match, tableId: guest.tableId, sessionRef: await gameGuestSessionRef(session.access.sid), ...(guest.watch ? { watch: true } : {}) };
         return reply(`window.HangoutBootstrap=${JSON.stringify(bootstrap)};window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};${lobbyParticipationMode(env) ? 'window.HangoutParticipationControls=true;' : ''}${guest ? '' : "try{sessionStorage.setItem('hangout-preview',window.HangoutBootstrap.preview);sessionStorage.setItem('hangout-owner',window.HangoutBootstrap.owner?'1':'0');}catch{}"}`, 200, 'text/javascript');
     }
     if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {

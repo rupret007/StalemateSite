@@ -362,7 +362,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .arcade-spades [data-spades-table][data-phase="bid"] :is(.spades-trick, .arcade-card-hand-label) {
     margin-block: 2px;
   }
-  .arcade-spades [data-spades-table][data-phase="bid"] :is(.arcade-card-score, .arcade-card-hand-label) {
+  .arcade-spades [data-spades-table][data-phase="bid"] .arcade-card-score,
+  .arcade-spades [data-spades-table][data-phase="bid"]:not([data-watching]) .arcade-card-hand-label {
     display: none;
   }
 }

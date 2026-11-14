@@ -254,12 +254,13 @@ export function mountArcadeTurdSpades(container, onMatch) {
         main.disabled = pending;
         partnerButton.hidden = command !== 'open' || !partnersSupported || !!savedMode;
         partnerButton.disabled = pending;
-        seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat;
+        seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat || model.watchOnly === true;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
         table.hidden = !match;
         if (!match) { showHand([]); return; }
         table.dataset.phase = match.phase;
         table.dataset.mode = paired ? 'partners' : 'four';
+        table.toggleAttribute('data-watching', !seat);
 
         for (let team = 0; team < 2; team++) {
             $(`[data-spades-score="${team}"]`).textContent = `${teams[team]} · ${match.scores[team]}/${match.target} · ${match.bags[team]} bags`;
