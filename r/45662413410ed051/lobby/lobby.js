@@ -2638,7 +2638,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             const sharePrimary = canShare || preferEmail || copyGuestLink.hidden;
             copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
             shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
-            guestLinkStatus.textContent = 'One guest can use this invitation within 20 minutes.';
+            guestLinkStatus.textContent = 'One guest can use this invitation for up to 20 minutes.';
             if (deliver && await deliverPreparedLink(request)) return;
             if (pendingGuestLink !== request) return;
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();

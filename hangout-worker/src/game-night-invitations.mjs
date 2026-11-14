@@ -1,5 +1,5 @@
 import { gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
-import { DEMO_INVITE_TTL } from './beta-auth.mjs';
+import { BETA_TTL } from './beta-auth.mjs';
 import { arcadeRoomRequest } from './game-night-sockets.mjs';
 
 export const GAME_GUEST_PATH = '/beta/game-night/guest';
@@ -65,9 +65,13 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         if (rows.size - expired.length >= LINK_CAP || hostCount >= LINK_CAP_PER_HOST) {
             return reply({ error: 'Game invitation allowance reached. Try again in a few minutes.' }, 429);
         }
+        const demo = session.demo === true;
+        const accessUntil = demo ? session.exp : null;
+        if (demo && (!Number.isFinite(accessUntil) || accessUntil <= now)) return unavailable();
         const code = randomCode();
-        const until = now + (session.demo === true ? DEMO_INVITE_TTL : LINK_TTL);
-        await storage.put(STORAGE_PREFIX + await digest(code), { scope: guest, until, version: host.betaInviteVersion, ...(session.demo === true ? { demo: true } : {}) });
+        const until = demo ? Math.min(now + LINK_TTL, accessUntil) : now + LINK_TTL;
+        await storage.put(STORAGE_PREFIX + await digest(code), { scope: guest, until, version: host.betaInviteVersion,
+            ...(demo ? { demo, accessUntil } : {}) });
         return reply({ code, until });
     }
 
@@ -82,7 +86,7 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     if (!scope) return unavailable();
     const attempt = operation === 'accept' ? await digest(body.attempt) : null;
     if (record.redeemer && record.redeemer !== attempt) return unavailable();
-    if (record.redeemer) return reply({ scope: record.scope, sid: record.sid, exp: record.exp });
+    if (record.redeemer) return record.exp > now ? reply({ scope: record.scope, sid: record.sid, exp: record.exp }) : unavailable();
 
     const actor = lobby.engine.invitedGameHost(scope);
     const binding = actor && lobby.arcadeBinding({ actor, room: scope.room, ref: scope.ref });
@@ -94,8 +98,9 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         return reply({ game: gameNightLabels[scope.game], host: binding.nick });
     }
     const sid = crypto.randomUUID();
-    const exp = record.demo ? Math.min(now + GUEST_TTL, record.until) : now + GUEST_TTL;
+    const exp = record.accessUntil !== undefined ? Math.min(now + BETA_TTL, record.accessUntil)
+        : record.demo ? Math.min(now + GUEST_TTL, record.until) : now + GUEST_TTL;
     const accepted = { ...record, sid, exp, redeemer: attempt };
-    if (!await table.reserveGuestSeat(scope, sid, now + CLAIM_TTL, key, accepted)) return unavailable();
+    if (!await table.reserveGuestSeat(scope, sid, Math.min(now + CLAIM_TTL, exp), key, accepted)) return unavailable();
     return reply({ scope, sid, exp });
 }
