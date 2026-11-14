@@ -2217,12 +2217,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const [first, second] = scores;
         const lead = parseInt(first.bricks, 10) - parseInt(second.bricks, 10) || parseInt(first.score, 10) - parseInt(second.score, 10);
         const publicResult = await status(spectator).textContent();
-        const [, reason] = publicResult.split(' · ');
+        const watching = '. Stay here to watch the next race.';
+        assert.ok(publicResult.endsWith(watching));
+        const [, reason] = publicResult.slice(0, -watching.length).split(' · ');
         assert.ok(['time limit', 'wall cleared', 'out of balls'].includes(reason), publicResult);
         const labels = lead > 0 ? ['You win', 'Rival wins', 'Player 1 wins']
             : lead < 0 ? ['Rival wins', 'You win', 'Player 2 wins'] : ['Draw', 'Draw', 'Draw'];
         for (const [index, page] of pages.entries()) {
-            await expect(status(page)).toHaveText(`${labels[index]} · ${reason}`);
+            await expect(status(page)).toHaveText(`${labels[index]} · ${reason}${page === spectator ? watching : ''}`);
             assert.deepEqual(await scoreboard(page), scores);
         }
         await expect(b.getByRole('button', { name: 'Request Turdanoid rematch' })).toBeInViewport({ ratio: 1 });

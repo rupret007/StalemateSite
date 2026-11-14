@@ -203,9 +203,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
         } else if (match?.result) {
             if (!seat) {
-                message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}. You’re watching.`;
-                command = 'watch';
-                label = 'Watch for the rematch';
+                message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}. Stay here to watch the rematch.`;
             } else {
                 message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
                 const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
@@ -236,8 +234,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 const turnName = `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
                 if (!seat) {
                     message = `Table full. You’re watching. ${turnName}`;
-                    command = 'watch';
-                    label = 'Keep watching';
+                    if (match.phase !== 'bid') {
+                        command = 'watch';
+                        label = 'Keep watching';
+                    }
                 } else {
                     const turn = yourTurn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : turnName;
                     message = `Round ${match.round} · ${turn}`;
