@@ -1,8 +1,11 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdtempSync, cpSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { JSDOM } from 'jsdom';
 import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve, dirname, join } from 'node:path';
 
 const root = fileURLToPath(new URL('../../join/', import.meta.url));
@@ -68,4 +71,44 @@ it('ships the reviewed Chess receiver only in the protected beta package', () =>
     expect(existsSync(join(root, 'game-offer.js'))).toBe(false);
     expect(readFileSync(join(overlay, 'session.js'), 'utf8')).toContain('from "./game-offer.js"');
     expect(readFileSync(join(overlay, 'index.html'), 'utf8')).toContain('id="game-offer" hidden');
+});
+
+it('copies the full protected receiver into the beta build', async () => {
+    const repo = resolve(root, '..');
+    const build = mkdtempSync(join(tmpdir(), 'webjam-beta-assets-'));
+    try {
+        for (const path of ['scripts/package-pilot.cjs', 'r', 'assets', 'join', 'play', 'hangout-worker/arcade/VENDORED.txt', 'hangout-worker/web-join-chess']) {
+            cpSync(join(repo, path), join(build, path), { recursive: true });
+        }
+        const result = spawnSync(process.execPath, [join(build, 'scripts/package-pilot.cjs'), 'beta'], { encoding: 'utf8' });
+        expect(result.status, result.stderr).toBe(0);
+        for (const file of ['index.html', 'session.js', 'game-offer.js']) {
+            expect(readFileSync(join(build, '.beta-assets/join', file)))
+                .toEqual(readFileSync(join(repo, 'hangout-worker/web-join-chess', file)));
+        }
+        const path = join(build, '.beta-assets/join/game-offer.js');
+        const { bindGameOfferChannel, GAME_OFFER_LABEL } = await import(pathToFileURL(path).href);
+        const { window } = new JSDOM('<div hidden></div>');
+        try {
+            const root = window.document.querySelector('div');
+            const channel = new window.EventTarget();
+            channel.label = GAME_OFFER_LABEL;
+            expect(bindGameOfferChannel(channel, { root, authorized: () => true })).toBe(true);
+            channel.dispatchEvent(new window.MessageEvent('message', {
+                data: JSON.stringify({ game: 'chess', hostName: 'Band host', state: 'full' })
+            }));
+            expect(root.hidden).toBe(false);
+            expect(root.querySelector('p').textContent)
+                .toBe('This table is full. Stay in this room and ask your host for a new invite when a seat opens.');
+            const dismiss = root.querySelector('button');
+            expect(dismiss.textContent).toBe('Dismiss');
+            dismiss.click();
+            expect(root.hidden).toBe(true);
+            expect(root.textContent).toBe('');
+        } finally {
+            window.close();
+        }
+    } finally {
+        rmSync(build, { recursive: true, force: true });
+    }
 });
