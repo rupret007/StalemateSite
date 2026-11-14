@@ -69,7 +69,7 @@ export function mountArcadeChess(container, onMatch) {
     const squares = new Map();
     let scope, pendingTimer, clockTimer;
     let pending = false, canOpen = false, connection = 'connecting', connectionError;
-    let model = null, chess = null, selected = null, focused = 'e2';
+    let model = null, chess = null, selected = null, claimOptions, focused = 'e2';
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
     const client = createGameNightMatchClient({
         onMatch,
@@ -143,6 +143,7 @@ export function mountArcadeChess(container, onMatch) {
         }
         clearPending();
         if (next?.fen !== prior?.fen || !chess) chess = next ? new Chess(next.fen) : null;
+        if (next?.id !== prior?.id || next?.moves.length !== prior?.moves.length) claimOptions = undefined;
         model = frame.state; canOpen = frame.canOpen === true;
         receivedAt = performance.now(); deadlineSynced = false;
         connection = 'ready'; connectionError = undefined;
@@ -308,18 +309,25 @@ export function mountArcadeChess(container, onMatch) {
             control.disabled = pending || connection !== 'ready';
             control.hidden = action === 'leave' ? !seated
                 : action === 'accept-draw' || action === 'decline-draw' ? !offer
-                    : !active || action === 'offer-draw' && !!match.drawOffer || action === 'claim-draw' && model.seat !== match.turn;
+                    : !active || action === 'offer-draw' && !!match.drawOffer || action === 'claim-draw' && (model.seat !== match.turn || !availableClaims().length);
         }
         if (match && panel.open) { drawBoard(); drawClocks(); }
     }
 
-    function chooseClaim() {
+    function availableClaims() {
+        if (claimOptions) return claimOptions;
         const full = new Chess();
         for (const move of model.match.moves) full.move(move);
         const current = claimReason(full);
-        const entries = current ? [[current, () => send('claim-draw')]]
-            : intendedClaims(full).map(option => [`${option.san} · ${option.reason}`, () => send('claim-draw', { move: option.move })]);
-        showChoice('Claim a draw', entries.length ? 'Select a claim to send to the server.' : 'There is no claim available from this position.', entries);
+        claimOptions = current ? [{ reason: current }] : intendedClaims(full);
+        return claimOptions;
+    }
+
+    function chooseClaim() {
+        const entries = availableClaims().map(({ san, reason, move }) => [
+            san ? `${san} · ${reason}` : reason, () => send('claim-draw', move ? { move } : undefined)
+        ]);
+        if (entries.length) showChoice('Claim a draw', 'Select a claim to send to the server.', entries);
     }
 
     startRematch.addEventListener('click', () => send('start-rematch'));
