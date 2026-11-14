@@ -449,6 +449,8 @@ test('the host can cancel an unconfirmed Music invitation and retry with another
         await host.clock.install();
         const invite = host.getByRole('button', { name: 'Invite bandmate to Music' });
         const cancel = host.getByRole('button', { name: 'Cancel Music invite' });
+        const manual = host.getByRole('button', { name: 'Open manual sharing' });
+        const editor = host.getByRole('textbox', { name: 'WebJam invitation', exact: true });
         const status = await expectExposedInviteStatus(host, '[data-music-handoff-status]');
         async function choose(nick) {
             await invite.click();
@@ -460,6 +462,7 @@ test('the host can cancel an unconfirmed Music invitation and retry with another
         await expect(status).toContainText('If your browser asks to open WebJam, choose Open.');
         await expect(status).toContainText('start a hosted Music session');
         await expect(cancel).toBeInViewport({ ratio: 1 });
+        await expect(manual).toBeVisible();
         await host.screenshot({ path: testInfo.outputPath('music-invite-waiting-375.png') });
         await cancel.press('Enter');
         await expect(cancel).toBeHidden();
@@ -490,6 +493,7 @@ test('the host can cancel an unconfirmed Music invitation and retry with another
         await expect(second.locator('[data-music-invite]')).toContainText('MusicHost invited you to join Music');
         await expect(first.locator('[data-music-invite]')).toBeHidden();
         await expect(cancel).toBeHidden();
+        await expect(manual).toBeHidden();
         await expect(status).toHaveText('Waiting for Hang Out to confirm delivery…');
         await expect(invite).toBeDisabled();
         await host.waitForFunction(() => typeof window.releaseMusicResult === 'function');
@@ -507,6 +511,27 @@ test('the host can cancel an unconfirmed Music invitation and retry with another
         await expect(status).toContainText('Open Hang Out in the return tab’s browser profile and retry.');
         await expect(cancel).toBeHidden();
         await expect(invite).toBeEnabled();
+        await expect(manual).toBeVisible();
+        await manual.press('Enter');
+        await expect(editor).toBeFocused();
+        await expect(editor).toBeEmpty();
+        await expect(manual).toBeHidden();
+        await expect(status).toBeEmpty();
+
+        const abandonedRequest = await choose('FirstGuest');
+        await manual.press('Enter');
+        await expect(editor).toBeFocused();
+        await expect(invite).toBeEnabled();
+        const abandonedCallback = await host.evaluate(({ abandonedRequest, href }) => {
+            return new Promise(resolve => {
+                const channel = new BroadcastChannel(`webjam-music-${abandonedRequest}`);
+                channel.onmessage = ({ data }) => { channel.close(); resolve(data); };
+                channel.postMessage({ href });
+                window.setTimeout(() => { channel.close(); resolve(null); }, 250);
+            });
+        }, { abandonedRequest, href });
+        expect(abandonedCallback).toBeNull();
+        await expect(first.locator('[data-music-invite]')).toBeHidden();
     } finally { await f.close(); }
 });
 

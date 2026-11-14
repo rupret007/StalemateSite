@@ -3318,13 +3318,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             ? opener.button : $(host ? '[data-roomtools]' : '[data-text]');
         target.focus({ preventScroll: true });
     });
-    function showMusicHandoffStatus(message, canCancel = false) {
+    function showMusicHandoffStatus(message, { canCancel = false, canShareManually = canCancel } = {}) {
         const cancel = $('[data-music-handoff-cancel]');
-        if (!canCancel && document.activeElement === cancel
-            && currentJam() === pendingMusicHandoff?.room && amOp(pendingMusicHandoff.room)) {
+        const manual = $('[data-music-handoff-manual]');
+        const focused = document.activeElement;
+        const room = pendingMusicHandoff?.room || musicHandoffRecoveryRoom;
+        if (((!canCancel && focused === cancel) || (!canShareManually && focused === manual))
+            && room && currentJam() === room && amOp(room)) {
             $('[data-jam-invite-music]').focus({ preventScroll: true });
         }
         cancel.hidden = !canCancel;
+        manual.hidden = !canShareManually;
         $('[data-music-handoff-status]').textContent = message;
     }
     function closeMusicHandoff() {
@@ -3337,13 +3341,24 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     }
     function clearMusicHandoffRecovery() {
         if (!musicHandoffRecoveryRoom) return;
-        musicHandoffRecoveryRoom = null;
         showMusicHandoffStatus('');
+        musicHandoffRecoveryRoom = null;
     }
     $('[data-music-handoff-cancel]').addEventListener('click', () => {
         if (!pendingMusicHandoff || pendingMusicHandoff.submitted) return;
         closeMusicHandoff();
         toast('Music invite canceled in Hang Out. If WebJam still shows a confirmation, choose No.');
+    });
+    $('[data-music-handoff-manual]').addEventListener('click', event => {
+        const room = currentJam();
+        if (event.currentTarget.hidden || !room || !amOp(room) || pendingMusicHandoff?.submitted
+            || room !== (pendingMusicHandoff?.room || musicHandoffRecoveryRoom)) return;
+        const waiting = !!pendingMusicHandoff;
+        closeMusicHandoff();
+        clearMusicHandoffRecovery();
+        $('[data-jam-manual]').open = true;
+        $('[data-jam-link]').focus();
+        if (waiting) toast('Music invite canceled in Hang Out. If WebJam still shows a confirmation, choose No.');
     });
     function drawMusicInviteOutcome() {
         const output = $('[data-music-invite-outcome]');
@@ -3384,7 +3399,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 musicHandoffRecoveryRoom = room;
                 showMusicHandoffStatus(handoff.submitted
                     ? 'Hang Out did not confirm delivery. Check with your bandmate before sending another invitation.'
-                    : 'WebJam did not return an invitation. If WebJam didn’t open, open the WebJam beta app and start Music → Host, then retry. If your browser asks to open WebJam, choose Open. If the return tab opened in another browser profile, choose End browser invite in WebJam. Open Hang Out in the return tab’s browser profile and retry.');
+                    : 'WebJam did not return an invitation. If WebJam didn’t open, open the WebJam beta app and start Music → Host, then retry. If your browser asks to open WebJam, choose Open. If the return tab opened in another browser profile, choose End browser invite in WebJam. Open Hang Out in the return tab’s browser profile and retry.',
+                    { canShareManually: !handoff.submitted });
             }, 90000)
         };
         pendingMusicHandoff = handoff;
@@ -3405,7 +3421,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         document.body.append(launch);
         launch.click();
         launch.remove();
-        showMusicHandoffStatus('If your browser asks to open WebJam, choose Open. Confirm the invitation in WebJam. If WebJam doesn’t open, cancel here, open the WebJam beta app and start a hosted Music session, then try again.', true);
+        showMusicHandoffStatus('If your browser asks to open WebJam, choose Open. Confirm the invitation in WebJam. If WebJam doesn’t open, cancel here, open the WebJam beta app and start a hosted Music session, then try again.', { canCancel: true });
     }
     function sendInviteToPerson(context, error, music = false) {
         const current = store(app.active);
