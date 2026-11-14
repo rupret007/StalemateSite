@@ -583,7 +583,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         nicknameError.id = 'nickname-error';
         nicknameError.className = 'status';
         nicknameError.setAttribute('role', 'status');
-        nickInput.closest('label').after(nicknameError);
+        nickInput.closest('.nickrow').after(nicknameError);
     }
     nickInput.value = nickInput.value || readRemembered('hangout-nick') || ''; // blank by default; remembered on this device
     function clearNicknameError() {
