@@ -3,8 +3,8 @@ const socketErrors = { 4403: 'room', 4409: 'replaced', 4429: 'rate-limited' };
 
 export const matchConnectionErrors = Object.freeze({
     'sign-in': 'Sign in to the private beta again, then return to this room.',
-    'room': 'Return to your Game Night room and try again.',
     'replaced': 'This match is open in another tab. Continue there, or reload to play here.',
+    'room': 'Return to your Game Night room and try again.',
     'disabled': 'This game is unavailable in this room right now.',
     'rate-limited': 'This match reached a connection or activity limit. Try again later.'
 });
@@ -16,20 +16,55 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         ? '?game-guest=1' + (tableId ? '&table=' + tableId : '') : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
     let pausedForNetwork = false, terminalError = false, lastSeq = 0;
-    function reset(reconnecting = false) {
+    let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false;
+    let playing = false, wakeLock, pendingWakeLock = false;
+    async function updateWakeLock() {
+        if (!playing || document.hidden) {
+            const prior = wakeLock;
+            wakeLock = null;
+            if (prior) await prior.release().catch(() => {});
+            return;
+        }
+        if (!navigator.wakeLock || wakeLock || pendingWakeLock) return;
+        pendingWakeLock = true;
+        try {
+            const requested = await navigator.wakeLock.request('screen');
+            if (!playing || document.hidden) await requested.release();
+            else if (!requested.released) {
+                wakeLock = requested;
+                requested.addEventListener('release', () => {
+                    if (wakeLock === requested) wakeLock = null;
+                }, { once: true });
+            }
+        } catch { /* The browser can deny or lack screen wake locks. */ }
+        finally { pendingWakeLock = false; }
+    }
+    function setPlaying(active) {
+        playing = active;
+        void updateWakeLock();
+    }
+    function reset(reconnecting = false, failed = false) {
         generation++;
-        onMatch?.(scope, undefined, undefined, reconnecting);
+        onMatch?.(scope, undefined, undefined, reconnecting, undefined, failed);
         clearTimeout(reconnectTimer);
         clearTimeout(joinTimer);
         clearTimeout(claimTimer);
+        clearTimeout(pongTimer);
         controller?.abort();
         controller = null;
         const prior = socket;
         socket = null;
         if (prior && prior.readyState < WebSocket.CLOSING) prior.close(1000);
         ready = false;
+        supportsPing = false;
     }
-    function stop() { reset(); scope = null; pausedForNetwork = false; }
+    function stop() {
+        reset();
+        scope = null;
+        pausedForNetwork = false;
+        hiddenAt = undefined;
+        setPlaying(false);
+    }
     function send(frame) {
         if (!ready || socket?.readyState !== WebSocket.OPEN) return false;
         try { socket.send(JSON.stringify({ version: 1, ...frame })); return true; }
@@ -39,8 +74,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         if (attempt !== generation || !scope) return;
         if (!reason && navigator.onLine === false) return pauseForNetwork();
         if (reason || failures >= 3) {
-            reset();
+            reset(false, true);
             terminalError = !!reason;
+            setPlaying(false);
             onStatus('unavailable', reason);
             return;
         }
@@ -79,6 +115,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                 if (frame?.t === 'match-ready' && frame.version === 1) {
                     if (stateFrameType) return;
                     stateFrameType = frame.snapshots === true ? 'snapshot' : 'match-state';
+                    supportsPing = frame.ping === true;
                     ready = true;
                     let pass;
                     try { if (tableId) pass = localStorage.getItem('gn:pass:' + tableId); } catch { /* The session cookie can still admit this guest. */ }
@@ -92,10 +129,13 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     if (Number.isInteger(wait) && wait > 0 && wait <= 60000) {
                         claimTimer = setTimeout(() => send({ action: 'sync' }), wait);
                     }
+                    const match = frame.state?.match;
+                    setPlaying(!!match && !!frame.state.seat && frame.phase !== 'finished' && !match.result);
                     onState(frame);
                     if (attempt === generation) onMatch?.(scope, frame.state, send, false,
                         stateFrameType === 'snapshot' ? frame : undefined);
-                } else if (frame?.t === 'match-error') onError(frame.reason);
+                } else if (frame?.t === 'pong' && frame.nonce === pingNonce) clearTimeout(pongTimer);
+                else if (frame?.t === 'match-error') onError(frame.reason);
             });
         } catch {
             retry(attempt);
@@ -110,7 +150,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         onStatus('reconnecting');
     }
     function reconnect() {
-        if (!scope || terminalError || pausedForNetwork) return;
+        if (!scope || terminalError || pausedForNetwork || controller || (socket && !ready)) return;
         failures = 1;
         reset(true);
         void connect();
@@ -123,6 +163,16 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     });
     window.addEventListener('pageshow', event => {
         if (event.persisted) reconnect();
+    });
+    document.addEventListener('visibilitychange', () => {
+        void updateWakeLock();
+        if (document.hidden) { hiddenAt = Date.now(); return; }
+        const away = hiddenAt === undefined ? 0 : Date.now() - hiddenAt;
+        hiddenAt = undefined;
+        if (!scope || away <= 5000 || terminalError || pausedForNetwork || controller || !ready && socket) return;
+        clearTimeout(pongTimer);
+        if (!supportsPing || !send({ action: 'ping', nonce: ++pingNonce })) return reconnect();
+        pongTimer = setTimeout(reconnect, 1500);
     });
     return {
         start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; void connect(); },

@@ -1845,8 +1845,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (!scope || table.loading) return;
         table.loading = true;
         table.load().then(mount => {
-            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting, snapshot) =>
-                arcadeMatchState(game, table, room, state, sendMatch, reconnecting, snapshot));
+            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting, snapshot, failed) =>
+                arcadeMatchState(game, table, room, state, sendMatch, reconnecting, snapshot, failed));
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn--small arcade-invite-friend';
@@ -1897,8 +1897,17 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (table.inviteButton)
             table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
-    function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting, snapshot) {
+    function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting, snapshot, failed) {
+        const pendingInvite = arcadeInvitation?.game === game && arcadeInvitation.room === scope?.room && arcadeInvitation.ref === scope?.ref;
+        if (failed && pendingInvite && gameGuest && !gameGuestSeated) {
+            clearTimeout(arcadeInvitation.timer);
+            offerGameGuestReload('Couldn’t reconnect to your seat. Try again.');
+        }
         if (reconnecting) {
+            if (pendingInvite) {
+                arcadeInvitation.sent = false;
+                if (gameGuest && !gameGuestSeated) gateStatus('Reconnecting…');
+            }
             table.invite = null;
             updateTableInvite(table, currentGameNight());
             return;
