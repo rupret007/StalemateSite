@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import '/play/games/turdanoid-sprites-core.js';
 import { advanceBrickRacer, brickRaceWall, brickRacePaddle, brickRaceTick, BRICK_LIMIT_TICKS, BRICK_WIDTH, BRICK_HEIGHT } from '/play/games/turdanoid-race.js';
@@ -144,6 +145,9 @@ export function mountArcadeTurdanoid(container, onMatch) {
                 clearInputs();
                 if (confirm.open) confirm.close();
             } else if (state?.match) flights = flights.filter(flight => flight.sequence > state.match.runner.sequence);
+            if (!reconnecting && !changed && state?.seat && state.match?.runner?.run.score > model?.match?.runner?.run.score) {
+                gameNightCue('ta.brick');
+            }
             model = state;
             canOpen = host;
             receivedAt = performance.now();

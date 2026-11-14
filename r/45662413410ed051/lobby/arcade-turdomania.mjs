@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { POOP_KINDS, findGroup, popGroup } from '/play/games/turdomania-core.js';
 
@@ -182,6 +183,8 @@ export function mountArcadeTurdomania(container, onMatch) {
             } else if (!prediction || state.match?.players[state.seat]?.moves > prediction.move) {
                 clearPending();
             }
+            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
+                && state.match.players[state.seat]?.moves > model.match.players[state.seat]?.moves) gameNightCue('mania.blip');
             model = state;
             canOpen = host;
             connection = 'ready';

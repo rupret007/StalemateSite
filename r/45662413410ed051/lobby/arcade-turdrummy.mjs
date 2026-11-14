@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import '/play/games/turdrummy-rules.js';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
@@ -101,6 +102,8 @@ export function mountArcadeTurdRummy(container, onMatch) {
                 clearChoice();
                 error.textContent = '';
             }
+            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
+                && state.match.revision !== model.match.revision) gameNightCue(state.match.phase === 'discard' ? 'rummy.drawStock' : 'rummy.discard');
             model = state;
             canOpen = host;
             connection = 'ready';

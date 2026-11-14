@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { suggestSpadesBid } from '/play/games/turdspades-engine.js';
 
@@ -82,6 +83,12 @@ export function mountArcadeTurdSpades(container, onMatch) {
             if (state?.id !== model?.id || state?.match?.revision !== model?.match?.revision) {
                 closeConfirmation();
                 feedback.textContent = '';
+            }
+            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
+                && state.match.revision !== model.match.revision) {
+                if (state.match.phase === 'bid') gameNightCue('spades.bid');
+                else if (state.match.lastTrick?.map(card => card.id).join() !== model.match.lastTrick?.map(card => card.id).join()) gameNightCue('spades.trick');
+                else if (state.match.trick?.length !== model.match.trick?.length) gameNightCue('spades.card');
             }
             model = state;
             canOpen = host;

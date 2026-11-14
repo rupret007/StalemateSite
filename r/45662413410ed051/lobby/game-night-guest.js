@@ -1,4 +1,5 @@
 import { GAME_INVITE_UNAVAILABLE } from '/r/45662413410ed051/lobby/game-night.mjs';
+import { unlockGameNightAudio } from '/r/45662413410ed051/lobby/game-night-audio.mjs';
 
 const status = document.querySelector('[data-guest-status]');
 const invite = document.querySelector('[data-guest-invite]');
@@ -138,7 +139,8 @@ async function accept() {
     }
 }
 
-join.addEventListener('click', () => {
+join.addEventListener('click', event => {
+    unlockGameNightAudio(event);
     retainInvitation(gameTitle.textContent);
     void accept();
 });

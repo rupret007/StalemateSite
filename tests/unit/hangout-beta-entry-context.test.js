@@ -68,8 +68,8 @@ it('returns unavailable for an invitation replay after its guest session was rev
     expect(revokedPass.headers.has('Set-Cookie')).toBe(false);
 });
 
-it('serves the invitation copy module before admission only when guest invites are enabled', async () => {
-    const modulePath = root + 'lobby/game-night.mjs';
+it.each(['game-night.mjs', 'game-night-audio.mjs'])('serves %s before admission only when guest invites are enabled', async name => {
+    const modulePath = root + 'lobby/' + name;
     const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1', ASSETS: {
         fetch: vi.fn(async () => new Response('export const GAME_INVITE_UNAVAILABLE = "Invite unavailable.";'))
     } });
@@ -79,6 +79,7 @@ it('serves the invitation copy module before admission only when guest invites a
     expect(await response.text()).toContain('export const GAME_INVITE_UNAVAILABLE');
     expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
     expect((await betaFetch(request(root + 'lobby/lobby.js'), config)).status).toBe(401);
+    expect((await betaFetch(request('/play/assets/suite-sound.js'), config)).status).toBe(401);
     expect((await betaFetch(request(modulePath), { ...config, HANGOUT_GAME_NIGHT_GUESTS: '0' })).status).toBe(401);
     expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
 });
@@ -96,15 +97,15 @@ it.each(['details', 'accept'])('uses the shared copy on a guest %s 410', async o
     const { window } = dom;
     const copy = GAME_INVITE_UNAVAILABLE + ' (updated for this test)';
     try {
-        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE: copy };
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE: copy, unlockGameNightAudio: vi.fn() };
         window.TextEncoder = TextEncoder;
         Object.defineProperty(window.crypto, 'subtle', { value: crypto.subtle });
         window.fetch = vi.fn(async path => path.endsWith('/' + operation)
             ? Response.json({ error: 'Fixture server says the invitation expired.' }, { status: 410 })
             : Response.json({ game: 'Royal Flush Chess', host: 'Fixture host' }));
         // Supply a changed module export. An old literal in either client path must fail this check.
-        window.eval(client.replace(/^import \{ GAME_INVITE_UNAVAILABLE \} from '[^']+';/,
-            'const { GAME_INVITE_UNAVAILABLE } = sharedGameNight;'));
+        window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
+            'const { $1 } = sharedGameNight;'));
         const join = window.document.querySelector('[data-guest-join]');
         if (operation === 'accept') {
             await vi.waitFor(() => expect(join.closest('section').hidden).toBe(false));
@@ -336,7 +337,7 @@ describe('optional storage in the actual private beta client', () => {
                 };
                 window.eval(await bootstrap.text());
                 expect(window.HangoutEntrySites).toContainEqual({ id: 'makers', label: 'Makers' });
-                window.HangoutClientTestModules = { ...entryFunctions, gameNightReturnHint, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
+                window.HangoutClientTestModules = { ...entryFunctions, gameNightReturnHint, createEntrySharing, createIdleHeartbeat, createChatAnnouncements, mountGameNightSound: vi.fn(), unlockGameNightAudio: vi.fn() };
                 window.eval(discovery);
                 const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
                 window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);

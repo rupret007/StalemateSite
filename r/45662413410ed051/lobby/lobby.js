@@ -3,6 +3,7 @@
 import * as entrance from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
+import { mountGameNightSound, unlockGameNightAudio } from './game-night-audio.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
 import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
 (() => {
@@ -1644,13 +1645,15 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         button.setAttribute('aria-disabled', String(busy));
         $('[data-game-offer-dismiss]').disabled = busy;
     }
-    $('[data-game-offer-join]').addEventListener('click', () => {
+    if (betaShell) mountGameNightSound($('[data-game-sound]'), $('[data-game-night]'));
+    $('[data-game-offer-join]').addEventListener('click', event => {
         const offer = currentGameOffer();
         if (joiningGameRoom || connectionState !== 'connected' || sessionEnded || app.sharingStopped) return;
         if (!offer) {
             if (!gameNightSupported || !gameEntry || gameEntry.target) return;
             return openGameRoom(true);
         }
+        unlockGameNightAudio(event);
         if (!cmd('join', [offer.room], app.active, offer.ref)) {
             return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
         }
