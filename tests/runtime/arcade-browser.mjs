@@ -453,10 +453,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (phone) {
                     await host.getByRole('button', { name: 'Leave match', exact: true }).click();
                     await host.getByRole('dialog', { name: 'Leave match?' }).getByRole('button', { name: 'Leave match', exact: true }).click();
-                    await host.getByRole('button', { name: 'Open Chess match', exact: true }).click();
-                    await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+                    const reopen = host.getByRole('button', { name: 'Open Chess match', exact: true });
+                    await expect(reopen).toBeVisible();
+                    const waiting = guest.locator('[data-game-guest-connecting]');
+                    const waitingText = 'Waiting for the host to open the table. This link still works.';
                     await guest.reload();
-                    await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
+                    await expect(waiting.getByRole('status')).toHaveText(waitingText);
+                    const ticketPath = url => url.pathname === '/beta/arcade-ticket';
+                    await guest.route(ticketPath, route => route.fulfill({ status: 503 }));
+                    await guest.reload();
+                    const retry = waiting.getByRole('button', { name: 'Try again', exact: true });
+                    await expect(retry).toBeFocused();
+                    await expect(waiting.getByRole('status')).toHaveText('Couldn’t reconnect to your seat. Try again.');
+                    await guest.unroute(ticketPath);
+                    await retry.tap();
+                    await expect(waiting.getByRole('status')).toHaveText(waitingText);
+                    await reopen.click();
+                    await expect(waiting).toBeHidden();
                     await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                     await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                     await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();

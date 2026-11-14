@@ -12,9 +12,9 @@ export const matchConnectionErrors = Object.freeze({
 export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1' ? '?game-guest=1' : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
-    function reset() {
+    function reset(failed = false) {
         generation++;
-        onMatch?.(scope);
+        onMatch?.(scope, undefined, undefined, false, undefined, failed);
         clearTimeout(reconnectTimer);
         clearTimeout(joinTimer);
         clearTimeout(claimTimer);
@@ -33,8 +33,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     }
     function retry(attempt, reason) {
         if (attempt !== generation || !scope) return;
-        reset();
-        if (reason || failures >= 3) {
+        const failed = !!reason || failures >= 3;
+        reset(failed);
+        if (failed) {
             onStatus('unavailable', reason);
             return;
         }
