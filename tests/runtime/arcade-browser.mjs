@@ -2256,17 +2256,28 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         b.on('websocket', observeLaunch);
         if (media) {
-            let delayFirstAim = process.env.ARCADE_BRICK_LATE_AIM === '1';
+            const forceLateAim = process.env.ARCADE_BRICK_LATE_AIM === '1';
+            let delayFirstAim = forceLateAim;
             await b.routeWebSocket(/\/beta\/arcade-turdanoid-match$/, route => {
                 const server = route.connectToServer();
+                let waitingForRejection = false;
+                server.onMessage(message => {
+                    if (waitingForRejection && typeof message === 'string' && JSON.parse(message).reason === 'late-input') {
+                        waitingForRejection = false;
+                    }
+                    route.send(message);
+                });
                 route.onMessage(message => {
-                    if (typeof message === 'string' && JSON.parse(message).action === 'input') {
-                        const delay = delayFirstAim ? 520 : 220;
-                        setTimeout(() => {
-                            delayFirstAim = false;
-                            server.send(message);
-                        }, delay);
-                    } else server.send(message);
+                    const frame = typeof message === 'string' ? JSON.parse(message) : null;
+                    if (frame?.action !== 'input') return server.send(message);
+                    if (delayFirstAim && frame.inputs?.some(([, action]) => action === 'aim')) {
+                        delayFirstAim = false;
+                        waitingForRejection = true;
+                        setTimeout(() => server.send(message), 520);
+                    } else if (forceLateAim) {
+                        if (!waitingForRejection) server.send(message);
+                    }
+                    else setTimeout(() => server.send(message), 220);
                 });
             });
         }
@@ -2310,7 +2321,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(match(a)).toHaveAttribute('data-sequence', '0');
         }
         const x = field.x + field.width * .5, y = field.y + field.height * .85;
-        const prediction = media ? b.evaluate(async () => {
+        const prediction = media && process.env.ARCADE_BRICK_LATE_AIM !== '1' ? b.evaluate(async () => {
             const table = document.querySelector('[data-brick-match]');
             const start = performance.now();
             while (performance.now() - start < 400) {
