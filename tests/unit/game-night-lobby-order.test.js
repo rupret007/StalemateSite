@@ -66,6 +66,15 @@ describe('Game Night beta lobby lineup', () => {
         expect(rows.slice(0, 3)).toEqual(['chess', 'spades', 'brick']);
     });
 
+    it('keeps the remaining desktop games in lineup order while Chess is active', () => {
+        const css = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/arcade-chess.css'), 'utf8');
+        const grid = css.match(/grid-template:\s*("chess heading"[^;]+);/);
+        expect(grid, 'desktop Chess grid').toBeTruthy();
+        const gameRows = [...grid[1].matchAll(/"chess\s+(\w+)"/g)].map(match => match[1])
+            .filter(area => !['heading', 'actions', 'call'].includes(area));
+        expect(gameRows).toEqual(expectedDesktopGridRowAreas().filter(area => area !== 'chess'));
+    });
+
     it('repositions panels after mount so DOM follows GAME_NIGHT_LOBBY_ORDER', () => {
         const lobby = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.js'), 'utf8');
         expect(lobby).toContain('placeArcadePanelInLobbyOrder');
@@ -102,6 +111,29 @@ describe('placeArcadePanelInLobbyOrder', () => {
         }
 
         expect(panelOrder(container)).toEqual([...GAME_NIGHT_LOBBY_ORDER]);
+    });
+
+    it('does not remount an already ordered panel and interrupt its keyboard focus', () => {
+        const container = document.createElement('section');
+        document.body.append(container);
+        try {
+            const first = mountStub(container, 'chess');
+            const last = mountStub(container, 'turdrush');
+            const call = document.createElement('div');
+            call.className = 'game-call';
+            container.append(call);
+            const summary = document.createElement('summary');
+            summary.textContent = 'Royal Flush Chess';
+            first.append(summary);
+            summary.focus();
+            const insertBefore = vi.spyOn(container, 'insertBefore');
+            placeArcadePanelInLobbyOrder(container, first, 'chess');
+            placeArcadePanelInLobbyOrder(container, last, 'turdrush');
+            expect(insertBefore).not.toHaveBeenCalled();
+            expect(document.activeElement).toBe(summary);
+        } finally {
+            container.remove();
+        }
     });
 });
 
