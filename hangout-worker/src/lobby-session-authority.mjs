@@ -416,7 +416,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             return { status: 200, reason: 'registered' };
         }),
         revoke: body => transact(async tx => {
-            const record = await session(tx, body.sid); if (!record || record.exp <= now() || record.version !== body.version || body.exp > record.exp) return null;
+            const record = await session(tx, body.sid); if (!record || record.idleUntil !== undefined || record.exp <= now() || record.version !== body.version || body.exp > record.exp) return null;
             ensure(Number.isSafeInteger(record.closureRevision + 1));
             const attempt = Math.min(20, record.attempt + 1), changed = { ...record, revoked: true, pending: true, attempt, closureRevision: record.closureRevision + 1,
                 retryAt: Math.min(record.exp, now() + Math.min(3600000, INTERVAL * 2 ** (attempt - 1))) };
@@ -425,19 +425,19 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         }),
         confirmClosed: attempt => transact(async tx => {
             const record = await session(tx, attempt.sid);
-            if (record?.revoked && record.closureRevision === attempt.closureRevision) await tx.put(SESSION + record.sid, { ...record, pending: false });
+            if (record?.revoked && record.idleUntil === undefined && record.closureRevision === attempt.closureRevision) await tx.put(SESSION + record.sid, { ...record, pending: false });
         }),
         schedule: () => transact((tx, raw) => schedule(tx, raw, now())),
         due: () => transact(async tx => {
             const rows = await prune(tx, now()), due = [];
             for (const item of rows.entries) {
                 const record = await session(tx, item.sid, rows); ensure(record && record.exp === item.exp);
-                if (record.pending && record.retryAt <= now()) due.push(record);
+                if (record.idleUntil === undefined && record.pending && record.retryAt <= now()) due.push(record);
             }
             return due.sort((a, b) => a.retryAt - b.retryAt || a.sid.localeCompare(b.sid)).slice(0, BATCH);
         }),
         retry: sid => transact(async tx => {
-            const record = await session(tx, sid); if (!record?.pending || record.retryAt > now()) return null;
+            const record = await session(tx, sid); if (!record?.pending || record.idleUntil !== undefined || record.retryAt > now()) return null;
             ensure(Number.isSafeInteger(record.closureRevision + 1));
             const attempt = Math.min(20, record.attempt + 1), next = { ...record, attempt, closureRevision: record.closureRevision + 1,
                 retryAt: Math.min(record.exp, now() + Math.min(3600000, INTERVAL * 2 ** (attempt - 1))) };

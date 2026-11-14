@@ -44,6 +44,21 @@ class InspectBeta extends BetaSessions {
         if (!command || Object.keys(command).sort().join(',') !== 'phase' || typeof command.phase !== 'string') return denied();
         const phase = command.phase;
         if (phase === 'inspect') return Response.json(await this.inspect());
+        if (phase === 'seed-night') {
+            const createdAt = Date.now();
+            await this.nativeState.storage.put('session:' + LIVE, {
+                v: 1, sid: LIVE, version: '1', createdAt, exp: createdAt + 16 * 60 * 60_000, idleUntil: createdAt + 4 * 60 * 60_000,
+                revoked: false, pending: false, attempt: 0, retryAt: 0, rooms: []
+            });
+            return Response.json(await this.inspect());
+        }
+        if (phase === 'check-night' || phase === 'check-ordinary' || phase === 'revoke-night') {
+            const sid = phase === 'check-ordinary' ? SID : LIVE;
+            return super.fetch(new Request(phase === 'revoke-night' ? 'https://local-registry/revoke' : 'https://local-registry/check', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sid, version: '1', exp: Date.now() + 60_000 })
+            }));
+        }
         if (phase === 'seed-prune') return this.nativeState.blockConcurrencyWhile(async () => {
             const at = Date.now(), rows = [];
             for (let index = 0; index < 271; index++) {
@@ -75,7 +90,7 @@ export class LegacyBeta extends InspectBeta {}
 export default { async fetch(request, env) {
     if (!guarded(request, env) || request.method !== 'POST' || request.headers.get('Content-Type') !== 'application/json') return denied();
     const [binding, name] = new URL(request.url).pathname.slice(1).split('/');
-    if (!['SQLITE', 'LEGACY'].includes(binding) || !['budget', 'session', 'alarm', 'prune-register', 'prune-direct'].includes(name)) return denied();
+    if (!['SQLITE', 'LEGACY'].includes(binding) || !['budget', 'session', 'alarm', 'prune-register', 'prune-direct', 'forward-night'].includes(name)) return denied();
     const bytes = await request.arrayBuffer(); if (bytes.byteLength > 128) return denied();
     return env[binding].get(env[binding].idFromName(name)).fetch(new Request('https://local-fixture/', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Fixture-Nonce': env.FIXTURE_NONCE }, body: bytes

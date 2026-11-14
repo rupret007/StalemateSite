@@ -68,6 +68,19 @@ async function child(state, nonce) {
         };
         for (const backend of ['SQLITE', 'LEGACY']) {
             results[backend] = {};
+            const initialNight = await call(backend, 'forward-night', 'seed-night');
+            assert.equal(initialNight.status, 200);
+            assert.equal(initialNight.body.records.length, 1);
+            for (const phase of ['check-night', 'revoke-night']) {
+                assert.equal((await call(backend, 'forward-night', phase)).status, 403);
+                const unchanged = await call(backend, 'forward-night', 'inspect');
+                assert.equal(unchanged.body.objectId, initialNight.body.objectId);
+                assert.deepEqual(unchanged.body.records, initialNight.body.records);
+            }
+            assert.equal((await call(backend, 'forward-night', 'register')).status, 200);
+            assert.equal((await call(backend, 'forward-night', 'check-ordinary')).status, 200);
+            checks.push({ name: `${backend}-forward-night-record-remains-readable-without-admission-or-mutation`, pass: true });
+
             for (const name of ['budget', 'session', 'alarm']) {
                 const initial = await call(backend, name, 'seed-alarm'); assert.equal(initial.status, 200); assert.equal(initial.body.sqlite, backend === 'SQLITE');
                 const failed = await call(backend, name, `fail-${name}`); assert.deepEqual(failed, { status: 503, body: { reason: 'beta session registry unavailable' } });
