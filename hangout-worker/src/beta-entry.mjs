@@ -13,7 +13,7 @@ import { incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
 import { publicBetaHelp } from './beta-public-help.mjs';
 import { arcadeEnabled, arcadeGame, arcadePath, arcadeRoomRequest } from './arcade-transport.mjs';
 import { mediaEnabled, mediaPath } from './game-night-media.mjs';
-import { GAME_GUEST_PATH, GAME_INVITATION_PATH, gameGuestEnabled, gameGuestScope, gameGuestSessionRef } from './game-night-invitations.mjs';
+import { GAME_GUEST_PATH, GAME_INVITATION_PATH, GAME_INVITE_UNAVAILABLE, gameGuestEnabled, gameGuestScope, gameGuestSessionRef } from './game-night-invitations.mjs';
 import { GAME_ROOM_GRANT_PATH, gameRoomGrantsEnabled } from './game-night-room-grant-routes.mjs';
 import { validRoomGrantValue } from './game-night-room-grants.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
@@ -272,7 +272,7 @@ async function gameInvitation(request, env, path, body) {
     if (path === 'issue' && !session) return json({ error: 'Private invitation required.' }, 401);
     if (path !== 'issue') {
         const invitation = await readBeta('game-invitation', body.code, env.HANGOUT_HMAC_KEY);
-        if (!invitation) return json({ error: 'This invitation is invalid or has expired. Ask your host for a new invite.' }, 410);
+        if (!invitation) return json({ error: GAME_INVITE_UNAVAILABLE }, 410);
         body = { ...body, code: invitation.sid };
     }
     const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_INVITATION_PATH}/${path}`, {
@@ -360,6 +360,10 @@ async function betaRequest(request, env, deps = {}) {
         .replace('STALEMATE / INVITATION ONLY', 'HANG OUT / INVITATION ONLY')
         .replace('<script defer src="/beta/client.js">', '<script type="module" src="/beta/client.js">'), 200, 'text/html; charset=utf-8');
     if (url.pathname === '/beta/style.css') return reply(STYLE + GAME_GUEST_STYLE, 200, 'text/css');
+    if (url.pathname === LOBBY_PAGE + 'game-night.mjs' && gameGuestEnabled(env) && ['GET', 'HEAD'].includes(request.method)) {
+        const asset = await env.ASSETS.fetch(request);
+        return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript; charset=utf-8');
+    }
     if (url.pathname === GAME_GUEST_PATH || url.pathname === GAME_GUEST_PATH + '.js') {
         if (!gameGuestEnabled(env) || !['GET', 'HEAD'].includes(request.method)) return reply('Game invitations are unavailable.', 404);
         if (url.pathname === GAME_GUEST_PATH) return reply(request.method === 'HEAD' ? null : GAME_GUEST_ENTRANCE, 200, 'text/html; charset=utf-8');
