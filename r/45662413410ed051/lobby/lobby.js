@@ -27,7 +27,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (document.fullscreenElement === document.documentElement) await document.exitFullscreen();
                 else await document.documentElement.requestFullscreen();
             } catch {
-                toast('Full screen is unavailable here. Maximize this browser window to use more space.');
+                toast('Full screen is unavailable here. You can keep chatting in this window.');
             } finally { reflectFullscreen(); }
         });
     }
