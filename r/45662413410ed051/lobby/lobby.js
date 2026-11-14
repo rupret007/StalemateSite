@@ -2398,7 +2398,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (gameNightSupported) openGameRoom();
             return;
         }
-        count(`room-start-${kind}`); cmd('join', [`#${kind}-${slug()}`]);
+        const label = slug();
+        const code = kind === 'jam' ? crypto.randomUUID().replaceAll('-', '') : '';
+        // Distinct private rooms can share the same generated display words.
+        const suffix = code ? `-${code.slice(0, 4)}x${code.slice(4, 8)}` : '';
+        count(`room-start-${kind}`);
+        cmd('join', [`#${kind}-${label}${suffix}`]);
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
     $('[data-channel-dialog]').addEventListener('close', () => {
