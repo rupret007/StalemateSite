@@ -13,6 +13,9 @@ export const matchConnectionErrors = Object.freeze({
 // Shown in place of "Waiting for the host" when the table has a game this person cannot see.
 export const matchHiddenText = 'A game is under way at this table. You can’t see it right now.';
 
+// A guest opened an invite for a different table. This is not a hidden game.
+export const matchUnavailableText = 'This table isn\'t available from this invite. Ask the host for a fresh link.';
+
 // A match connection can be replaced without changing room, chat or call.
 export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch, onRematch }) {
     let shownMatch = null, rematchTimer;
@@ -20,7 +23,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1'
         ? '?game-guest=1' + (tableId ? '&table=' + tableId : '') : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
-    let pausedForNetwork = false, terminalError = false, lastSeq = 0, matchOpen = false;
+    let pausedForNetwork = false, terminalError = false, lastSeq = 0, matchOpen = false, matchUnavailable = false;
     let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false, waitingForPage = false;
     let playing = false, wakeLock, pendingWakeLock = false, retryWakeLock = false;
     async function updateWakeLock() {
@@ -149,8 +152,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     const match = frame.state?.match;
                     shownMatch = frame.state?.id ?? frame.currentMatchId ?? null;
                     clearTimeout(rematchTimer);
-                    // The server names a phase other than lobby when a game is open but hidden.
-                    matchOpen = !frame.state && typeof frame.phase === 'string' && frame.phase !== 'lobby';
+                    // playing/finished: a game is open but hidden. unavailable: wrong-table invite.
+                    matchUnavailable = !frame.state && frame.phase === 'unavailable';
+                    matchOpen = !frame.state && (frame.phase === 'playing' || frame.phase === 'finished');
                     setPlaying(!!match && !!frame.state.seat && frame.phase !== 'finished' && !match.result);
                     onState(frame);
                     if (attempt === generation) onMatch?.(scope, frame.state, send, false,
@@ -205,9 +209,10 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         pongTimer = setTimeout(reconnect, 1500);
     });
     return {
-        start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; matchOpen = false; shownMatch = null; void connect(); },
+        start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; matchOpen = false; matchUnavailable = false; shownMatch = null; void connect(); },
         stop,
         matchOpen: () => matchOpen,
+        matchUnavailable: () => matchUnavailable,
         send
     };
 }

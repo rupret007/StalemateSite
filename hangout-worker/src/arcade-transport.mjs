@@ -208,11 +208,13 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 view.disconnectedSeats = subjects.filter(subject => !online.has(subject)).map(subject => game.seat(subject));
                 view.canStartRematch = game.host === binding.betaSid && binding.canOpen;
             }
-            const hidden = view ? undefined : hiddenMatch(game, binding, recipient);
+            const shown = view ? undefined : hiddenMatch(game, binding, recipient);
             const { hidden: _stale, ...kept } = recipient;
-            // reconcile() has no table in hand, so it reads the open match from here.
+            // reconcile() has no table in hand. Keep the redacted match when this
+            // viewer is blocked, or the next wake replays a lobby snapshot.
+            const remembered = shown ?? (game?.openMatch ? hiddenMatch(game) : undefined);
             try { socket.serializeAttachment({ ...kept, subjects: permitted ? subjects : [],
-                playerId: binding.betaSid, seat, seq, ...(permitted && game?.openMatch ? { hidden: hiddenMatch(game) } : {}) }); }
+                playerId: binding.betaSid, seat, seq, ...(remembered ? { hidden: remembered } : {}) }); }
             catch { close(socket, 1011, 'match connection unavailable'); continue; }
             const invitation = binding.gameGuest;
             if (view?.waiting) {
@@ -231,7 +233,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             if (view && nextMatch) send(socket, { t: 'rematch', matchId: nextMatch });
             const reopenMode = PartnerTable && permitted && game?.closed && game.subjects.length > 1
                 && binding.canOpen && game.host === binding.betaSid ? game.mode ?? 'four' : undefined;
-            sendView(socket, recipient, view, binding.canOpen, seq, seat, reopenMode, hidden);
+            sendView(socket, recipient, view, binding.canOpen, seq, seat, reopenMode, shown);
         }
     }
     async function receive(socket, raw) {
@@ -267,8 +269,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             if (!canView(game, binding, scope)) {
                 const attachment = socket.deserializeAttachment();
                 if (frame.action === 'sync' && attachment.snapshot) {
-                    socket.serializeAttachment({ ...attachment, subjects: [], playerId: subject, seat: null, seq });
-                    sendView(socket, attachment, null, false, seq, null, undefined, hiddenMatch(game, binding, scope));
+                    const hidden = hiddenMatch(game, binding, scope);
+                    const { hidden: _stale, ...kept } = attachment;
+                    socket.serializeAttachment({ ...kept, subjects: [], playerId: subject, seat: null, seq, ...(hidden ? { hidden } : {}) });
+                    sendView(socket, attachment, null, false, seq, null, undefined, hidden);
                     return;
                 }
                 return send(socket, { t: 'match-error', reason: 'unavailable' });
@@ -375,9 +379,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             if (!binding) close(ws, 4403, 'room membership ended');
             else if (scope.subjects?.some(subject => !binding.canSee(subject) &&
                 !(scope.seat && binding.isPresent?.(subject) === false))) {
-                try { ws.serializeAttachment({ ...scope, subjects: [], seat: null }); }
+                const hidden = scope.hidden;
+                try { ws.serializeAttachment({ ...scope, subjects: [], seat: null, ...(hidden ? { hidden } : {}) }); }
                 catch { close(ws, 1011, 'match connection unavailable'); continue; }
-                sendView(ws, scope, null, false, scope.seq ?? 0, null, undefined, scope.hidden);
+                sendView(ws, scope, null, false, scope.seq ?? 0, null, undefined, hidden);
             }
         }
     }
