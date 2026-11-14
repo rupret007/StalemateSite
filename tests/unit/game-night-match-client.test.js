@@ -128,6 +128,40 @@ describe('Game Night phone wake and history recovery', () => {
             expect(source.slice(hidden, waiting)).toContain('matchHiddenText');
         });
 
+    it('keeps trying to reconnect with a capped wait while the page is visible', async () => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const delays = [];
+        const timeout = vi.spyOn(globalThis, 'setTimeout');
+        for (let attempt = 0; attempt < 12; attempt++) {
+            const before = sockets.length;
+            timeout.mockClear();
+            sockets.at(-1).dispatchEvent(new CloseEvent('close', { code: 1006 }));
+            expect(status).toHaveBeenLastCalledWith('reconnecting');
+            delays.push(timeout.mock.calls.at(-1)[1]);
+            await vi.advanceTimersByTimeAsync(delays.at(-1));
+            expect(sockets).toHaveLength(before + 1);
+        }
+        expect(status).not.toHaveBeenCalledWith('unavailable', undefined);
+        expect(Math.max(...delays)).toBeLessThanOrEqual(10_000);
+        expect(delays.at(-1)).toBeGreaterThanOrEqual(7_500);
+        expect(delays[0]).toBeLessThan(1_000);
+    });
+
+    it('waits while the page is hidden and reconnects when it is shown again', async () => {
+        visibility(true);
+        sockets[0].dispatchEvent(new CloseEvent('close', { code: 1006 }));
+        await vi.advanceTimersByTimeAsync(3_000);
+        expect(sockets).toHaveLength(1);
+        expect(issue).toHaveBeenCalledTimes(1);
+        visibility(false);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(sockets).toHaveLength(2);
+    });
+
     function matchState(state) {
         sockets.at(-1).dispatchEvent(new MessageEvent('message', {
             data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state })

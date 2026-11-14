@@ -1,5 +1,6 @@
 const requestErrors = { 401: 'sign-in', 403: 'room', 404: 'disabled', 429: 'rate-limited' };
 const socketErrors = { 4403: 'room', 4409: 'replaced', 4429: 'rate-limited' };
+const RECONNECT_CAP = 10_000;
 
 export const matchConnectionErrors = Object.freeze({
     'sign-in': 'Sign in to the private beta again, then return to this room.',
@@ -19,7 +20,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         ? '?game-guest=1' + (tableId ? '&table=' + tableId : '') : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
     let pausedForNetwork = false, terminalError = false, lastSeq = 0, matchOpen = false;
-    let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false;
+    let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false, waitingForPage = false;
     let playing = false, wakeLock, pendingWakeLock = false, retryWakeLock = false;
     async function updateWakeLock() {
         if (!playing || document.hidden) {
@@ -54,6 +55,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     }
     function reset(reconnecting = false, failed = false) {
         generation++;
+        waitingForPage = false;
         onMatch?.(scope, undefined, undefined, reconnecting, undefined, failed);
         clearTimeout(reconnectTimer);
         clearTimeout(joinTimer);
@@ -82,16 +84,20 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     function retry(attempt, reason) {
         if (attempt !== generation || !scope) return;
         if (!reason && navigator.onLine === false) return pauseForNetwork();
-        if (reason || failures >= 3) {
+        if (reason) {
             reset(false, true);
-            terminalError = !!reason;
+            terminalError = true;
             setPlaying(false);
             onStatus('unavailable', reason);
             return;
         }
+        // An ordinary drop is never final: keep trying while the page is on screen.
         reset(true);
         onStatus('reconnecting');
-        reconnectTimer = setTimeout(connect, 400 * 2 ** failures++ * (0.75 + Math.random() / 2));
+        if (document.hidden) { waitingForPage = true; return; }
+        const wait = Math.min(RECONNECT_CAP, 400 * 2 ** failures * (0.75 + Math.random() / 2));
+        failures = Math.min(failures + 1, 8);
+        reconnectTimer = setTimeout(connect, wait);
     }
     async function connect() {
         if (!scope || controller || socket) return;
@@ -181,6 +187,8 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         if (document.hidden) { hiddenAt = Date.now(); return; }
         const away = hiddenAt === undefined ? 0 : Date.now() - hiddenAt;
         hiddenAt = undefined;
+        // A drop while the page was hidden waited here instead of spending retries.
+        if (waitingForPage) return reconnect();
         if (!scope || away <= 5000 || terminalError || pausedForNetwork || controller || !ready && socket) return;
         clearTimeout(pongTimer);
         if (!supportsPing || !send({ action: 'ping', nonce: ++pingNonce })) return reconnect();
