@@ -175,3 +175,18 @@ for (const cached of [false, true]) {
         expect(errors).toEqual([]);
     });
 }
+
+test('keyboard entry hands focus to the lobby channel after a first join', async ({ page, baseURL, browserName }, testInfo) => {
+    await page.setViewportSize(browserName === 'webkit' ? { width: 390, height: 844 } : { width: 1440, height: 900 });
+    await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
+    const relay = hangoutRelayWsBase(baseURL, `first-chat-focus-${randomUUID()}`);
+    await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+    const nickname = page.getByRole('textbox', { name: 'Your nick' });
+    await nickname.fill('ReadyGuest');
+    await nickname.press('Enter');
+    const lobby = page.getByRole('tab', { name: '#stalemate', exact: true });
+    await expect(lobby).toBeFocused({ timeout: 3000 });
+    await expect(lobby).toHaveAttribute('aria-selected', 'true');
+    await expect(lobby).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: testInfo.outputPath('first-chat-focus.png') });
+});
