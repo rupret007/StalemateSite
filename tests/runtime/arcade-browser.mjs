@@ -534,8 +534,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(join).toBeEnabled();
                 await captureArcadeInvite(friend, viewport, 'guest-retry-01-error');
                 if (!phone) await expect(join).toBeFocused();
+                const requests = [];
+                const acceptPath = url => url.pathname === '/beta/game-night/invitation/accept';
+                friend.on('request', request => {
+                    if (acceptPath(new URL(request.url()))) requests.push(request.postDataJSON().attempt);
+                });
+                await friend.route(acceptPath, async route => {
+                    const response = await route.fetch();
+                    try {
+                        assert.equal(response.status(), 200, 'the Worker committed the first acceptance');
+                        await route.abort();
+                    } finally { await response.dispose(); }
+                }, { times: 1 });
                 await activate();
                 await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                assert.ok(requests.length === 2 && requests[0] === requests[1], 'one tap retries the committed acceptance once with the original attempt');
                 await captureArcadeInvite(friend, viewport, 'guest-retry-02-seated');
                 await friend.locator('[data-leave]').click();
                 await expect(friend.locator('[data-game-night]')).toBeHidden();
@@ -972,13 +985,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await route.abort();
                 }, { times: 1 });
                 await (phone ? joinGame.tap() : joinGame.click());
-                await expect(friend.locator('[data-guest-status]')).toHaveText('Couldn’t join just now. Try again.');
-                assert.equal(firstStatus, 200, 'the server accepted the invitation before its response was dropped');
-                await captureArcadeInvite(friend, viewport, step('03b-join-response-interrupted'));
-                await friend.context().clearCookies();
-                await friend.reload({ waitUntil: 'commit' });
                 await expect(friend.locator('[data-chess-status]')).toContainText('You’re Black');
-                assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'reload recovers the same accepted attempt');
+                assert.equal(firstStatus, 200, 'the server accepted the invitation before its response was dropped');
+                assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'one Join recovers the same accepted attempt');
+                await captureArcadeInvite(friend, viewport, step('03b-join-response-recovered'));
                 assert.ok(await friend.evaluate(() => !history.state?.gameNightInvite), 'the seated page retains no invitation state');
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');

@@ -12,16 +12,18 @@ async function rummyWithoutStorage(page, url, touch) {
     });
     await page.goto(url);
     await activate(page.locator('#startRoundBtn'), touch);
-    if (await page.locator('#coachSkipBtn').isVisible()) await activate(page.locator('#coachSkipBtn'), touch);
-    await expect(page.locator('#drawStockBtn')).toBeEnabled();
-    await activate(page.locator('#drawStockBtn'), touch);
+    const draw = page.locator('#drawStockBtn');
+    // The first-round coach is optional and can disappear when the opening layout settles.
+    // Exercise gameplay directly so this check also proves the coach does not block the draw.
+    await expect(draw).toBeEnabled();
+    await activate(draw, touch);
     await expect(page.locator('#playerHand [data-hand-id]')).toHaveCount(11);
     await activate(page.locator('#playerHand button[data-card-id]:visible').first(), touch);
     await activate(page.locator('#discardBtn'), touch);
     await expect(page.locator('#playerHand [data-hand-id]')).toHaveCount(10);
     const hard = page.locator('.suite-difficulty-btn[data-level="hard"]');
     // On phones the existing Table menu contains the difficulty controls.
-    if (!await hard.isVisible()) await activate(page.locator('.mobile-settings summary'), touch);
+    if (!await hard.isVisible()) await activate(page.getByText('Table menu', { exact: true }), touch);
     await activate(hard, touch);
     await expect(page.locator('.suite-difficulty-btn[data-level="hard"]')).toHaveAttribute('aria-pressed', 'true');
     expect(errors).toEqual([]);
