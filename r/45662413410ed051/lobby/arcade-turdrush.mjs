@@ -13,6 +13,7 @@ const markup = `
 <p class="small arcade-card-error" data-race-error role="status"></p>
 <div class="arcade-card-actions rush-race-actions">
     <button class="btn btn--small" type="button" data-race-main hidden></button>
+    <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
     <button class="btn btn--small btn--ghost" type="button" data-race-leave hidden>Leave race</button>
 </div>
 <div data-card-table data-race-match hidden>
@@ -249,6 +250,8 @@ export function mountArcadeTurdRush(container, onMatch) {
         if (!match.result) raf = requestAnimationFrame(drawFrame);
     }
 
+    const startRematch = $('[data-start-rematch]');
+
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
@@ -270,8 +273,13 @@ export function mountArcadeTurdRush(container, onMatch) {
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turd Rush rematch' : 'Request Turd Rush rematch'; }
             if (seat && seat === model.rematch) message += ' · Rematch requested';
         } else if (match) message = !seat ? 'Watching both runners' : 'Swipe or use arrows to move, jump and slide.';
+        if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
+            message += ` · Waiting for ${'your rival'}, link still works.`;
+        }
         put(status, message);
         status.classList.toggle('rush-race-playing', !!match && !result);
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = !!pending;
         main.hidden = !action;
         main.dataset.command = action;
         put(main, label);
@@ -284,6 +292,7 @@ export function mountArcadeTurdRush(container, onMatch) {
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
     }
 
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
     leave.addEventListener('click', () => {
         put($('[data-race-confirm-text]'), model?.waiting ? 'The open seat will close.' : 'Leaving forfeits your race.');

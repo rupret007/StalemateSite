@@ -23,6 +23,7 @@ const markup = `
 <p class="small arcade-card-status" data-rummy-status role="status"></p>
 <p class="small arcade-card-error" data-rummy-error role="status"></p>
 <button class="btn" type="button" data-rummy-main hidden></button>
+    <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
 <div data-card-table data-rummy-table hidden>
     <div class="arcade-card-score" aria-label="Match scores">
         <span data-rummy-score="a"></span><span data-rummy-score="b"></span>
@@ -164,6 +165,8 @@ export function mountArcadeTurdRummy(container, onMatch) {
         if (next.length !== old.size || next.some((button, index) => hand.children[index] !== button)) hand.replaceChildren(...next);
     }
 
+    const startRematch = $('[data-start-rematch]');
+
     function draw() {
         const seat = model?.seat, match = model?.match;
         const name = value => value === seat ? 'You' : side[value];
@@ -196,7 +199,12 @@ export function mountArcadeTurdRummy(container, onMatch) {
             const turn = match.turn === seat ? (match.phase === 'draw' ? 'Draw a card' : 'Choose your discard') : name(match.turn) + ' to play';
             message = `Round ${match.round} · ${turn}`;
         }
+        if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
+            message += ` · Waiting for ${model.disconnectedSeats.map(value => side[value]).join(', ')}, link still works.`;
+        }
         if (status.textContent !== message) status.textContent = message;
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = !!pending;
         main.hidden = !command;
         main.textContent = label;
         main.dataset.command = command;
@@ -239,6 +247,7 @@ export function mountArcadeTurdRummy(container, onMatch) {
         selected = selected === card ? null : card;
         draw();
     });
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => {
         if (main.dataset.command === 'retry') client.start(scope);
         else if (main.dataset.command) send(main.dataset.command);

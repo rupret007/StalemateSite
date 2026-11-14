@@ -38,7 +38,7 @@ function fixture() {
         current: scope => actors.get(scope.actor), active: async () => true, approve: async () => true,
         charge: async () => true, allowed: () => true });
     const send = (socket, action, fields = {}) => transport.receive(socket, JSON.stringify({ version: 1, action, ...fields }));
-    const board = socket => socket.frames.findLast(frame => frame.t === 'match-state')?.state;
+    const board = socket => socket.frames.findLast(frame => frame.t === 'match-state' || frame.t === 'snapshot')?.state;
     const start = async () => {
         await send(a, 'open');
         const { id } = board(b);
@@ -221,38 +221,127 @@ describe('Game Night match transport', () => {
         expect(f.board(f.b)).toMatchObject({ id, seat: 'b', waiting: false });
     });
 
-    it('lets an admitted guest join a replacement table from the same host only', async () => {
+    it('offers a replacement to an unseated guest only if the same host has room', async () => {
         const f = fixture();
-        const { id } = await f.start();
+        await f.send(f.a, 'open');
+        const { id } = f.board(f.a);
         const binding = f.actors.get(guest);
-        const invitation = { room, ref, host: sid, match: id, game: 'chess' };
-        binding.gameGuest = invitation;
+        binding.gameGuest = { room, ref, host: sid, match: id, game: 'chess' };
         await f.send(f.a, 'leave', { id });
         await f.send(f.a, 'open');
         const replacement = f.board(f.a).id;
-        expect(replacement).not.toBe(id);
-
-        for (const mismatch of [{ host: 'another-host' }, { ref: '9'.repeat(32) }, { room: '#game-418f99x990041' }, { game: 'turdspades' }]) {
-            binding.gameGuest = { ...invitation, ...mismatch };
-            await f.send(f.b, 'sync');
-            expect(f.board(f.b)).not.toHaveProperty('replacementAvailable');
-            await f.send(f.b, 'join', { id: replacement, seat: 'next' });
-            expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
-        }
-        binding.gameGuest = invitation;
-        await f.send(f.b, 'sync');
-        expect(f.board(f.b)).toMatchObject({ id: replacement, waiting: true, replacementAvailable: true });
+        expect(f.board(f.b)).toMatchObject({ id: replacement, replacementAvailable: true, hasOpenSeat: true });
         const scope = { room, ref, host: sid, match: replacement };
         expect(await f.transport.reserveGuestSeat(scope, 'another-guest', 61000, 'invite', {})).toBe(true);
-        await f.send(f.b, 'sync');
-        expect(f.board(f.b).hasOpenSeat).toBe(false);
+        expect(f.board(f.b)).toMatchObject({ id: replacement, hasOpenSeat: false });
         expect(f.board(f.b)).not.toHaveProperty('replacementAvailable');
-        await f.send(f.b, 'join', { id: replacement, seat: 'next' });
-        expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
         await f.transport.releaseGuestClaim(scope, 'another-guest');
-        expect(f.board(f.b)).toMatchObject({ id: replacement, waiting: true, replacementAvailable: true });
+        expect(f.board(f.b)).toMatchObject({ id: replacement, replacementAvailable: true, hasOpenSeat: true });
         await f.send(f.b, 'join', { id: replacement, seat: 'next' });
         expect(f.board(f.b)).toMatchObject({ id: replacement, seat: 'b', waiting: false });
+    });
+
+    it('preserves the table identity and roster when the host reopens, and makes a duplicate join idempotent', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        const invitation = { room, ref, host: sid, match: id, tableId: id, game: 'chess' };
+        f.actors.get(guest).gameGuest = invitation;
+        await f.send(f.b, undefined, { t: 'hello', lastSeq: 0 });
+        await f.send(f.a, 'leave', { id });
+        expect(f.b.frames.at(-1)).toMatchObject({
+            t: 'snapshot', phase: 'lobby', currentMatchId: null, yourSeat: 'b', turn: null, state: null
+        });
+        await f.send(f.a, 'open');
+        const replacement = f.board(f.a).id;
+        expect(replacement).not.toBe(id);
+        expect(f.b.frames.at(-1)).toMatchObject({
+            t: 'snapshot', currentMatchId: replacement, yourSeat: 'b', state: { tableId: id, seat: 'b', waiting: false }
+        });
+        expect(f.b.deserializeAttachment()).toMatchObject({ playerId: 'seat-black', seat: 'b' });
+        const before = f.storage.put.mock.calls.length;
+        await f.send(f.b, 'join', { id, seat: 'next' });
+        expect(f.b.frames.at(-1).t).toBe('snapshot');
+        expect(f.storage.put.mock.calls).toHaveLength(before);
+
+        f.actors.get(guest).gameGuest = { ...invitation, host: 'different-host' };
+        await f.send(f.b, undefined, { t: 'hello', lastSeq: 0 });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'snapshot', state: null, yourSeat: null });
+        await f.send(f.b, 'move', { id: replacement, revision: 0, move: 'e7e5' });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'match-error', reason: 'unavailable' });
+        expect(f.storage.put.mock.calls).toHaveLength(before);
+    });
+
+    it('returns an authoritative snapshot and starts a rematch with a closed phone on the roster', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        await f.send(f.b, 'resign', { id, revision: 0 });
+        f.b.readyState = 3;
+        const host = f.actors.get(actor);
+        host.canSee = subject => subject === sid;
+        host.isPresent = subject => subject === sid;
+        f.transport.reconcile();
+        await f.send(f.a, 'rematch', { id });
+        const rematch = f.a.frames.findLast(frame => frame.t === 'rematch');
+        expect(rematch?.matchId).toBeTruthy();
+        expect(rematch.matchId).not.toBe(id);
+        expect(f.board(f.a)).toMatchObject({ tableId: id, seat: 'w', disconnectedSeats: ['b'] });
+
+        f.b.readyState = 1;
+        await f.send(f.b, undefined, { t: 'hello', lastSeq: 1 });
+        expect(f.b.frames.at(-1)).toMatchObject({
+            t: 'snapshot', seq: expect.any(Number), phase: 'playing', currentMatchId: rematch.matchId,
+            yourSeat: 'b', turn: 'w', state: { tableId: id, disconnectedSeats: [] }
+        });
+    });
+
+    it('starts a requested rematch when the unready phone disconnects', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        await f.send(f.b, 'resign', { id, revision: 0 });
+        await f.send(f.a, 'rematch', { id });
+        expect(f.board(f.a)).toMatchObject({ id, rematch: 'w' });
+        const closed = f.b.deserializeAttachment();
+        f.b.readyState = 3;
+        await f.transport.presenceChanged(closed);
+        const rematch = f.a.frames.findLast(frame => frame.t === 'rematch');
+        expect(rematch?.matchId).not.toBe(id);
+        expect(f.board(f.a)).toMatchObject({ id: rematch.matchId, tableId: id, seat: 'w', disconnectedSeats: ['b'] });
+    });
+
+    it('starts a ready rematch if a replacement phone socket closes before its first snapshot', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        await f.send(f.b, 'resign', { id, revision: 0 });
+        await f.send(f.a, 'rematch', { id });
+
+        const oldSocket = f.b.deserializeAttachment();
+        const { seat: _seat, subjects: _subjects, ...attachment } = oldSocket;
+        f.b.serializeAttachment(attachment);
+        await f.transport.presenceChanged({ ...oldSocket, retired: true });
+        expect(f.board(f.a)).toMatchObject({ id, rematch: 'w', disconnectedSeats: [] });
+
+        f.b.readyState = 3;
+        await f.transport.presenceChanged(attachment);
+        const rematch = f.a.frames.findLast(frame => frame.t === 'rematch');
+        expect(rematch?.matchId).toBeTruthy();
+        expect(f.board(f.a)).toMatchObject({ id: rematch.matchId, seat: 'w', disconnectedSeats: ['b'] });
+
+        f.b.readyState = 1;
+        await f.send(f.b, undefined, { t: 'hello', lastSeq: 0 });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'snapshot', currentMatchId: rematch.matchId, yourSeat: 'b' });
+    });
+
+    it('only lets the table host start a rematch before the other seat is ready', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        await f.send(f.b, 'resign', { id, revision: 0 });
+        await f.send(f.b, 'start-rematch', { id });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'match-error', reason: 'rematch-unavailable' });
+        expect(f.board(f.a).id).toBe(id);
+        await f.send(f.a, 'start-rematch', { id });
+        const rematch = f.b.frames.findLast(frame => frame.t === 'rematch');
+        expect(rematch?.matchId).toBeTruthy();
+        expect(f.board(f.b)).toMatchObject({ id: rematch.matchId, tableId: id, seat: 'b' });
     });
 
     it('expires a room grant before opening a socket', async () => {

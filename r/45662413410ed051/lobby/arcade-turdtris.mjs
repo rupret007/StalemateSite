@@ -18,6 +18,7 @@ const markup = `
 <p class="small arcade-card-error" data-tris-error role="status"></p>
 <div class="arcade-card-actions tris-actions">
     <button class="btn btn--small" type="button" data-tris-main hidden></button>
+    <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
     <button class="btn btn--small btn--ghost" type="button" data-tris-leave hidden>Leave race</button>
 </div>
 <div data-card-table data-tris-match hidden>
@@ -214,6 +215,8 @@ export function mountArcadeTurdtris(container, onMatch) {
         if (!match.result) raf = requestAnimationFrame(drawFrame);
     }
 
+    const startRematch = $('[data-start-rematch]');
+
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
@@ -238,7 +241,12 @@ export function mountArcadeTurdtris(container, onMatch) {
             message = !seat ? 'Watching the race' : match.self.board.status === 'top-out' ? 'Your board topped out. Opponent still playing.'
                 : match.self.board.status === 'cleared' ? '40 lines cleared. Confirming the finish…' : 'Race to 40';
         }
+        if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
+            message += ' · Waiting for your opponent, link still works.';
+        }
         if (message !== status.textContent) status.textContent = message;
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = !!pending;
         main.hidden = !action;
         main.dataset.command = action;
         main.textContent = label;
@@ -251,6 +259,7 @@ export function mountArcadeTurdtris(container, onMatch) {
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
     }
 
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
     leave.addEventListener('click', () => {
         $('[data-tris-confirm-text]').textContent = model?.waiting ? 'The open seat will close.' : 'Leaving forfeits your race.';

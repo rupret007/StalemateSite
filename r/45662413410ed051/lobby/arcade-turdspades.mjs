@@ -21,6 +21,7 @@ const markup = `
 <div class="arcade-card-actions">
     <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>
     <button class="btn btn--small" type="button" data-spades-main hidden></button>
+    <button class="btn btn--small btn--ghost" type="button" data-spades-start-rematch hidden>Start now</button>
 </div>
 <div class="arcade-card-actions" data-spades-seats hidden></div>
 <div data-card-table data-spades-table hidden>
@@ -167,11 +168,14 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (next.length !== old.size || next.some((button, index) => hand.children[index] !== button)) hand.replaceChildren(...next);
     }
 
+    const startRematch = $('[data-spades-start-rematch]');
+
     function draw() {
         const match = model?.match, seat = model?.seat, occupied = model?.occupied || [];
         const paired = model?.mode === 'partners', people = paired ? 2 : 4;
         const computer = position => paired && ['north', 'east'].includes(position);
         const nameFor = position => names[position] + (computer(position) ? ' (CPU)' : '');
+        const away = model?.disconnectedSeats ?? [];
         const teams = paired ? ['South + North CPU', 'West + East CPU'] : partnerships;
         let command = '', label = '', message = 'Connecting to the table…';
         if (connection === 'unavailable') {
@@ -190,7 +194,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
             message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
             if (seat) {
                 const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
-                message += ` ${votes.length}/${people} ready for a rematch.`;
+                const ready = votes.filter(vote => !away.includes(vote)).length;
+                message += ` ${ready}/${occupied.length - away.length} ready for a rematch.`;
                 if (!votes.includes(seat)) { command = 'rematch'; label = votes.length ? 'Accept Spades rematch' : 'Request Spades rematch'; }
             }
         } else if (match?.roundResult) {
@@ -215,6 +220,11 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
             }
         }
+        if (connection === 'ready' && seat && match && away.length) {
+            message += ` · Waiting for ${away.map(nameFor).join(', ')}, link still works.`;
+        }
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = pending;
         if (status.textContent !== message) status.textContent = message;
         main.hidden = !command;
         main.textContent = label;
@@ -278,6 +288,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         const button = event.target.closest('[data-spades-card]');
         if (button && !button.disabled) send('play', { card: Number(button.dataset.spadesCard) });
     });
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => {
         const action = main.dataset.command;
         if (action === 'retry') client.start(scope);
