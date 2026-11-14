@@ -51,6 +51,24 @@ async function visitor(features = { messageResults: 1, privateMessageContext: 1,
     return { window, ws, $, timers, sockets, flush, welcome, join, input, submit, result, rows, action };
 }
 
+it('keeps the IRC command palette open until a retry sends the command', async () => {
+    const f = await visitor();
+    const dialog = f.$('[data-palette]');
+    const sent = f.ws.send.bind(f.ws);
+    f.ws.send = vi.fn().mockImplementationOnce(() => { throw new Error('Closed during send'); }).mockImplementation(sent);
+    f.$('[data-palette-open]').click();
+    const help = [...dialog.querySelectorAll('button')].find(button => button.textContent === '/help');
+    help.focus();
+    help.click();
+    expect(dialog.open).toBe(true);
+    expect(f.window.document.activeElement).toBe(help);
+    expect(dialog.querySelector('[data-palette-status]').textContent).toContain('Couldn’t send that command');
+    expect(f.ws.sent.filter(frame => frame.name === 'help')).toHaveLength(0);
+    help.click();
+    expect(dialog.open).toBe(false);
+    expect(f.ws.sent.filter(frame => frame.name === 'help')).toHaveLength(1);
+});
+
 describe('bounded tab-only composer recovery', () => {
     it('keeps a pending copy until its own committed result, ignoring unrelated notices and tokens', async () => {
         const f = await visitor(), frame = f.submit('One exact local copy');
