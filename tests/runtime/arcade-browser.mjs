@@ -350,6 +350,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const guest = await context.newPage();
                 guest.setDefaultTimeout(10000);
                 guest.on('pageerror', error => errors.push(`First visit: ${error.message}`));
+                await guest.addInitScript(() => {
+                    window.gameNightWakeLocks = { acquired: 0, released: 0 };
+                    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: {
+                        async request(type) {
+                            if (type !== 'screen') throw Error('Unexpected wake lock type');
+                            window.gameNightWakeLocks.acquired++;
+                            const lock = new EventTarget();
+                            lock.release = async () => {
+                                window.gameNightWakeLocks.released++;
+                                lock.dispatchEvent(new Event('release'));
+                            };
+                            return lock;
+                        }
+                    } });
+                });
                 assert.equal((await context.cookies()).length, 0, 'guest starts with an empty browser profile');
                 const unconfirmed = await context.request.post(origin + '/beta/game-night/invitation/accept', {
                     headers: { Origin: origin }, data: { code: new URLSearchParams(link.hash.slice(1)).get('invite'), age13: false }
@@ -358,6 +373,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 assert.equal((await context.cookies()).length, 0, 'an unconfirmed invitation grants no access');
                 await openGameNightLink(guest, link);
                 await expect(guest.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
+                assert.deepEqual(await guest.evaluate(() => window.gameNightWakeLocks), { acquired: 0, released: 0 });
                 await expect(guest.getByText('LinkHost invited you to play.')).toBeVisible();
                 await expect(guest.getByRole('textbox')).toHaveCount(0);
                 await expect(guest.getByRole('button')).toHaveCount(1);
@@ -435,6 +451,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                await expect.poll(() => guest.evaluate(() => window.gameNightWakeLocks)).toEqual({ acquired: 1, released: 0 });
                 await captureArcadeInvite(guest, viewport, 'first-visit-02-seated');
                 const leaveMatch = guest.getByRole('button', { name: 'Leave match', exact: true });
                 await expectUncoveredControl(leaveMatch);
@@ -597,6 +614,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (!phone) await guest.getByRole('button', { name: 'Retry closing invitation', exact: true }).click();
                 await expect.poll(async () => (await context.request.get(origin + '/beta/state?game-guest=1')).status()).toBe(401);
                 await expect(guest.locator('[data-session-reason]')).toHaveText('You left Game Night. Ask your host for a fresh invitation.');
+                await expect.poll(() => guest.evaluate(() => {
+                    const { acquired, released } = window.gameNightWakeLocks;
+                    return acquired > 0 && acquired === released;
+                })).toBe(true);
                 await captureArcadeInvite(guest, viewport, 'first-visit-04-left');
                 await guest.reload();
                 await expect(guest.locator('[data-game-night]')).toHaveCount(0);
