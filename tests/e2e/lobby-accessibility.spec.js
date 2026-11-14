@@ -719,8 +719,8 @@ for (const width of [375, 390]) {
         } finally { await arrival?.close(); await visitor.close(); await host.close(); }
     });
 
-    test(`room directory explains why there are no results at ${width}px`, async ({ browser, baseURL }) => {
-        const relay = hangoutRelayWsBase(baseURL, `directory-results-${randomUUID()}`), viewport = { width, height: 667 };
+    test(`room directory explains why there are no results at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        const relay = hangoutRelayWsBase(baseURL, `directory-results-${randomUUID()}`), viewport = { width, height: width === 390 ? 844 : 667 };
         const host = await guest(browser, baseURL, 'SearchHost', viewport, relay);
         const visitor = await guest(browser, baseURL, 'SearchGuest', viewport, relay);
         try {
@@ -733,15 +733,25 @@ for (const width of [375, 390]) {
             await expect(card).toBeVisible();
             await expect(empty).toBeHidden();
             const search = visitor.page.getByRole('searchbox', { name: 'Find a room', exact: true });
+            const results = visitor.page.locator('[data-room-search-status]');
+            await expect(results).toHaveAttribute('role', 'status');
+            await expect(results).toBeEmpty();
             await search.fill('missing-room');
+            await expect(search).toBeFocused();
+            await expect(results).toHaveText('No rooms match your search. Try another name or clear the search.');
+            await visitor.page.screenshot({ path: testInfo.outputPath('room-search-no-matches.png') });
             await expect(empty).toBeVisible();
             await expect(empty).toHaveText('No rooms match your search. Try another name or clear the search.');
             await search.fill('');
+            await expect(results).toHaveText('1 room shown.');
+            await expect(search).toBeFocused();
             const filter = visitor.page.getByRole('combobox', { name: 'Room directory', exact: true });
             await filter.selectOption('registered');
             await expect(empty).toBeVisible();
             await expect(empty).toHaveText('No registered rooms to show.');
+            await expect(results).toHaveText('No registered rooms to show.');
             await filter.selectOption('active');
+            await expect(results).toHaveText('1 room shown.');
             await expect(card).toBeVisible();
             await expect(empty).toBeHidden();
             await filter.selectOption('registered');
