@@ -1744,7 +1744,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const wasVisible = currentGameOffer() === offer;
         if (joiningGameRoom === offer.room) joiningGameRoom = '';
         forgetGameRoom(offer.room);
-        if (wasVisible) toast('That invitation expired. Ask your host to send another.');
+        if (wasVisible) toast('That invitation expired. Ask your host to send another.', [], `room-invite-expired:${offer.room}`);
     }
     function forgetGameRoom(name) {
         const removed = gameInvites.delete(name);
@@ -1807,6 +1807,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             updateOfferStatus(status, visible, '');
             if (hadFocus) focusChannelTab(app.active);
             return;
+        }
+        if (offer?.request && toastKind === `room-invite-expired:${offer.room}`) {
+            if (toastRegion.contains(document.activeElement)) focusChannelTab(app.active);
+            dismissToast();
         }
         const jam = jamRoomName(offer?.room);
         const roomLabel = jam ? offer.room : 'Game Night';
