@@ -5,7 +5,7 @@ import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { mountGameNightSound, unlockGameNightAudio } from './game-night-audio.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName, placeArcadePanelInLobbyOrder, webJamRoomName } from './game-night.mjs';
+import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName, placeArcadePanelInLobbyOrder, watchWaitingText, webJamRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -2072,7 +2072,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             clearTimeout(invite.timer);
             gameGuestReloadOffered = false;
             $('[data-game-guest-retry]').hidden = true;
-            gateStatus('Waiting for the table to become visible. This link still works.');
+            gateStatus(watchWaitingText);
             return;
         }
         const canSeeReplacement = gameGuest && state?.replacementAvailable === true;
