@@ -1682,7 +1682,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-jam-invite-room]').hidden = true;
         $('[data-jam-invite-music]').hidden = true;
         $('[data-jam-wait]').hidden = false;
-        const web = $('[data-jam-web]'); web.disabled = true; web.onclick = null; web.textContent = 'Browser join unavailable';
+        const web = $('[data-jam-web]'); web.hidden = true; web.disabled = true; web.onclick = null;
     }
     function browserInviteDeadline(link) {
         const hashAt = link.indexOf('#');
@@ -2063,10 +2063,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const wait = $('[data-jam-wait]'), web = $('[data-jam-web]');
         const copy = $('[data-jam-invite-copy]'), qr = $('[data-jam-invite-qr-toggle]');
         const manualCopy = $('[data-jam-invite-copy-value]');
-        wait.hidden = shared && !expired;
-        const guidance = expired ? next.host
-            ? 'Browser invite expired. Copy a fresh browser invite from WebJam and share it here.'
-            : 'Browser invite expired. Ask your host for a fresh invite here.' : jamWaitingCopy;
+        wait.hidden = !!browserLink;
+        let guidance = jamWaitingCopy;
+        if (expired) {
+            guidance = next.host
+                ? 'Browser invite expired. Copy a fresh browser invite from WebJam and share it here.'
+                : 'Browser invite expired. Ask your host for a fresh invite here.';
+        } else if (next.invitation && !browserLink) {
+            guidance = next.host
+                ? 'Desktop invite shared. Send a browser invite to guests joining without the app.'
+                : 'Your host shared a desktop invite. Ask for a browser invite to join without the app.';
+        }
         if (wait.textContent !== guidance) wait.textContent = guidance;
         copy.hidden = qr.hidden = !browserLink;
         if (!browserLink) {
@@ -2078,11 +2085,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             qr.textContent = 'Show QR code';
         } else if (!$('[data-jam-invite-qr-panel]').hidden) drawJamInviteQr(browserLink);
         web.disabled = !browserLink;
-        web.classList.toggle('btn--ghost', web.disabled);
-        web.hidden = expired;
-        web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser';
-        web.title = web.disabled ? 'Your host has not shared an approved browser invite yet'
-            : 'Open the host’s browser invitation to listen or join with a microphone';
+        web.hidden = !browserLink;
+        if (browserLink) {
+            web.classList.remove('btn--ghost');
+            web.textContent = 'Join in browser';
+            web.title = 'Open the host’s browser invitation to listen or join with a microphone';
+        }
         const context = jamContext;
         web.onclick = () => {
             if (jamContext !== context || currentJam() !== context.room) return;
@@ -2090,7 +2098,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (link) window.open(link, '_blank', 'noopener,noreferrer');
             else drawJam();
         };
-        if (expired && [web, copy, qr, manualCopy].includes(focused)) wait.focus({ preventScroll: true });
+        if (!browserLink && [web, copy, qr, manualCopy].includes(focused)) wait.focus({ preventScroll: true });
         else if (browserLink && focused === wait) web.focus({ preventScroll: true });
         if (browserLink && deadline > now) {
             jamInviteExpiryTimer = setTimeout(() => {

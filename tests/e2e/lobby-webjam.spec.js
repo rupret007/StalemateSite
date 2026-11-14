@@ -876,6 +876,9 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(host.locator('[data-jam-copy]')).toBeVisible();
         await expect(host.locator('[data-jam-host-steps]')).toBeHidden();
         await expect(guest.locator('[data-jam-copy]')).toBeVisible();
+        await expect(guest.locator('[data-jam-web]')).toBeHidden();
+        await expect(guest.getByRole('status').filter({ hasText: 'Your host shared a desktop invite.' }))
+            .toContainText('Ask for a browser invite to join without the app.');
         await paste(host, ` \n${WEB_INVITE}\n `);
         await expect(host.locator('[data-jam-web]')).toBeEnabled();
         await expect(guest.locator('[data-jam-web]')).toBeEnabled();
