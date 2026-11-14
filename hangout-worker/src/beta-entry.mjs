@@ -58,11 +58,12 @@ const WEB_JOIN_ENTRANCE = `<!doctype html>
 </main>
 </body>
 </html>`;
+const WEBJAM_GUEST_PATH = '/beta/game-night/webjam-guest';
 const GAME_GUEST_ENTRANCE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Game Night invitation</title><link rel="stylesheet" href="/beta/style.css"><script type="module" src="${GAME_GUEST_PATH}.js"></script></head>
 <body><main class="game-invitation"><p class="eyebrow">PRIVATE GAME NIGHT</p><h1 data-guest-game>Game Night</h1>
-<p class="lede" data-guest-inviter hidden></p><p data-guest-status role="status">Checking your invitation…</p>
+<p class="lede" data-guest-inviter hidden></p><p id="guest-invitation-status" data-guest-status role="status">Checking your invitation…</p>
 <section data-guest-invite aria-label="Accept the invitation" hidden>
 <p id="guest-agreement">By joining, you confirm you’re 13+ and agree to the house rules.</p>
 <button type="button" aria-describedby="guest-agreement" data-guest-join>Join game</button>
@@ -364,9 +365,15 @@ async function betaRequest(request, env, deps = {}) {
         const asset = await env.ASSETS.fetch(request);
         return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript; charset=utf-8');
     }
-    if (url.pathname === GAME_GUEST_PATH || url.pathname === GAME_GUEST_PATH + '.js') {
-        if (!gameGuestEnabled(env) || !['GET', 'HEAD'].includes(request.method)) return reply('Game invitations are unavailable.', 404);
-        if (url.pathname === GAME_GUEST_PATH) return reply(request.method === 'HEAD' ? null : GAME_GUEST_ENTRANCE, 200, 'text/html; charset=utf-8');
+    const webJamGuest = url.pathname === WEBJAM_GUEST_PATH;
+    if (webJamGuest || url.pathname === GAME_GUEST_PATH || url.pathname === GAME_GUEST_PATH + '.js') {
+        if (!(webJamGuest ? gameRoomGrantsEnabled(env) : gameGuestEnabled(env)) || !['GET', 'HEAD'].includes(request.method)) {
+            return reply('Game invitations are unavailable.', 404);
+        }
+        if (webJamGuest || url.pathname === GAME_GUEST_PATH) {
+            const page = webJamGuest ? GAME_GUEST_ENTRANCE.replace('<main ', '<main data-webjam-guest ') : GAME_GUEST_ENTRANCE;
+            return reply(request.method === 'HEAD' ? null : page, 200, 'text/html; charset=utf-8');
+        }
         const asset = await env.ASSETS.fetch(new Request(`${url.origin}${LOBBY_PAGE}game-night-guest.js`));
         return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript');
     }
