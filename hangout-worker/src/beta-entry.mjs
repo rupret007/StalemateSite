@@ -276,10 +276,13 @@ async function gameInvitation(request, env, path, body) {
         body = { ...body, code: invitation.sid };
     }
     const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_INVITATION_PATH}/${path}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true } })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true, exp: session.access.exp } })
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
-    if (path === 'issue' && response.ok) return json({ code: await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY) });
+    if (path === 'issue' && response.ok) {
+        const code = await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY);
+        return json({ code, until: data.until, inviteExpiresAt: data.until });
+    }
     if (path !== 'accept' || !response.ok) return json(data, response.status);
     return gameGuestAccess(request, env, data);
 }
@@ -320,7 +323,7 @@ async function gameRoomGrant(request, env, operation, body) {
     if (operation === 'register' && !session) return json({ error: 'Private invitation required.' }, 401);
     const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_ROOM_GRANT_PATH}/${operation}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body, session: session && { betaSid: session.access.sid } })
+        body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true, exp: session.access.exp } })
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
     if (operation !== 'redeem' || !response.ok) return json(data, response.status);

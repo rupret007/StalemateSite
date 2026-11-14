@@ -2642,7 +2642,12 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             const sharePrimary = canShare || preferEmail || copyGuestLink.hidden;
             copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
             shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
-            guestLinkStatus.textContent = 'One guest can use this invitation within 20 minutes.';
+            const expiresAt = value.inviteExpiresAt ?? value.until;
+            guestLinkStatus.textContent = Number.isSafeInteger(expiresAt) && expiresAt > 0 && expiresAt <= 8.64e15
+                ? `One guest can use this invitation. Expires ${new Intl.DateTimeFormat(undefined, {
+                    dateStyle: 'medium', timeStyle: 'short'
+                }).format(expiresAt)}.`
+                : 'One guest can use this invitation.';
             if (deliver && await deliverPreparedLink(request)) return;
             if (pendingGuestLink !== request) return;
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();

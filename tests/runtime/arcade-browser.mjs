@@ -601,10 +601,20 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const open = host.getByRole('button', { name: 'Open Chess match', exact: true });
                 await expect(open).toBeVisible();
                 assert.equal(issues, 0, 'the host opens a waiting match before preparing its invitation');
+                const deadline = Date.UTC(2031, 3, 6, 18, 15);
+                await host.route('**/beta/game-night/invitation/issue', async route => {
+                    const response = await route.fetch();
+                    await route.fulfill({ response, json: { ...(await response.json()), inviteExpiresAt: deadline } });
+                }, { times: 1 });
                 await open.click();
                 const share = host.getByRole('button', { name: webShare ? 'Share invite' : 'Email invite', exact: true });
                 await expect(share).toBeFocused();
                 await expect(share).toBeEnabled();
+                const localized = await host.evaluate(expires => new Intl.DateTimeFormat(undefined, {
+                    dateStyle: 'medium', timeStyle: 'short'
+                }).format(expires), deadline);
+                await expect(host.locator('[data-game-invite-link-status]'))
+                    .toHaveText(`One guest can use this invitation. Expires ${localized}.`);
                 await expect(host.getByRole('button', { name: 'Copy invite', exact: true })).toBeVisible();
                 assert.equal(issues, 1, 'the WebJam handoff prepares exactly one invitation');
                 assert.equal(await host.evaluate(() => window.testGameShares), 0, 'table readiness never invokes Web Share');
