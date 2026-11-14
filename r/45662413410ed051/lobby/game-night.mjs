@@ -19,6 +19,8 @@ export function newGameNightRoomName() {
     return `#game-${code.slice(0, 6)}x${code.slice(6, 12)}`;
 }
 
+export const watchWaitingText = 'Waiting for the table to become visible. You can stay here.';
+
 export const gameNightLabels = Object.freeze({
     chess: 'Royal Flush Chess', crapeights: 'Crappy Eights', turdrummy: 'TurdRummy', turdspades: 'TurdSpades',
     turdjack: 'Crapjack 21', turdtris: 'Turdtris Sprint', turdomania: 'Turdomania Duel',

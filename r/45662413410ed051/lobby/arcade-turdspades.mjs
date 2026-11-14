@@ -1,5 +1,6 @@
 import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors, matchHiddenText, matchUnavailableText } from './game-night-match-client.mjs';
+import { watchWaitingText } from './game-night.mjs';
 import { suggestSpadesBid } from '/play/games/turdspades-engine.js';
 
 const seats = ['south', 'west', 'north', 'east'];
@@ -197,7 +198,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         } else if (!model && client.matchUnavailable()) {
             message = matchUnavailableText;
         } else if (!model && client.matchOpen()) {
-            message = matchHiddenText;
+            message = window.HangoutBootstrap?.gameGuest?.watch === true ? watchWaitingText : matchHiddenText;
         } else if (!model) {
             message = canOpen ? (partnersSupported ? 'Play with one friend and a CPU partner on each team, or fill all four seats with friends.'
                 : 'Open a partnership table for four players.') : 'Waiting for the host to open a table.';

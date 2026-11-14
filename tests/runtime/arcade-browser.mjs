@@ -3221,11 +3221,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const eastUrl = new URL(players[3].url());
         await players[3].goto('about:blank');
         await expect(page.locator('[data-spades-status]')).toHaveText(
-            'A game is under way at this table. You can’t see it right now.');
+            'Waiting for the table to become visible. You can stay here.');
         await expect(page.locator('[data-spades-table]')).toBeHidden();
         await page.reload();
         await expect(page.locator('[data-game-guest-connecting] [role="status"]')).toHaveText(
-            'Waiting for the table to become visible. This link still works.');
+            'Waiting for the table to become visible. You can stay here.');
         await players[3].goto(origin + eastUrl.pathname + eastUrl.search);
         await expect(players[3].locator('[data-spades-card]')).toHaveCount(13);
         await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
