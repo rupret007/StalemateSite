@@ -239,7 +239,7 @@ function validState(value) {
         && typeof value.emailConfigured === 'boolean' && typeof value.staffConfigured === 'boolean'
         && (value.kind !== 'staff' || ['owner', 'band', 'moderator'].includes(value.role));
 }
-async function draw({ refocusInvitation = false } = {}) {
+async function draw({ refocusInvitation = false, recoveringAccess = false } = {}) {
     if (leavingUnconfirmed) return;
     const attempt = begin('check');
     if (!attempt) return;
@@ -247,7 +247,10 @@ async function draw({ refocusInvitation = false } = {}) {
         const response = await accessRequest('/beta/state');
         if (attempt !== currentAttempt) return;
         if (response.status === 401) {
-            finish(attempt, 'invitation', 'A private invitation is required.');
+            const message = recoveringAccess && code.value
+                ? 'Your invitation code is still here. Submit it again to continue.'
+                : 'A private invitation is required.';
+            finish(attempt, 'invitation', message);
             if (refocusInvitation && [document.body, retry, retryLeave, logout?.querySelector('button')].includes(document.activeElement)) code.focus();
             return;
         }
@@ -297,7 +300,7 @@ code.addEventListener('input', () => {
 });
 $('#unlock').addEventListener('submit', event => { event.preventDefault(); unlock(code.value); });
 logout?.addEventListener('submit', event => { event.preventDefault(); leave(); });
-retry.addEventListener('click', () => draw({ refocusInvitation: true }));
+retry.addEventListener('click', () => draw({ refocusInvitation: true, recoveringAccess: true }));
 retryLeave?.addEventListener('click', leave);
 if (webJoinEntry) {
     // The music capability belongs to the audio client. Leave it in the tab's
