@@ -861,7 +861,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const context = await browser.newContext({ viewport: phone, hasTouch: true, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
         const friend = await context.newPage();
         friend.on('pageerror', error => errors.push(`Spades partners: ${error.message}`));
+        const matchView = watchCardMatch(friend, 'turdspades');
         const sounds = [];
+        const completed = () => Object.values(matchView().match.tricks).reduce((sum, count) => sum + count, 0);
         await friend.exposeFunction('recordSpadesSound', event => { sounds.push(event); });
         await friend.route('**/play/assets/suite-sound.js', async route => {
             const response = await route.fetch();
@@ -923,6 +925,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             const players = [host, friend], remaining = [13, 13];
             await expect(friend.locator('[data-spades-trick]')).toContainText(/West \(you\) · Bid (?:Nil|\d+) · 0 tricks/);
             let checkedUnavailableCard = false;
+            let tricksAtReload;
             for (let play = 0; play < 26; play++) {
                 let turn;
                 await expect.poll(async () => {
@@ -951,14 +954,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     for (const total of totals) assert.match(total, /\/250 · \d+ bags/);
                 }
                 if (play === 5) {
+                    tricksAtReload = completed();
+                    await expect.poll(() => sounds.filter(event => event === 'spades.trick').length).toBe(tricksAtReload);
                     await friend.reload();
                     await expect(cards(friend)).toHaveCount(remaining[1]);
+                    // Resume the new document's audio through a trusted interaction.
+                    await friend.locator('details.arcade-spades > summary').tap();
+                    await friend.locator('details.arcade-spades > summary').tap();
                 }
             }
             assert.ok(checkedUnavailableCard, 'the scored round exercises a card that cannot follow suit');
-            await expect.poll(() => sounds.filter(event => event === 'spades.trick').length,
-                { message: 'distinct completed tricks each use the trick cue' }).toBeGreaterThan(1);
             for (const page of players) await expect(table(page)).toHaveAttribute('data-phase', 'round-end');
+            assert.ok(tricksAtReload > 0 && tricksAtReload < 13);
+            assert.equal(completed(), 13);
+            await expect.poll(() => sounds.filter(event => event === 'spades.trick').length,
+                { message: 'each completed trick uses exactly one cue across the reload' }).toBe(completed());
             assert.deepEqual(await host.locator('[data-spades-score]').allTextContents(), await friend.locator('[data-spades-score]').allTextContents());
             await friend.locator('[data-spades-action="resign"]').click();
             await friend.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
