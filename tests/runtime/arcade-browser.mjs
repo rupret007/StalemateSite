@@ -332,6 +332,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
             const link = await shareGameNightLink(host, viewport, 'first-visit-00-host-share');
             const inviteFromTable = host.locator('.arcade-chess').getByRole('button', { name: 'Invite a friend', exact: true });
+            if (phone) {
+                await expect(inviteFromTable).toBeVisible();
+                await host.evaluate(() => window.dispatchEvent(new Event('offline')));
+                await expect(host.locator('[data-chess-status]')).toContainText('Reconnecting');
+                await expect(inviteFromTable).toBeHidden();
+                await host.evaluate(() => window.dispatchEvent(new Event('online')));
+                await expect(inviteFromTable).toBeVisible();
+            }
             await inviteFromTable.click();
             const picker = host.getByRole('dialog', { name: 'Invite a guest' });
             await expect(picker.getByRole('button', { name: 'Invite a friend to Royal Flush Chess' })).toBeFocused();
@@ -468,11 +476,109 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         assert.equal(requests, 1, 'coming online restores the seat with one ticket');
 
                         const restored = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
-                        await guest.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+                        const restoreTickets = await guest.evaluate(() => {
+                            const now = Date.now, fetch = window.fetch;
+                            let tickets = 0;
+                            window.fetch = (...args) => {
+                                if (new URL(args[0], location.href).pathname === '/beta/arcade-ticket') tickets++;
+                                return fetch(...args);
+                            };
+                            try {
+                                Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+                                document.dispatchEvent(new Event('visibilitychange'));
+                                Date.now = () => now() + 120_000;
+                                Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+                                window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+                                document.dispatchEvent(new Event('visibilitychange'));
+                                return tickets;
+                            } finally {
+                                Date.now = now;
+                                delete document.hidden;
+                                window.fetch = fetch;
+                            }
+                        });
+                        assert.equal(restoreTickets, 1, 'history and foreground events share one in-flight ticket');
                         await restored;
                         await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                         await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
                         assert.equal(requests, 2, 'a restored history entry refreshes the match once');
+                        await guest.evaluate(() => {
+                            window.simulateMatchWake = (dropPing, away = 120_000, restoreAfterWake = false) => {
+                                const now = Date.now, hiddenAt = now();
+                                const send = WebSocket.prototype.send;
+                                let probes = 0;
+                                try {
+                                    Date.now = () => hiddenAt;
+                                    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+                                    document.dispatchEvent(new Event('visibilitychange'));
+                                    Date.now = () => hiddenAt + away;
+                                    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+                                    WebSocket.prototype.send = function (raw) {
+                                        if (typeof raw === 'string' && JSON.parse(raw).action === 'ping') {
+                                            probes++;
+                                            if (dropPing) return;
+                                            this.addEventListener('message', function recordPong(event) {
+                                                if (JSON.parse(event.data).t !== 'pong') return;
+                                                window.receivedMatchPong = true;
+                                                this.removeEventListener('message', recordPong);
+                                            });
+                                        }
+                                        return send.call(this, raw);
+                                    };
+                                    document.dispatchEvent(new Event('visibilitychange'));
+                                    if (restoreAfterWake) window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+                                    return probes;
+                                } finally {
+                                    WebSocket.prototype.send = send;
+                                    Date.now = now;
+                                    delete document.hidden;
+                                }
+                            };
+                        });
+                        assert.equal(await guest.evaluate(() => window.simulateMatchWake(false, 5000)), 0, 'five seconds hidden needs no probe');
+                        assert.equal(await guest.evaluate(() => window.simulateMatchWake(false, 5001)), 1, 'just over five seconds sends one probe');
+                        await guest.waitForFunction(() => window.receivedMatchPong);
+                        assert.equal(requests, 2, 'a healthy match answers the foreground probe without a new ticket');
+                        const refreshed = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        await guest.evaluate(() => window.simulateMatchWake(true));
+                        await refreshed;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                        assert.equal(requests, 3, 'a missing pong triggers one new match connection');
+
+                        let legacyReady = 0;
+                        await guest.routeWebSocket(url => url.pathname === '/beta/arcade-match', route => {
+                            const server = route.connectToServer();
+                            server.onMessage(message => {
+                                const frame = JSON.parse(message.toString());
+                                if (frame.t !== 'match-ready') return route.send(message);
+                                delete frame.ping;
+                                legacyReady++;
+                                route.send(JSON.stringify(frame));
+                            });
+                        });
+                        const legacyTicket = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        await guest.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+                        await legacyTicket;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        assert.equal(legacyReady, 1, 'the replacement socket advertised the legacy handshake');
+                        const legacyWakeTicket = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        const legacyRestore = await guest.evaluate(() => {
+                            const fetch = window.fetch;
+                            let tickets = 0;
+                            window.fetch = (...args) => {
+                                if (new URL(args[0], location.href).pathname === '/beta/arcade-ticket') tickets++;
+                                return fetch(...args);
+                            };
+                            try { return { probes: window.simulateMatchWake(false, 120_000, true), tickets }; }
+                            finally { window.fetch = fetch; }
+                        });
+                        assert.deepEqual(legacyRestore, { probes: 0, tickets: 1 }, 'legacy visibility then history restore uses one ticket');
+                        await legacyWakeTicket;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                        assert.equal(legacyReady, 2);
+                        assert.equal(requests, 5, 'legacy wake restores the same seat with exactly one new ticket');
                     } finally { guest.off('request', countTicket); }
                 }
                 await guest.locator('[data-text]').fill('First visit from the game invite');

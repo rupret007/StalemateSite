@@ -49,6 +49,22 @@ function fixture() {
 }
 
 describe('Game Night match transport', () => {
+    it('answers a seated player’s foreground probe without changing the match', async () => {
+        const f = fixture();
+        await f.start();
+        const writes = f.storage.put.mock.calls.length, reads = f.storage.get.mock.calls.length;
+        const hostFrames = f.a.frames.length;
+        await f.send(f.b, 'ping', { nonce: 7 });
+        expect(f.b.frames.at(-1)).toEqual({ t: 'pong', nonce: 7 });
+        expect(f.storage.put).toHaveBeenCalledTimes(writes);
+        expect(f.storage.get).toHaveBeenCalledTimes(reads);
+        expect(f.a.frames).toHaveLength(hostFrames);
+        f.actors.delete(guest);
+        await f.send(f.b, 'ping', { nonce: 8 });
+        expect(f.b.close).toHaveBeenCalledWith(4403, 'room membership ended');
+        expect(f.b.frames.at(-1)).toEqual({ t: 'pong', nonce: 7 });
+    });
+
     it('withholds an uncommitted move and permits a retry against the durable revision', async () => {
         const f = fixture(), move = await f.start();
         const before = f.b.frames.length;
