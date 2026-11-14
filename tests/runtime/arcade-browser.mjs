@@ -862,7 +862,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(invitePicker.getByText('Open a game with a free seat to invite a friend.')).toBeVisible();
                 await expect(invitePicker.getByRole('button', { name: /^Invite a friend/ })).toHaveCount(0);
                 await captureArcadeInvite(host, viewport, step('02a-open-a-table'));
-                await invitePicker.getByRole('button', { name: 'Cancel' }).click();
+                const chooseGame = invitePicker.getByRole('button', { name: 'Choose a game', exact: true });
+                await expect(chooseGame).toBeFocused();
+                if (phone) await chooseGame.tap();
+                else await host.keyboard.press('Enter');
+                await expect(invitePicker).toBeHidden();
+                await expect(gamePicker).toBeFocused();
+                await expectUncoveredControl(gamePicker);
                 await host.getByRole('button', { name: 'Room address', exact: true }).click();
                 const address = host.getByRole('dialog', { name: 'Game Night room address' });
                 await expect(address.getByText('Players with a room invitation can use this address.', { exact: false })).toBeVisible();
