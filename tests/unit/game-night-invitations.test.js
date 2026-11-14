@@ -109,13 +109,16 @@ it('caps demo Chess links and admitted guests at the demo host session deadline'
     }
 });
 
-it('resumes the hashed pass only for its current table and invite version', async () => {
+it.each([
+    ['Game Night', '#game-1acbefx23acbe', false],
+    ['WebJam', '#jam-pass-test', true]
+])('resumes the %s hashed pass only for its current table and invite version', async (_label, room, webJam) => {
     const pass = 'b'.repeat(64);
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
     const hash = Buffer.from(digest).toString('hex');
     const tableId = '11111111-1111-4111-8111-111111111111';
     const access = {
-        scope: { game: 'chess', match: tableId, tableId, room: '#game-1acbefx23acbe', ref: 'c'.repeat(32),
+        scope: { game: 'chess', match: tableId, tableId, room, ref: 'c'.repeat(32),
             host: 'host-session-aaaa', nameSeed: 4 },
         sid: 'guest-session-bbbb', exp: Date.now() + 60000
     };
@@ -126,6 +129,10 @@ it('resumes the hashed pass only for its current table and invite version', asyn
         arcadeAvailable: game => game === 'chess'
     };
     const resume = (table = tableId, candidate = pass) => gameInvitationRequest(lobby, 'resume', { tableId: table, pass: candidate });
+    if (webJam) {
+        expect((await resume()).status).toBe(410);
+        lobby.env.HANGOUT_GAME_NIGHT_ROOM_GRANTS = '1';
+    }
     expect(await (await resume()).json()).toEqual(access);
     expect((await resume('22222222-2222-4222-8222-222222222222')).status).toBe(410);
     expect((await resume(tableId, 'a'.repeat(64))).status).toBe(410);
