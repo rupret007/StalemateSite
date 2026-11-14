@@ -371,6 +371,17 @@ describe('production retention on the actual authority codec and SQLite', () => 
 });
 
 describe('actual SQLite session issuance, binding and lobby effect fence', () => {
+    it('keeps an earlier table alarm through registration and advances a consumed deadline', async () => {
+        const f = await fixture();
+        const deadline = f.now() + 20000;
+        await f.rawPut(ALARM, deadline);
+        expect((await f.authority.register(f.registration('alice'))).status).toBe(200);
+        expect(await f.rawGet(ALARM)).toBe(deadline);
+        f.advance(20000);
+        await f.authority.schedule({ afterAlarm: true });
+        expect(await f.rawGet(ALARM)).toBeGreaterThan(deadline);
+    });
+
     it('rolls back mint/session/index/alarm writes on registration alarm failure; retry spends the mint allowance once', async () => {
         const f = await fixture(), request = f.registration('alice'), before = fingerprint(f.driver); let injected = false;
         f.hooks.after = event => { if (!injected && event.name === 'put' && event.key === ALARM) { injected = true; throw Error('synthetic post-alarm registration failure'); } };

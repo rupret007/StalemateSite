@@ -11,7 +11,10 @@ const guest = 'c' + '2'.repeat(32);
 function fixture() {
     const records = new Map(), actors = new Map(), connections = [];
     let now = 1000, matchCount = 0;
+    let alarm = null;
     const storage = {
+        getAlarm: async () => alarm,
+        setAlarm: async value => { alarm = value; },
         get: vi.fn(async key => structuredClone(records.get(key))),
         put: vi.fn(async (key, value) => {
             for (const [name, record] of typeof key === 'string' ? [[key, value]] : Object.entries(key)) {
@@ -117,6 +120,21 @@ describe('Game Night match transport', () => {
         await f.send(f.b, 'join', { id });
         expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
         expect((await saved()).claims).toBeUndefined();
+    });
+
+    it('schedules the earliest seat hold and restores the match deadline after it expires', async () => {
+        const f = fixture();
+        await f.send(f.a, 'open');
+        const { id } = f.board(f.a);
+        const scope = { room, ref, host: sid, match: id };
+        const { expiresAt } = await f.storage.get(ARCADE_TAG + ':' + ref);
+        expect(await f.storage.getAlarm()).toBe(expiresAt);
+        await f.transport.reserveGuestSeat(scope, 'invited-guest', 21000, 'invite', {});
+        expect(await f.storage.getAlarm()).toBe(21000);
+        f.advance(20000);
+        await f.transport.maintain();
+        expect(f.board(f.a)).toMatchObject({ hasOpenSeat: true });
+        expect(await f.storage.getAlarm()).toBe(expiresAt);
     });
 
     it('releases an unused seat after its deadline while keeping the host table', async () => {
