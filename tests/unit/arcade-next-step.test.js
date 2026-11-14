@@ -122,9 +122,8 @@ describe('Spades next step', () => {
             canOpen: false, partners: true
         });
         expect(status.textContent).toBe('Table full. You’re watching. West to bid');
-        expect(button.textContent).toBe('Keep watching');
+        expect(button.hidden).toBe(true);
         expect(view.querySelector('[data-spades-hand-label]').textContent).toBe('Watching · hands are private');
-        button.click();
         expect(client.sent).toEqual([]);
         state({
             state: { version: 1, game: 'turdspades', id: 'spades-1', seat: null, mode: 'partners', waiting: false, occupied: ['south', 'west'], match: spadesMatch({ result: { winner: 1, reason: 'resigned' } }) },

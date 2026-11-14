@@ -234,8 +234,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 const turnName = `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
                 if (!seat) {
                     message = `Table full. You’re watching. ${turnName}`;
-                    command = 'watch';
-                    label = 'Keep watching';
+                    if (match.phase !== 'bid') {
+                        command = 'watch';
+                        label = 'Keep watching';
+                    }
                 } else {
                     const turn = yourTurn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : turnName;
                     message = `Round ${match.round} · ${turn}`;
