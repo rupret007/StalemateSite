@@ -1552,8 +1552,22 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await page.locator(`[data-square="${from}"]`).press('Enter');
                 const target = page.locator(`[data-square="${to}"]`);
                 if (to === 'f7') {
+                    const darkCapture = page.locator('[data-square="e5"]');
                     await expect(target).toHaveAttribute('data-capture', '');
-                    assert.equal(await target.evaluate(square => getComputedStyle(square, '::after').inset), '6px');
+                    await expect(target).not.toHaveAttribute('data-dark');
+                    await expect(darkCapture).toHaveAttribute('data-capture', '');
+                    await expect(darkCapture).toHaveAttribute('data-dark', '');
+                    const ring = square => square.evaluate(node => {
+                        const style = getComputedStyle(node, '::after');
+                        return { inset: style.inset, border: style.borderTopColor, shadow: style.boxShadow };
+                    });
+                    const light = await ring(target);
+                    const dark = await ring(darkCapture);
+                    assert.deepEqual([light.inset, dark.inset], ['6px', '6px']);
+                    assert.equal(light.border, 'rgb(23, 53, 56)');
+                    assert.equal(dark.border, 'rgb(228, 255, 175)');
+                    assert.match(light.shadow, /rgb\(228, 255, 175\)/);
+                    assert.match(dark.shadow, /rgb\(23, 53, 56\)/);
                 }
                 await target.press('Enter');
             }

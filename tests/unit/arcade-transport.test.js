@@ -365,10 +365,23 @@ describe('Game Night match transport', () => {
         expect(f.b.frames.at(-1).t).toBe('snapshot');
         expect(f.storage.put.mock.calls).toHaveLength(before);
 
-        f.actors.get(guest).gameGuest = { ...invitation, host: 'different-host' };
+    });
+
+    it.each([
+        { host: 'different-host' },
+        { game: 'turdspades' },
+        { room: '#game-dead00xdead00' },
+        { ref: '1'.repeat(32) },
+        { tableId: 'c8eb7f10-e113-418f-9900-000000000999' }
+    ])('does not expose a live table to a mismatched guest scope (%j)', async override => {
+        const f = fixture();
+        const { id } = await f.start();
+        const before = f.storage.put.mock.calls.length;
+        f.actors.get(guest).gameGuest = { room, ref, host: sid, match: id, tableId: id, game: 'chess', ...override };
         await f.send(f.b, undefined, { t: 'hello', lastSeq: 0 });
-        expect(f.b.frames.at(-1)).toMatchObject({ t: 'snapshot', state: null, yourSeat: null });
-        await f.send(f.b, 'move', { id: replacement, revision: 0, move: 'e7e5' });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'snapshot', state: null, yourSeat: null, currentMatchId: null });
+        expect(f.b.deserializeAttachment()).toMatchObject({ seat: null, subjects: [] });
+        await f.send(f.b, 'move', { id, revision: 0, move: 'e7e5' });
         expect(f.b.frames.at(-1)).toMatchObject({ t: 'match-error', reason: 'unavailable' });
         expect(f.storage.put.mock.calls).toHaveLength(before);
     });
