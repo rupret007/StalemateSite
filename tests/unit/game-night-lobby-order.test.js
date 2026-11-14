@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../..');
 import {
@@ -102,5 +102,50 @@ describe('placeArcadePanelInLobbyOrder', () => {
         }
 
         expect(panelOrder(container)).toEqual([...GAME_NIGHT_LOBBY_ORDER]);
+    });
+});
+
+describe('drawArcadeTable WebJam chess', () => {
+    function controllerPlacementBlock() {
+        const lobby = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.js'), 'utf8');
+        const start = lobby.indexOf('        if (table.controller) {');
+        const end = lobby.indexOf('        if (!scope || table.loading) return;');
+        expect(start).toBeGreaterThan(-1);
+        expect(end).toBeGreaterThan(start);
+        return lobby.slice(start, end);
+    }
+
+    it('declares moved before the WebJam open guard', () => {
+        const block = controllerPlacementBlock();
+        expect(block).toMatch(/const moved = table\.controller\.panel\.parentElement !== container;/);
+        expect(block).toMatch(/if \(inWebJam && scope && \(moved \|\| table\.webJamRef !== scope\.ref\)\)/);
+    });
+
+    it('runs the WebJam open branch under strict mode without ReferenceError', () => {
+        const block = controllerPlacementBlock();
+        const run = new Function(
+            'container', 'table', 'inWebJam', 'scope', 'game', 'placeArcadePanelInLobbyOrder', 'c',
+            'updateTableInvite', 'arcadeInvitation', 'arcadeReturning',
+            `'use strict';\n${block}`
+        );
+        const open = vi.fn(() => ({ open: false }));
+        const jamContainer = document.createElement('section');
+        jamContainer.setAttribute('data-jam-chess', '');
+        const otherParent = document.createElement('div');
+        document.body.append(otherParent, jamContainer);
+        const panel = document.createElement('details');
+        otherParent.append(panel);
+        const table = {
+            controller: { panel, setRoom: vi.fn(), open },
+            webJamRef: undefined,
+            supported: true,
+        };
+        const scope = { actor: 'self', room: '#jam', ref: 'keep-ref' };
+        const room = { name: '#jam', keepRef: 'keep-ref' };
+        expect(() => run(
+            jamContainer, table, true, scope, 'chess', () => {}, room, vi.fn(), null, null
+        )).not.toThrow();
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(jamContainer.contains(panel)).toBe(true);
     });
 });
