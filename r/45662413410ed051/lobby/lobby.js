@@ -5,7 +5,7 @@ import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { mountGameNightSound, unlockGameNightAudio } from './game-night-audio.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName, webJamRoomName } from './game-night.mjs';
+import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName, placeArcadePanelInLobbyOrder, webJamRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -1924,8 +1924,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const option = $(`[data-arcade-game] option[value="${game}"]`);
         option.hidden = option.disabled = inWebJam || !scope || !table.controller;
         if (table.controller) {
-            const moved = table.controller.panel.parentElement !== container;
-            if (moved) container.append(table.controller.panel);
+            if (!inWebJam) placeArcadePanelInLobbyOrder(container, table.controller.panel, game);
+            else if (table.controller.panel.parentElement !== container) container.append(table.controller.panel);
             table.controller.setRoom(scope);
             if (inWebJam && scope && (moved || table.webJamRef !== scope.ref)) table.controller.open();
             table.webJamRef = inWebJam ? scope?.ref : undefined;
@@ -1942,8 +1942,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (!scope || table.loading) return;
         table.loading = true;
         table.load().then(mount => {
-            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting, snapshot, failed) =>
+            const gameNight = $('[data-game-night]');
+            table.controller = mount(gameNight, (room, state, sendMatch, reconnecting, snapshot, failed) =>
                 arcadeMatchState(game, table, room, state, sendMatch, reconnecting, snapshot, failed));
+            placeArcadePanelInLobbyOrder(gameNight, table.controller.panel, game);
             const summary = table.controller.panel.querySelector('summary');
             const reconnect = document.createElement('span');
             reconnect.className = 'arcade-reconnect';

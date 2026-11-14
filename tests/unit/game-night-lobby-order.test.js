@@ -1,4 +1,4 @@
-// @vitest-environment node
+// @vitest-environment jsdom
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -6,11 +6,33 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../..');
-import { GAME_NIGHT_LOBBY_ORDER, gameNightLabels } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import {
+    arcadeLobbyPanelSelector,
+    GAME_NIGHT_LOBBY_GRID_AREA,
+    GAME_NIGHT_LOBBY_ORDER,
+    gameNightLabels,
+    placeArcadePanelInLobbyOrder,
+} from '../../r/45662413410ed051/lobby/game-night.mjs';
 
 const OLD_LOBBY_ORDER = Object.freeze([
     'chess', 'crapeights', 'turdrummy', 'turdspades', 'turdjack', 'turdtris', 'turdomania', 'turdrush', 'turdanoid'
 ]);
+
+const OLD_DESKTOP_GRID_ROW_AREAS = ['chess', 'eights', 'rummy', 'spades', 'jack', 'tris', 'mania', 'rush', 'brick'];
+
+function expectedDesktopGridRowAreas() {
+    return GAME_NIGHT_LOBBY_ORDER.map(game => GAME_NIGHT_LOBBY_GRID_AREA[game]);
+}
+
+function readDesktopCardTableGridRowAreas() {
+    const css = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
+    const block = css.match(
+        /\.game-night:has\(\.arcade-card-table\[open\] \[data-card-table\]:not\(\[hidden\]\)\)\s*\{[^}]*grid-template:\s*([^;]+);/
+    );
+    expect(block, 'desktop open card-table grid block').toBeTruthy();
+    return [...block[1].matchAll(/"cards\s+(\w+)"/g)].map(match => match[1])
+        .filter(area => !['heading', 'actions', 'call'].includes(area));
+}
 
 describe('Game Night beta lobby lineup', () => {
     it('puts Chess, TurdSpades, and Turdanoid first', () => {
@@ -35,5 +57,50 @@ describe('Game Night beta lobby lineup', () => {
     it('wires lobby.js arcadeTables through GAME_NIGHT_LOBBY_ORDER', () => {
         const lobby = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.js'), 'utf8');
         expect(lobby).toContain('GAME_NIGHT_LOBBY_ORDER.map(game => [game, arcadeTableDefs[game]])');
+    });
+
+    it('orders desktop grid rows for an open card table like GAME_NIGHT_LOBBY_ORDER', () => {
+        const rows = readDesktopCardTableGridRowAreas();
+        expect(rows).toEqual(expectedDesktopGridRowAreas());
+        expect(rows).not.toEqual(OLD_DESKTOP_GRID_ROW_AREAS);
+        expect(rows.slice(0, 3)).toEqual(['chess', 'spades', 'brick']);
+    });
+
+    it('repositions panels after mount so DOM follows GAME_NIGHT_LOBBY_ORDER', () => {
+        const lobby = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.js'), 'utf8');
+        expect(lobby).toContain('placeArcadePanelInLobbyOrder');
+    });
+});
+
+describe('placeArcadePanelInLobbyOrder', () => {
+    function mountStub(container, game) {
+        const panel = document.createElement('details');
+        const rootClass = arcadeLobbyPanelSelector(game).replace('details.', '');
+        panel.className = rootClass;
+        panel.dataset.game = game;
+        container.append(panel);
+        return panel;
+    }
+
+    function panelOrder(container) {
+        return [...container.querySelectorAll(':scope > details[data-game]')].map(el => el.dataset.game);
+    }
+
+    it('matches GAME_NIGHT_LOBBY_ORDER when imports resolve out of order', () => {
+        const container = document.createElement('section');
+        container.className = 'game-night';
+        const gameCall = document.createElement('div');
+        gameCall.className = 'game-call';
+        container.append(gameCall);
+
+        const resolutionOrder = ['crapeights', 'turdjack', 'turdspades', 'turdomania', 'turdrummy', 'chess', 'turdtris', 'turdanoid', 'turdrush'];
+        const panels = new Map();
+        for (const game of resolutionOrder) {
+            const panel = mountStub(container, game);
+            panels.set(game, panel);
+            placeArcadePanelInLobbyOrder(container, panel, game);
+        }
+
+        expect(panelOrder(container)).toEqual([...GAME_NIGHT_LOBBY_ORDER]);
     });
 });
