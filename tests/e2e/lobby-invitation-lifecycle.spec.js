@@ -682,7 +682,19 @@ for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionab
             await expect(offer).toContainText(`JamHost invited you to ${room}.`);
         };
         await guest.clock.install();
+        if (width === 375) {
+            fixture.disconnect('JamGuest', 1012);
+            await expect(guest.locator('[data-toast]')).toContainText('Room ownership and settings are kept');
+        }
         await inviteGuest();
+        if (width === 375) {
+            // The pane clips overflowing controls even if the page itself fits.
+            await expect(guest.locator('[data-toast]')).toBeVisible();
+            const composer = guest.locator('[data-say]');
+            await expect(composer).toBeInViewport({ ratio: 1 });
+            await expect(composer.getByRole('textbox', { name: 'Message' })).toHaveCSS('font-size', '16px');
+            await guest.screenshot({ path: testInfo.outputPath('jam-room-invitation-with-reconnect-375.png') });
+        }
         // The earlier invitation was a notice that disappeared after twelve
         // seconds, leaving no way into an invite-only room.
         await guest.clock.runFor(13_000);
