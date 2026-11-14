@@ -4,6 +4,10 @@ import { BETA_TTL, registryRequest } from './beta-session-client.mjs';
 export { BETA_TTL } from './beta-session-client.mjs';
 
 const enc = new TextEncoder();
+export const DEMO_INVITE_TTL = 72 * 60 * 60_000;
+const DEMO_INVITE_PREFIX = 'demo.';
+export const isDemoInvite = value => typeof value === 'string' && value.startsWith(DEMO_INVITE_PREFIX);
+
 const encode = (value) => btoa(String.fromCharCode(...value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const decode = (value) => Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
 export const BETA_COOKIE = '__Host-hangout-beta';
@@ -25,6 +29,20 @@ export async function signBeta(kind, claims, secret) {
     return `${body}.${encode(new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(`beta:${kind}:${body}`))))}`;
 }
 
+export async function makeDemoInvite(secret, version, now = Date.now()) {
+    return DEMO_INVITE_PREFIX + await signBeta('demo-invite', {
+        v: 1, sid: crypto.randomUUID(), iat: now, exp: now + DEMO_INVITE_TTL, version
+    }, secret);
+}
+
+export async function verifyDemoInvite(invite, secret, version, now = Date.now()) {
+    if (!isDemoInvite(invite)) return null;
+    const claims = await readBeta('demo-invite', invite.slice(DEMO_INVITE_PREFIX.length), secret, now);
+    if (!claims || !Number.isSafeInteger(claims.iat) || claims.iat > now
+        || claims.exp !== claims.iat + DEMO_INVITE_TTL || claims.version !== version) return null;
+    return claims.exp;
+}
+
 export async function readBeta(kind, token, secret, now = Date.now()) {
     try {
         if (!hmacKeyOk(secret) || typeof token !== 'string' || token.length > 4096) return null;
@@ -33,7 +51,8 @@ export async function readBeta(kind, token, secret, now = Date.now()) {
         const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
         if (!await crypto.subtle.verify('HMAC', key, decode(signature), enc.encode(`beta:${kind}:${body}`))) return null;
         const claims = JSON.parse(new TextDecoder().decode(decode(body)));
-        if (!claims || claims.v !== 1 || !/^[a-z0-9-]{16,64}$/.test(claims.sid) || !Number.isFinite(claims.exp) || claims.exp <= now || claims.exp > now + BETA_TTL) return null;
+        if (!claims || claims.v !== 1 || !/^[a-z0-9-]{16,64}$/.test(claims.sid) || !Number.isFinite(claims.exp) || claims.exp <= now
+            || claims.exp > now + (['demo-invite', 'game-invitation'].includes(kind) ? DEMO_INVITE_TTL : BETA_TTL)) return null;
         return claims;
     } catch { return null; }
 }
