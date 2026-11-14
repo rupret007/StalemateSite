@@ -98,6 +98,12 @@ for (const width of [375, 1440]) test(`landmarks, visible nickname label and mes
         await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('#stalemate');
         await expect(page.getByRole('group', { name: 'Ways to hang out' })).toContainText('Anyone can host');
         const randomName = page.getByRole('button', { name: /^Make me a name/ });
+        const nickname = page.getByRole('textbox', { name: 'Your nick', exact: true });
+        const label = page.locator('.nickrow label, label.nickrow');
+        await expect(label).toHaveText('Your nick');
+        await expect(label.locator('button')).toHaveCount(0);
+        await label.click();
+        await expect(nickname).toBeFocused();
         await expect(randomName).toBeVisible();
         await randomName.click(); await expect(page.locator('[data-nick]')).not.toHaveValue('');
         await page.locator('[data-nick]').fill(`SemanticGuest${width}`); await page.locator('[data-enter]').click();
