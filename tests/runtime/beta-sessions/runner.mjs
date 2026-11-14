@@ -80,6 +80,12 @@ async function child(state, nonce) {
             assert.equal((await call(backend, 'forward-night', 'register')).status, 200);
             assert.equal((await call(backend, 'forward-night', 'check-ordinary')).status, 200);
             checks.push({ name: `${backend}-forward-night-record-remains-readable-without-admission-or-mutation`, pass: true });
+            const pending = await call(backend, 'forward-night', 'seed-pending-night');
+            const afterAlarm = await call(backend, 'forward-night', 'run-alarm');
+            assert.equal(afterAlarm.status, 200);
+            assert.deepEqual(afterAlarm.body.records, pending.body.records);
+            assert.equal(afterAlarm.body.control.disconnects ?? 0, 0);
+            checks.push({ name: `${backend}-rollback-alarm-does-not-retry-pending-game-night-closure`, pass: true });
 
             for (const name of ['budget', 'session', 'alarm']) {
                 const initial = await call(backend, name, 'seed-alarm'); assert.equal(initial.status, 200); assert.equal(initial.body.sqlite, backend === 'SQLITE');

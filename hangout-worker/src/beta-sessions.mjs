@@ -40,7 +40,9 @@ export class BetaSessions {
         // No registry lock spans fanout. A timed-out attempt can never reach this outbox confirmation.
         await this.state.blockConcurrencyWhile(async () => {
             const current = await this.state.storage.get(`session:${record.sid}`);
-            if (current && validRecord(current, record.sid) && current.revoked) await this.state.storage.put(`session:${record.sid}`, { ...current, pending: false });
+            if (current && validRecord(current, record.sid) && current.idleUntil === undefined && current.revoked) {
+                await this.state.storage.put(`session:${record.sid}`, { ...current, pending: false });
+            }
         });
         return true;
     }
@@ -122,12 +124,12 @@ export class BetaSessions {
         });
         if (!rows) return;
         // Bound each alarm and back off unavailable targets; never multiply WS frames into regular RPCs.
-        const due = [...rows.values()].filter((record) => record.revoked && record.pending && record.retryAt <= Date.now())
+        const due = [...rows.values()].filter((record) => record.idleUntil === undefined && record.revoked && record.pending && record.retryAt <= Date.now())
             .sort((a, b) => a.retryAt - b.retryAt || a.sid.localeCompare(b.sid)).slice(0, BETA_RETRY_BATCH);
         for (const record of due) {
             const next = await this.state.blockConcurrencyWhile(async () => {
                 const current = await this.state.storage.get(`session:${record.sid}`);
-                if (!current || !current.pending || current.retryAt > Date.now()) return null;
+                if (!current || current.idleUntil !== undefined || !current.pending || current.retryAt > Date.now()) return null;
                 const attempt = Math.min(20, current.attempt + 1);
                 const changed = { ...current, attempt, retryAt: Math.min(current.exp, Date.now() + Math.min(3600000, INTERVAL * 2 ** (attempt - 1))) };
                 await this.state.storage.put(`session:${record.sid}`, changed); return changed;
