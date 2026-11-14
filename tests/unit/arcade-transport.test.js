@@ -76,6 +76,18 @@ describe('Game Night match transport', () => {
         expect(f.a.close).toHaveBeenCalledWith(4403, 'room membership ended');
     });
 
+    it('acknowledges replayed joins after the invited seat was committed', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        f.actors.get(guest).gameGuest = { room, ref, host: sid, match: id, game: 'chess' };
+        const writes = f.storage.put.mock.calls.length;
+        await f.send(f.b, 'join', { id, seat: 'next' });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'match-state', state: { id, seat: 'b', waiting: false } });
+        expect(f.storage.put.mock.calls).toHaveLength(writes);
+        await f.send(f.b, 'join', { id: 'different-match', seat: 'next' });
+        expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
+    });
+
     it('commits the accepted invitation with the reserved capacity and admits its guest', async () => {
         const f = fixture();
         await f.send(f.a, 'open');
@@ -194,6 +206,12 @@ describe('Game Night match transport', () => {
         expect(f.board(f.b)).toMatchObject({ id: replacement, waiting: true, replacementAvailable: true });
         await f.send(f.b, 'join', { id: replacement, seat: 'next' });
         expect(f.board(f.b)).toMatchObject({ id: replacement, seat: 'b', waiting: false });
+        const writes = f.storage.put.mock.calls.length;
+        await f.send(f.b, 'join', { id: replacement, seat: 'next' });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'match-state', state: { id: replacement, seat: 'b' } });
+        expect(f.storage.put.mock.calls).toHaveLength(writes);
+        await f.send(f.b, 'join', { id, seat: 'next' });
+        expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
     });
 
     it('expires a room grant before opening a socket', async () => {

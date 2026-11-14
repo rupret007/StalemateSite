@@ -196,9 +196,12 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                     const invitation = binding.gameGuest;
                     const invited = !invitation || invitation.game === name && invitation.room === scope.room && invitation.ref === scope.ref
                         && invitation.host === game.subjects[0] && (invitation.match === frame.id || !held);
-                    if (!invited || !game.subjects.every(peer => binding.canJoin(peer)) ||
-                        !game.join(subject, frame.id, now(), seat, otherClaims.length, heldSeats)) error = 'seat-unavailable';
-                    else { claims = otherClaims; changed = true; expiresAt = now() + MATCH_TTL; }
+                    if (!invited) error = 'seat-unavailable';
+                    else if (!game.seat(subject) || game.view(subject, now()).id !== frame.id) {
+                        if (!game.subjects.every(peer => binding.canJoin(peer)) ||
+                            !game.join(subject, frame.id, now(), seat, otherClaims.length, heldSeats)) error = 'seat-unavailable';
+                        else { claims = otherClaims; changed = true; expiresAt = now() + MATCH_TTL; }
+                    }
                 } else if (frame.action === 'start') {
                     if (claims.length || !binding.canOpen || !game.start(subject, frame.id, now())) error = 'start-unavailable';
                     else { changed = true; expiresAt = now() + MATCH_TTL; }
