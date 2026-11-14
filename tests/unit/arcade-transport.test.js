@@ -50,7 +50,7 @@ function fixture(name = 'chess') {
         await send(b, 'join', { id });
         return { id, revision: 0, move: 'e2e4' };
     };
-    return { a, b, board, send, start, storage, actors, transport, guestActivity, advance: ms => { now += ms; } };
+    return { a, b, board, player, send, start, storage, actors, transport, guestActivity, advance: ms => { now += ms; } };
 }
 
 describe('Game Night match transport', () => {
@@ -329,13 +329,19 @@ describe('Game Night match transport', () => {
 
     it.each([['partners', 'partners'], [undefined, 'four']])('offers only the saved Spades mode with a roster (%s)', async (mode, reopenMode) => {
         const f = fixture('turdspades');
+        const operator = f.player('c' + 'c'.repeat(32), 'other-operator', true);
         await f.send(f.a, 'open', mode ? { mode } : {});
         const { id, tableId } = f.board(f.a);
         await f.send(f.b, 'join', { id, seat: 'west' });
         expect(f.board(f.b)).toMatchObject({ seat: 'west' });
         await f.send(f.a, 'leave', { id });
-        expect(f.a.frames.at(-1)).toMatchObject({ state: null, reopenMode });
+        expect(f.a.frames.at(-1)).toMatchObject({ state: null, canOpen: true, reopenMode });
+        expect(f.b.frames.at(-1)).toMatchObject({ state: null, canOpen: false });
         expect(f.b.frames.at(-1)).not.toHaveProperty('reopenMode');
+        expect(operator.frames.at(-1)).toMatchObject({ state: null, canOpen: false });
+        expect(operator.frames.at(-1)).not.toHaveProperty('reopenMode');
+        await f.send(operator, 'open', mode ? { mode } : {});
+        expect(operator.frames.at(-1)).toEqual({ t: 'match-error', reason: 'unavailable' });
         await f.send(f.a, 'open', mode ? {} : { mode: 'partners' });
         expect(f.a.frames.at(-1)).toMatchObject({ t: 'match-error', reason: 'unavailable' });
         await f.send(f.a, 'open', mode ? { mode } : {});

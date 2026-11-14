@@ -896,6 +896,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await host.locator('[data-spades-action="leave"]').click();
             await host.getByRole('dialog', { name: 'Leave this table?' }).getByRole('button', { name: 'Leave table', exact: true }).click();
             const reopen = host.getByRole('button', { name: 'Reopen 2-player Spades', exact: true });
+            await expect(status(friend)).toHaveText('Waiting for the host to open a table.');
             await expect(reopen).toBeVisible();
             await expect(host.getByRole('button', { name: 'Open 4-player Spades', exact: true })).toBeHidden();
             await reopen.click();
@@ -2107,6 +2108,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             allHands.push(...await hand.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard)));
         }
         assert.equal(new Set(allHands).size, 52);
+        const unbidSeats = east.locator('[data-spades-trick]').getByText(/No bid yet · 0 tricks/);
+        await expect(unbidSeats).toHaveCount(4);
+        for (const seat of await unbidSeats.all()) await expect(seat).toBeVisible();
         const portrait = b.viewportSize();
         try {
             for (const height of [portrait.height, 661]) {

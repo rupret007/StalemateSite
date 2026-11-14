@@ -214,9 +214,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 }
             }
             if (view && nextMatch) send(socket, { t: 'rematch', matchId: nextMatch });
+            const canOpen = binding.canOpen && !(PartnerTable && game?.closed && game.host !== binding.betaSid);
             const reopenMode = PartnerTable && permitted && game?.closed && game.subjects.length > 1
-                && binding.canOpen && game.host === binding.betaSid ? game.mode ?? 'four' : undefined;
-            sendView(socket, recipient, view, binding.canOpen, seq, seat, reopenMode);
+                && canOpen ? game.mode ?? 'four' : undefined;
+            sendView(socket, recipient, view, canOpen, seq, seat, reopenMode);
         }
     }
     async function receive(socket, raw) {
