@@ -85,7 +85,7 @@ describe('entry context through the private beta shell', () => {
             const status = window.document.querySelector('#status');
             const code = window.document.querySelector('#code');
             await vi.waitFor(() => expect(retry.hidden).toBe(false));
-            retry.focus();
+            expect(window.document.activeElement).toBe(retry);
             retry.click();
             await vi.waitFor(() => expect(status.textContent).toBe('Your invitation code is still here. Submit it again to continue.'));
             expect(window.document.activeElement).toBe(code);

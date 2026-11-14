@@ -195,10 +195,15 @@ function begin(kind) {
 function finish(attempt, phase, message, identity) {
     if (attempt !== currentAttempt) return;
     const retryCode = operation === 'unlock' && phase === 'invitation';
+    // Unlock hides the form while it waits. Return keyboard users to the
+    // recovery action if they did not move focus elsewhere.
+    const refocusRetry = operation === 'unlock' && phase === 'unavailable' &&
+        [document.body, code, $('#unlock button')].includes(document.activeElement);
     const refocusLeave = phase === 'leave-unconfirmed' &&
         [document.body, retryLeave, logout?.querySelector('button')].includes(document.activeElement);
     operation = '';
     render(phase, retryCode && codeError ? '' : message, identity);
+    if (refocusRetry) retry.focus();
     if (refocusLeave) retryLeave?.focus();
     if (retryCode) {
         if (codeError) codeError.textContent = message;
