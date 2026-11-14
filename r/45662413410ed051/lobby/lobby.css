@@ -915,8 +915,14 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
     gap: 4px;
     min-height: 0;
   }
-  .invite-people { min-height: 50px; margin: 0; }
-  [data-invite-quick-cancel] { align-self: flex-start; }
+  [data-invite-quick] .invite-people {
+    min-height: 0;
+    margin: 0;
+  }
+  [data-invite-quick-cancel] {
+    flex: none;
+    align-self: flex-start;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
