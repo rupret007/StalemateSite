@@ -25,7 +25,7 @@ if (target === 'beta') {
             'games/arcade-action-clock.js', 'games/turdanoid-race.js', 'games/turdanoid-physics-core.js',
             'games/turdanoid-levels.js', 'games/turdanoid-levels-core.js', 'games/turdanoid-sprites-core.js',
             'assets/vendor/three/three.module.js', 'assets/vendor/three/three.core.js', 'assets/vendor/three/LICENSE',
-            'assets/chess/chessjs-LICENSE.txt', 'assets/chess/Spatial-LICENSE.txt'
+            'assets/chess/chessjs-LICENSE.txt', 'assets/chess/Spatial-LICENSE.txt', 'assets/chess/GPL-3.0.txt'
         ];
         for (const color of ['w', 'b']) for (const piece of 'prnbqk') files.push(`assets/chess/pieces/spatial-${color}${piece}.svg`);
         for (const file of files) {

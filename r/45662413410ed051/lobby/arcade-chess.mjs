@@ -208,7 +208,10 @@ export function mountArcadeChess(container, onMatch) {
         }
         const last = model.match.moves.at(-1);
         const lastSquares = last ? [last.slice(0, 2), last.slice(2, 4)] : [];
-        const targets = new Set(selected && isTurn() ? chess.moves({ square: selected, verbose: true }).map(option => option.to) : []);
+        const moves = selected && isTurn() ? chess.moves({ square: selected, verbose: true }) : [];
+        const targets = new Set(moves.map(move => move.to));
+        const captures = new Set(moves.filter(move => move.isCapture() || move.isEnPassant()).map(move => move.to));
+        const checkedSide = chess.isCheck() ? chess.turn() : null;
         for (const [square, button] of squares) {
             const piece = chess.get(square);
             const art = piece ? piece.color + piece.type : '';
@@ -225,9 +228,9 @@ export function mountArcadeChess(container, onMatch) {
             }
             button.toggleAttribute('data-dark', (files.indexOf(square[0]) + Number(square[1])) % 2 === 1);
             button.toggleAttribute('data-legal', targets.has(square));
-            button.toggleAttribute('data-capture', targets.has(square) && !!piece);
+            button.toggleAttribute('data-capture', captures.has(square));
             button.toggleAttribute('data-last', lastSquares.includes(square));
-            button.toggleAttribute('data-check', piece?.type === 'k' && piece.color === chess.turn() && chess.isCheck());
+            button.toggleAttribute('data-check', piece?.type === 'k' && piece.color === checkedSide);
             button.setAttribute('aria-label', piece ? `${square}, ${colorName(piece.color)} ${pieceName(piece.type)}` : `${square}, empty`);
             button.setAttribute('aria-pressed', String(square === selected));
             button.tabIndex = square === focused ? 0 : -1;
@@ -286,6 +289,7 @@ export function mountArcadeChess(container, onMatch) {
         } else {
             const who = seated ? `You’re ${colorName(model.seat)}` : 'Watching';
             status.textContent = `${who} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
+            if (chess?.isCheck()) status.textContent += ` · ${colorName(match.turn)} is in check`;
         }
         for (const control of actions) {
             const active = seated && match && !match.result;

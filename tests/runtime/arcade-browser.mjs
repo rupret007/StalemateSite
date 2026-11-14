@@ -1081,6 +1081,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (const page of [black, white]) {
             await expect(page.locator('[data-chess-status]')).toHaveText('White wins · Checkmate');
             await expect(page.getByRole('button', { name: 'f7, White queen' })).toBeAttached();
+            const king = page.getByRole('button', { name: 'e8, Black king' });
+            await expect(king).toHaveAttribute('data-check', '');
+            await expect(king).toHaveCSS('background-image', /radial-gradient/);
         }
         if (media) {
             await waitForPackets(white, 'audio', before);
@@ -1089,6 +1092,27 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await black.getByRole('button', { name: 'Request rematch' }).click();
         await white.getByRole('button', { name: 'Accept rematch' }).click();
         await expect(black.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+        for (const [page, from, to] of [[black, 'd2', 'd4'], [white, 'e7', 'e5'], [black, 'h2', 'h3'], [white, 'f8', 'b4']]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
+        }
+        for (const page of [black, white]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('White is in check');
+            await expect(page.locator('[data-square="e1"][data-dark][data-check]')).toHaveCSS('background-image', /radial-gradient/);
+        }
+        if (evidence) {
+            const desktop = black.viewportSize();
+            const phone = white.viewportSize();
+            try {
+                await black.setViewportSize({ width: 1440, height: 900 });
+                await white.setViewportSize({ width: 390, height: 844 });
+                await captureArcadeInvite(black, black.viewportSize(), 'chess-check');
+                await captureArcadeInvite(white, white.viewportSize(), 'chess-check');
+            } finally {
+                await black.setViewportSize(desktop);
+                await white.setViewportSize(phone);
+            }
+        }
         console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
     }
     async function joinCalls(a, b) {
