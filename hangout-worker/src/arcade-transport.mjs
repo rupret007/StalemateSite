@@ -139,11 +139,19 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             try { socket.serializeAttachment({ ...recipient, subjects: permitted ? subjects : [] }); }
             catch { close(socket, 1011, 'match connection unavailable'); continue; }
             const view = permitted && game ? game.view(binding.betaSid, now()) : null;
-            if (view?.waiting && claims.length) {
+            const invitation = binding.gameGuest;
+            if (view?.waiting) {
                 const reserved = claims.some(claim => claim.sid === binding.betaSid);
-                view.hasOpenSeat = reserved || game.hasGuestSeat(view.id, subjects[0], claims.length);
-                if (view.canStart) view.canStart = false;
-                if (binding.canOpen && view.seat) view.pendingGuestMs = Math.max(1, Math.min(...claims.map(claim => claim.until)) - now());
+                const unreservedSeat = game.hasGuestSeat(view.id, subjects[0], claims.length);
+                view.hasOpenSeat = reserved || unreservedSeat;
+                if (invitation && unreservedSeat && !reserved && view.id !== invitation.match && invitation.game === name
+                    && invitation.room === recipient.room && invitation.ref === recipient.ref && invitation.host === subjects[0]) {
+                    view.replacementAvailable = true;
+                }
+                if (claims.length) {
+                    if (view.canStart) view.canStart = false;
+                    if (binding.canOpen && view.seat) view.pendingGuestMs = Math.max(1, Math.min(...claims.map(claim => claim.until)) - now());
+                }
             }
             send(socket, { t: 'match-state', version: 1, room: recipient.room,
                 state: view, canOpen: binding.canOpen,
