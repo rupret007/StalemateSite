@@ -407,9 +407,22 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     assert.match(html, /<h1 data-game-guest-title>Royal Flush Chess<\/h1>/);
                     await captureArcadeInvite(guest, viewport, 'first-visit-01-finding-seat');
                 } finally {
+                    if (phone) await guest.evaluate(() => {
+                        const send = WebSocket.prototype.send;
+                        WebSocket.prototype.send = function (raw) {
+                            const frame = typeof raw === 'string' ? JSON.parse(raw) : null;
+                            if (frame?.action !== 'join' || new URL(this.url).pathname !== '/beta/arcade-match') {
+                                return send.call(this, raw);
+                            }
+                            WebSocket.prototype.send = send;
+                            window.droppedInitialSeatClaim = true;
+                            queueMicrotask(() => this.close(1000));
+                        };
+                    });
                     releaseTicket();
                 }
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                if (phone) assert.equal(await guest.evaluate(() => window.droppedInitialSeatClaim), true);
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
                 await expect(guest.locator('details.arcade-chess > summary')).toBeFocused();
                 const pieces = guest.locator('.arcade-chess cg-board piece');
