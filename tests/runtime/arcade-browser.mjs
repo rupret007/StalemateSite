@@ -475,13 +475,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             const context = await browser.newContext({ viewport, hasTouch: phone, reducedMotion: 'reduce', ignoreHTTPSErrors: true });
             try {
                 const friend = await context.newPage();
+                await friend.route('**/beta/game-night/invitation/details', route =>
+                    route.fulfill({ status: 503, json: { error: message } }), { times: 1 });
                 await openGameNightLink(friend, link);
+                const retry = friend.getByRole('button', { name: 'Try again', exact: true });
+                await expect(friend.locator('[data-guest-status]')).toHaveText('Couldn’t check the invitation. Try again.');
+                await expect(retry).toBeFocused();
+                await expectUncoveredControl(retry);
+                if (phone) await retry.tap();
+                else await friend.keyboard.press('Enter');
                 await friend.route('**/beta/game-night/invitation/accept', route => route.fulfill({
                     status: 503, json: { error: message }
                 }), { times: 1 });
                 const join = friend.getByRole('button', { name: 'Join game', exact: true });
                 const activate = () => phone ? join.tap() : friend.keyboard.press('Enter');
-                if (!phone) await expect(join).toBeFocused();
+                await expect(join).toBeFocused();
                 await activate();
                 await expect(friend.locator('[data-guest-status]')).toHaveText(message);
                 await expect(join).toBeEnabled();
