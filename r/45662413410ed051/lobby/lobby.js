@@ -928,14 +928,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             retry.hidden = false;
         }
     }
-    const send = (obj) => {
+    const send = (obj, onTransportFailure) => {
         const commandName = obj.t === 'cmd' ? String(obj.name || '').toLowerCase()
             : obj.t === 'say' && /^\/(?!\/)/.test(obj.text || '') ? obj.text.slice(1).split(/\s/, 1)[0].toLowerCase() : '';
         const safeCommand = ['block', 'unblock', 'ignore', 'unignore', 'part', 'leave', 'quit', 'exit', 'bye', 'help', 'h', '?', 'camoff', 'decline', 'deny'].includes(commandName);
         if (app.sharingStopped || app.localMediaPaused) {
             if (obj.t !== 'report' && !safeCommand) return false;
         }
-        if (!app.ws || app.ws.readyState !== 1) return false;
+        if (!app.ws || app.ws.readyState !== 1) {
+            onTransportFailure?.();
+            return false;
+        }
         if (obj.t !== 'hello' && connectionState !== 'connected') return false;
         if (typeof obj.ch === 'string' && obj.ch.startsWith('pm:')) {
             const text = typeof obj.text === 'string' ? obj.text : '';
@@ -964,6 +967,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const payload = JSON.stringify(obj);
         if (Number.isFinite(app.ws.bufferedAmount) && app.ws.bufferedAmount + new Blob([payload]).size > 2 * 1024 * 1024) {
             app.ws.close(4413, 'outgoing connection fell behind');
+            onTransportFailure?.();
             return false;
         }
         try {
@@ -972,7 +976,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 : obj.t === 'say' && /^\/(?!\/)/.test(obj.text || '') ? String(obj.text).slice(1).split(/\s/, 1)[0].toLowerCase() : '';
             if (['quit', 'exit', 'bye'].includes(name)) clearMessageRecovery();
             return true;
-        } catch { return false; }
+        } catch {
+            onTransportFailure?.();
+            return false;
+        }
     };
     const cmd = (name, args = [], ch = app.active, roomInstance) => send({ t: 'cmd', name, args, ch, ...(['msg', 'm'].includes(name) ? { pmExplicit: true } : {}), ...(roomInstance === undefined ? {} : { roomInstance }) });
     // Named intent is explicit at prompt/API call sites, never added by the
@@ -3517,8 +3524,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (ordinary && !record) return;
         const frame = { t: 'say', ch: app.active, text };
         if (record && !record.legacy) frame.clientMessageId = record.id;
-        const sent = send(frame);
-        if (sent) { input.value = ''; drafts.delete(app.active); drawMessageRecovery(); }
+        const sent = send(frame, () => {
+            toast('Couldn’t send your message. Your draft is still here. Try sending it again.', [], 'chat-send-failed');
+        });
+        if (sent) {
+            if (toastKind === 'chat-send-failed') dismissToast();
+            input.value = ''; drafts.delete(app.active); drawMessageRecovery();
+        }
         else if (record) forgetSavedMessage(record);
     });
     $$('[data-quick-line]').forEach((b) => b.addEventListener('click', () => send({ t: 'say', ch: app.active, text: b.dataset.quickLine })));
