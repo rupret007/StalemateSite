@@ -178,6 +178,11 @@ test('keyboard guest can join, recover a named-room error, chat, navigate tabs a
         await page.keyboard.type('#art-keyboard'); await page.keyboard.press('Enter');
         await expect(page.locator('[data-channel-error]')).toContainText('starts an activity room');
         await expect(page.locator('[data-channel-name]')).toHaveAttribute('aria-describedby', /channel-name-error/);
+        await expect(page.locator('[data-channel-name]')).toHaveAttribute('aria-invalid', 'true');
+        await expect(page.locator('[data-channel-name]')).toHaveAccessibleDescription(/starts an activity room/);
+        await replaceText(page, '#keyboard-studio');
+        await expect(page.locator('[data-channel-name]')).not.toHaveAttribute('aria-invalid');
+        await expect(page.locator('[data-channel-error]')).toBeEmpty();
         await expect(page.locator('[data-channel-name]')).toBeFocused();
         await page.keyboard.press('Escape'); await expect(dialog).toBeHidden(); await expect(opener).toBeFocused();
         await page.keyboard.press('Enter'); await replaceText(page, '#keyboard-studio'); await page.keyboard.press('Enter');
@@ -255,6 +260,43 @@ test('a delayed native close event cannot erase a reopened channel request and t
         expect(visitor.errors).toEqual([]); expect(transportErrors).toEqual([]);
     } finally { await visitor.close(); }
 });
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    test(`the keyboard can retry an unsent IRC command at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+        const visitor = await guest(browser, baseURL, `CommandGuest${viewport.width}`, viewport, undefined, page =>
+            page.addInitScript(() => {
+                const send = WebSocket.prototype.send;
+                let refuse = true;
+                WebSocket.prototype.send = function (data) {
+                    const frame = JSON.parse(data);
+                    if (frame.t === 'cmd' && frame.name === 'help' && refuse) {
+                        refuse = false;
+                        throw new Error('Fixture: first help command could not send');
+                    }
+                    return send.call(this, data);
+                };
+            }));
+        try {
+            const { page } = visitor;
+            const opener = page.locator('[data-palette-open]');
+            const dialog = page.getByRole('dialog', { name: 'Commands' });
+            await tabTo(page, opener);
+            await page.keyboard.press('Enter');
+            const help = dialog.getByRole('button', { name: '/help', exact: true });
+            await tabTo(page, help);
+            await page.screenshot({ path: testInfo.outputPath('before-command-failure.png') });
+            await page.keyboard.press('Enter');
+            await expect(dialog.getByRole('status')).toContainText('Couldn’t send that command');
+            await expect(help).toBeFocused();
+            await expect(help).toBeInViewport();
+            await page.screenshot({ path: testInfo.outputPath('command-ready-to-retry.png') });
+            await page.keyboard.press('Enter');
+            await expect(dialog).toBeHidden();
+            await expect(opener).toBeFocused();
+            expect(visitor.errors).toEqual([]);
+        } finally { await visitor.close(); }
+    });
+}
 
 test('host command, camera and person dialogs expose visible headings as accessible names', async ({ browser, baseURL }) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);

@@ -11,19 +11,18 @@ async function rummyWithoutStorage(page, url, touch) {
         } });
     });
     await page.goto(url);
-    // Give the storage recovery journey a repeatable opening deal. A random
-    // deal can let the bot knock before the player has a chance to draw.
-    await page.evaluate(() => {
-        let seed = 1;
-        Math.random = () => {
-            seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-            return seed / 0x100000000;
-        };
-    });
     await activate(page.locator('#startRoundBtn'), touch);
     if (await page.locator('#coachSkipBtn').isVisible()) await activate(page.locator('#coachSkipBtn'), touch);
-    await expect(page.locator('#drawStockBtn')).toBeEnabled();
-    await activate(page.locator('#drawStockBtn'), touch);
+    const drawStock = page.locator('#drawStockBtn');
+    const nextRound = page.locator('#newRoundBtn');
+    await expect.poll(async () => await drawStock.isEnabled() || await nextRound.isEnabled()).toBe(true);
+    if (await nextRound.isEnabled()) {
+        // The bot can legally knock before the first player draw. The next deal starts with the player.
+        if (!await nextRound.isVisible()) await activate(page.locator('.mobile-settings summary'), touch);
+        await activate(nextRound, touch);
+    }
+    await expect(drawStock).toBeEnabled();
+    await activate(drawStock, touch);
     await expect(page.locator('#playerHand [data-hand-id]')).toHaveCount(11);
     await activate(page.locator('#playerHand button[data-card-id]:visible').first(), touch);
     await activate(page.locator('#discardBtn'), touch);
