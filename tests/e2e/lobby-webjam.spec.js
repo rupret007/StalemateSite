@@ -375,11 +375,49 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         await accept.click();
         await expect(audio).toBeVisible();
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        const jamText = guest.getByRole('textbox', { name: 'Message', exact: true });
+        if (!delayed) {
+            await jamText.fill('Keep this rehearsal note in the Jam room.');
+            await jamText.press('Enter');
+            await expect(guest.getByRole('log')).toContainText('Keep this rehearsal note in the Jam room.');
+            await jamText.fill('Unsent Jam draft for later.');
+        }
         await audio.focus();
         const lobbyTab = guest.locator('[data-tabs] [data-channel-key="#stalemate"]');
         await lobbyTab.dispatchEvent('click');
         await expect(panel).toBeHidden();
         await expect(lobbyTab).toBeFocused();
+
+        if (!delayed) {
+            // Expiry while focused must replace the old action and explain recovery.
+            await guest.clock.install({ time: Date.now() });
+            await guest.clock.pauseAt(new Date(Date.now() + 100));
+            expect(await returnInvite(invite)).toBe(true);
+            await expect(accept).toBeVisible();
+            await accept.focus();
+            await guest.clock.fastForward(121_000);
+            const expired = 'This Music invitation expired. Ask the host to send a fresh one.';
+            await expect(guestStatus).toHaveText(expired);
+            await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
+            await expect(accept).toBeHidden();
+            const freshExpiry = await guest.evaluate(() => Math.floor(Date.now() / 1000) + 120);
+            const fresh = invite.replace(/&e=\d+$/, `&e=${freshExpiry}`);
+            const opensBeforeResend = await guest.evaluate(() => window.browserOpens.length);
+            expect(await returnInvite(fresh)).toBe(true);
+            await expect(accept).toBeVisible();
+            await expect(other.locator('[data-music-invite]')).toBeHidden();
+            await accept.press('Enter');
+            await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+            await expect(audio).toBeFocused();
+            await expect(audio).toBeInViewport();
+            await expect(jamText).toHaveValue('Unsent Jam draft for later.');
+            await expect(guest.getByRole('log')).not.toContainText('Unsent Jam draft for later.');
+            await expect(guest.getByRole('log')).toContainText('Keep this rehearsal note in the Jam room.');
+            await audio.press('Enter');
+            expect(await guest.evaluate(index => window.browserOpens.slice(index), opensBeforeResend))
+                .toEqual([[fresh, '_blank', 'noopener,noreferrer']]);
+            expect(await guest.evaluate(() => [window.copiedInvite, window.audioRequests])).toEqual(['', 0]);
+        }
         expect(f.external).toEqual([]);
     } finally { await f.close(); }
 });

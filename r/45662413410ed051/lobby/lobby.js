@@ -1881,7 +1881,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         else if (frame.t === 'music-invite-ended') return endMusicInvite();
         else if (!['joining', 'unconfirmed'].includes(musicInvite.state)) return;
         else {
-            const current = currentJam();
+            const current = currentJam(musicInvite.room);
             const link = typeof frame.href === 'string' && browserInviteLink({ webReady: true, web: frame.href });
             if (!link || musicInvite.expires <= Date.now() || current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance
                 || frame.ch !== musicInvite.room || frame.roomInstance !== musicInvite.instance
@@ -1889,6 +1889,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             clearTimeout(musicInvite.replyTimer);
             musicInvite.href = link;
             musicInvite.state = 'accepted';
+            if (app.active !== current.name) switchTo(current.name);
         }
         drawMusicInvite();
     }
@@ -1897,8 +1898,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         clearTimeout(musicInvite?.replyTimer);
     }
     function endMusicInvite() {
-        if (!musicInvite) return;
+        if (!musicInvite || musicInvite.state === 'ended') return;
         clearMusicInviteTimers();
+        musicInvite.expired = musicInvite.expires <= Date.now();
         musicInvite.state = 'ended';
         delete musicInvite.href;
         drawMusicInvite();
@@ -1920,7 +1922,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             // action. Keep the room-wide controls available for published links.
             $('[data-jam-actions]').hidden = targetsCurrentRoom && !ended && !panel.hidden;
         }
-        const message = panel.hidden ? '' : ended ? 'This music invitation ended. Ask the host for a fresh one.'
+        const endedMessage = musicInvite?.expired
+            ? 'This Music invitation expired. Ask the host to send a fresh one.'
+            : 'This Music invitation ended. Ask the host for a fresh one.';
+        const message = panel.hidden ? '' : ended ? endedMessage
             : accepted ? 'You’re in the Jam room. WebJam opens in a new tab. Come back to this tab to chat.'
             : unconfirmed ? 'Hang Out hasn’t confirmed your Music invitation. Wait here or ask the host to send a fresh one.'
             : joining ? 'Waiting for Hang Out to confirm you joined.'
@@ -1982,8 +1987,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         drawMusicInvite();
         resetJamControls();
     }
-    function currentJam() {
-        const c = app.chans.get(app.active);
+    function currentJam(key = app.active) {
+        const c = app.chans.get(key);
         return connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
             && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
     }
