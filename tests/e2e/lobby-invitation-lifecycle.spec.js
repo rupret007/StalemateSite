@@ -365,7 +365,7 @@ test('a co-host can kick or ban after the founder leaves and the guest can tell 
         }
         const person = (page, nick) => page.locator('[data-nicks] button.nick').filter({ hasText: new RegExp(`^${nick}$`) });
         await person(host, 'GuestCohost').click();
-        await host.getByRole('button', { name: 'Make @', exact: true }).click();
+        await host.getByRole('button', { name: 'Add guest co-host', exact: true }).click();
         await expect(cohost.locator('[data-roomtools]')).toBeVisible();
         await host.locator('[data-leave]').click();
         await expect(host.locator('[data-chat-context]')).toHaveText('#stalemate');
