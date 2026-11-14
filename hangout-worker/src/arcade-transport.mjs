@@ -139,6 +139,10 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             try { socket.serializeAttachment({ ...recipient, subjects: permitted ? subjects : [] }); }
             catch { close(socket, 1011, 'match connection unavailable'); continue; }
             const view = permitted && game ? game.view(binding.betaSid, now()) : null;
+            const invitation = binding.gameGuest;
+            if (view?.waiting && invitation && view.id !== invitation.match && invitation.game === name
+                && invitation.room === recipient.room && invitation.ref === recipient.ref && invitation.host === subjects[0]
+                && !claims.some(claim => claim.sid === binding.betaSid)) view.replacementAvailable = true;
             if (view?.waiting && claims.length) {
                 const reserved = claims.some(claim => claim.sid === binding.betaSid);
                 view.hasOpenSeat = reserved || game.hasGuestSeat(view.id, subjects[0], claims.length);

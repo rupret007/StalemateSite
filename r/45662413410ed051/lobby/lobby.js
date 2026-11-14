@@ -1917,7 +1917,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         }
         const invite = arcadeInvitation;
         if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
-        if (state?.seat && (state.id === invite.match || gameGuest)) {
+        const canSeeReplacement = gameGuest && state?.replacementAvailable === true;
+        if (canSeeReplacement || state?.seat && (state.id === invite.match || gameGuest)) {
             if (gameGuest && !gameGuestSeated) {
                 gameGuestSeated = true;
                 gameGuestReloadOffered = false;
