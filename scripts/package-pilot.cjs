@@ -9,6 +9,10 @@ const out = path.join(root, `.${target}-assets`);
 fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
 for (const dir of ['r', 'assets', ...(target === 'beta' ? ['join'] : [])]) fs.cpSync(path.join(root, dir), path.join(out, dir), { recursive: true });
 if (target === 'beta') {
+    const chessJoin = path.join(root, 'hangout-worker', 'web-join-chess');
+    for (const file of ['index.html', 'session.js', 'game-offer.js']) {
+        fs.copyFileSync(path.join(chessJoin, file), path.join(out, 'join', file));
+    }
     const play = path.join(root, 'play');
     fs.mkdirSync(path.join(out, 'play/assets'), { recursive: true });
     fs.copyFileSync(path.join(play, 'assets/suite-sound.js'), path.join(out, 'play/assets/suite-sound.js'));
