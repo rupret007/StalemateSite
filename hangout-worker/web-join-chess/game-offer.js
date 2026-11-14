@@ -5,7 +5,7 @@ export const GAME_OFFER_LABEL = "webjoin-game-offer";
 export const OFFER_TTL_MS = 120000;
 export const AGE_LINE = "By joining, you confirm you're 13+ and agree to the house rules.";
 const HANGOUT_GUEST_PAGE = "https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/game-night/webjam-guest";
-const FULL_COPY = "Table full, you're up next game";
+const FULL_COPY = "This table is full. Stay in this room and ask your host for a new invite when a seat opens.";
 const EXPIRED_COPY = "This game offer expired";
 
 let generation = 0;
@@ -99,7 +99,7 @@ function showStatus(root, doc, state, env) {
   const copy = state === "full" ? FULL_COPY : state === "expired" ? EXPIRED_COPY : "";
   if (!copy) return;
   beginCard();
-  const button = leaf(doc, "button", "OK");
+  const button = leaf(doc, "button", "Dismiss");
   button.type = "button";
   button.disabled = false;
   button.addEventListener("click", (event) => {

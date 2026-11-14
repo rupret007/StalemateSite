@@ -6,8 +6,8 @@
   "files": {
     "game-offer.js": {
       "source": "web/join/game-offer.js",
-      "sha256": "03ff4afaef2b28a3f7908861d517518c9013ef5deda530563e1ffec2d4715ea7",
-      "adaptation": null
+      "sha256": "f43e6fb5408e3a6def9a519822df1ecc361dfd38a6640bf303e6023a365a50c3",
+      "adaptation": "Protected full-table guidance and dismiss label"
     },
     "index.html": {
       "source": "web/join/index.html",
