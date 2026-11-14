@@ -17,6 +17,14 @@ function env(extra = {}) {
         ASSETS: { fetch: vi.fn(async () => new Response(readFileSync(new URL('../../r/45662413410ed051/entry-sites.mjs', import.meta.url), 'utf8'))) },
         LOBBY: {}, QUOTA: {}, ROOMS: {}, BETA_SESSIONS: {}, ...extra };
 }
+it('explains an invalid Game Night link before loading the lobby', async () => {
+    const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });
+    const response = await betaFetch(new Request('https://beta.example' + root + 'lobby/?game-guest=1&table=invalid'), config);
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe('This Game Night link is not valid.');
+    expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+});
+
 it('returns unavailable for an invitation replay after its guest session was revoked', async () => {
     const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });
     const exp = Date.now() + 60_000;

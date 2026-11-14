@@ -8,9 +8,9 @@ describe('Game Night phone wake and history recovery', () => {
         hidden = value;
         document.dispatchEvent(new Event('visibilitychange'));
     };
-    function ready(socket) {
+    function ready(socket, features = {}) {
         socket.readyState = WebSocket.OPEN;
-        socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ t: 'match-ready', version: 1, ping: true }) }));
+        socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ t: 'match-ready', version: 1, ping: true, ...features }) }));
     }
 
     beforeEach(async () => {
@@ -76,6 +76,26 @@ describe('Game Night phone wake and history recovery', () => {
         expect(sockets).toHaveLength(2);
     });
 
+    it('uses one ticket on history restore and repeats hello with the confirmed snapshot sequence', async () => {
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const current = sockets.at(-1);
+        ready(current, { snapshots: true });
+        expect(current.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([{ version: 1, t: 'hello', lastSeq: 0 }]);
+        current.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'snapshot', version: 1, room: '#game-fixture', seq: 7, state: null })
+        }));
+        visibility(true);
+        vi.setSystemTime(121_000);
+        restored();
+        visibility(false);
+        expect(issue).toHaveBeenCalledTimes(3); // Original setup, new scope, single restore.
+        await vi.advanceTimersByTimeAsync(0);
+        const replacement = sockets.at(-1);
+        ready(replacement, { snapshots: true });
+        expect(replacement.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([{ version: 1, t: 'hello', lastSeq: 7 }]);
+    });
+
     function matchState(state) {
         sockets.at(-1).dispatchEvent(new MessageEvent('message', {
             data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state })
@@ -117,6 +137,24 @@ describe('Game Night phone wake and history recovery', () => {
             await vi.advanceTimersByTimeAsync(0);
             client.stop();
             expect(locks[2].release).toHaveBeenCalledTimes(1);
+        } finally { delete navigator.wakeLock; }
+    });
+
+    it('retries a pending wake lock denied during a hide and return', async () => {
+        const { request, locks } = fakeWakeLock();
+        let reject;
+        request.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }));
+        try {
+            matchState({ seat: 'w', match: {} });
+            visibility(true);
+            visibility(false);
+            expect(request).toHaveBeenCalledTimes(1);
+            reject(new DOMException('Document became hidden', 'NotAllowedError'));
+            await vi.advanceTimersByTimeAsync(0);
+            expect(request).toHaveBeenCalledTimes(2);
+            expect(locks).toHaveLength(1);
+            client.stop();
+            expect(locks[0].release).toHaveBeenCalledOnce();
         } finally { delete navigator.wakeLock; }
     });
 

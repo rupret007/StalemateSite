@@ -17,7 +17,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
     let pausedForNetwork = false, terminalError = false, lastSeq = 0;
     let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false;
-    let playing = false, wakeLock, pendingWakeLock = false;
+    let playing = false, wakeLock, pendingWakeLock = false, retryWakeLock = false;
     async function updateWakeLock() {
         if (!playing || document.hidden) {
             const prior = wakeLock;
@@ -37,7 +37,13 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                 }, { once: true });
             }
         } catch { /* The browser can deny or lack screen wake locks. */ }
-        finally { pendingWakeLock = false; }
+        finally {
+            pendingWakeLock = false;
+            if (retryWakeLock) {
+                retryWakeLock = false;
+                void updateWakeLock();
+            }
+        }
     }
     function setPlaying(active) {
         playing = active;
@@ -165,6 +171,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         if (event.persisted) reconnect();
     });
     document.addEventListener('visibilitychange', () => {
+        if (pendingWakeLock && !document.hidden) retryWakeLock = true;
         void updateWakeLock();
         if (document.hidden) { hiddenAt = Date.now(); return; }
         const away = hiddenAt === undefined ? 0 : Date.now() - hiddenAt;
