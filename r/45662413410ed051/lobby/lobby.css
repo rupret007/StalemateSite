@@ -811,7 +811,10 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   /* The lobby welcome and phone navigation leave less height for the transcript. */
   .chat:where(:has(> .lobby-welcome:not([hidden]))) .buffer { min-height: 56px; }
   /* A return offer takes its own row. Save room for the composer while it is open. */
+  .irc:has(.game-offer:not([hidden])) .lobby-welcome { margin-block: 8px 4px; padding: 8px; }
   .irc:has(.game-offer:not([hidden])) .lobby-welcome p { display: none; }
+  .irc:has(.game-offer:not([hidden])) .conversation-starters { flex-wrap: nowrap; overflow-x: auto; }
+  .irc:has(.game-offer:not([hidden])) .conversation-starters button { white-space: nowrap; }
   .irc:has(.game-offer:not([hidden])) .buffer { min-height: 24px; }
 }
 /* Small phones and landscape windows keep the composer ahead of welcome copy. */

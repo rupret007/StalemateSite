@@ -996,9 +996,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function personCommand(context, name, args = []) {
         const current = context && app.chans.get(context.channel);
         const safety = ['block', 'ignore', 'unignore'].includes(name);
-        if (!personContextValid(context) || connectionState !== 'connected' || !current || current.keepRef !== context.instance
-            || !safety && !findPerson(context.peer)) {
-            personSheetStatus('That person or room is no longer confirmed. Choose a current person.'); return false;
+        if (connectionState !== 'connected') {
+            personSheetStatus('You’re disconnected. Reconnect before trying again.'); return false;
+        }
+        if (!personContextValid(context) || !current || current.keepRef !== context.instance) {
+            personSheetStatus('This person menu is out of date. Close it and choose someone from the current room.'); return false;
+        }
+        if (!safety && !findPerson(context.peer)) {
+            personSheetStatus(`${context.label || 'That guest'} went offline. Close this window and choose someone who’s online.`); return false;
         }
         const values = [...args]; if (values.length) values[0] = personLabel(context);
         const sent = send({ t: 'cmd', name, args: values, ch: context.channel, roomInstance: context.instance, personContext: 1, personPeer: context.peer });
