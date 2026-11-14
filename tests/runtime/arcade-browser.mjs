@@ -1735,7 +1735,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(b.getByLabel('Your bid')).toHaveValue('0');
         }
         for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Bid for me' }).click();
-        await expect(a.locator('[data-spades-trick]')).toContainText('West · Nil');
+        await expect(a.locator('[data-spades-trick]')).toContainText('West · Bid Nil · 0 tricks');
         const lead = b.locator('[data-spades-card]:enabled').first();
         await verifyCardLandscape(b, 'TurdSpades', lead, b.locator('[data-spades-action="resign"]'));
         await lead.scrollIntoViewIfNeeded();
@@ -1771,11 +1771,26 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             assert.deepEqual(await ids(b), hand);
             await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         }
+        let checkedFollowSuit = false;
         for (const page of [north, east, a]) {
+            await expect(page.locator('[data-spades-status]')).toContainText('Your play');
+            const restricted = page.locator('[data-spades-card]:disabled');
+            if (await restricted.count()) {
+                checkedFollowSuit = true;
+                await expect(page.locator('[data-spades-card][data-cannot-follow]')).toHaveCount(await restricted.count());
+                await expect(restricted.first()).toHaveCSS('opacity', '0.52');
+                await expect(restricted.first()).toHaveAccessibleName(/cannot play this turn$/);
+                const playable = page.locator('[data-spades-card]:enabled').first();
+                await expect(playable).not.toHaveAttribute('data-cannot-follow');
+                await expect(playable).not.toHaveAccessibleName(/cannot play this turn$/);
+            }
             await page.locator('[data-spades-card]:enabled').first().click();
             await expect(page.locator('[data-spades-card]')).toHaveCount(12);
+            await expect(page.locator('[data-spades-card][data-cannot-follow]')).toHaveCount(0);
         }
+        assert.ok(checkedFollowSuit, 'the first trick exercises follow-suit dimming');
         await expect(a.locator('[data-spades-status]')).toContainText('won the last trick');
+        await expect(a.locator('[data-spades-trick]')).toContainText('1 trick');
         await finishSpadesRound(players, commands);
         await b.locator('[data-spades-action="resign"]').click();
         await b.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
