@@ -589,6 +589,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 host.on('request', request => {
                     if (new URL(request.url()).pathname === '/beta/game-night/invitation/issue') issues++;
                 });
+                if (webShare) await host.route('**/beta/game-night/invitation/issue', async route => {
+                    const response = await route.fetch();
+                    const { code, until } = await response.json();
+                    assert.ok(code && Number.isFinite(until), 'the current Worker supplies a signed invitation and expiry');
+                    await route.fulfill({ response, json: { code } });
+                }, { times: 1 });
                 await host.evaluate(supported => {
                     window.testGameShares = 0;
                     Object.defineProperty(navigator, 'share', { configurable: true, value: supported ? async ({ title, url }) => {
@@ -611,10 +617,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(share).toBeEnabled();
                 await expect(host.getByRole('button', { name: 'Copy invite', exact: true })).toBeVisible();
                 assert.equal(issues, 1, 'the WebJam handoff prepares exactly one invitation');
+                const status = host.locator('[data-game-invite-link-status]');
+                if (webShare) await expect(status).toHaveText('This link is for one guest. Send it now while your table has a seat available.');
+                else {
+                    await expect(status).toContainText('Link expires');
+                    await host.clock.setFixedTime(Date.now() + 30 * 60_000);
+                    await share.click();
+                    await expect(status).toHaveText('This invitation expired. Prepare a new one.');
+                    await expect(host.getByRole('button', { name: 'Invite a friend to Royal Flush Chess', exact: true })).toBeFocused();
+                    await host.clock.setFixedTime(Date.now());
+                    await host.getByRole('button', { name: 'Invite a friend to Royal Flush Chess', exact: true }).click();
+                    await expect(host.getByRole('button', { name: 'Copy invite', exact: true })).toBeFocused();
+                    await expect(share).toBeVisible();
+                    await expect(status).toContainText('Link expires');
+                }
                 assert.equal(await host.evaluate(() => window.testGameShares), 0, 'table readiness never invokes Web Share');
                 assert.ok(!new URL(host.url()).searchParams.has('deliver'), 'the handoff is removed from the address');
                 if (webShare) {
-                    const status = host.locator('[data-game-invite-link-status]');
                     await share.click();
                     await expect(share).toBeDisabled();
                     await expect(status).toHaveText('Choose a friend in the share sheet…');
@@ -627,7 +646,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(share).toBeHidden();
                     assert.equal(await host.evaluate(() => window.testGameShares), 2, 'both share calls came from trusted clicks');
                 }
-                assert.equal(issues, 1, 'sharing an already prepared invitation issues no extra link');
+                assert.equal(issues, webShare ? 1 : 2, 'only an explicit replacement issues another link');
             } finally { await host.context().close(); }
         }
     }

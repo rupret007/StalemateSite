@@ -2592,9 +2592,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         const request = pendingGuestLink, target = arcadeInviteTarget();
         if (request?.link && request.room === currentGameNight() &&
             request.target.game === target?.game && request.target.match === target.match) {
-            if (request.until > Date.now()) return request;
+            if (request.until === undefined || request.until > Date.now()) return request;
             resetGuestLink();
             guestLinkStatus.textContent = 'This invitation expired. Prepare a new one.';
+            createGuestLink.focus({ preventScroll: true });
             return;
         }
         resetGuestLink();
@@ -2641,7 +2642,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             });
             const value = await response.json();
             if (pendingGuestLink !== request || room !== currentGameNight()) return;
-            if (!response.ok || !gameInviteCode(value.code) || !Number.isFinite(value.until) || value.until <= Date.now()) {
+            if (!response.ok || !gameInviteCode(value.code) || value.until !== undefined && (!Number.isFinite(value.until) || value.until <= Date.now())) {
                 throw new Error(value.error || 'The invitation could not be prepared. Try again.');
             }
             request.until = value.until;
@@ -2654,8 +2655,12 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             const sharePrimary = canShare || preferEmail || copyGuestLink.hidden;
             copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
             shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
-            const expiry = new Date(request.until).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-            guestLinkStatus.textContent = `One guest can join while a seat is available. Link expires ${expiry}.`;
+            if (request.until === undefined) {
+                guestLinkStatus.textContent = 'This link is for one guest. Send it now while your table has a seat available.';
+            } else {
+                const expiry = new Date(request.until).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+                guestLinkStatus.textContent = `One guest can join while a seat is available. Link expires ${expiry}.`;
+            }
             if (deliver && await deliverPreparedLink(request)) return;
             if (pendingGuestLink !== request) return;
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();
