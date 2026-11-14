@@ -1,6 +1,6 @@
 import { gameNightCue } from './game-night-audio.mjs';
 import { Chess, claimReason, colorName, intendedClaims, pieceName } from '/play/games/chess-core.js';
-import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors, matchHiddenText } from './game-night-match-client.mjs';
 
 const files = 'abcdefgh', ranks = '87654321';
 const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
@@ -281,6 +281,8 @@ export function mountArcadeChess(container, onMatch) {
         } else if (connection !== 'ready') {
             status.textContent = match ? 'Reconnecting to Chess… The clocks keep running.'
                 : connection === 'reconnecting' ? 'Reconnecting to Chess…' : 'Connecting to Chess…';
+        } else if (!model && client.matchOpen()) {
+            status.textContent = matchHiddenText;
         } else if (!model) {
             status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a match.';
             if (canOpen) button('Open Chess match', 'open');

@@ -96,6 +96,38 @@ describe('Game Night phone wake and history recovery', () => {
         expect(replacement.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([{ version: 1, t: 'hello', lastSeq: 7 }]);
     });
 
+    function snapshot(fields) {
+        sockets.at(-1).dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'snapshot', version: 1, room: '#game-fixture', seq: 1, state: null, ...fields })
+        }));
+    }
+
+    it('tells a table view when a game is open but hidden, so it never says to wait for the host', async () => {
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        ready(sockets.at(-1), { snapshots: true });
+        expect(client.matchOpen()).toBe(false);
+        snapshot({ phase: 'lobby', currentMatchId: null });
+        expect(client.matchOpen()).toBe(false);
+        for (const phase of ['playing', 'finished', 'unavailable']) {
+            snapshot({ phase, currentMatchId: phase === 'unavailable' ? null : 'match-fixture' });
+            expect(client.matchOpen()).toBe(true);
+        }
+        snapshot({ phase: 'playing', currentMatchId: 'match-fixture', state: { seat: null, match: {} } });
+        expect(client.matchOpen()).toBe(false);
+    });
+
+    it.each(['arcade-chess', 'arcade-crapeights', 'arcade-turdrummy', 'arcade-turdspades', 'arcade-turdjack'])(
+        'checks for a hidden game before the waiting-for-host copy in %s', async view => {
+            const { readFileSync } = await import('node:fs');
+            const source = readFileSync(`r/45662413410ed051/lobby/${view}.mjs`, 'utf8');
+            const hidden = source.indexOf('} else if (!model && client.matchOpen()) {');
+            const waiting = source.indexOf('Waiting for the host to open');
+            expect(hidden).toBeGreaterThan(-1);
+            expect(waiting).toBeGreaterThan(hidden);
+            expect(source.slice(hidden, waiting)).toContain('matchHiddenText');
+        });
+
     function matchState(state) {
         sockets.at(-1).dispatchEvent(new MessageEvent('message', {
             data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state })

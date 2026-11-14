@@ -1,5 +1,5 @@
 import { gameNightCue } from './game-night-audio.mjs';
-import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors, matchHiddenText } from './game-night-match-client.mjs';
 
 const seats = ['one', 'two', 'three', 'four'];
 const seatName = seat => 'Seat ' + (seats.indexOf(seat) + 1);
@@ -210,6 +210,8 @@ export function mountArcadeTurdJack(container, onMatch) {
             if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect table'; }
         } else if (connection !== 'ready') {
             if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
+        } else if (!model && client.matchOpen()) {
+            message = matchHiddenText;
         } else if (!model) {
             message = canOpen ? 'Open a shared dealer table for two to four players. Play chips only.' : 'Waiting for the host to open a table.';
             if (canOpen) { action = 'open'; label = 'Open Crapjack table'; }

@@ -71,6 +71,10 @@ export function createGameNightTable({
         get mode() { return mode; }
         get host() { return this.#host; }
         get tableId() { return this.#tableId; }
+        // What a viewer who cannot see the board may still be told.
+        get openMatch() {
+            return this.#closed || !this.#match ? null : { id: this.#id, finished: !!finished(this.#match) };
+        }
         get subjects() { return sides.map(seat => this.#seats[seat]).filter(Boolean); }
 
         seat(subject) {

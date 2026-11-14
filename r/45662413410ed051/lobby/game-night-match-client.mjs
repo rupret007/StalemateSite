@@ -9,13 +9,16 @@ export const matchConnectionErrors = Object.freeze({
     'rate-limited': 'This match reached a connection or activity limit. Try again later.'
 });
 
+// Shown in place of "Waiting for the host" when the table has a game this person cannot see.
+export const matchHiddenText = 'A game is under way at this table. You can’t see it right now.';
+
 // A match connection can be replaced without changing room, chat or call.
 export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
     const tableId = window.HangoutBootstrap?.gameGuest?.tableId;
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1'
         ? '?game-guest=1' + (tableId ? '&table=' + tableId : '') : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
-    let pausedForNetwork = false, terminalError = false, lastSeq = 0;
+    let pausedForNetwork = false, terminalError = false, lastSeq = 0, matchOpen = false;
     let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false;
     let playing = false, wakeLock, pendingWakeLock = false, retryWakeLock = false;
     async function updateWakeLock() {
@@ -136,6 +139,8 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                         claimTimer = setTimeout(() => send({ action: 'sync' }), wait);
                     }
                     const match = frame.state?.match;
+                    // The server names a phase other than lobby when a game is open but hidden.
+                    matchOpen = !frame.state && typeof frame.phase === 'string' && frame.phase !== 'lobby';
                     setPlaying(!!match && !!frame.state.seat && frame.phase !== 'finished' && !match.result);
                     onState(frame);
                     if (attempt === generation) onMatch?.(scope, frame.state, send, false,
@@ -182,8 +187,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         pongTimer = setTimeout(reconnect, 1500);
     });
     return {
-        start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; void connect(); },
+        start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; matchOpen = false; void connect(); },
         stop,
+        matchOpen: () => matchOpen,
         send
     };
 }

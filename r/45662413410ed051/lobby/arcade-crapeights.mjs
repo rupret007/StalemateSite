@@ -1,5 +1,5 @@
 import { gameNightCue } from './game-night-audio.mjs';
-import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors, matchHiddenText } from './game-night-match-client.mjs';
 
 const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds'], C: ['♣', 'Clubs'] };
 const side = { a: 'Seat 1', b: 'Seat 2' };
@@ -183,6 +183,8 @@ export function mountArcadeCrapeights(container, onMatch) {
         } else if (phase !== 'ready') {
             status.textContent = match && seated ? 'Reconnecting to the table… Your hand is paused.'
                 : phase === 'reconnecting' ? 'Reconnecting to the table…' : 'Connecting to the table…';
+        } else if (!model && client.matchOpen()) {
+            status.textContent = matchHiddenText;
         } else if (!model) {
             status.textContent = canOpen ? 'Open a head-to-head table for this room.' : 'Waiting for the host to open a table.';
             if (canOpen) { command = 'open'; label = 'Open Eights table'; }
