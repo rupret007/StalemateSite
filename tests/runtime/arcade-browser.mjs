@@ -2256,11 +2256,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         b.on('websocket', observeLaunch);
         if (media) {
+            let delayFirstAim = process.env.ARCADE_BRICK_LATE_AIM === '1';
             await b.routeWebSocket(/\/beta\/arcade-turdanoid-match$/, route => {
                 const server = route.connectToServer();
                 route.onMessage(message => {
                     if (typeof message === 'string' && JSON.parse(message).action === 'input') {
-                        setTimeout(() => server.send(message), 220);
+                        const delay = delayFirstAim ? 520 : 220;
+                        setTimeout(() => {
+                            delayFirstAim = false;
+                            server.send(message);
+                        }, delay);
                     } else server.send(message);
                 });
             });
@@ -2323,10 +2328,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
             } finally { await connection.detach(); }
         } else await b.touchscreen.tap(x + field.width * .075, y);
-        if (prediction) assert.equal(await prediction, true, 'phone drag moves paddle before delayed server confirmation');
-        await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
-        await expect(match(b)).toHaveAttribute('data-stuck', 'true');
-        await expect(match(b)).toHaveAttribute('data-sequence', /^[1-9]\d*$/);
+        try {
+            if (prediction) assert.equal(await prediction, true, 'phone drag moves paddle before delayed server confirmation');
+            await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
+            await expect(match(b)).toHaveAttribute('data-stuck', 'true');
+            await expect(match(b)).toHaveAttribute('data-sequence', /^[1-9]\d*$/);
+            if (process.env.ARCADE_BRICK_LATE_AIM === '1') {
+                assert.ok(launchFrames.some(frame => frame.reason === 'late-input'), 'the server rejected the delayed aim');
+                await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
+                console.log('Passed Turdanoid late phone aim resync and authoritative retry.');
+            }
+        } catch (error) {
+            const feedback = await b.locator('[data-brick-error]').textContent();
+            console.error('Turdanoid phone drag:', JSON.stringify({ feedback, launchFrames }));
+            throw error;
+        }
         await board(a).focus();
         await a.keyboard.down('ArrowRight');
         await expect.poll(async () => Number(await match(a).getAttribute('data-paddle'))).toBeGreaterThan(248);
@@ -2431,6 +2447,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
+        if (process.env.ARCADE_BRICK_DRAG_ONLY === '1') {
+            const host = await guest('stalemate', 'ChessHost', { width: 1440, height: 900 });
+            const player = await guest('rad-dad', 'ChessGuest', { width: 390, height: 844 }, true);
+            const watcher = await guest('stalemate', 'BrickDragWatcher', { width: 1280, height: 900 });
+            await host.getByRole('button', { name: /Game Night/ }).click();
+            await inviteToGame(host, player, 'ChessGuest');
+            await inviteToGame(host, watcher, 'BrickDragWatcher');
+            if (media) await joinCalls(host, player);
+            await playTurdanoid(host, player, watcher);
+            assert.deepEqual(errors, []);
+            return;
+        }
         if (options.webJamShare) {
             await verifyWebJamShare();
             assert.deepEqual(errors, []);
