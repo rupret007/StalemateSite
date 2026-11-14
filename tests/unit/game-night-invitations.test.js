@@ -144,3 +144,75 @@ it.each([
     lobby.env.HANGOUT_BETA_INVITE_VERSION = '2';
     expect((await resume()).status).toBe(410);
 });
+
+it('keeps a Spades watch link read-only and bound to the same table through redemption and resume', async () => {
+    vi.useFakeTimers();
+    try {
+        const now = Date.now();
+        const host = 'host-session-aaaa';
+        const tableId = '11111111-1111-4111-8111-111111111111';
+        const replacementId = '22222222-2222-4222-8222-222222222222';
+        let currentTable = tableId;
+        const nightEndsAt = now + 60 * 60_000;
+        const rows = new Map();
+        const table = {
+            watchTableId: async scope => !scope.tableId || scope.tableId === currentTable ? currentTable : null,
+            guestNightEndsAt: async scope => scope.tableId === currentTable ? nightEndsAt : 0,
+            reserveGuestSeat: vi.fn()
+        };
+        const lobby = {
+            env: { HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1' },
+            state: { storage: {
+                get: async key => rows.get(key),
+                list: async ({ prefix }) => new Map([...rows].filter(([key]) => key.startsWith(prefix))),
+                put: async (key, record) => {
+                    if (typeof key === 'string') rows.set(key, record);
+                    else for (const [entry, value] of Object.entries(key)) rows.set(entry, value);
+                }
+            } },
+            controlBudget: { take: async () => true },
+            arcadeAvailable: game => game === 'turdspades',
+            arcadeBinding: () => ({ betaSid: host, nick: 'Host', betaInviteVersion: '1', canOpen: true, canPlay: true }),
+            sessionActive: async () => true,
+            engine: { invitedGameHost: () => 'c' + 'a'.repeat(32) },
+            arcade: new Map([['turdspades', table]])
+        };
+        const payload = { actor: 'c' + 'a'.repeat(32), room: '#game-1acbefx23acbe', ref: 'c'.repeat(32),
+            game: 'turdspades', match: tableId, watch: true };
+        const issue = async (session = { betaSid: host }) => (await gameInvitationRequest(lobby, 'issue', payload, session)).json();
+        const pass = 'd'.repeat(64);
+        const passHash = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass))).toString('hex');
+        const attempt = 'e'.repeat(32);
+        const accept = (code, data) => gameInvitationRequest(lobby, 'accept', { code, age13: true, attempt, passHash, ...data });
+        const details = code => gameInvitationRequest(lobby, 'details', { code });
+        const resume = id => gameInvitationRequest(lobby, 'resume', { tableId: id, pass });
+
+        const original = await issue();
+        const pending = await issue();
+        const short = await issue({ betaSid: host, demo: true, exp: now + 1000 });
+        expect(original.until).toBeGreaterThan(nightEndsAt);
+        expect(short.until).toBe(now + 1000);
+        expect(await (await details(original.code)).json()).toMatchObject({ host: 'Host', watch: true });
+        expect((await accept(original.code, { age13: false })).status).toBe(400);
+        const admitted = await (await accept(original.code, { watch: false })).json();
+        expect(admitted.scope).toMatchObject({ tableId, watch: true });
+        expect(admitted.exp).toBe(nightEndsAt);
+        expect(await (await accept(original.code)).json()).toEqual(admitted);
+        expect((await accept(original.code, { attempt: 'f'.repeat(32) })).status).toBe(410);
+        expect(await (await resume(tableId)).json()).toEqual(admitted);
+        expect((await resume(replacementId)).status).toBe(410);
+
+        vi.setSystemTime(short.until);
+        expect((await details(short.code)).status).toBe(410);
+        expect((await accept(short.code)).status).toBe(410);
+        currentTable = replacementId;
+        expect((await details(pending.code)).status).toBe(410);
+        expect((await accept(pending.code)).status).toBe(410);
+        expect((await accept(original.code)).status).toBe(410);
+        expect((await resume(tableId)).status).toBe(410);
+        expect(table.reserveGuestSeat).not.toHaveBeenCalled();
+        expect(gameGuestScope({ ...admitted.scope, game: 'chess' })).toBeNull();
+    } finally {
+        vi.useRealTimers();
+    }
+});

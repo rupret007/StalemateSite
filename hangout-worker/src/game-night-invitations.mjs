@@ -104,7 +104,12 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     if (!scope) return unavailable();
     const attempt = operation === 'accept' ? await digest(body.attempt) : null;
     if (record.redeemer && record.redeemer !== attempt) return unavailable();
-    if (record.redeemer) return record.exp > now ? reply({ scope: record.scope, sid: record.sid, exp: record.exp }) : unavailable();
+    if (record.redeemer) {
+        if (record.exp <= now) return unavailable();
+        if (scope.watch && (!lobby.arcadeAvailable(scope.game) ||
+            await lobby.arcade.get(scope.game).guestNightEndsAt(scope) <= now)) return unavailable();
+        return reply({ scope, sid: record.sid, exp: record.exp });
+    }
 
     const actor = lobby.engine.invitedGameHost(scope);
     const binding = actor && lobby.arcadeBinding({ actor, room: scope.room, ref: scope.ref });

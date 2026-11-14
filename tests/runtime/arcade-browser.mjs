@@ -3144,7 +3144,96 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await verifyGameNightEntry();
         await verifyPrivateSiteEntry();
     }
+    async function verifySpadesWatchInvitation(brand) {
+        const desktop = { width: 1440, height: 900 }, phone = { width: 390, height: 844 };
+        const host = await guest(brand, 'FullTableHost', desktop, false, origin + '/beta/?game-night=1&via=' + brand);
+        await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+        await host.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
+        await host.getByRole('button', { name: 'Open 4-player Spades' }).click();
+        const players = [host];
+        for (const [index, seat] of ['West','North','East'].entries()) {
+            const link = await shareGameNightLink(host, desktop, brand + '-seat-' + seat.toLowerCase());
+            const context = await browser.newContext({ viewport: phone, hasTouch: true, ignoreHTTPSErrors: true });
+            const player = await context.newPage();
+            await openGameNightLink(player, link);
+            await player.getByRole('button', { name: 'Join game', exact: true }).tap();
+            players.push(player);
+            if (index < 2) await expect(host.locator('[data-spades-status]')).toContainText((index + 2) + '/4 seated');
+        }
+        for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
+        await host.evaluate(() => {
+            Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ url }) => { window.testWatchLink = url; } });
+        });
+        await host.getByRole('button', { name: 'Invite players', exact: true }).click();
+        const watchInvite = host.getByRole('button', { name: 'Invite a friend to watch' });
+        await expect(watchInvite).toBeFocused();
+        await captureArcadeInvite(host, desktop, brand + '-watch-picker');
+        await watchInvite.click();
+        await expect(host.locator('[data-game-invite-link-status]')).toHaveText('This link lets one friend watch this table.');
+        await host.getByRole('button', { name: 'Share invite', exact: true }).click();
+        const link = new URL(await host.evaluate(() => window.testWatchLink));
+        const extra = await browser.newContext({ viewport: phone, hasTouch: true, ignoreHTTPSErrors: true });
+        const page = await extra.newPage();
+        const read = watchCardMatch(page, 'turdspades');
+        let upstream;
+        const rejections = [];
+        await page.routeWebSocket(url => url.pathname === '/beta/arcade-turdspades-match', route => {
+            upstream = route.connectToServer();
+            upstream.onMessage(message => {
+                const frame = JSON.parse(message);
+                if (frame.t === 'match-error') rejections.push(frame.reason);
+                route.send(message);
+            });
+        });
+        await openGameNightLink(page, link);
+        const watch = page.getByRole('button', { name: 'Watch game', exact: true });
+        await expect(watch).toBeVisible();
+        await captureArcadeInvite(page, phone, brand + '-watch-consent');
+        await watch.tap();
+        await expect(page.locator('[data-spades-table]')).toHaveAttribute('data-phase', 'bid');
+        await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
+        await expect(page.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
+        await expect(page.getByRole('button', { name: 'Bid for me' })).toBeHidden();
+        await expect(page.locator('[data-spades-card]')).toHaveCount(0);
+        await expect.poll(() => read()?.watchOnly).toBe(true);
+        assert.ok(!read().seat);
+        assert.deepEqual(read().match.hand, []);
+        assert.equal(read().match.canBid, false);
+        const before = read().match;
+        upstream.send(JSON.stringify({ version: 1, action: 'join', id: before.id, seat: 'next' }));
+        upstream.send(JSON.stringify({ version: 1, action: 'bid', id: before.id, revision: before.revision, bid: 1 }));
+        await expect.poll(() => rejections).toEqual(['unavailable', 'unavailable']);
+        assert.equal(read().match.revision, before.revision);
+        await players[1].getByLabel('Your bid').selectOption('1');
+        await players[1].getByRole('button', { name: 'Bid for me' }).tap();
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
+        await captureArcadeInvite(page, phone, brand + '-watch-live');
+        await page.reload();
+        await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
+        for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
+        await extra.clearCookies();
+        await page.reload();
+        await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
+        await host.locator('[data-spades-action="leave"]').click();
+        await host.getByRole('dialog', { name: 'Leave this table?' }).getByRole('button', { name: 'Leave table', exact: true }).click();
+        await host.getByRole('button', { name: 'Reopen 4-player Spades', exact: true }).click();
+        await expect(page.locator('[data-spades-table]')).toHaveAttribute('data-phase', 'bid');
+        await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · No bid yet');
+        await expect(page.locator('[data-spades-card]')).toHaveCount(0);
+        await extra.close();
+        console.log(`Passed ${engine} ${brand} full Spades table watch link, read-only commands, table pass and host reopen.`);
+    }
     try {
+        if (process.env.ARCADE_SPADES_WATCH_BRAND) {
+            const brand = process.env.ARCADE_SPADES_WATCH_BRAND;
+            assert.ok(['stalemate', 'rad-dad'].includes(brand));
+            await verifySpadesWatchInvitation(brand);
+            assert.deepEqual(errors, []);
+            return;
+        }
         if (process.env.ARCADE_GUEST_TABLE_ISOLATION_ONLY === '1') {
             await verifyGuestTableIsolation();
             assert.deepEqual(errors, []);
