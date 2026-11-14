@@ -137,6 +137,19 @@ describe('Game Night match transport', () => {
         expect(await f.storage.getAlarm()).toBe(expiresAt);
     });
 
+    it('lets a redeemed WebJam seat bring the shared alarm forward', async () => {
+        const f = fixture();
+        await f.send(f.a, 'open');
+        const scope = { room, ref, host: sid, match: f.board(f.a).id };
+        const bridge = f.transport.roomGrants;
+        expect(await bridge.hold(scope, { holder: 'webjam-hold', until: 81000, write: {} })).toBe(true);
+        expect(await f.storage.getAlarm()).toBe(81000);
+        expect(await bridge.seat(scope, {
+            subject: 'invited-guest', holder: 'webjam-hold', until: 21000, write: {}
+        })).toBe('b');
+        expect(await f.storage.getAlarm()).toBe(21000);
+    });
+
     it('releases an unused seat after its deadline while keeping the host table', async () => {
         const f = fixture();
         await f.send(f.a, 'open');
