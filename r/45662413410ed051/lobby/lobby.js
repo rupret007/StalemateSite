@@ -1873,8 +1873,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 });
                 return { response, result: await response.json() };
             };
-            const { response, result } = await register().catch(error => {
-                if (!(error instanceof TypeError || error instanceof SyntaxError || error.name === 'TimeoutError')) throw error;
+            const { response, result } = await register().catch(() => {
                 webJamHostSeatStatus.textContent = 'Reconnecting to confirm the Chess seat…';
                 return register();
             });
