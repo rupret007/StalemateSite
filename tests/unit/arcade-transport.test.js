@@ -92,6 +92,34 @@ describe('Game Night match transport', () => {
         });
     });
 
+    it('keeps the table, its tableId and the roster when a guest leaves mid-match', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        const saved = () => f.storage.get(ARCADE_TAG + ':' + ref);
+        await f.send(f.b, 'leave', { id });
+        expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-held' });
+        expect((await saved()).chess).toMatchObject({ id, tableId: id, seats: { w: sid, b: 'seat-black' } });
+        expect(f.board(f.a)).toMatchObject({ id, tableId: id, seat: 'w', waiting: false });
+        expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
+        expect(f.storage.delete).not.toHaveBeenCalled();
+    });
+
+    it('frees a guest seat after the match ends without deleting the table', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        await f.send(f.b, 'resign', { id, revision: 0 });
+        await f.send(f.b, 'leave', { id });
+        expect(f.storage.delete).not.toHaveBeenCalled();
+        const record = (await f.storage.get(ARCADE_TAG + ':' + ref)).chess;
+        expect(record).toMatchObject({ tableId: id, host: sid, seats: { w: sid, b: null }, match: null });
+        expect(record.id).not.toBe(id);
+        // The host keeps the same table with an open seat, and the same guest can sit down again.
+        expect(f.board(f.a)).toMatchObject({ id: record.id, tableId: id, seat: 'w', waiting: true, hasOpenSeat: true });
+        expect(f.board(f.b)).toMatchObject({ id: record.id, tableId: id, seat: null });
+        await f.send(f.b, 'join', { id: record.id });
+        expect(f.board(f.b)).toMatchObject({ tableId: id, seat: 'b', waiting: false });
+    });
+
     it('still says lobby when the host has closed the table', async () => {
         const f = fixture();
         const { id } = await f.start();

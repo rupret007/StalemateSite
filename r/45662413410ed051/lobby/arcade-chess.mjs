@@ -6,6 +6,7 @@ const files = 'abcdefgh', ranks = '87654321';
 const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
 const reasonText = {
     unavailable: 'Chess is unavailable in this room right now.',
+    'seat-held': 'Your seat is saved while this match is on. Resign to end it, or come back with the same link.',
     stale: 'The board changed. Try your move again.',
     'wrong-turn': 'Wait for your turn.',
     'illegal-move': 'That move is unavailable.',

@@ -305,11 +305,11 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                     else { changed = true; }
                 } else if (frame.action === 'leave') {
                     if (!game.seat(subject) || game.view(subject, now()).id !== frame.id) error = 'match-changed';
-                    else {
-                        if (binding.canOpen && game.close(subject, frame.id)) claims = [];
-                        else if (!game.releaseSeat(subject)) game = null;
-                        changed = true;
-                    }
+                    else if (binding.canOpen && game.close(subject, frame.id)) { claims = []; changed = true; }
+                    // Only the host can end the table. A guest frees the seat, or keeps it
+                    // while a match is being played, and the roster and tableId stay.
+                    else if (game.releaseSeat(subject) || game.vacate(subject, uuid())) changed = true;
+                    else error = 'seat-held';
                 } else if (frame.action === 'rematch' || frame.action === 'start-rematch') {
                     const force = frame.action === 'start-rematch';
                     const candidate = uuid();

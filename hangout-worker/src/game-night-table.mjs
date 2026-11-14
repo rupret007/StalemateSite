@@ -124,6 +124,22 @@ export function createGameNightTable({
             return true;
         }
 
+        // A guest gives up a seat once play is over. The table, its host and the
+        // other seats stay; a finished match is cleared so the seat can be filled.
+        // During play the seat is held, so this returns false.
+        vacate(subject, nextId) {
+            const seat = this.seat(subject);
+            if (this.#closed || !seat || seat === first || subject === this.#host) return false;
+            if (this.#match) {
+                if (!finished(this.#match) || typeof nextId !== 'string' || !/^[a-zA-Z0-9-]{5,80}$/.test(nextId) || nextId === this.#id) return false;
+                this.#match = null;
+                this.#id = nextId;
+                this.#votes = [];
+            }
+            this.#seats[seat] = null;
+            return true;
+        }
+
         close(subject, id) {
             if (this.#closed || subject !== this.#host || id !== this.#id) return false;
             this.#closed = true;
