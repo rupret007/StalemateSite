@@ -3543,7 +3543,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     $$('[data-quick-cmd]').forEach((b) => b.addEventListener('click', () => {
         const name = b.dataset.quickCmd;
         if (name === 'slap') { if (app.active.startsWith('pm:')) return cmd('slap'); const c = store(app.active); const others = (c && c.names || []).filter((n) => n.nick !== app.me); const who = others.length ? pick(others) : null; return who ? personCommand(personContext(who.id, c.name, c.keepRef, who.nick), 'slap', [who.nick]) : toast('Nobody here to slap. Yet.'); }
-        if (name === 'away') { app.away = !app.away; return cmd('away', app.away ? ['grabbing', 'a', 'snack'] : []); }
+        if (name === 'away') {
+            const away = !app.away;
+            const args = away ? ['grabbing', 'a', 'snack'] : [];
+            const sent = send({ t: 'cmd', name, args, ch: app.active }, () => {
+                toast('Couldn’t change your away status. Try again.', [], 'away-shortcut-failed');
+            });
+            if (sent) {
+                app.away = away;
+                if (toastKind === 'away-shortcut-failed') dismissToast();
+            }
+            return;
+        }
         return cmd(name, []);
     }));
     $('[data-leave]').addEventListener('click', () => cmd('part', [app.active]));

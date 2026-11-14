@@ -57,6 +57,47 @@ test('a failed chat shortcut can be retried without changing the composer draft'
     await page.screenshot({ path: testInfo.outputPath('shortcut-retried.png') });
 });
 
+test('the away shortcut retries the same change after a send failure', async ({ page, baseURL }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await enter(page, baseURL);
+    const shortcut = page.locator('[data-quick-cmd="away"]');
+    const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+    const status = page.getByRole('status').filter({ hasText: 'Couldn’t change your away status. Try again.' });
+    const messages = page.getByRole('log', { name: 'Conversation' });
+    const away = messages.getByRole('listitem').filter({ hasText: "You're marked away: grabbing a snack" });
+    const returned = messages.getByRole('listitem').filter({ hasText: 'Welcome back.' });
+    await composer.fill('Keep my draft here.');
+    await page.evaluate(() => {
+        const socket = window.__lobby.ws;
+        const send = socket.send;
+        socket.send = function (data) {
+            const frame = JSON.parse(data);
+            if (frame.t === 'cmd' && frame.name === 'away') {
+                socket.send = send;
+                throw new Error('Synthetic away transport failure');
+            }
+            return send.call(this, data);
+        };
+    });
+
+    await shortcut.press('Enter');
+    await expect(status).toBeVisible();
+    await expect(shortcut).toBeFocused();
+    await expect(away).toHaveCount(0);
+    await expect(composer).toHaveValue('Keep my draft here.');
+    await page.screenshot({ path: testInfo.outputPath('away-send-failed.png') });
+
+    await shortcut.press('Enter');
+    await expect(away).toHaveCount(1);
+    await expect(status).toBeHidden();
+    await expect(returned).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('away-retried.png') });
+
+    await shortcut.press('Enter');
+    await expect(returned).toHaveCount(1);
+    await expect(composer).toHaveValue('Keep my draft here.');
+});
+
 for (const [width, height] of [[1440, 900], [390, 844]]) {
     test(`a chat send failure is explained and can be retried at ${width}px`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
