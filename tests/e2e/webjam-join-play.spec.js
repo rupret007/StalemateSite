@@ -238,9 +238,10 @@ for (const width of [375, 390]) {
             await expect(page.getByRole('checkbox')).toBeFocused();
             await page.keyboard.press('Space');
             await expect(join).toBeEnabled();
+            await expect(join).toBeFocused();
             await expect(join).toBeInViewport({ ratio: 1 });
             expect(await page.evaluate(() => window.captureCount)).toBe(0);
-            await join.press('Enter');
+            await page.keyboard.press('Enter');
             await expect(page.locator('#status')).toContainText('Web Join is unavailable');
             await expect(retry).toBeFocused();
             await expect(page.getByText('Your mic is using voice-quality audio.')).toBeVisible();
