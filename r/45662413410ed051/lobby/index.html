@@ -330,8 +330,8 @@
                 <button class="btn btn--ghost jam-room-invite" type="button" data-music-handoff-cancel hidden>Cancel Music invite</button>
                 <p class="small room-invite-status" data-music-invite-outcome role="status" aria-atomic="true"></p>
                 <div class="jam-actions" data-jam-actions>
-                    <span class="small" data-jam-wait role="status" tabindex="-1">Waiting for the host’s invite. When it’s ready, choose Join in browser—no app needed.</span>
-                    <button class="btn btn--ghost" type="button" data-jam-web disabled title="Your host has not shared an approved browser invite yet">Browser join unavailable</button>
+                    <span class="small" data-jam-wait role="status" tabindex="-1">You’re in the Jam room. Ask your host for an audio invite. You can join in your browser, no app needed.</span>
+                    <button class="btn" type="button" data-jam-web hidden disabled title="Open the host’s browser invitation to listen or join with a microphone">Join in browser</button>
                     <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
                     <button class="btn" type="button" data-jam-copy hidden>Copy desktop invite</button>
                     <button class="btn btn--ghost" type="button" data-jam-invite-copy hidden>Copy browser invite</button>
@@ -363,7 +363,8 @@
                 <p class="small jam-platform" data-jam-platform>A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.</p>
                 <details class="jam-setup" data-jam-help>
                     <summary>Setup &amp; invitation help</summary>
-                    <p><strong>Joining in your browser?</strong> Accept the Music invitation, then choose <strong>Open WebJam in browser</strong>. If your host shares a link with the room, choose <strong>Join in browser</strong>. WebJam opens in a new tab. Come back to this tab to chat. On the join page, listen with your mic off or check your microphone and join with headphones. Browser audio usually has more delay than the desktop app.</p>
+                    <p><strong>Joining in your browser?</strong> Accept the Music invitation and choose <strong>Open WebJam in browser</strong>. For a room link, choose <strong>Join in browser</strong>.</p>
+                    <p>WebJam opens in a new tab. Come back to this tab to chat. Listen with your mic off or check your microphone and join with headphones. Browser audio usually has more delay than the desktop app.</p>
                     <p><strong>Hosting from a Mac?</strong> Start a Music session in the WebJam beta app. When <strong>Invite bandmate to Music</strong> appears in this room, choose your guest and confirm the invitation in WebJam. Keep your Music session open.</p>
                     <p>To share manually, click <strong>Copy browser invite</strong> in WebJam. Wait for <strong>Link copied</strong>, then paste the link in Hang Out and choose <strong>Share with room</strong>. Sharing an invite does not turn on your microphone.</p>
                     <p>For guests using the desktop beta app, share the entire desktop invitation. On Mac, they can open it in WebJam. On supported Windows and Linux builds, paste the full invitation into <strong>Join</strong> in the app.</p>
