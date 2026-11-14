@@ -474,7 +474,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect.poll(() => ticketRequested).toBe(true);
                     const joining = guest.locator('[data-game-guest-connecting]');
                     await expect(joining.getByRole('heading', { name: 'Royal Flush Chess', exact: true })).toBeVisible();
-                    await expect(joining.getByRole('status')).toHaveText('Finding your seat…');
+                    await expect(joining.getByRole('status')).toHaveText('Connecting…');
                     await expect(guest.locator('[data-app]')).toBeHidden();
                     await expect(guest.locator('.titlebar')).toBeHidden();
                     const shell = await context.request.get(guest.url());
@@ -483,6 +483,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     assert.match(html, /<main class="gate" data-gate hidden>/);
                     assert.match(html, /<main class="gate" data-game-guest-connecting>/);
                     assert.match(html, /<h1 data-game-guest-title>Royal Flush Chess<\/h1>/);
+                    assert.match(html, /data-game-guest-status role="status">Connecting…/);
                     await captureArcadeInvite(guest, viewport, 'first-visit-01-finding-seat');
                 } finally {
                     releaseTicket();
@@ -490,7 +491,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (phone) {
                     try {
                         await expect.poll(() => legacyViewSent).toBe(true);
-                        await expect(guest.locator('[data-game-guest-status]')).toHaveText('Finding your seat…');
+                        await expect(guest.locator('[data-game-guest-status]')).toHaveText('Connecting…');
                         await expect(guest.locator('[data-app]')).toBeHidden();
                     } finally { releaseHello(); }
                 }
