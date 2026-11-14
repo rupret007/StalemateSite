@@ -24,6 +24,13 @@ export const gameNightLabels = Object.freeze({
     turdjack: 'Crapjack 21', turdtris: 'Turdtris Sprint', turdomania: 'Turdomania Duel',
     turdrush: 'Turd Rush Race', turdanoid: 'Turdanoid Brick Race'
 });
+
+// Beta Game Night lobby card order (Map insertion order in lobby.js). TurdSpades is one
+// card with 2-player partners and 4-player modes; partners is offered first in the panel UI.
+export const GAME_NIGHT_LOBBY_ORDER = Object.freeze([
+    'chess', 'turdspades', 'turdanoid',
+    'crapeights', 'turdrummy', 'turdjack', 'turdtris', 'turdomania', 'turdrush'
+]);
 const matchId = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
 export const gameInviteCode = value => typeof value === 'string' && /^[A-Za-z0-9_-]{20,200}\.[A-Za-z0-9_-]{43}$/.test(value);
 

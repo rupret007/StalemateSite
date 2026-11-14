@@ -5,7 +5,7 @@ import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { mountGameNightSound, unlockGameNightAudio } from './game-night-audio.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName, webJamRoomName } from './game-night.mjs';
+import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName, webJamRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -507,17 +507,18 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     let jamShareResultsSupported = false, jamShareTimer;
     let gameNightSupported = false, gameOpenSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
-    const arcadeTables = new Map([
-        ['chess', { label: 'Royal Flush Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
-        ['crapeights', { label: 'Crappy Eights', load: () => import('./arcade-crapeights.mjs').then(module => module.mountArcadeCrapeights) }],
-        ['turdrummy', { label: 'TurdRummy', load: () => import('./arcade-turdrummy.mjs').then(module => module.mountArcadeTurdRummy) }],
-        ['turdspades', { label: 'TurdSpades', load: () => import('./arcade-turdspades.mjs').then(module => module.mountArcadeTurdSpades) }],
-        ['turdjack', { label: 'Crapjack 21', load: () => import('./arcade-turdjack.mjs').then(module => module.mountArcadeTurdJack) }],
-        ['turdtris', { label: 'Turdtris Sprint', load: () => import('./arcade-turdtris.mjs').then(module => module.mountArcadeTurdtris) }],
-        ['turdomania', { label: 'Turdomania Duel', load: () => import('./arcade-turdomania.mjs').then(module => module.mountArcadeTurdomania) }],
-        ['turdrush', { label: 'Turd Rush Race', load: () => import('./arcade-turdrush.mjs').then(module => module.mountArcadeTurdRush) }],
-        ['turdanoid', { label: 'Turdanoid Brick Race', load: () => import('./arcade-turdanoid.mjs').then(module => module.mountArcadeTurdanoid) }]
-    ]);
+    const arcadeTableDefs = {
+        chess: { label: 'Royal Flush Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) },
+        crapeights: { label: 'Crappy Eights', load: () => import('./arcade-crapeights.mjs').then(module => module.mountArcadeCrapeights) },
+        turdrummy: { label: 'TurdRummy', load: () => import('./arcade-turdrummy.mjs').then(module => module.mountArcadeTurdRummy) },
+        turdspades: { label: 'TurdSpades', load: () => import('./arcade-turdspades.mjs').then(module => module.mountArcadeTurdSpades) },
+        turdjack: { label: 'Crapjack 21', load: () => import('./arcade-turdjack.mjs').then(module => module.mountArcadeTurdJack) },
+        turdtris: { label: 'Turdtris Sprint', load: () => import('./arcade-turdtris.mjs').then(module => module.mountArcadeTurdtris) },
+        turdomania: { label: 'Turdomania Duel', load: () => import('./arcade-turdomania.mjs').then(module => module.mountArcadeTurdomania) },
+        turdrush: { label: 'Turd Rush Race', load: () => import('./arcade-turdrush.mjs').then(module => module.mountArcadeTurdRush) },
+        turdanoid: { label: 'Turdanoid Brick Race', load: () => import('./arcade-turdanoid.mjs').then(module => module.mountArcadeTurdanoid) }
+    };
+    const arcadeTables = new Map(GAME_NIGHT_LOBBY_ORDER.map(game => [game, arcadeTableDefs[game]]));
     const gameLabel = game => arcadeTables.get(game)?.label || gameNightLabels[game] || 'Game Night';
     let arcadeReturning = null, arcadeInvitation = null, arcadeShareIntent = null;
     let webJamChessSupported = false, webJamHostSeatPending = false, webJamWaitingTable = null, webJamReservation = null;
