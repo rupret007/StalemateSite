@@ -19,16 +19,17 @@ Use this message with the currently serving private beta.
 > **Join with microphone**. Chrome is all you need on the PC. If the invite
 > expires, stay in Hang Out and I’ll send another.
 
-Once the selected-guest Music build is deployed, use this version.
+After the selected-guest Music build is delivered and verified, use this version.
 
 > Hey Che’, open the private Hang Out invite I send you in Chrome on your PC.
 > Pick a nickname and wait in the lobby. When my Music invite appears, click
-> **Accept and join**, then **Open WebJam in browser**. To listen, choose
-> **Join to listen**. To play, put on wired headphones, choose **Check
-> microphone**, and play a few hits. If Chrome picked the wrong input, choose
-> your drum interface under **Microphone**. Once the check detects it, check
-> the headphones box and choose **Join with microphone**. Keep the Hang Out
-> tab open for chat or to ask me for another invite.
+> **Accept and join**, then **Open WebJam in browser**. You can **Join to listen**
+> with your mic off. When you’re ready to play, plug in wired headphones,
+> choose **Check microphone**, and hit the drums a few times. If Chrome shows
+> the wrong input, choose your drum interface under **Microphone**. When you
+> see **Microphone detected.**, check the headphones box and select
+> **Join with microphone**. Keep Hang Out open for chat. If an invite expires,
+> ask me there for a new one. Chrome is all you need on the PC.
 
 Send the private Hang Out invitation separately through the usual private
 channel. A guest opens it and reads the guest agreement before entering. A
@@ -53,12 +54,15 @@ the same lobby and can see each other in **People**.
 | Selected-guest Music candidate, private fixture | Choose **Invite bandmate to Music**, select the guest, and confirm in WebJam. Wait for Hang Out to show the invitation was sent. | Choose **Accept and join**, then **Open WebJam in browser**. Choose **Join to listen** to keep the microphone off, or follow the microphone check to play. |
 
 Use the `8d76db40` instructions for the staged rehearsal. Both Mac
-shortcuts point to `c6eecdc`. The invitation-code follow-up pairs
-website `183c045` with desktop source `72e5e28`. Chromium and WebKit fixtures
-passed the selected-guest invitation and recovery through native Qt
-confirmation. The Apple Silicon `72e5e28` test package is archived and
-reached the startup dialog. The packaged macOS handoff and live audio
-remain open. Earlier Windows Chrome checks used generated audio.
+shortcuts point to `c6eecdc`. The latest paired walkthrough used website source `d199ea3` and WebJam
+source `424f2ed`. In desktop Chromium and phone WebKit, guests from both
+band entrances accepted a selected-guest invite, recovered from a failed
+verification with a fresh invite, listened with the mic off, and left.
+The walkthrough used an offscreen Qt host and simulated audio. The local
+Apple Silicon `424f2ed` package passed startup and launcher controls.
+Browser-to-app dispatch on the intended installed build and live Music
+remain open. Check **Build** in **About WebJam** before using a candidate
+so an older Desktop shortcut does not open the wrong build.
 
 ## Audio check, recovery and ending the session
 
