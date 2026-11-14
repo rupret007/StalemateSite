@@ -874,6 +874,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(newGuest).toHaveAccessibleName('Invite a friend to Royal Flush Chess');
                     await expect(invitePicker.getByText('Nobody else is in Hang Out yet.')).toHaveCount(0);
                     await captureArcadeInvite(host, viewport, step('02c-invite-picker'));
+                    if (!phone) return;
+                    await host.route('**/beta/game-night/invitation/issue', route =>
+                        route.fulfill({ status: 503, contentType: 'text/html', body: '<p>Service unavailable</p>' }), { times: 1 });
+                    await newGuest.tap();
+                    await expect(host.locator('[data-game-invite-link-status]')).toHaveText('The invitation could not be prepared. Try again.');
+                    await expect(newGuest).toBeFocused();
+                    await expectUncoveredControl(newGuest);
+                    await expect(host.getByRole('button', { name: 'Share invite', exact: true })).toBeHidden();
+                    await captureArcadeInvite(host, viewport, step('02d-invite-retry'));
                 });
                 assert.equal((await friend.context().cookies()).length, 0, 'the invited profile is completely new');
                 const attempts = [];

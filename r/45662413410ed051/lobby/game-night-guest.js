@@ -1,3 +1,5 @@
+import { GAME_INVITE_UNAVAILABLE } from '/r/45662413410ed051/lobby/game-night.mjs';
+
 const status = document.querySelector('[data-guest-status]');
 const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
@@ -7,7 +9,6 @@ const restored = !location.hash && !location.search ? history.state?.gameNightIn
 const code = restored?.code ?? new URLSearchParams(location.hash.slice(1)).get('invite');
 const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
 const confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
-const closedInvitation = 'This invite is no longer available. Ask your host for a new one.';
 const hasInvitation = typeof code === 'string' && code.length > 0 && code.length <= 250;
 
 function retainInvitation(confirmedGame) {
@@ -49,7 +50,7 @@ async function describe() {
         invite.hidden = false;
         if (document.activeElement === document.body) join.focus({ preventScroll: true });
     } catch (error) {
-        status.textContent = error.status === 410 ? closedInvitation : 'Couldn’t check the invitation. Try again.';
+        status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE : 'Couldn’t check the invitation. Try again.';
         retry.hidden = error.status === 410;
         if (error.status === 410) {
             clearInvitation();
@@ -68,7 +69,7 @@ async function accept() {
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
         location.replace(next);
     } catch (error) {
-        status.textContent = error.status === 410 ? closedInvitation
+        status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE
             : [429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
         if (error.status === 410) {
             clearInvitation();
