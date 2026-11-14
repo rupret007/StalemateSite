@@ -393,6 +393,19 @@ for (const { delayed, width, height, hostSite, guestSite } of [
             await expect(guestStatus).toHaveText(expired);
             await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
             await expect(accept).toBeHidden();
+            const freshExpiry = await guest.evaluate(() => Math.floor(Date.now() / 1000) + 120);
+            const fresh = invite.replace(/&e=\d+$/, `&e=${freshExpiry}`);
+            const opensBeforeResend = await guest.evaluate(() => window.browserOpens.length);
+            expect(await returnInvite(fresh)).toBe(true);
+            await expect(accept).toBeVisible();
+            await expect(other.locator('[data-music-invite]')).toBeHidden();
+            await accept.press('Enter');
+            await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+            await expect(audio).toBeFocused();
+            await audio.press('Enter');
+            expect(await guest.evaluate(index => window.browserOpens.slice(index), opensBeforeResend))
+                .toEqual([[fresh, '_blank', 'noopener,noreferrer']]);
+            expect(await guest.evaluate(() => [window.copiedInvite, window.audioRequests])).toEqual(['', 0]);
         }
         expect(f.external).toEqual([]);
     } finally { await f.close(); }

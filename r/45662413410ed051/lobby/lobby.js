@@ -1881,7 +1881,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         else if (frame.t === 'music-invite-ended') return endMusicInvite();
         else if (!['joining', 'unconfirmed'].includes(musicInvite.state)) return;
         else {
-            const current = currentJam();
+            const current = currentJam(musicInvite.room);
             const link = typeof frame.href === 'string' && browserInviteLink({ webReady: true, web: frame.href });
             if (!link || musicInvite.expires <= Date.now() || current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance
                 || frame.ch !== musicInvite.room || frame.roomInstance !== musicInvite.instance
@@ -1889,6 +1889,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             clearTimeout(musicInvite.replyTimer);
             musicInvite.href = link;
             musicInvite.state = 'accepted';
+            if (app.active !== current.name) switchTo(current.name);
         }
         drawMusicInvite();
     }
@@ -1986,8 +1987,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         drawMusicInvite();
         resetJamControls();
     }
-    function currentJam() {
-        const c = app.chans.get(app.active);
+    function currentJam(key = app.active) {
+        const c = app.chans.get(key);
         return connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
             && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
     }
