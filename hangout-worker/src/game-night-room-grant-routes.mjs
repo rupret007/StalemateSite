@@ -15,7 +15,7 @@ export function lobbyRoomGrants(lobby) {
         async status(scope) {
             if (!lobby.arcadeAvailable(scope.game)) return null;
             const actor = lobby.engine.invitedGameHost(scope);
-            const host = actor && lobby.arcadeBinding({ ...scope, actor });
+            const host = actor && lobby.arcadeBinding({ ...scope, actor }, scope.game);
             if (!host?.canPlay || !await lobby.sessionActive(host)) return null;
             return transport(scope)?.status(scope);
         },
@@ -36,15 +36,15 @@ export function lobbyRoomGrants(lobby) {
         if (operation !== 'register') return reply('Game invitations are unavailable.', 404);
 
         const { actor, room, ref, game, match, hashes } = body;
-        const guest = gameGuestScope({ room, ref, game, match, host: session?.betaSid, nameSeed: 0 });
+        const guest = gameGuestScope({ room, ref, game, match, host: session?.betaSid, nameSeed: 0 }, true);
         const scope = guest && arcadeRoomRequest({ actor, room, ref });
-        const host = scope && lobby.arcadeBinding(scope);
+        const host = scope && lobby.arcadeBinding(scope, game);
         if (!host?.canOpen || !host.canPlay || host.gameGuest || host.betaSid !== session.betaSid ||
             !lobby.arcadeAvailable(game) || !await lobby.sessionActive(host)) return unavailable();
         if (!await lobby.controlBudget.take(host.socket, actor)) {
             return reply('Game invitation allowance reached. Try again in a few minutes.', 429);
         }
-        return grantResponse(await grants.registerGrants({ room, game, match, hashes, ref, hostSubject: host.betaSid, now, version }));
+        return grantResponse(await grants.registerGrants({ room, game, match, hashes, ref, hostSubject: host.betaSid, now, version, recover: body.recover === true }));
     }
 
     return { request, sweep: grants.sweep };

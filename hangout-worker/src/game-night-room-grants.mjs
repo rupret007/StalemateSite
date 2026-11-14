@@ -110,7 +110,7 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
     }
 
     // `hostSubject` must come from the trusted host session, never from request data.
-    function registerGrants({ room, match, game, hostSubject, hashes, now, ref = null, version }) {
+    function registerGrants({ room, match, game, hostSubject, hashes, now, ref = null, version, recover = false }) {
         return serial(async () => {
             const refused = () => fail(403, 'unavailable', { error: REGISTER_COPY });
             if (!text(room) || !text(game) || !matchPattern.test(match || '') || !text(hostSubject) || !Number.isFinite(now)
@@ -118,6 +118,18 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
                 || !hashes.every(hash => hashPattern.test(hash || '')) || new Set(hashes).size !== hashes.length
                 || typeof ref !== 'string' || !refPattern.test(ref)) return refused();
             const scope = { room, game, match, ref, host: hostSubject, ...(version === undefined ? {} : { version }) };
+            // A lost response can be acknowledged without extending a hold or creating a new one.
+            if (recover === true && hashes.length === 1) {
+                const prior = await storage.get(key(hashes[0]));
+                if (prior && ['grant', 'redeemed'].includes(prior.kind) && prior.until > now
+                    && sameTable(prior.scope, scope) && prior.scope.ref === ref
+                    && prior.scope.host === hostSubject && prior.scope.version === version) {
+                    const state = await table.status(scope);
+                    if (present(state, scope) && (prior.kind === 'redeemed' || state.waiting)) {
+                        return { ok: true, status: 200, body: { granted: 1, standby: 0, until: prior.until } };
+                    }
+                }
+            }
             // The host is seated by their own session before any grant exists.
             const state = await tableState(scope);
             if (!state) return refused();
