@@ -3269,13 +3269,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
         await expect(page.locator('[data-spades-trick]')).toContainText('West · No bid yet');
         await expect(page.locator('[data-spades-card]')).toHaveCount(0);
+        await players[1].locator('[data-spades-action="resign"]').tap();
+        await players[1].getByRole('dialog', { name: 'Resign for your team?' })
+            .getByRole('button', { name: 'Resign', exact: true }).tap();
+        await players[1].locator('[data-spades-action="leave"]').tap();
+        const release = players[1].getByRole('dialog', { name: 'Leave this table?' });
+        await expect(release).toContainText('You’ll free your seat. The table stays open.');
+        await release.getByRole('button', { name: 'Leave table', exact: true }).tap();
+        await expect(page.locator('[data-spades-status]')).toHaveText(
+            /^3\/4 seated.*Stay here to watch when the next hand starts\.$/);
+        await expect(page.getByRole('button', { name: /^Join / })).toHaveCount(0);
         const lobbyAddress = new URL(page.url());
         await page.locator('[data-leave]').tap();
         await expect(page.locator('[data-session-reason]')).toHaveText('You left Game Night. Ask your host for a fresh invitation.');
         assert.equal((await extra.request.get(origin + '/beta/state' + lobbyAddress.search)).status(), 401);
         await page.reload();
         await expect(page.locator('[data-spades-table]')).toBeHidden();
-        for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
+        await expect(host.locator('[data-spades-status]')).toContainText('3/4 seated');
         await extra.close();
         console.log(`Passed ${engine} ${brand} full Spades table watch link, read-only commands, rematch, table pass, host reopen and Leave.`);
     }
