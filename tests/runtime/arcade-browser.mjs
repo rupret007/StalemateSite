@@ -717,10 +717,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(player.locator('[data-connection]')).toHaveText('Connected');
             const returnToSeat = player.getByRole('button', { name: 'Back to my seat', exact: true });
             await expectUncoveredControl(returnToSeat);
-            await panel.locator('summary').evaluate(summary => {
-                const focus = summary.focus;
-                summary.focus = function (options) {
-                    this.dataset.returnFocusWithoutScroll = String(options?.preventScroll === true);
+            await player.evaluate(() => {
+                const focus = HTMLElement.prototype.focus;
+                HTMLElement.prototype.focus = function (options) {
+                    if (this.matches('details.arcade-chess > summary')) {
+                        this.dataset.returnFocusWithoutScroll = String(options?.preventScroll === true);
+                    }
                     return focus.call(this, options);
                 };
             });
