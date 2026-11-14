@@ -117,6 +117,28 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.table.dataset.stuck).toBe('true');
     });
 
+    it.each(['pointercancel', 'lostpointercapture', 'keyboard'])(
+        'does not retry a rejected aim after %s supersedes the drag', interrupt => {
+            const view = mount();
+            view.publish(54_000);
+            view.pump();
+            pointer(view.board, 'pointerdown', 40, 170);
+            pointer(view.board, 'pointermove', 170, 170);
+            view.pump(100);
+            expect(inputs().map(([, action]) => action)).toEqual(['aim']);
+
+            client.handlers.onError('late-input');
+            expect(client.sent.at(-1)).toEqual({ action: 'sync' });
+            if (interrupt === 'keyboard') {
+                view.board.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+            } else pointer(view.board, interrupt, 170, 170);
+            view.publish(54_200);
+            view.pump(300);
+
+            expect(inputs().map(([, action]) => action)).toEqual(interrupt === 'keyboard' ? ['aim', 'axis'] : ['aim']);
+        }
+    );
+
     it('hides the countdown hint for a spectator', () => {
         const view = mount();
         view.publish(50_000, null);
