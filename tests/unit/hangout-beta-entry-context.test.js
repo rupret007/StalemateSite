@@ -70,6 +70,30 @@ describe('entry context through the private beta shell', () => {
         } finally { dom.window.close(); }
     });
 
+    it('explains how to resubmit a retained code after an invitation outage', async () => {
+        const config = env();
+        const address = 'https://beta.example/beta/#invite=local-fixture-code';
+        const html = await (await betaFetch(new Request(address), config)).text();
+        const client = await (await betaFetch(new Request('https://beta.example/beta/client.js'), config)).text();
+        const dom = new JSDOM(html, { url: address, runScripts: 'outside-only' });
+        try {
+            const { window } = dom;
+            window.entryFunctions = entryFunctions;
+            window.fetch = vi.fn(async path => new Response(null, { status: path === '/beta/unlock' ? 503 : 401 }));
+            window.eval(client.replace(/^import \* as (\w+) from '[^']+';/, 'const $1 = entryFunctions;'));
+            const retry = window.document.querySelector('#retry');
+            const status = window.document.querySelector('#status');
+            const code = window.document.querySelector('#code');
+            await vi.waitFor(() => expect(retry.hidden).toBe(false));
+            expect(window.document.activeElement).toBe(retry);
+            retry.click();
+            await vi.waitFor(() => expect(status.textContent).toBe('Your invitation code is still here. Submit it again to continue.'));
+            expect(window.document.activeElement).toBe(code);
+            expect(code.value).toBe('local-fixture-code');
+            expect(window.fetch.mock.calls.map(([path]) => path)).toEqual(['/beta/unlock', '/beta/state']);
+        } finally { dom.window.close(); }
+    });
+
     it('carries the selected entrance through invitation unlock and a deliberate join without keeping it in the address', async () => {
         const dom = await shell('https://beta.example/?via=rad-dad#invite=private-fixture');
         try {
@@ -586,7 +610,7 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
                 expect(retry.disabled).toBe(true);
             }
             await vi.waitFor(() => expect(doc.querySelector('#login').hidden).toBe(false));
-            expect(doc.querySelector('#status').textContent).toBe('A private invitation is required.');
+            expect(doc.querySelector('#status').textContent).toBe('Your invitation code is still here. Submit it again to continue.');
             expect(doc.querySelector('#code').value).toBe('unsent invitation draft');
             expect(retry.hidden).toBe(true);
             expect(h.calls).toEqual(Array.from({ length: 4 }, () => ({ path: '/beta/state', method: 'GET' })));
