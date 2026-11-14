@@ -219,7 +219,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .nicks { gap: 2px; }
 .nick { display: block; width: 100%; min-height: 39px; padding: 7px 6px; border: 0; background: transparent; font: 11px/1.6 var(--mono); text-align: left; overflow-wrap: anywhere; }
 .nick::before { content: '·'; color: var(--muted); padding-right: 7px; }
-.nick[data-self=true]::after { content: 'you'; padding: 2px 4px; margin-left: 6px; font: 8px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; }
+.nick[data-self=true]::after { content: 'you'; display: inline-block; white-space: nowrap; padding: 2px 4px; margin-left: 6px; font: 8px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; }
 .nick:disabled { opacity: 1; cursor: inherit; }
 .nick:enabled:hover { background: var(--raised); }
 .pmtoggle { display: flex; align-items: center; gap: 7px; min-height: 44px; padding-top: 14px; margin-top: 15px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
@@ -915,8 +915,14 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
     gap: 4px;
     min-height: 0;
   }
-  .invite-people { min-height: 50px; margin: 0; }
-  [data-invite-quick-cancel] { align-self: flex-start; }
+  [data-invite-quick] .invite-people {
+    min-height: 0;
+    margin: 0;
+  }
+  [data-invite-quick-cancel] {
+    flex: none;
+    align-self: flex-start;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }

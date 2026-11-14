@@ -123,5 +123,15 @@ for (const width of [375, 390]) {
         expect(send.y + send.height).toBeLessThanOrEqual(844);
         expect(await page.locator('[data-text]').evaluate(input => getComputedStyle(input).fontSize)).toBe('16px');
         await page.screenshot({ path: testInfo.outputPath(`paint-materials-${width}.png`), animations: 'disabled' });
+        const lesson = page.getByRole('textbox', { name: 'YouTube URL' });
+        await lesson.fill('not a YouTube link');
+        await lesson.press('Enter');
+        const error = page.locator('[data-act-load-status]');
+        await expect(error).toHaveText('Enter a YouTube video link or video ID.');
+        await page.screenshot({ path: testInfo.outputPath(`paint-error-${width}.png`), animations: 'disabled' });
+        await expect(lesson).toBeFocused();
+        await expect(error).toBeInViewport({ ratio: 1 });
+        await expect(lesson).toBeInViewport({ ratio: 1 });
+        await expect(page.locator('[data-send]')).toBeInViewport({ ratio: 1 });
     });
 }

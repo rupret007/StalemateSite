@@ -583,7 +583,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         nicknameError.id = 'nickname-error';
         nicknameError.className = 'status';
         nicknameError.setAttribute('role', 'status');
-        nickInput.closest('label').after(nicknameError);
+        nickInput.closest('.nickrow').after(nicknameError);
     }
     nickInput.value = nickInput.value || readRemembered('hangout-nick') || ''; // blank by default; remembered on this device
     function clearNicknameError() {
@@ -670,6 +670,11 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let retry = 0;
     let retryTimer;
     let connectionAttempt = 0;
+    let focusFirstChannel = false;
+    function focusAtNicknameGate() {
+        const focused = document.activeElement;
+        return focused === document.body || $('[data-gate]').contains(focused);
+    }
     function setConnection(state) {
         connectionState = state;
         if (state !== 'connected') {
@@ -1145,7 +1150,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
-            $('[data-gate]').hidden = true;
+            const gate = $('[data-gate]');
+            focusFirstChannel = !wasIn && !gameGuest && !gate.hidden && focusAtNicknameGate();
+            gate.hidden = true;
             if (gameGuest && !gameGuestSeated) gateStatus('Finding your seat…');
             else {
                 $('[data-app]').hidden = false;
@@ -1196,7 +1203,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (c.name !== '#stalemate' && toastKind === 'reconnect') dismissToast();
             if (gameGuest?.game === 'four' && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginFourInvitation(c);
             if (joinedFromChannelDialog) focusChannelTab(c.name, { preventScroll: false });
-            else if (gameOfferAccepted && !arcadeInvitation) focusChannelTab(c.name);
+            else if ((gameOfferAccepted && !arcadeInvitation) || (focusFirstChannel && focusAtNicknameGate()))
+                focusChannelTab(c.name);
+            focusFirstChannel = false;
             followPendingRoomJoin();
             break;
         }
@@ -1682,7 +1691,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         $('[data-jam-invite-room]').hidden = true;
         $('[data-jam-invite-music]').hidden = true;
         $('[data-jam-wait]').hidden = false;
-        const web = $('[data-jam-web]'); web.disabled = true; web.onclick = null; web.textContent = 'Browser join unavailable';
+        const web = $('[data-jam-web]'); web.hidden = true; web.disabled = true; web.onclick = null;
     }
     function browserInviteDeadline(link) {
         const hashAt = link.indexOf('#');
@@ -1744,7 +1753,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const wasVisible = currentGameOffer() === offer;
         if (joiningGameRoom === offer.room) joiningGameRoom = '';
         forgetGameRoom(offer.room);
-        if (wasVisible) toast('That invitation expired. Ask your host to send another.');
+        if (wasVisible) toast('That invitation expired. Ask your host to send another.', [], `room-invite-expired:${offer.room}`);
     }
     function forgetGameRoom(name) {
         const removed = gameInvites.delete(name);
@@ -1807,6 +1816,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             updateOfferStatus(status, visible, '');
             if (hadFocus) focusChannelTab(app.active);
             return;
+        }
+        if (offer?.request && toastKind === `room-invite-expired:${offer.room}`) {
+            if (toastRegion.contains(document.activeElement)) focusChannelTab(app.active);
+            dismissToast();
         }
         const jam = jamRoomName(offer?.room);
         const roomLabel = jam ? offer.room : 'Game Night';
@@ -1881,7 +1894,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         else if (frame.t === 'music-invite-ended') return endMusicInvite();
         else if (!['joining', 'unconfirmed'].includes(musicInvite.state)) return;
         else {
-            const current = currentJam();
+            const current = currentJam(musicInvite.room);
             const link = typeof frame.href === 'string' && browserInviteLink({ webReady: true, web: frame.href });
             if (!link || musicInvite.expires <= Date.now() || current?.name !== musicInvite.room || current.keepRef !== musicInvite.instance
                 || frame.ch !== musicInvite.room || frame.roomInstance !== musicInvite.instance
@@ -1889,6 +1902,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             clearTimeout(musicInvite.replyTimer);
             musicInvite.href = link;
             musicInvite.state = 'accepted';
+            if (app.active !== current.name) switchTo(current.name);
         }
         drawMusicInvite();
     }
@@ -1897,8 +1911,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         clearTimeout(musicInvite?.replyTimer);
     }
     function endMusicInvite() {
-        if (!musicInvite) return;
+        if (!musicInvite || musicInvite.state === 'ended') return;
         clearMusicInviteTimers();
+        musicInvite.expired = musicInvite.expires <= Date.now();
         musicInvite.state = 'ended';
         delete musicInvite.href;
         drawMusicInvite();
@@ -1920,7 +1935,10 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             // action. Keep the room-wide controls available for published links.
             $('[data-jam-actions]').hidden = targetsCurrentRoom && !ended && !panel.hidden;
         }
-        const message = panel.hidden ? '' : ended ? 'This music invitation ended. Ask the host for a fresh one.'
+        const endedMessage = musicInvite?.expired
+            ? 'This Music invitation expired. Ask the host to send a fresh one.'
+            : 'This Music invitation ended. Ask the host for a fresh one.';
+        const message = panel.hidden ? '' : ended ? endedMessage
             : accepted ? 'You’re in the Jam room. WebJam opens in a new tab. Come back to this tab to chat.'
             : unconfirmed ? 'Hang Out hasn’t confirmed your Music invitation. Wait here or ask the host to send a fresh one.'
             : joining ? 'Waiting for Hang Out to confirm you joined.'
@@ -1982,8 +2000,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         drawMusicInvite();
         resetJamControls();
     }
-    function currentJam() {
-        const c = app.chans.get(app.active);
+    function currentJam(key = app.active) {
+        const c = app.chans.get(key);
         return connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
             && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
     }
@@ -2058,10 +2076,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const wait = $('[data-jam-wait]'), web = $('[data-jam-web]');
         const copy = $('[data-jam-invite-copy]'), qr = $('[data-jam-invite-qr-toggle]');
         const manualCopy = $('[data-jam-invite-copy-value]');
-        wait.hidden = shared && !expired;
-        const guidance = expired ? next.host
-            ? 'Browser invite expired. Copy a fresh browser invite from WebJam and share it here.'
-            : 'Browser invite expired. Ask your host for a fresh invite here.' : jamWaitingCopy;
+        wait.hidden = !!browserLink;
+        let guidance = jamWaitingCopy;
+        if (expired) {
+            guidance = next.host
+                ? 'Browser invite expired. Copy a fresh browser invite from WebJam and share it here.'
+                : 'Browser invite expired. Ask your host for a fresh invite here.';
+        } else if (next.invitation && !browserLink) {
+            guidance = next.host
+                ? 'Desktop invite shared. Send a browser invite to guests joining without the app.'
+                : 'Your host shared a desktop invite. Ask for a browser invite to join without the app.';
+        }
         if (wait.textContent !== guidance) wait.textContent = guidance;
         copy.hidden = qr.hidden = !browserLink;
         if (!browserLink) {
@@ -2073,11 +2098,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             qr.textContent = 'Show QR code';
         } else if (!$('[data-jam-invite-qr-panel]').hidden) drawJamInviteQr(browserLink);
         web.disabled = !browserLink;
-        web.classList.toggle('btn--ghost', web.disabled);
-        web.hidden = expired;
-        web.textContent = web.disabled ? 'Browser join unavailable' : 'Join in browser';
-        web.title = web.disabled ? 'Your host has not shared an approved browser invite yet'
-            : 'Open the host’s browser invitation to listen or join with a microphone';
+        web.hidden = !browserLink;
+        if (browserLink) {
+            web.classList.remove('btn--ghost');
+            web.textContent = 'Join in browser';
+            web.title = 'Open the host’s browser invitation to listen or join with a microphone';
+        }
         const context = jamContext;
         web.onclick = () => {
             if (jamContext !== context || currentJam() !== context.room) return;
@@ -2085,7 +2111,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (link) window.open(link, '_blank', 'noopener,noreferrer');
             else drawJam();
         };
-        if (expired && [web, copy, qr, manualCopy].includes(focused)) wait.focus({ preventScroll: true });
+        if (!browserLink && [web, copy, qr, manualCopy].includes(focused)) wait.focus({ preventScroll: true });
         else if (browserLink && focused === wait) web.focus({ preventScroll: true });
         if (browserLink && deadline > now) {
             jamInviteExpiryTimer = setTimeout(() => {
@@ -2647,8 +2673,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
     }
 
-    $('[data-room-filter]').addEventListener('change', drawRooms);
-    $('[data-room-search]').addEventListener('input', drawRooms);
+    function updateRoomSearch() {
+        drawRooms();
+        const status = $('[data-room-search-status]');
+        if (!status) return;
+        const empty = $('[data-rooms-empty]');
+        const count = $('[data-roomlist]').children.length;
+        const message = count ? `${count} ${count === 1 ? 'room shown' : 'rooms shown'}.` : empty.textContent;
+        if (status.textContent !== message) status.textContent = message;
+    }
+
+    $('[data-room-filter]').addEventListener('change', updateRoomSearch);
+    $('[data-room-search]').addEventListener('input', updateRoomSearch);
     $('[data-owner-signin]').href = relayBase ? `${relayBase.replace(/^ws/, 'http')}/lobby-owner/login?entry-return=1` : '#';
     $('[data-owner-signin]').addEventListener('click', event => { if (!prepareOwnerSignin()) event.preventDefault(); });
     $('[data-keep-cancel]').addEventListener('click', () => clearKeep('Room not kept. You can keep it later from Host tools.'));

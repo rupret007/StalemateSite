@@ -98,6 +98,12 @@ for (const width of [375, 1440]) test(`landmarks, visible nickname label and mes
         await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('#stalemate');
         await expect(page.getByRole('group', { name: 'Ways to hang out' })).toContainText('Anyone can host');
         const randomName = page.getByRole('button', { name: /^Make me a name/ });
+        const nickname = page.getByRole('textbox', { name: 'Your nick', exact: true });
+        const label = page.locator('.nickrow label, label.nickrow');
+        await expect(label).toHaveText('Your nick');
+        await expect(label.locator('button')).toHaveCount(0);
+        await label.click();
+        await expect(nickname).toBeFocused();
         await expect(randomName).toBeVisible();
         await randomName.click(); await expect(page.locator('[data-nick]')).not.toHaveValue('');
         await page.locator('[data-nick]').fill(`SemanticGuest${width}`); await page.locator('[data-enter]').click();
@@ -435,7 +441,17 @@ test('new messages keep keyboard focus in the conversation when the catch-up but
         };
         const readHistory = async () => {
             await expect.poll(() => log.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(60);
-            await log.evaluate(element => { element.scrollTop = 0; });
+            const before = await log.evaluate(element => element.scrollTop);
+            expect(before).toBeGreaterThan(60);
+            await tabTo(reader.page, log);
+            await expect(log).toBeFocused();
+            await reader.page.keyboard.press('PageUp');
+            await expect.poll(() => log.evaluate(element => element.scrollTop)).toBeLessThan(before);
+            for (let i = 0; i < 8 && await log.evaluate(element => element.scrollTop) > 1; i += 1) {
+                await reader.page.keyboard.press('PageUp');
+                await reader.page.waitForTimeout(70);
+            }
+            await expect.poll(() => log.evaluate(element => element.scrollTop)).toBeLessThanOrEqual(1);
         };
         const focusJump = async () => {
             await expect(jump).toBeVisible();
@@ -719,8 +735,8 @@ for (const width of [375, 390]) {
         } finally { await arrival?.close(); await visitor.close(); await host.close(); }
     });
 
-    test(`room directory explains why there are no results at ${width}px`, async ({ browser, baseURL }) => {
-        const relay = hangoutRelayWsBase(baseURL, `directory-results-${randomUUID()}`), viewport = { width, height: 667 };
+    test(`room directory explains why there are no results at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        const relay = hangoutRelayWsBase(baseURL, `directory-results-${randomUUID()}`), viewport = { width, height: width === 390 ? 844 : 667 };
         const host = await guest(browser, baseURL, 'SearchHost', viewport, relay);
         const visitor = await guest(browser, baseURL, 'SearchGuest', viewport, relay);
         try {
@@ -733,15 +749,25 @@ for (const width of [375, 390]) {
             await expect(card).toBeVisible();
             await expect(empty).toBeHidden();
             const search = visitor.page.getByRole('searchbox', { name: 'Find a room', exact: true });
+            const results = visitor.page.locator('[data-room-search-status]');
+            await expect(results).toHaveAttribute('role', 'status');
+            await expect(results).toBeEmpty();
             await search.fill('missing-room');
+            await expect(search).toBeFocused();
+            await expect(results).toHaveText('No rooms match your search. Try another name or clear the search.');
+            await visitor.page.screenshot({ path: testInfo.outputPath('room-search-no-matches.png') });
             await expect(empty).toBeVisible();
             await expect(empty).toHaveText('No rooms match your search. Try another name or clear the search.');
             await search.fill('');
+            await expect(results).toHaveText('1 room shown.');
+            await expect(search).toBeFocused();
             const filter = visitor.page.getByRole('combobox', { name: 'Room directory', exact: true });
             await filter.selectOption('registered');
             await expect(empty).toBeVisible();
             await expect(empty).toHaveText('No registered rooms to show.');
+            await expect(results).toHaveText('No registered rooms to show.');
             await filter.selectOption('active');
+            await expect(results).toHaveText('1 room shown.');
             await expect(card).toBeVisible();
             await expect(empty).toBeHidden();
             await filter.selectOption('registered');
@@ -877,3 +903,23 @@ for (const width of [375, 390]) test(`short Jam instructions and manual invite c
         await expect(page).toHaveURL(admittedURL); expect(popups).toBe(0); expect(visitor.errors).toEqual([]);
     } finally { await visitor.close(); }
 });
+
+for (const width of [1440, 390]) {
+    test(`People roster: self badge stays together at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        const visitor = await guest(browser, baseURL, 'FullscreenWriter', { width, height: width === 1440 ? 900 : 844 });
+        try {
+            const { page } = visitor;
+            await section(page, 'people');
+            const self = page.locator('[data-nicks] button[data-self="true"]');
+            await expect(self).toBeInViewport();
+            await page.screenshot({ path: testInfo.outputPath('self-badge.png') });
+            const badge = await self.evaluate(element => {
+                const style = getComputedStyle(element, '::after');
+                return { text: style.content, display: style.display, wrap: style.whiteSpace };
+            });
+            expect(badge).toEqual({ text: '"you"', display: 'inline-block', wrap: 'nowrap' });
+            expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+            expect(visitor.errors).toEqual([]);
+        } finally { await visitor.close(); }
+    });
+}

@@ -128,9 +128,10 @@
           <div class="gate-card">
             <div class="window-chrome"><span><i aria-hidden="true"></i> CONNECT TO THE COMMUNITY</span><span aria-hidden="true">↵</span></div>
             <h2>Pick a name. Pull up a chair.</h2>
-            <label class="nickrow">Your nick
-                <span class="nickbox"><input data-nick maxlength="20" autocomplete="off" spellcheck="false" aria-label="Your nick" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a name — random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
-            </label>
+            <div class="nickrow">
+                <label for="guest-nickname">Your nick</label>
+                <span class="nickbox"><input id="guest-nickname" data-nick maxlength="20" autocomplete="off" spellcheck="false" placeholder="Type a nickname… or roll one →"><button class="btn btn--ghost dice" type="button" data-reroll aria-label="Make me a name — random fun nickname" title="Make me a random fun nickname">🎲 Make me a name</button></span>
+            </div>
             <p class="status" id="nickname-error" role="status"></p>
             <p class="small gate-hint">Remembered on this device, not reserved. Camera &amp; mic stay off.</p>
             <div class="entry-choice" data-entry-context hidden><label><input type="checkbox" data-entry-share checked> Show <span data-entry-label></span> beside my name</label><p class="small">Your entrance, not a verified identity. You can hide it in People.</p></div>
@@ -185,6 +186,7 @@
             <label class="small"><span class="sr-only">Find a room</span><input data-room-search type="search" maxlength="40" aria-label="Find a room" placeholder="Find a room…"></label></div>
             <a class="private" data-owner-signin href="#">Sign in with email to keep a room</a>
             <button class="btn btn--small btn--ghost" data-owner-signout hidden>Continue as guest</button>
+            <p class="sr-only" data-room-search-status role="status" aria-atomic="true"></p>
             <ul class="roomlist" data-roomlist></ul>
             <p class="empty" data-rooms-empty>No rooms yet. Stay for a chat, or be the first to start one.</p>
             <h2 class="start-heading" tabindex="-1">Make room for something</h2>
@@ -330,8 +332,8 @@
                 <button class="btn btn--ghost jam-room-invite" type="button" data-music-handoff-cancel hidden>Cancel Music invite</button>
                 <p class="small room-invite-status" data-music-invite-outcome role="status" aria-atomic="true"></p>
                 <div class="jam-actions" data-jam-actions>
-                    <span class="small" data-jam-wait role="status" tabindex="-1">Waiting for the host’s invite. When it’s ready, choose Join in browser—no app needed.</span>
-                    <button class="btn btn--ghost" type="button" data-jam-web disabled title="Your host has not shared an approved browser invite yet">Browser join unavailable</button>
+                    <span class="small" data-jam-wait role="status" tabindex="-1">You’re in the Jam room. Ask your host for an audio invite. You can join in your browser, no app needed.</span>
+                    <button class="btn" type="button" data-jam-web hidden disabled title="Open the host’s browser invitation to listen or join with a microphone">Join in browser</button>
                     <a class="btn" data-jam-desktop href="#" hidden>Open in WebJam 🎸</a>
                     <button class="btn" type="button" data-jam-copy hidden>Copy desktop invite</button>
                     <button class="btn btn--ghost" type="button" data-jam-invite-copy hidden>Copy browser invite</button>
@@ -363,7 +365,8 @@
                 <p class="small jam-platform" data-jam-platform>A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.</p>
                 <details class="jam-setup" data-jam-help>
                     <summary>Setup &amp; invitation help</summary>
-                    <p><strong>Joining in your browser?</strong> Accept the Music invitation, then choose <strong>Open WebJam in browser</strong>. If your host shares a link with the room, choose <strong>Join in browser</strong>. WebJam opens in a new tab. Come back to this tab to chat. On the join page, listen with your mic off or check your microphone and join with headphones. Browser audio usually has more delay than the desktop app.</p>
+                    <p><strong>Joining in your browser?</strong> Accept the Music invitation and choose <strong>Open WebJam in browser</strong>. For a room link, choose <strong>Join in browser</strong>.</p>
+                    <p>WebJam opens in a new tab. Come back to this tab to chat. Listen with your mic off or check your microphone and join with headphones. Browser audio usually has more delay than the desktop app.</p>
                     <p><strong>Hosting from a Mac?</strong> Start a Music session in the WebJam beta app. When <strong>Invite bandmate to Music</strong> appears in this room, choose your guest and confirm the invitation in WebJam. Keep your Music session open.</p>
                     <p>To share manually, click <strong>Copy browser invite</strong> in WebJam. Wait for <strong>Link copied</strong>, then paste the link in Hang Out and choose <strong>Share with room</strong>. Sharing an invite does not turn on your microphone.</p>
                     <p>For guests using the desktop beta app, share the entire desktop invitation. On Mac, they can open it in WebJam. On supported Windows and Linux builds, paste the full invitation into <strong>Join</strong> in the app.</p>

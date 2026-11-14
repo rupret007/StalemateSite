@@ -446,6 +446,12 @@
                     ui.url.setAttribute('aria-invalid', 'true');
                     ui.loadStatus.textContent = message;
                     ui.url.reportValidity();
+                    // Show the field and its inline error within the scrollable activity.
+                    const panel = ui.load.closest('[data-activity]');
+                    if (panel) {
+                        const { top } = panel.getBoundingClientRect();
+                        panel.scrollTop += ui.load.getBoundingClientRect().top - top - 8;
+                    }
                     return;
                 }
                 shareLesson(id, draft);
