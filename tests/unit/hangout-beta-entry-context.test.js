@@ -47,7 +47,7 @@ it.each(['details', 'accept'])('uses the shared copy on a guest %s 410', async o
     try {
         window.sharedGameNight = { GAME_INVITE_UNAVAILABLE: copy };
         window.fetch = vi.fn(async path => path.endsWith('/' + operation)
-            ? Response.json({ error: copy }, { status: 410 })
+            ? Response.json({ error: 'Fixture server says the invitation expired.' }, { status: 410 })
             : Response.json({ game: 'Royal Flush Chess', host: 'Fixture host' }));
         // Supply a changed module export. An old literal in either client path must fail this check.
         window.eval(client.replace(/^import \{ GAME_INVITE_UNAVAILABLE \} from '[^']+';/,
