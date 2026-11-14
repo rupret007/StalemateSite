@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { Chess, claimReason, colorName, intendedClaims, pieceName } from '/play/games/chess-core.js';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
@@ -134,6 +135,9 @@ export function mountArcadeChess(container, onMatch) {
     function applyState(frame) {
         const prior = model?.match, next = frame.state?.match;
         const enteringBoard = next && next.id !== prior?.id;
+        if (connection === 'ready' && next && !enteringBoard && frame.state.seat && next.moves.length === prior.moves.length + 1) {
+            gameNightCue('chess.move');
+        }
         if (model?.id !== frame.state?.id || prior?.revision !== next?.revision) {
             selected = null; closeChoice(); feedback.textContent = '';
         }

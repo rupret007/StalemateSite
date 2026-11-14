@@ -375,6 +375,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                             return lock;
                         }
                     } });
+                    const NativeAudio = window.AudioContext || window.webkitAudioContext;
+                    if (!NativeAudio) return;
+                    window.gameAudioContexts = 0;
+                    window.gameAudioCues = 0;
+                    window.AudioContext = class extends NativeAudio {
+                        constructor() {
+                            super();
+                            window.gameAudioContexts++;
+                            const bufferSource = this.createBufferSource.bind(this);
+                            this.createBufferSource = (...args) => {
+                                const source = bufferSource(...args);
+                                const start = source.start.bind(source);
+                                source.start = (...values) => { window.gameAudioCues++; return start(...values); };
+                                return source;
+                            };
+                        }
+                    };
                 });
                 assert.equal((await context.cookies()).length, 0, 'guest starts with an empty browser profile');
                 const unconfirmed = await context.request.post(origin + '/beta/game-night/invitation/accept', {
@@ -389,6 +406,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.getByRole('textbox')).toHaveCount(0);
                 await expect(guest.getByRole('button')).toHaveCount(1);
                 assert.equal(new URL(guest.url()).hash, '');
+                assert.equal(await guest.evaluate(() => window.gameAudioContexts), 0, 'opening the invite does not unlock sound');
+                const joiningAudio = [];
+                await guest.exposeFunction('recordJoinAudio', sample => { joiningAudio.push(sample); });
+                await guest.evaluate(() => document.querySelector('[data-guest-join]').addEventListener('click', () =>
+                    window.recordJoinAudio({ contexts: window.gameAudioContexts, cues: window.gameAudioCues })));
                 await captureArcadeInvite(guest, viewport, 'first-visit-01-guest-accept');
                 await reopenGameNight(host, viewport, phone);
                 const join = guest.getByRole('button', { name: 'Join game', exact: true });
@@ -476,6 +498,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (phone) assert.equal(interruptedJoin, true, 'the phone automatically retries its first Join on a new socket');
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
                 await expect(guest.locator('details.arcade-chess > summary')).toBeFocused();
+                assert.deepEqual(joiningAudio, [{ contexts: 1, cues: 0 }], 'Join unlocks without playing a cue');
                 const pieces = guest.locator('.arcade-chess [data-square] img');
                 await expect(pieces).toHaveCount(32);
                 await expect(pieces.first()).toBeVisible();
@@ -734,6 +757,24 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                     await expect(guest.getByRole('button', { name: 'e2, White pawn' })).toBeVisible();
                     console.log(`Passed ${engine} same-seat Chess reopen, newest-tab takeover and rematch after the phone closes.`);
+                }
+                if (!phone) {
+                    const sound = guest.getByRole('button', { name: 'Game sound', exact: true });
+                    await expect(sound).toHaveAttribute('aria-pressed', 'true');
+                    assert.equal(await guest.evaluate(() => window.gameAudioCues), 0, 'joining and receiving a snapshot stay quiet');
+                    await tapSquare(guest, 'e7', phone);
+                    // Select and move only from the guest's own board.
+                    await tapSquare(guest, 'e5', phone);
+                    await expect(host.getByRole('button', { name: 'e5, Black pawn' })).toBeAttached();
+                    await expect.poll(() => guest.evaluate(() => window.gameAudioCues)).toBeGreaterThan(0);
+                    await sound.click();
+                    await expect(sound).toHaveAttribute('aria-pressed', 'false');
+                    const cuesBeforeMute = await guest.evaluate(() => window.gameAudioCues);
+                    await tapSquare(host, 'g1', false);
+                    await tapSquare(host, 'f3', false);
+                    await expect(guest.getByRole('button', { name: 'f3, White knight' })).toBeAttached();
+                    assert.equal(await guest.evaluate(() => window.gameAudioCues), cuesBeforeMute, 'muting stops gameplay cues');
+                    await sound.click();
                 }
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
                 assert.equal((await context.request.get(origin + '/beta/state?game-guest=1')).status(), 200, 'an obsolete tab cannot close a different invitation');

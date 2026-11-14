@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
 const seats = ['one', 'two', 'three', 'four'];
@@ -95,6 +96,8 @@ export function mountArcadeTurdJack(container, onMatch) {
                 closeConfirmation();
                 feedback.textContent = '';
             }
+            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
+                && state.match.revision !== model.match.revision) gameNightCue(state.match.phase === 'wager' ? 'jack.chip' : 'jack.card');
             model = state;
             canOpen = host;
             connection = 'ready';

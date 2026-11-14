@@ -397,7 +397,8 @@ async function betaRequest(request, env, deps = {}) {
         .replace('STALEMATE / INVITATION ONLY', 'HANG OUT / INVITATION ONLY')
         .replace('<script defer src="/beta/client.js">', '<script type="module" src="/beta/client.js">'), 200, 'text/html; charset=utf-8');
     if (url.pathname === '/beta/style.css') return reply(STYLE + GAME_GUEST_STYLE, 200, 'text/css');
-    if (url.pathname === LOBBY_PAGE + 'game-night.mjs' && gameGuestEnabled(env) && ['GET', 'HEAD'].includes(request.method)) {
+    const invitationAssets = [LOBBY_PAGE + 'game-night.mjs', LOBBY_PAGE + 'game-night-audio.mjs'];
+    if (gameGuestEnabled(env) && ['GET', 'HEAD'].includes(request.method) && invitationAssets.includes(url.pathname)) {
         const asset = await env.ASSETS.fetch(request);
         return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript; charset=utf-8');
     }

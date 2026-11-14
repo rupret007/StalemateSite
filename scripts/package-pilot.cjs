@@ -10,6 +10,8 @@ fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive:
 for (const dir of ['r', 'assets', ...(target === 'beta' ? ['join'] : [])]) fs.cpSync(path.join(root, dir), path.join(out, dir), { recursive: true });
 if (target === 'beta') {
     const play = path.join(root, 'play');
+    fs.mkdirSync(path.join(out, 'play/assets'), { recursive: true });
+    fs.copyFileSync(path.join(play, 'assets/suite-sound.js'), path.join(out, 'play/assets/suite-sound.js'));
     const matchReceipt = path.join(root, 'hangout-worker/arcade/VENDORED.txt');
     if (fs.existsSync(matchReceipt)) {
         const source = fs.readFileSync(matchReceipt, 'utf8').trim();

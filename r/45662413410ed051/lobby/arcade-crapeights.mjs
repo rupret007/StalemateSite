@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
 const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds'], C: ['♣', 'Clubs'] };
@@ -100,6 +101,8 @@ export function mountArcadeCrapeights(container, onMatch) {
             const focused = document.activeElement;
             const focusInTable = showingOutcome && panel.contains(focused);
             if (model?.id !== state?.id || previous?.revision !== match?.revision) closeChoices();
+            if (phase === 'ready' && state?.seat && match && match.id === previous?.id
+                && match.revision !== previous.revision) gameNightCue(match.action?.kind === 'draw' ? 'eights.draw' : 'eights.play');
             phase = 'ready';
             connectionError = undefined;
             model = state;

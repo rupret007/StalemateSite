@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { createTurdtrisArt } from '/play/games/turdtris-art.js';
 import { classifyGesture } from '/play/games/turdtris-presentation.js';
@@ -103,6 +104,8 @@ export function mountArcadeTurdtris(container, onMatch) {
                 inflight = null;
                 error.textContent = '';
             }
+            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
+                && state.match.self?.board.lines > model.match.self?.board.lines) gameNightCue('tris.clear');
             model = state;
             canOpen = host;
             receivedAt = performance.now();

@@ -42,7 +42,7 @@ async function visitor({ via = 'rad-dad', verified = false, stored = {}, returni
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, gameNightReturnHint, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
+    window.HangoutClientTestModules = { ...entryFunctions, mountGameNightSound: vi.fn(), unlockGameNightAudio: vi.fn(), gameNightReturnHint, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
     window.eval(discovery);
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
     window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);

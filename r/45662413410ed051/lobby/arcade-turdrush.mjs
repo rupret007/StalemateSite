@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { classifyRushSwipe } from '/play/games/turdrush-core.js';
 import { advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer } from '/play/games/turdrush-race.js';
@@ -135,6 +136,8 @@ export function mountArcadeTurdRush(container, onMatch) {
             } else if (state?.match) {
                 flights = flights.filter(flight => flight.sequence > state.match.runner.sequence);
             }
+            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
+                && state.match.players?.[state.seat]?.picks > model.match.players?.[state.seat]?.picks) gameNightCue('shared.ding');
             model = state;
             canOpen = host;
             receivedAt = performance.now();
