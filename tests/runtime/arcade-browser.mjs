@@ -13,6 +13,7 @@ import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race
 import '../../hangout-worker/arcade/games/turdrummy-rules.js';
 
 const runProcess = promisify(execFile);
+const isMatchView = frame => frame.t === 'snapshot' || frame.t === 'match-state';
 
 export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media, relay = false, options = {}) {
     const mixed = options.previousClient || options.previousWorker ? options : null;
@@ -114,23 +115,33 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await offer.getByRole('button', { name: 'Join Game Night', exact: true }).click();
         await expect(offer).toBeHidden();
     }
-    async function verifyMixedVersions({ previousClient, previousWorker }) {
+    async function verifyMixedVersions({ previousClient, previousWorker, previousArcade }) {
         const host = await guest('stalemate', previousWorker ? 'OldWorkerHost' : 'CurrentHost', { width: 1280, height: 900 });
         const nick = previousWorker ? 'OldWorkerGuest' : 'PreviousClient';
         const player = await guest('rad-dad', nick, { width: 375, height: 667 }, true, null, previousClient);
         await host.getByRole('button', { name: /Game Night/ }).click();
         await inviteToGame(host, player, nick);
-        await expect(player.locator('[data-arcade-game]')).toHaveCount(previousClient ? 0 : 1);
-        await expect(player.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
-        await expect(player.locator('[data-call-toggle]')).toBeHidden();
-        if (previousWorker) {
-            await expect(host.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
-            await expect(host.locator('[data-call-toggle]')).toBeHidden();
-        } else {
-            if (media) await expect(host.locator('[data-call-toggle]')).toBeVisible();
-            await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+        if (previousArcade) {
+            for (const page of [host, player]) {
+                await page.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+            }
             await host.getByRole('button', { name: 'Open Chess match' }).click();
-            await expect(host.locator('[data-chess-status]')).toContainText('Waiting');
+            await player.getByRole('button', { name: 'Join as Black' }).tap();
+            for (const square of ['e2', 'e4']) await host.locator(`[data-square="${square}"]`).click();
+            await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+        } else {
+            await expect(player.locator('[data-arcade-game]')).toHaveCount(previousClient ? 0 : 1);
+            await expect(player.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
+            await expect(player.locator('[data-call-toggle]')).toBeHidden();
+            if (previousWorker) {
+                await expect(host.getByRole('combobox', { name: 'Switch game' })).toBeHidden();
+                await expect(host.locator('[data-call-toggle]')).toBeHidden();
+            } else {
+                if (media) await expect(host.locator('[data-call-toggle]')).toBeVisible();
+                await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+                await host.getByRole('button', { name: 'Open Chess match' }).click();
+                await expect(host.locator('[data-chess-status]')).toContainText('Waiting');
+            }
         }
         for (const [sender, recipient, message] of [[player, host, 'Hello from Rad Dad'], [host, player, 'Hello from Stalemate']]) {
             await sender.locator('[data-text]').fill(message);
@@ -360,16 +371,30 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(join).toBeInViewport({ ratio: 1 });
                 await expect(join).toHaveAccessibleDescription(/13\+ and agree to the house rules/);
                 assert.ok((await join.boundingBox()).height >= 44, 'the first action is a full touch target');
+                let legacyViewSent = false, releaseHello, matchRoom;
+                const holdHello = new Promise(resolve => { releaseHello = resolve; });
                 if (phone) {
                     let connections = 0;
                     await guest.routeWebSocket(url => url.pathname === '/lobby', socket => {
                         if (++connections > 1) socket.connectToServer();
+                    });
+                    await guest.routeWebSocket(url => url.pathname === '/beta/arcade-match', socket => {
+                        const server = socket.connectToServer();
+                        socket.onMessage(async payload => {
+                            if (typeof payload === 'string' && JSON.parse(payload).t === 'hello' && !legacyViewSent) {
+                                socket.send(JSON.stringify({ t: 'match-state', version: 1, room: matchRoom, state: null, canOpen: false }));
+                                legacyViewSent = true;
+                                await holdHello;
+                            }
+                            server.send(payload);
+                        });
                     });
                 }
                 let ticketRequested = false, releaseTicket;
                 const holdTicket = new Promise(resolve => { releaseTicket = resolve; });
                 await guest.route(url => url.pathname === '/beta/arcade-ticket' && url.searchParams.get('game-guest') === '1', async route => {
                     ticketRequested = true;
+                    matchRoom = route.request().postDataJSON().room;
                     await holdTicket;
                     await route.continue();
                 }, { times: 1 });
@@ -409,6 +434,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await captureArcadeInvite(guest, viewport, 'first-visit-01-finding-seat');
                 } finally {
                     releaseTicket();
+                }
+                if (phone) {
+                    try {
+                        await expect.poll(() => legacyViewSent).toBe(true);
+                        await expect(guest.locator('[data-game-guest-status]')).toHaveText('Finding your seat…');
+                        await expect(guest.locator('[data-app]')).toBeHidden();
+                    } finally { releaseHello(); }
                 }
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
@@ -727,7 +759,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     connections.push([route, server]);
                     if (connections === matches && matches.length === 2) server.onMessage(message => {
                         // Upgrade and deliver match-ready, but never confirm the board on this socket.
-                        if (typeof message !== 'string' || JSON.parse(message).t !== 'match-state') route.send(message);
+                        if (typeof message !== 'string' || !isMatchView(JSON.parse(message))) route.send(message);
                     });
                 });
             }
@@ -1302,7 +1334,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             if (!new URL(socket.url()).pathname.endsWith(`/arcade-${game}-match`)) return;
             socket.on('framereceived', ({ payload }) => {
                 const frame = JSON.parse(payload.toString());
-                if (frame.t === 'match-state') current = frame.state;
+                if (isMatchView(frame)) current = frame.state;
             });
         });
         return () => current;
@@ -1314,7 +1346,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             const server = route.connectToServer();
             connections.push([route, server]);
             if (connections.length === 2) server.onMessage(message => {
-                if (!released && typeof message === 'string' && JSON.parse(message).t === 'match-state') heldState = message;
+                if (!released && typeof message === 'string' && isMatchView(JSON.parse(message))) heldState = message;
                 else route.send(message);
             });
         });
@@ -1678,7 +1710,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 socket.on('framereceived', ({ payload }) => {
                     const frame = JSON.parse(payload.toString());
                     if (frame.t === 'match-error') last.reason = frame.reason;
-                    if (frame.t === 'match-state') last.revision = frame.state?.match?.revision;
+                    if (isMatchView(frame)) last.revision = frame.state?.match?.revision;
                 });
             });
             return last;

@@ -63,9 +63,13 @@ assert.ok(siteGuest === undefined || browserName && !mixedRef && !relay &&
     'choose a browser and --site-guest=stalemate or --site-guest=rad-dad (requires ARCADE_PREVIEW_RAD_DAD)');
 const previousAssets = new Map();
 if (mixedRef) {
-    for (const file of ['entry-sites.mjs', 'lobby/index.html', 'lobby/lobby.js', 'lobby/lobby.css']) {
+    for (const file of ['entry-sites.mjs', 'lobby/index.html', 'lobby/lobby.js', 'lobby/lobby.css', 'lobby/game-night-match-client.mjs']) {
         const path = 'r/45662413410ed051/' + file;
-        previousAssets.set('/' + path, execFileSync('git', ['show', `${mixedRef}:${path}`], { cwd: app }));
+        try {
+            previousAssets.set('/' + path, execFileSync('git', ['show', `${mixedRef}:${path}`], { cwd: app, stdio: ['ignore', 'pipe', 'ignore'] }));
+        } catch (error) {
+            if (!file.endsWith('game-night-match-client.mjs')) throw error;
+        }
     }
 }
 const directory = await mkdtemp(join(tmpdir(), 'game-night-arcade-'));
@@ -1253,10 +1257,11 @@ try {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;
         if (mixedRef) {
-            await runArcadeBrowser(browserName, browserOrigin, invite, evidence, null, browserMedia, false, { previousClient: true });
+            const previousArcade = previousAssets.has('/r/45662413410ed051/lobby/game-night-match-client.mjs');
+            await runArcadeBrowser(browserName, browserOrigin, invite, evidence, null, browserMedia, false, { previousClient: true, previousArcade });
             options.modules[0].contents = await bundleRollbackSource(mixedRef);
             await mf.setOptions(convertV4MiniflareOptions(options));
-            await runArcadeBrowser(browserName, (await mf.ready).origin, invite, evidence, null, browserMedia, false, { previousWorker: true });
+            await runArcadeBrowser(browserName, (await mf.ready).origin, invite, evidence, null, browserMedia, false, { previousWorker: true, previousArcade });
             console.log(`Passed ${browserName} mixed lobby versions using source ${mixedRef}.`);
         } else {
             await runArcadeBrowser(browserName, browserOrigin, invite, evidence,
@@ -1311,10 +1316,12 @@ try {
     const resumed = await upgrade(black.cookie, await grant(black, ch.keepRef));
     assert.equal(resumed.status, 101);
     const returning = observe(resumed.webSocket);
-    await returning.wait(frame => frame.t === 'match-ready', 'match reconnected');
-    returning.send({ version: 1, action: 'sync' });
-    const synced = await returning.wait(frame => frame.state?.match?.moves?.[0] === 'e2e4', 'restored board');
-    assert.equal(synced.state.seat, 'b');
+    const ready = await returning.wait(frame => frame.t === 'match-ready', 'match reconnected');
+    assert.equal(ready.snapshots, true);
+    returning.send({ version: 1, t: 'hello', lastSeq: 0 });
+    const synced = await returning.wait(frame => frame.t === 'snapshot' && frame.state?.match?.moves?.[0] === 'e2e4', 'restored board');
+    assert.deepEqual([synced.phase, synced.currentMatchId, synced.yourSeat, synced.turn], ['playing', started.state.id, 'b', 'b']);
+    assert.ok(Number.isSafeInteger(synced.seq) && synced.seq > 0);
     await verifyMedia(white, black, ch.keepRef, a, returning);
     const { a: cards, spectator } = await verifyEights(white, black, ch.keepRef, a);
     const rummy = await verifyRummy(white, black, spectator, ch.keepRef);

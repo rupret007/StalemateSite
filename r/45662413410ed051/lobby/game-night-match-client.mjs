@@ -12,7 +12,7 @@ export const matchConnectionErrors = Object.freeze({
 export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1' ? '?game-guest=1' : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
-    let pausedForNetwork = false, terminalError = false;
+    let pausedForNetwork = false, terminalError = false, lastSeq = 0;
     function reset(reconnecting = false) {
         generation++;
         onMatch?.(scope, undefined, undefined, reconnecting);
@@ -67,15 +67,19 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
             url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             const connection = new WebSocket(url, [grant.protocol, grant.ticket]);
             socket = connection;
+            let stateFrameType;
             connection.addEventListener('close', event => retry(attempt, socketErrors[event.code]));
             connection.addEventListener('message', event => {
                 if (attempt !== generation) return;
                 let frame;
                 try { frame = JSON.parse(event.data); } catch { return; }
                 if (frame?.t === 'match-ready' && frame.version === 1) {
+                    if (stateFrameType) return;
+                    stateFrameType = frame.snapshots === true ? 'snapshot' : 'match-state';
                     ready = true;
-                    send({ action: 'sync' });
-                } else if (frame?.t === 'match-state' && frame.version === 1 && frame.room === scope.room) {
+                    send(stateFrameType === 'snapshot' ? { t: 'hello', lastSeq } : { action: 'sync' });
+                } else if (stateFrameType && frame?.t === stateFrameType && frame.version === 1 && frame.room === scope.room) {
+                    lastSeq = Number.isSafeInteger(frame.seq) ? frame.seq : 0;
                     clearTimeout(joinTimer);
                     failures = 0;
                     clearTimeout(claimTimer);
@@ -115,7 +119,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         if (event.persisted) reconnect();
     });
     return {
-        start(next) { stop(); scope = next; terminalError = false; failures = 0; void connect(); },
+        start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; void connect(); },
         stop,
         send
     };
