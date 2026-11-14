@@ -761,6 +761,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await captureArcadeInvite(friend, phone, 'spades-02-playing');
 
             const players = [host, friend], remaining = [13, 13];
+            await expect(friend.locator('[data-spades-trick]')).toContainText(/West \(you\) · Bid (?:Nil|\d+) · 0 tricks/);
+            let checkedUnavailableCard = false;
             for (let play = 0; play < 26; play++) {
                 let turn;
                 await expect.poll(async () => {
@@ -769,6 +771,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     return turn.length;
                 }).toBe(1);
                 const index = turn[0], page = players[index], card = page.locator('[data-spades-card]:enabled').first();
+                const unavailable = page.locator('[data-spades-card]:disabled');
+                if (!checkedUnavailableCard && await unavailable.count()) {
+                    await expect(unavailable.first()).toHaveCSS('opacity', '0.52');
+                    await expect(unavailable.first()).toHaveAccessibleName(/cannot play this turn$/);
+                    await expect(card).not.toHaveAttribute('data-cannot-follow');
+                    checkedUnavailableCard = true;
+                }
                 if (play === 0) {
                     await card.tap();
                     await expect(status(friend)).not.toContainText('tap a card');
@@ -786,6 +795,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(cards(friend)).toHaveCount(remaining[1]);
                 }
             }
+            assert.ok(checkedUnavailableCard, 'the scored round exercises a card that cannot follow suit');
             for (const page of players) await expect(table(page)).toHaveAttribute('data-phase', 'round-end');
             assert.deepEqual(await host.locator('[data-spades-score]').allTextContents(), await friend.locator('[data-spades-score]').allTextContents());
             await friend.locator('[data-spades-action="resign"]').click();
@@ -1318,9 +1328,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
             if (page === black) {
                 await tapSquare(page, from);
+                await expect(page.locator(`[data-square="${to}"]`)).toHaveAttribute('data-legal', '');
                 await tapSquare(page, to);
             } else {
-                for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
+                await page.locator(`[data-square="${from}"]`).press('Enter');
+                const target = page.locator(`[data-square="${to}"]`);
+                if (to === 'f7') {
+                    await expect(target).toHaveAttribute('data-capture', '');
+                    assert.equal(await target.evaluate(square => getComputedStyle(square, '::after').inset), '6px');
+                }
+                await target.press('Enter');
             }
         }
         for (const page of [black, white]) {
@@ -1911,7 +1928,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(b.getByLabel('Your bid')).toHaveValue('0');
         }
         for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Bid for me' }).click();
-        await expect(a.locator('[data-spades-trick]')).toContainText('West · Nil');
+        await expect(a.locator('[data-spades-trick]')).toContainText('West · Bid Nil · 0 tricks');
         const lead = b.locator('[data-spades-card]:enabled').first();
         await verifyCardLandscape(b, 'TurdSpades', lead, b.locator('[data-spades-action="resign"]'));
         await lead.scrollIntoViewIfNeeded();
