@@ -846,16 +846,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await activate();
                 if (phone) {
                     const gate = friend.locator('[data-game-guest-connecting]');
-                    await expect(gate.getByRole('status')).toHaveText('Couldn’t reconnect to your seat. Try again.');
-                    assert.equal(interrupted, 4, 'the initial connection and three retries were interrupted');
-                    const retrySeat = gate.getByRole('button', { name: 'Try again', exact: true });
-                    await expect(retrySeat).toBeFocused();
-                    await expectUncoveredControl(retrySeat);
+                    await expect(gate.getByRole('status')).toHaveText('Reconnecting…');
                     await expect(friend.locator('[data-app]')).toBeHidden();
-                    await captureArcadeInvite(friend, viewport, 'guest-retry-02-seat-connection-error');
-                    await retrySeat.tap();
+                    await captureArcadeInvite(friend, viewport, 'guest-retry-02-reconnecting');
                 }
-                await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · White to move', { timeout: 15000 });
+                if (phone) assert.equal(interrupted, 4, 'the seat reconnects automatically after four interruptions');
                 await captureArcadeInvite(friend, viewport, 'guest-retry-02-seated');
                 await friend.locator('[data-leave]').click();
                 await expect(friend.locator('[data-game-night]')).toBeHidden();

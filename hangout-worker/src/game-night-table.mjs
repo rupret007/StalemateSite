@@ -71,6 +71,10 @@ export function createGameNightTable({
         get mode() { return mode; }
         get host() { return this.#host; }
         get tableId() { return this.#tableId; }
+        // What a viewer who cannot see the board may still be told.
+        get openMatch() {
+            return this.#closed || !this.#match ? null : { id: this.#id, finished: !!finished(this.#match) };
+        }
         get subjects() { return sides.map(seat => this.#seats[seat]).filter(Boolean); }
 
         seat(subject) {
@@ -116,6 +120,22 @@ export function createGameNightTable({
         releaseSeat(subject) {
             const seat = this.seat(subject);
             if (twoSeats || this.#match || !seat || seat === first) return false;
+            this.#seats[seat] = null;
+            return true;
+        }
+
+        // A guest gives up a seat once play is over. The table, its host and the
+        // other seats stay; a finished match is cleared so the seat can be filled.
+        // During play the seat is held, so this returns false.
+        vacate(subject, nextId) {
+            const seat = this.seat(subject);
+            if (this.#closed || !seat || seat === first || subject === this.#host) return false;
+            if (this.#match) {
+                if (!finished(this.#match) || typeof nextId !== 'string' || !/^[a-zA-Z0-9-]{5,80}$/.test(nextId) || nextId === this.#id) return false;
+                this.#match = null;
+                this.#id = nextId;
+                this.#votes = [];
+            }
             this.#seats[seat] = null;
             return true;
         }

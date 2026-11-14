@@ -96,6 +96,113 @@ describe('Game Night phone wake and history recovery', () => {
         expect(replacement.send.mock.calls.map(([data]) => JSON.parse(data))).toEqual([{ version: 1, t: 'hello', lastSeq: 7 }]);
     });
 
+    function snapshot(fields) {
+        sockets.at(-1).dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'snapshot', version: 1, room: '#game-fixture', seq: 1, state: null, ...fields })
+        }));
+    }
+
+    it('tells a table view when a game is open but hidden, so it never says to wait for the host', async () => {
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        ready(sockets.at(-1), { snapshots: true });
+        expect(client.matchOpen()).toBe(false);
+        snapshot({ phase: 'lobby', currentMatchId: null });
+        expect(client.matchOpen()).toBe(false);
+        for (const phase of ['playing', 'finished', 'unavailable']) {
+            snapshot({ phase, currentMatchId: phase === 'unavailable' ? null : 'match-fixture' });
+            expect(client.matchOpen()).toBe(true);
+        }
+        snapshot({ phase: 'playing', currentMatchId: 'match-fixture', state: { seat: null, match: {} } });
+        expect(client.matchOpen()).toBe(false);
+    });
+
+    it.each(['arcade-chess', 'arcade-crapeights', 'arcade-turdrummy', 'arcade-turdspades', 'arcade-turdjack'])(
+        'checks for a hidden game before the waiting-for-host copy in %s', async view => {
+            const { readFileSync } = await import('node:fs');
+            const source = readFileSync(`r/45662413410ed051/lobby/${view}.mjs`, 'utf8');
+            const hidden = source.indexOf('} else if (!model && client.matchOpen()) {');
+            const waiting = source.indexOf('Waiting for the host to open');
+            expect(hidden).toBeGreaterThan(-1);
+            expect(waiting).toBeGreaterThan(hidden);
+            expect(source.slice(hidden, waiting)).toContain('matchHiddenText');
+        });
+
+    it('keeps trying to reconnect with a capped wait while the page is visible', async () => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const delays = [];
+        const timeout = vi.spyOn(globalThis, 'setTimeout');
+        for (let attempt = 0; attempt < 12; attempt++) {
+            const before = sockets.length;
+            timeout.mockClear();
+            sockets.at(-1).dispatchEvent(new CloseEvent('close', { code: 1006 }));
+            expect(status).toHaveBeenLastCalledWith('reconnecting');
+            delays.push(timeout.mock.calls.at(-1)[1]);
+            await vi.advanceTimersByTimeAsync(delays.at(-1));
+            expect(sockets).toHaveLength(before + 1);
+        }
+        expect(status).not.toHaveBeenCalledWith('unavailable', undefined);
+        expect(Math.max(...delays)).toBeLessThanOrEqual(10_000);
+        expect(delays.at(-1)).toBeGreaterThanOrEqual(7_500);
+        expect(delays[0]).toBeLessThan(1_000);
+    });
+
+    it('waits while the page is hidden and reconnects when it is shown again', async () => {
+        visibility(true);
+        sockets[0].dispatchEvent(new CloseEvent('close', { code: 1006 }));
+        await vi.advanceTimersByTimeAsync(3_000);
+        expect(sockets).toHaveLength(1);
+        expect(issue).toHaveBeenCalledTimes(1);
+        visibility(false);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(sockets).toHaveLength(2);
+    });
+
+    describe('rematch frame', () => {
+        let onRematch, current;
+        const sent = () => current.send.mock.calls.map(([data]) => JSON.parse(data));
+        const frame = data => current.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(data) }));
+        beforeEach(async () => {
+            onRematch = vi.fn();
+            client.stop();
+            client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: vi.fn(), onState: vi.fn(), onError: vi.fn(), onRematch });
+            client.start({ room: '#game-fixture', ref: 'fixture' });
+            await vi.advanceTimersByTimeAsync(0);
+            current = sockets.at(-1);
+            ready(current, { snapshots: true });
+            frame({ t: 'snapshot', version: 1, room: '#game-fixture', seq: 4, phase: 'finished', currentMatchId: 'match-one',
+                state: { id: 'match-one', seat: 'w', match: { result: { winner: 'w' } } } });
+            current.send.mockClear();
+        });
+
+        it('follows the new match when its snapshot arrives', async () => {
+            frame({ t: 'rematch', matchId: 'match-two' });
+            expect(onRematch).toHaveBeenCalledExactlyOnceWith('match-two');
+            frame({ t: 'snapshot', version: 1, room: '#game-fixture', seq: 5, phase: 'playing', currentMatchId: 'match-two',
+                state: { id: 'match-two', seat: 'b', match: {} } });
+            await vi.advanceTimersByTimeAsync(5_000);
+            expect(sent()).toEqual([]);
+        });
+
+        it('asks for the new match when its snapshot does not arrive', async () => {
+            frame({ t: 'rematch', matchId: 'match-two' });
+            await vi.advanceTimersByTimeAsync(1_500);
+            expect(sent()).toEqual([{ version: 1, action: 'sync' }]);
+        });
+
+        it('ignores a malformed rematch frame and one for the match already shown', async () => {
+            frame({ t: 'rematch', matchId: 7 });
+            frame({ t: 'rematch', matchId: 'match-one' });
+            await vi.advanceTimersByTimeAsync(5_000);
+            expect(onRematch).not.toHaveBeenCalled();
+            expect(sent()).toEqual([]);
+        });
+    });
+
     function matchState(state) {
         sockets.at(-1).dispatchEvent(new MessageEvent('message', {
             data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state })
