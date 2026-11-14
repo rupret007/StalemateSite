@@ -435,7 +435,17 @@ test('new messages keep keyboard focus in the conversation when the catch-up but
         };
         const readHistory = async () => {
             await expect.poll(() => log.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(60);
-            await log.evaluate(element => { element.scrollTop = 0; });
+            const before = await log.evaluate(element => element.scrollTop);
+            expect(before).toBeGreaterThan(60);
+            await tabTo(reader.page, log);
+            await expect(log).toBeFocused();
+            await reader.page.keyboard.press('PageUp');
+            await expect.poll(() => log.evaluate(element => element.scrollTop)).toBeLessThan(before);
+            for (let i = 0; i < 8 && await log.evaluate(element => element.scrollTop) > 1; i += 1) {
+                await reader.page.keyboard.press('PageUp');
+                await reader.page.waitForTimeout(70);
+            }
+            await expect.poll(() => log.evaluate(element => element.scrollTop)).toBeLessThanOrEqual(1);
         };
         const focusJump = async () => {
             await expect(jump).toBeVisible();
