@@ -49,7 +49,7 @@ the same lobby and can see each other in **People**.
 | Build | Host | Guest |
 | --- | --- | --- |
 | Serving private beta, source `dc77aef`, Worker version `8d76db40` | Choose **Invite bandmate to room** if shown, or **Invite guest** in Host tools. Once the guest joins the room, choose **Invite a browser guest → Copy browser invite** in WebJam. Paste it into the Jam room and click **Share**. | Accept **Join room**, then choose **Join in browser** when the host shares the Music invite. |
-| Selected-guest candidate, website `02a74e73` and WebJam `424f2ed6` | After private delivery and launch verification, choose **Invite bandmate to Music**, select the guest, and confirm in WebJam. Wait for Hang Out to say the invitation was sent. | Choose **Accept and join**, then **Open WebJam in browser**. Choose **Join to listen** with your mic off, or check your input and join with a microphone. |
+| Selected-guest candidate, website `103827ff` and WebJam `424f2ed6` | After private delivery and launch verification, choose **Invite bandmate to Music**, select the guest, and confirm in WebJam. Wait for Hang Out to say the invitation was sent. | Choose **Accept and join**, then **Open WebJam in browser**. Choose **Join to listen** with your mic off, or check your input and join with a microphone. |
 
 ### If WebJam doesn’t open from Hang Out
 
@@ -59,16 +59,26 @@ beta app, start **Music → Host**, then try again. If the return tab opens in a
 different browser profile, choose **End browser invite** in WebJam and retry
 from Hang Out in the return tab’s browser profile.
 
+If the direct invite still fails, use the room fallback after the selected-guest
+build has been delivered. Choose **Invite bandmate to room** in Hang Out, and
+have your bandmate choose **Join room**. In WebJam, choose **Copy browser invite**
+and wait for **Link copied**. Back in the Hang Out Jam room, open **Share a link
+manually**, paste the link, and choose **Share with room**. Wait for
+**Invitation shared.** Your bandmate can now choose **Join in browser**. If
+Hang Out rejects the paste, the link stays in the field so you can correct it.
+
 ### What’s been verified
 
 The serving beta uses the first row. The selected-guest path passed in desktop
 Chromium and phone-size WebKit with the exact private website archive and WebJam
 Qt source. The guest recovered from a refused invitation, accepted a fresh one,
-listened and left. Those checks simulated audio. The exact Apple Silicon package
-passed targeted warm and cold launches. The Mini’s default private URL handler
-still selected `c6eecdc` at the latest check. A matching Intel package, actual
-browser-to-app launch and the live rehearsal still need verification.
-[Website review](https://github.com/rupret007/StalemateSite/pull/487) ·
+listened and left. Those checks simulated audio. The manual fallback also passed across Stalemate
+and Rad Dad in local desktop Chromium and phone-size WebKit. The exact Apple
+Silicon package passed targeted warm and cold macOS launches. The Mini’s
+default private URL handler still selected `c6eecdc` at the latest check.
+A matching Intel package, normal browser-to-app launch and the live rehearsal
+still need verification.
+[Website review](https://github.com/rupret007/StalemateSite/pull/488) ·
 [Desktop review](https://github.com/rupret007/WebJam/pull/505)
 
 ## Audio check, recovery and ending the session
