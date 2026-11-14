@@ -1812,7 +1812,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         open.hidden = !link;
         const status = $('[data-game-call-status]');
         const guidance = !c ? '' : link ? 'Voice and video open in Discord. Hang Out chat stays here.'
-            : canCall ? 'Voice and video are optional. A host can share a Discord call link.' : 'Discord calls are unavailable in this session. You can still play and chat.';
+            : canCall ? 'Voice and video are optional. A host can share a Discord call link.'
+                : watchingGuest ? 'Discord calls are unavailable in this session. You can still watch and chat.'
+                    : 'Discord calls are unavailable in this session. You can still play and chat.';
         if (status.textContent !== guidance) status.textContent = guidance;
         editor.hidden = !canManage;
         $('[data-game-clear]').hidden = !link;

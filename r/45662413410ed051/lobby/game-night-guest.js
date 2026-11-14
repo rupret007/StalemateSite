@@ -112,6 +112,7 @@ async function describe() {
         }
         watching = watch === true;
         join.textContent = watching ? 'Watch game' : 'Join game';
+        if (watching) document.querySelector('#guest-agreement').textContent = 'By choosing Watch game, you confirm you’re 13+ and agree to the house rules.';
         inviter.textContent = `${host} invited you to ${watching ? 'watch' : 'play'}.`;
         inviter.hidden = false;
         gameTitle.textContent = game;

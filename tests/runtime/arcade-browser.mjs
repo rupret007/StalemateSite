@@ -3191,6 +3191,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await openGameNightLink(page, link);
         const watch = page.getByRole('button', { name: 'Watch game', exact: true });
         await expect(watch).toBeVisible();
+        await expect(watch).toHaveAccessibleDescription(/By choosing Watch game/);
         const expires = page.locator('[data-guest-expiry] time');
         await expect(expires).toBeVisible();
         assert.ok(Date.parse(await expires.getAttribute('datetime')) > Date.now());
@@ -3199,6 +3200,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(page.locator('[data-spades-table]')).toHaveAttribute('data-phase', 'bid');
         await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
         await expect(page.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
+        await expect(page.getByText('Discord calls are unavailable in this session. You can still watch and chat.')).toBeVisible();
         await expect(page.getByRole('button', { name: 'Bid for me' })).toBeHidden();
         await expect(page.locator('[data-spades-card]')).toHaveCount(0);
         await expect.poll(() => read()?.watchOnly).toBe(true);
