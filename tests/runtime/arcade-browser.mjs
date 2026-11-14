@@ -772,6 +772,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(host.getByRole('log', { name: 'Conversation' }).getByRole('listitem')
             .filter({ hasText: 'Meet me at the chess board' })).toBeVisible();
         if (!media && !relay) {
+            const waiting = player.locator('[data-game-waiting]');
+            const status = player.locator('[data-chess-status]');
+            await expect(waiting).toBeHidden();
+            await player.evaluate(() => window.dispatchEvent(new Event('offline')));
+            await expect(status).toContainText('Reconnecting');
+            await expect(waiting).toBeHidden();
+            await player.evaluate(() => window.dispatchEvent(new Event('online')));
+            await expect(status).toHaveText('You’re Black · Your turn');
+            await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+            await expect(waiting).toBeHidden();
+        }
+        if (!media && !relay) {
             const panel = player.locator('details.arcade-chess');
             const summary = panel.locator('summary');
             await summary.tap();
