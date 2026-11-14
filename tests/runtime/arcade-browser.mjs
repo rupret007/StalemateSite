@@ -1113,6 +1113,33 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await white.setViewportSize(phone);
             }
         }
+        await black.getByRole('button', { name: 'Resign', exact: true }).click();
+        await black.getByRole('dialog', { name: 'Resign match?' }).getByRole('button', { name: 'Resign', exact: true }).click();
+        await white.getByRole('button', { name: 'Request rematch' }).click();
+        await black.getByRole('button', { name: 'Accept rematch' }).click();
+        for (const [page, from, to] of [[white, 'd2', 'd4'], [black, 'a7', 'a6'], [white, 'd4', 'd5'], [black, 'e7', 'e5']]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
+        }
+        await expect(white.locator('[data-chess-status]')).toContainText('Your turn');
+        await tapSquare(white, 'd5');
+        const capture = white.getByRole('button', { name: 'e6, empty' });
+        await expect(capture).toHaveAttribute('data-capture', '');
+        await expect(capture).not.toHaveAttribute('data-dark');
+        assert.deepEqual(await capture.evaluate(square => {
+            const indicator = getComputedStyle(square, '::after');
+            return [indicator.borderTopColor, indicator.boxShadow.includes('rgb(228, 255, 175)')];
+        }), ['rgb(23, 53, 56)', true], 'the capture ring has dark and light edges');
+        if (evidence) {
+            const original = white.viewportSize();
+            try {
+                await white.setViewportSize({ width: 390, height: 844 });
+                await captureArcadeInvite(white, white.viewportSize(), 'chess-en-passant');
+            } finally { await white.setViewportSize(original); }
+        }
+        await tapSquare(white, 'e6');
+        await expect(black.getByRole('button', { name: 'e6, White pawn' })).toBeVisible();
+        await expect(black.getByRole('button', { name: 'e5, empty' })).toBeVisible();
         console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
     }
     async function joinCalls(a, b) {
