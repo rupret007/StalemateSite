@@ -10,6 +10,7 @@ export function discordCallLink(value) {
 
 // Reserve a generated room-name format so the durable chat record stays
 // readable by the previous Worker without a storage migration.
+export const webJamRoomName = name => typeof name === 'string' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(name);
 export const gameNightRoomName = name => typeof name === 'string' && /^#game-[a-f0-9]{6}x[a-f0-9]{6}$/.test(name);
 
 export function newGameNightRoomName() {

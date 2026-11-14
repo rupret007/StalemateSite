@@ -5,7 +5,7 @@ import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { mountGameNightSound, unlockGameNightAudio } from './game-night-audio.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
+import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName, webJamRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -520,6 +520,9 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     ]);
     const gameLabel = game => arcadeTables.get(game)?.label || gameNightLabels[game] || 'Game Night';
     let arcadeReturning = null, arcadeInvitation = null, arcadeShareIntent = null;
+    let webJamChessSupported = false, webJamHostSeatPending = false, webJamWaitingTable = null, webJamReservation = null;
+    const webJamHostSeat = $('[data-webjam-host-seat]');
+    const webJamHostSeatStatus = $('[data-webjam-host-seat-status]');
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
     const gameReturnKey = 'hangout-game-return';
     const gameInvites = new Map();
@@ -527,8 +530,9 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     let gameOpenPending = null, gameOpenError = '';
     // Jam rooms are invite-only like Game Night, so the directory cannot lead
     // an invited guest back. They share the same offer and return controls.
-    const jamRoomName = name => typeof name === 'string' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(name);
+    const jamRoomName = webJamRoomName;
     const offerRoomName = name => jamRoomName(name) || gameNightSupported && gameNightRoomName(name);
+    let webJamReturn = null;
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -1034,6 +1038,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             gameNightSupported = m.features?.gameNight === 1;
             gameOpenSupported = m.features?.gameOpen === 1;
             gameGuestInvitesSupported = m.features?.gameGuestInvites === 1;
+            webJamChessSupported = m.features?.webJamChess === 1;
             arcadeTables.get('chess').supported = m.features?.arcadeChess === 1;
             arcadeTables.get('crapeights').supported = m.features?.arcadeCrapeights === 1;
             arcadeTables.get('turdrummy').supported = m.features?.arcadeTurdRummy === 1;
@@ -1149,7 +1154,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 $('[data-channel-dialog]').close();
             }
             app.chans.set(m.ch.name, c);
-            if (c.kind === 'game' && invite?.arcade && invite.ref === c.keepRef) beginArcadeInvitation(c, invite.arcade);
+            if (invite?.arcade && invite.ref === c.keepRef && (c.kind === 'game' ||
+                webJamChessSupported && c.kind === 'jam' && invite.arcade.game === 'chess')) beginArcadeInvitation(c, invite.arcade);
             if (gameGuest && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginArcadeInvitation(c, gameGuest);
             if (pendingKeep?.stage === 'joining' && c.name === pendingKeep.room) {
                 if (c.keepRef === pendingKeep.ref) pendingKeep.stage = 'confirm';
@@ -1158,6 +1164,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
             switchTo(m.ch.name, { freshJoin: true });
+            if (c.name === '#stalemate' && webJamReturn) {
+                const requestedReturn = webJamReturn;
+                webJamReturn = null;
+                if (gameReturn?.room === requestedReturn.room && gameReturn.ref === requestedReturn.ref) {
+                    $('[data-game-offer-join]').click();
+                }
+            }
             if (gameOfferAccepted && !arcadeInvitation && !returningGame) focusChannelTab(c.name);
             followPendingRoomJoin();
             break;
@@ -1268,7 +1281,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                     if (!gameInvites.has(m.ch) && gameInvites.size === 5 && !joiningGameRoom)
                         gameInvites.delete(gameInvites.keys().next().value);
                     if (gameInvites.has(m.ch) || gameInvites.size < 5) {
-                        const arcade = gameNightRoomName(m.ch) && arcadeTables.get(m.arcade?.game)?.supported
+                        const jamChess = webJamChessSupported && jamRoomName(m.ch) && m.arcade?.game === 'chess' && roomNonce(m.roomInstance);
+                        const arcade = (gameNightRoomName(m.ch) || jamChess) && arcadeTables.get(m.arcade?.game)?.supported
                             ? gameNightInvite(m.arcade.game, m.arcade.match) : null;
                         gameInvites.set(m.ch, { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by, arcade });
                     }
@@ -1618,7 +1632,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         const panel = $('[data-game-offer]'), status = $('[data-game-offer-status]');
         const button = $('[data-game-offer-join]');
         const hadFocus = panel.contains(document.activeElement);
-        panel.hidden = !offer && !start;
+        panel.hidden = (!offer && !start) || (!offer && !!gameEntry?.webJamGrant && !!currentJam());
         if (panel.hidden) {
             status.textContent = '';
             if (hadFocus) focusChannelTab(app.active);
@@ -1629,7 +1643,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
         const selectedGame = arcadeTables.get(gameEntry?.table)?.label;
         let message;
-        if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || (selectedGame
+        if (start && gameEntry.webJamGrant) message = webJamChessSupported
+            ? 'Open your WebJam room, then open a Chess match to reserve your guest’s seat.'
+            : 'WebJam Chess invitations are unavailable in this session.';
+        else if (start) message = gameOpenPending ? 'Opening Game Night…' : gameOpenError || (selectedGame
             ? `Start a private Game Night for ${selectedGame}.` : 'Start a private Game Night or wait for your host’s invitation.');
         else if (joiningGameRoom === offer.room) message = `Joining ${roomLabel}…`;
         else if (gameReturnOffered) {
@@ -1639,9 +1656,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         } else if (offer.by) message = gameLabel ? `${offer.by} invited you to play ${gameLabel}.` : `${offer.by} invited you to ${roomLabel}.`;
         else message = 'Your link points to a private Game Night. The host’s invitation is required.';
         if (status.textContent !== message) status.textContent = message;
-        button.textContent = start ? 'Start Game Night' : gameReturnOffered ? (offer.game ? 'Back to my seat' : 'Return to room')
+        button.textContent = start ? (gameEntry.webJamGrant ? 'Go to WebJam rooms' : 'Start Game Night')
+            : gameReturnOffered ? (offer.game ? 'Back to my seat' : 'Return to room')
             : gameLabel ? `Play ${gameLabel}` : jam ? 'Join room' : 'Join Game Night';
-        const busy = !!joiningGameRoom || start && !!gameOpenPending;
+        const busy = !!joiningGameRoom || start && (!!gameOpenPending || !!gameEntry.webJamGrant && !webJamChessSupported);
         button.setAttribute('aria-disabled', String(busy));
         $('[data-game-offer-dismiss]').disabled = busy;
     }
@@ -1651,6 +1669,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (joiningGameRoom || connectionState !== 'connected' || sessionEnded || app.sharingStopped) return;
         if (!offer) {
             if (!gameNightSupported || !gameEntry || gameEntry.target) return;
+            if (gameEntry.webJamGrant) {
+                if (webJamChessSupported) {
+                    show('rooms');
+                    $('[data-room-directory-title]').focus();
+                }
+                return;
+            }
             return openGameRoom(true);
         }
         unlockGameNightAudio(event);
@@ -1690,7 +1715,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     }
     function currentJam() {
         const c = app.chans.get(app.active);
-        return connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
+        return !gameGuest && connectionState === 'connected' && !app.localMediaPaused && !app.sharingStopped
             && c?.kind === 'jam' && c.names?.some(n => n.nick === app.me) ? c : null;
     }
     function confirmJamShare(c) {
@@ -1757,7 +1782,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     function currentGameNight() {
         const c = app.chans.get(app.active);
         return gameNightSupported && connectionState === 'connected' && !app.sharingStopped && !app.localMediaPaused
-            && c?.kind === 'game' && c.names?.some(member => member.id === app.selfId) ? c : null;
+            && (c?.kind === 'game' || (gameGuest?.game === 'chess' && c?.kind === 'jam' && c.name === gameGuest.room))
+            && c.names?.some(member => member.id === app.selfId) ? c : null;
     }
     function clearGameLinks() {
         for (const c of app.chans.values()) if (c.kind === 'game') { c.gameCall = ''; }
@@ -1765,7 +1791,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     }
     function drawGameNight() {
         const c = currentGameNight();
-        if (arcadeInvitation && c?.keepRef !== arcadeInvitation.ref) finishArcadeInvitation();
+        const jam = webJamChessSupported ? currentJam() : null;
+        if (arcadeInvitation && c?.keepRef !== arcadeInvitation.ref && jam?.keepRef !== arcadeInvitation.ref) finishArcadeInvitation();
         const canCall = !gameGuest && discordLinksSupported && !shieldActive;
         const canManage = c && canCall && amOp(c) && roomNonce(c.keepRef);
         const editor = $('[data-game-editor]');
@@ -1796,6 +1823,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         arcadePicker.hidden = !!gameGuest || !c || ![...arcadeTables.values()].some(table => table.supported);
         gameArcade.hidden = !betaShell || arcadePicker.hidden;
         for (const [game, table] of arcadeTables) drawArcadeTable(c, game, table);
+        drawWebJamHostSeat();
         drawArcadeMedia(c);
     }
     function seatReturnController(room) {
@@ -1837,13 +1865,69 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         }).catch(() => toast('Call controls could not load. Reopen Game Night to try again.'))
             .finally(() => { arcadeMediaLoading = false; });
     }
+    function webJamHostTarget() {
+        const room = currentJam();
+        const waiting = webJamReservation && webJamReservation.hash === gameEntry?.webJamGrant
+            ? webJamReservation.table : webJamWaitingTable;
+        return webJamChessSupported && !shieldActive && !!gameEntry?.webJamGrant && room?.modes.i && amOp(room)
+            && waiting?.room === room.name && waiting.ref === room.keepRef ? waiting : null;
+    }
+    webJamHostSeat?.addEventListener('click', async () => {
+        const table = webJamHostTarget();
+        if (webJamHostSeatPending || !table) return;
+        const hash = gameEntry.webJamGrant;
+        webJamReservation = { hash, table };
+        webJamHostSeatPending = webJamHostSeat.disabled = true;
+        webJamHostSeatStatus.textContent = 'Reserving the Chess seat…';
+        try {
+            const register = async () => {
+                const response = await fetch('/beta/game-night/room-grant/register', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...table, hashes: [hash], recover: true }),
+                    signal: AbortSignal.timeout(10000)
+                });
+                return { response, result: await response.json() };
+            };
+            const { response, result } = await register().catch(() => {
+                webJamHostSeatStatus.textContent = 'Reconnecting to confirm the Chess seat…';
+                return register();
+            });
+            if (!response.ok || result.granted !== 1) {
+                webJamHostSeatStatus.textContent = response.status === 429 ? result.error
+                    : 'Couldn’t confirm the seat. Check the match or start a fresh offer in WebJam.';
+                return;
+            }
+            if (gameEntry?.webJamGrant === hash) gameEntry = null;
+            webJamReservation = null;
+            webJamHostSeatStatus.textContent = 'Chess seat reserved. Your guest can join now.';
+            drawGameOffer();
+        } catch {
+            webJamHostSeatStatus.textContent = 'Couldn’t confirm the seat. Try confirming again.';
+        } finally {
+            webJamHostSeatPending = false;
+            drawWebJamHostSeat();
+        }
+    });
+    function drawWebJamHostSeat() {
+        if (!webJamHostSeat) return;
+        webJamHostSeat.hidden = !webJamHostSeatPending && !webJamHostTarget();
+        webJamHostSeat.disabled = webJamHostSeatPending;
+    }
     function drawArcadeTable(c, game, table) {
+        const jam = game === 'chess' && webJamChessSupported && !gameGuest ? currentJam() : null;
+        if (jam?.modes.i) c = jam;
+        const inWebJam = !!jam?.modes.i;
+        const container = $(inWebJam ? '[data-jam-chess]' : '[data-game-night]');
         const scope = table.supported && (!gameGuest || gameGuest.game === game) && !shieldActive && c && roomNonce(c.keepRef)
             ? { actor: app.selfId, room: c.name, ref: c.keepRef } : null;
         const option = $(`[data-arcade-game] option[value="${game}"]`);
-        option.hidden = option.disabled = !scope || !table.controller;
+        option.hidden = option.disabled = inWebJam || !scope || !table.controller;
         if (table.controller) {
+            const moved = table.controller.panel.parentElement !== container;
+            if (moved) container.append(table.controller.panel);
             table.controller.setRoom(scope);
+            if (inWebJam && scope && (moved || table.webJamRef !== scope.ref)) table.controller.open();
+            table.webJamRef = inWebJam ? scope?.ref : undefined;
             updateTableInvite(table, c);
             if (scope && arcadeInvitation?.game === game && arcadeInvitation.ref === scope.ref) table.controller.open();
             if (scope && game === arcadeReturning?.game && scope.room === arcadeReturning.room && scope.ref === arcadeReturning.ref) {
@@ -1908,7 +1992,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     }
     function updateTableInvite(table, room) {
         if (table.inviteButton)
-            table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
+            table.inviteButton.hidden = room?.kind !== 'game' || !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
     function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting, snapshot, failed) {
         const pendingInvite = arcadeInvitation?.game === game && arcadeInvitation.room === scope?.room && arcadeInvitation.ref === scope?.ref;
@@ -1939,6 +2023,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         drawGameWaiting(room);
         table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
         updateTableInvite(table, currentGameNight());
+        if (game === 'chess') {
+            webJamWaitingTable = table.invite && state.seat === 'w' && jamRoomName(scope.room) ? { ...scope, ...table.invite } : null;
+            const prior = webJamReservation?.table;
+            if (prior && sendMatch && scope?.room === prior.room && scope.ref === prior.ref
+                && (state?.id !== prior.match || state.seat !== 'w')) webJamReservation = null;
+            drawWebJamHostSeat();
+        }
         const share = arcadeShareIntent;
         if (share && table.invite && table.controller?.isOpen() && scope.room === share.room && scope.ref === share.ref && game === share.game) {
             arcadeShareIntent = null;
@@ -1970,7 +2061,11 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             return finishArcadeInvitation();
         }
         if (state?.id !== invite.match || !state.waiting || state.hasOpenSeat === false) {
-            return finishArcadeInvitation('This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
+            const message = currentJam()?.keepRef === invite.ref
+                ? state?.id === invite.match ? 'The Chess table is full. You can stay in the room for the next game.'
+                    : 'That Chess match has ended. You can still join an open match here.'
+                : 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.';
+            return finishArcadeInvitation(message);
         }
         if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
     }
@@ -2609,7 +2704,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         else $('[data-invite-nick]').focus();
     }
     function roomInviteArgs(nick, room) {
-        const target = room.kind === 'game' && arcadeInviteTarget();
+        const target = room.kind === 'game' ? arcadeInviteTarget()
+            : webJamChessSupported && room.kind === 'jam' ? arcadeTables.get('chess')?.invite : null;
         return target ? [nick, room.name, target.game, target.match] : [nick, room.name];
     }
     function arcadeInviteTarget() {
@@ -2990,6 +3086,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 } else void connect('');
             });
             void connect('');
+        }
+    }
+    if (betaShell && !gameGuest && document.body.hasAttribute('data-webjam-return')) {
+        const savedRoom = readGameReturn();
+        if (savedRoom && jamRoomName(savedRoom.room)) {
+            webJamReturn = savedRoom;
+            if (nickInput.value.trim()) $('[data-enter]').click();
         }
     }
     function scheduleToastDismiss() {

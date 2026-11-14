@@ -69,8 +69,11 @@ export function gameNightEntry(params, hash = '') {
     const tables = params.getAll('table');
     const table = !target && tables.length === 1 && GAME_NIGHT_TABLES.has(tables[0]) ? tables[0] : '';
     const deliveries = params.getAll('deliver');
+    const grant = fragment.get('grants');
+    const webJamGrant = table === 'chess' && deliveries.length === 0 && [...fragment.keys()].join(',') === 'grants'
+        && /^[a-f0-9]{64}$/.test(grant || '') ? grant : null;
     const prepareShare = table && !hash && deliveries.length === 1 && deliveries[0] === 'share';
-    return { target, ...(table ? { table } : {}), ...(prepareShare ? { prepareShare: true } : {}) };
+    return { target, ...(table ? { table } : {}), ...(prepareShare ? { prepareShare: true } : {}), ...(webJamGrant ? { webJamGrant } : {}) };
 }
 
 export function gameNightFragment(target) {

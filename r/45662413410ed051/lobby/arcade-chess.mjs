@@ -285,8 +285,10 @@ export function mountArcadeChess(container, onMatch) {
             status.textContent = canOpen ? 'Open a ten-minute match for two players.' : 'Waiting for the host to open a match.';
             if (canOpen) button('Open Chess match', 'open');
         } else if (model.waiting) {
-            status.textContent = seated ? 'You’re White · Waiting for an opponent.' : 'Black is open. Join to play.';
-            button(seated ? 'Close waiting match' : 'Join as Black', seated ? 'leave' : 'join');
+            const inWebJam = panel.parentElement.hasAttribute('data-jam-chess');
+            status.textContent = seated ? 'You’re White · Waiting for an opponent.'
+                : inWebJam ? 'A seat is open. Join Chess to play.' : 'Black is open. Join to play.';
+            button(seated ? 'Close waiting match' : inWebJam ? 'Join Chess' : 'Join as Black', seated ? 'leave' : 'join');
         } else if (match?.result) {
             status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
             if (seated && model.rematch !== model.seat) button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');
