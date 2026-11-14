@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createGameNightMatchClient } from '../../r/45662413410ed051/lobby/game-night-match-client.mjs';
+import { createGameNightMatchClient, matchUnavailableText } from '../../r/45662413410ed051/lobby/game-night-match-client.mjs';
 
 describe('Game Night phone wake and history recovery', () => {
     let client, sockets, issue, hidden, events;
@@ -107,24 +107,35 @@ describe('Game Night phone wake and history recovery', () => {
         await vi.advanceTimersByTimeAsync(0);
         ready(sockets.at(-1), { snapshots: true });
         expect(client.matchOpen()).toBe(false);
+        expect(client.matchUnavailable()).toBe(false);
         snapshot({ phase: 'lobby', currentMatchId: null });
         expect(client.matchOpen()).toBe(false);
-        for (const phase of ['playing', 'finished', 'unavailable']) {
-            snapshot({ phase, currentMatchId: phase === 'unavailable' ? null : 'match-fixture' });
+        expect(client.matchUnavailable()).toBe(false);
+        for (const phase of ['playing', 'finished']) {
+            snapshot({ phase, currentMatchId: 'match-fixture' });
             expect(client.matchOpen()).toBe(true);
+            expect(client.matchUnavailable()).toBe(false);
         }
+        snapshot({ phase: 'unavailable', currentMatchId: null });
+        expect(client.matchOpen()).toBe(false);
+        expect(client.matchUnavailable()).toBe(true);
+        expect(matchUnavailableText).toBe('This table isn\'t available from this invite. Ask the host for a fresh link.');
         snapshot({ phase: 'playing', currentMatchId: 'match-fixture', state: { seat: null, match: {} } });
         expect(client.matchOpen()).toBe(false);
+        expect(client.matchUnavailable()).toBe(false);
     });
 
     it.each(['arcade-chess', 'arcade-crapeights', 'arcade-turdrummy', 'arcade-turdspades', 'arcade-turdjack'])(
         'checks for a hidden game before the waiting-for-host copy in %s', async view => {
             const { readFileSync } = await import('node:fs');
             const source = readFileSync(`r/45662413410ed051/lobby/${view}.mjs`, 'utf8');
+            const unavailable = source.indexOf('!model && client.matchUnavailable()');
             const hidden = source.indexOf('} else if (!model && client.matchOpen()) {');
             const waiting = source.indexOf('Waiting for the host to open');
-            expect(hidden).toBeGreaterThan(-1);
+            expect(unavailable).toBeGreaterThan(-1);
+            expect(hidden).toBeGreaterThan(unavailable);
             expect(waiting).toBeGreaterThan(hidden);
+            expect(source.slice(unavailable, hidden)).toContain('matchUnavailableText');
             expect(source.slice(hidden, waiting)).toContain('matchHiddenText');
         });
 

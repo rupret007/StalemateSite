@@ -1,6 +1,6 @@
 import { gameNightCue } from './game-night-audio.mjs';
 import '/play/games/turdrummy-rules.js';
-import { createGameNightMatchClient, matchConnectionErrors, matchHiddenText } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors, matchHiddenText, matchUnavailableText } from './game-night-match-client.mjs';
 
 const { analyzeHand } = globalThis.TurdRummyRules;
 const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds'], C: ['♣', 'Clubs'] };
@@ -179,6 +179,8 @@ export function mountArcadeTurdRummy(container, onMatch) {
             if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Reconnect table'; }
         } else if (connection !== 'ready') {
             if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
+        } else if (!model && client.matchUnavailable()) {
+            message = matchUnavailableText;
         } else if (!model && client.matchOpen()) {
             message = matchHiddenText;
         } else if (!model) {
