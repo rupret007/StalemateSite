@@ -1120,6 +1120,28 @@ async function verifyRollback(reloadWorker) {
         assert.equal(old.status, 404, prefix + ' upgrade after disable');
         await old.body?.cancel();
     };
+    await reloadWorker({});
+    await reopen('Chat after restarting the Worker with games enabled', true);
+    await pause();
+    await rejoinRoom(white);
+    await rejoinRoom(black);
+    const restoredResponse = await upgrade(black.cookie, await grant(black, ch.keepRef));
+    assert.equal(restoredResponse.status, 101);
+    const restoredChess = observe(restoredResponse.webSocket);
+    const ready = await restoredChess.wait(frame => frame.t === 'match-ready', 'restored Chess socket');
+    assert.equal(ready.snapshots, true);
+    restoredChess.send({ version: 1, t: 'hello', lastSeq: 0 });
+    const snapshot = await restoredChess.wait(frame => frame.t === 'snapshot', 'restored Chess snapshot');
+    assert.equal(snapshot.phase, 'playing');
+    assert.equal(snapshot.currentMatchId, opened.state.id);
+    assert.equal(snapshot.yourSeat, 'b');
+    assert.equal(snapshot.turn, 'b');
+    assert.deepEqual(snapshot.state.match.moves, ['e2e4']);
+    restoredChess.send({ version: 1, action: 'move', id: snapshot.currentMatchId, revision: snapshot.state.match.revision, move: 'e7e5' });
+    await restoredChess.wait(frame => frame.t === 'snapshot' && frame.state?.match?.moves?.[1] === 'e7e5', 'next move after Worker restart');
+    console.log('Passed enabled Worker restart: the original Chess match, seat, turn and move history survived, and the next move committed.');
+    await pause();
+
     await reloadWorker({ HANGOUT_ARCADE_CHESS: '0' });
     await reopen('Chat after disabling Chess', true);
     assert.equal(white.features.arcadeChess, undefined);
