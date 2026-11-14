@@ -487,10 +487,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await host.getByRole('button', { name: 'Leave match', exact: true }).click();
                     await host.getByRole('dialog', { name: 'Leave match?' }).getByRole('button', { name: 'Leave match', exact: true }).click();
                     await host.getByRole('button', { name: 'Open Chess match', exact: true }).click();
+                    await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await guest.reload();
                     await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
-                    await expect(guest.locator('[data-chess-status]')).toHaveText('Black is open. Join to play.');
-                    await guest.getByRole('button', { name: 'Join as Black', exact: true }).tap();
                     await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                     await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                     await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
