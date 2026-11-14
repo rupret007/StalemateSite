@@ -43,9 +43,15 @@ async function request(action, data) {
 
 async function acceptInvitation() {
     const body = { age13: true, attempt };
+    let retriedConnection = false;
     for (;;) {
         try { return await request('accept', body); }
         catch (error) {
+            if (webJam && !retriedConnection && error.status === undefined) {
+                retriedConnection = true;
+                status.textContent = 'Reconnecting to confirm your seat…';
+                continue;
+            }
             const remaining = waitUntil - Date.now();
             if (!webJam || error.status !== 410 || remaining <= 0) throw error;
             join.textContent = 'Waiting for host…';

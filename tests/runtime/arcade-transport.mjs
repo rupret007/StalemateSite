@@ -297,19 +297,23 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         assert.equal(attempts.length, 0, 'loading and refreshing require an explicit join');
         assert.equal((await page.context().cookies()).length, 0, 'no access before consent');
         await capture(page, 'join');
-        let firstStatus;
+        const interruptedCount = sameWebJamRoom ? 2 : 1;
+        const interruptedStatuses = [];
         await page.route(url => url.pathname === redeemPath, async route => {
             const response = await route.fetch();
-            firstStatus = response.status();
+            interruptedStatuses.push(response.status());
             await response.dispose();
-            await route.abort();
-        }, { times: 1 });
+            if (sameWebJamRoom) await route.fulfill({ status: 200, contentType: 'application/json', body: '{' });
+            else await route.abort();
+        }, { times: interruptedCount });
         await joinGame.tap();
-        await expect(page.locator('[data-guest-status]')).toHaveText('Couldn’t join just now. Try again.');
-        assert.equal(firstStatus, 200, 'the server accepted before the response was lost');
-        await capture(page, 'interrupted');
-        await page.context().clearCookies();
-        await page.reload({ waitUntil: 'commit' });
+        if (sameWebJamRoom) {
+            await expect(page.locator('[data-guest-status]')).toHaveText('Couldn’t join just now. Try again.');
+            await expect(joinGame).toBeEnabled();
+            await capture(page, 'interrupted');
+            await page.context().clearCookies();
+            await page.reload({ waitUntil: 'commit' });
+        }
         await expect(page.locator('[data-chess-status]')).toContainText('You’re Black');
         if (sameWebJamRoom) {
             assert.ok(await page.evaluate(roomName => {
@@ -323,7 +327,9 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
                 })).status);
             assert.equal(offGame, 403, 'the grant cannot open a different game');
         }
-        assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'automatic recovery uses the original attempt');
+        assert.deepEqual(interruptedStatuses, Array(interruptedCount).fill(200), 'the server accepted before the reply was interrupted');
+        assert.equal(attempts.length, interruptedCount + 1, 'automatic recovery tries at most once');
+        assert.equal(new Set(attempts).size, 1, 'recovery uses the original consent attempt');
         assert.ok(await page.evaluate(() => !history.state?.webJamGameNightInvite), 'the seated page has no grant in history state');
         await match.wait(frame => frame.state?.id === matchId && frame.state?.match, 'WebJam guest enters the exact Chess match');
         match.send({ version: 1, action: 'move', id: matchId, revision: 0, move: 'e2e4' });
