@@ -1045,6 +1045,18 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (ignore && personSheetSelection) ignore.textContent = app.peerIgnores.has(personSheetSelection.peer) ? 'Unignore' : 'Ignore';
     }
 
+    function updateAway(away) {
+        app.away = away;
+        const shortcut = $('[data-quick-cmd="away"]');
+        shortcut.textContent = away ? '↩ Back' : '💤 Away';
+        shortcut.setAttribute('aria-label', away ? 'Mark yourself back' : 'Mark yourself away');
+    }
+
+    function syncOwnPresence(names) {
+        const self = app.selfId && Array.isArray(names) && names.find(member => member.id === app.selfId);
+        if (typeof self?.away === 'boolean') updateAway(self.away);
+    }
+
     function handle(m, nick) {
         switch (m.t) {
         case 'rate-limit':
@@ -1115,7 +1127,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                     recoveryContexts.delete(view);
                 }
                 app.rooms = []; app.active = '#stalemate';
-                app.away = false; app.ignores.clear(); app.peerIgnores.clear();
+                updateAway(false); app.ignores.clear(); app.peerIgnores.clear();
                 app.restorePmOff = $('[data-pm-off]').checked;
                 $('[data-pmreqs]').replaceChildren();
                 $('[data-text]').value = drafts.get('#stalemate')?.text || '';
@@ -1197,6 +1209,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 if (joinedFromChannelDialog) $('[data-channel-dialog]').close();
             }
             app.chans.set(m.ch.name, c);
+            syncOwnPresence(c.names);
             if (c.kind === 'game' && invite?.arcade && invite.ref === c.keepRef) beginArcadeInvitation(c, invite.arcade);
             if (gameGuest && gameGuest.game !== 'four' && c.name === gameGuest.room && c.keepRef === gameGuest.ref) beginArcadeInvitation(c, gameGuest);
             if (pendingKeep?.stage === 'joining' && c.name === pendingKeep.room) {
@@ -1249,6 +1262,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                     view.names = names;
                 }
                 Object.assign(c, view);
+                syncOwnPresence(view.names);
                 const jamDraft = confirmJamShare(c, m.ch.jam);
                 if (app.active === c.name) drawChan();
                 // An own-share confirmation changes the room's invitation
@@ -3550,7 +3564,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 toast('Couldn’t change your away status. Try again.', [], 'away-shortcut-failed');
             });
             if (sent) {
-                app.away = away;
+                // Older servers without connection identities cannot confirm our own roster row.
+                if (!app.selfId) updateAway(away);
                 if (toastKind === 'away-shortcut-failed') dismissToast();
             }
             return;

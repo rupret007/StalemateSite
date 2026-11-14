@@ -98,6 +98,35 @@ test('the away shortcut retries the same change after a send failure', async ({ 
     await expect(composer).toHaveValue('Keep my draft here.');
 });
 
+test('the away shortcut follows typed IRC presence changes', async ({ page, baseURL }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await enter(page, baseURL);
+    const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+    const shortcut = page.locator('[data-quick-cmd="away"]');
+    const messages = page.getByRole('log', { name: 'Conversation' });
+    const back = messages.getByRole('listitem').filter({ hasText: 'Welcome back.' });
+    const snack = messages.getByRole('listitem').filter({ hasText: "You're marked away: grabbing a snack" });
+
+    await composer.fill('/away making tea');
+    await composer.press('Enter');
+    await expect(messages).toContainText("You're marked away: making tea");
+    await expect(shortcut).toHaveAccessibleName('Mark yourself back');
+    await page.screenshot({ path: testInfo.outputPath('typed-away.png') });
+    await shortcut.press('Enter');
+    await expect(back).toHaveCount(1);
+    await expect(snack).toHaveCount(0);
+    await expect(shortcut).toHaveAccessibleName('Mark yourself away');
+    await page.screenshot({ path: testInfo.outputPath('shortcut-back.png') });
+
+    await shortcut.press('Enter');
+    await expect(snack).toHaveCount(1);
+    await composer.fill('/away');
+    await composer.press('Enter');
+    await expect(back).toHaveCount(2);
+    await shortcut.press('Enter');
+    await expect(snack).toHaveCount(2);
+});
+
 for (const [width, height] of [[1440, 900], [390, 844]]) {
     test(`a chat send failure is explained and can be retried at ${width}px`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
