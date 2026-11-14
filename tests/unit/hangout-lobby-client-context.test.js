@@ -57,6 +57,28 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
+it('keeps the external Arcade note description-only in the ordinary lobby', async () => {
+    const { window } = await visitor('rad-dad');
+    const link = window.document.querySelector('[data-game-arcade-external]');
+    const note = window.document.getElementById(link.getAttribute('aria-describedby'));
+    expect(link.hidden).toBe(false);
+    expect(link.textContent).toContain('Open Rad Dad Arcade');
+    expect(new URL(link.href).pathname).toBe('/play/');
+    expect(link.target).toBe('_blank');
+    expect(note.hidden).toBe(true);
+    expect(note.textContent).toBe('Opens in a new tab');
+});
+
+it('rewrites a saved Game Night hint with only navigation fields', async () => {
+    const { window, welcome } = await visitor('stalemate', { gameNight: 1 }, { beta: true });
+    const key = 'hangout-game-return';
+    const hint = { room: '#game-1acbefx23acbe', ref: 'c'.repeat(32), until: Date.now() + 60_000, game: 'chess' };
+    window.sessionStorage.setItem(key, JSON.stringify({ ...hint, seat: 'b', ticket: 'placeholder', grant: 'placeholder' }));
+    welcome();
+    expect(JSON.parse(window.sessionStorage.getItem(key))).toEqual(hint);
+    expect(window.document.querySelector('[data-game-offer]').textContent).toContain('Back to my seat');
+});
+
 describe('private entry recovery after a rejected socket admission', () => {
     it('offers normal private entry only after the same-origin access check returns 401', async () => {
         const fetch = vi.fn(async () => ({ status: 401 }));

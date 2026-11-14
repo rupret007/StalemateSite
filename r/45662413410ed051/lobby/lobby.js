@@ -90,7 +90,6 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         externalArcade.href = new URL('play/', gameArcadeBrand.home).href;
         $('[data-game-arcade-label]').textContent = arcadeLabel;
         externalArcade.hidden = false;
-        $('#game-arcade-tab-note').hidden = false;
     }
     let shareEntry = (handoff || resumeEntry)?.share !== false;
     let entrySourcesSupported = null;
@@ -1542,7 +1541,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             try { saved = JSON.parse(readTab(gameReturnKey)); } catch { /* Ignore stale tab data. */ }
         }
         const hint = gameNightReturnHint(saved, offerRoomName);
-        if (hint) return hint;
+        if (hint) {
+            writeTab(gameReturnKey, JSON.stringify(hint));
+            return hint;
+        }
         removeTab(gameReturnKey);
         return null;
     }
@@ -1833,7 +1835,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 const returning = arcadeReturning;
                 arcadeReturning = null;
                 const panel = table.controller.open();
-                if (returning.seat && panel?.open) panel.querySelector('summary').focus();
+                if (returning.seat && panel?.open) panel.querySelector('summary').focus({ preventScroll: true });
             }
             return;
         }
