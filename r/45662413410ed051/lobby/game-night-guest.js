@@ -1,3 +1,5 @@
+import { GAME_INVITE_UNAVAILABLE } from '/r/45662413410ed051/lobby/game-night.mjs';
+
 const status = document.querySelector('[data-guest-status]');
 const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
@@ -48,9 +50,13 @@ async function describe() {
         invite.hidden = false;
         if (document.activeElement === document.body) join.focus({ preventScroll: true });
     } catch (error) {
-        status.textContent = error.status === 410 ? error.message : 'Couldn’t check the invitation. Try again.';
+        status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE : 'Couldn’t check the invitation. Try again.';
         retry.hidden = error.status === 410;
-        if (error.status === 410) clearInvitation();
+        if (error.status === 410) {
+            clearInvitation();
+            status.tabIndex = -1;
+            status.focus({ preventScroll: true });
+        }
     }
 }
 
@@ -63,10 +69,13 @@ async function accept() {
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
         location.replace(next);
     } catch (error) {
-        status.textContent = [410, 429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
+        status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE
+            : [429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
         if (error.status === 410) {
             clearInvitation();
             invite.hidden = true;
+            status.tabIndex = -1;
+            status.focus({ preventScroll: true });
         } else if (invite.hidden) {
             retry.hidden = false;
             if (document.activeElement === document.body) retry.focus({ preventScroll: true });

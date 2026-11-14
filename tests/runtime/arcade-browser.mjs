@@ -446,7 +446,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
                 const reused = await context.newPage();
                 await openGameNightLink(reused, link);
-                await expect(reused.getByRole('status')).toContainText('was used');
+                await expect(reused.getByRole('status')).toHaveText('This invite is no longer available. Ask your host for a new one.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
@@ -660,7 +660,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await joinOffer.click();
         await expect(player.locator('[data-game-night]')).toBeVisible();
         await expect(player.getByRole('button', { name: 'Room address' })).toBeHidden();
-        await expect(player.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        await expect(player.locator('[data-entry-return][href]')).toHaveCount(0);
+        await expect(host.locator('[data-entry-return][href]')).toHaveCount(0);
         const matches = [], calls = [];
         if (media && !relay) {
             for (const [path, connections] of [[/\/beta\/arcade-match$/, matches], [/\/beta\/game-night-media$/, calls]]) {
@@ -700,6 +701,34 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await player.locator('[data-send]').tap();
         await expect(host.getByRole('log', { name: 'Conversation' }).getByRole('listitem')
             .filter({ hasText: 'Meet me at the chess board' })).toBeVisible();
+        if (!media && !relay) {
+            const panel = player.locator('details.arcade-chess');
+            const summary = panel.locator('summary');
+            await summary.tap();
+            await expect(panel).not.toHaveAttribute('open', '');
+            await expect(player.locator('[data-game-waiting]')).toHaveText('Choose a game to see whether a table is open.');
+            assert.equal(await player.evaluate(() => JSON.parse(sessionStorage.getItem('hangout-game-return')).game), 'chess');
+            await player.addInitScript(() => {
+                const focus = HTMLElement.prototype.focus;
+                HTMLElement.prototype.focus = function (options) {
+                    if (this.matches('details.arcade-chess > summary')) window.returnFocusOptions = options;
+                    return focus.call(this, options);
+                };
+            });
+            await player.reload();
+            await player.getByLabel('Your nick').fill('LinkGuest');
+            await player.locator('[data-enter]').click();
+            await expect(player.locator('[data-connection]')).toHaveText('Connected');
+            const back = player.getByRole('button', { name: 'Back to my seat', exact: true });
+            await expect(player.locator('[data-game-offer-status]')).toHaveText('You disconnected. Return to your game to check your seat.');
+            await back.tap();
+            await expect(panel).toHaveAttribute('open', '');
+            await expect(summary).toBeFocused();
+            assert.equal(await player.evaluate(() => window.returnFocusOptions?.preventScroll), true);
+            await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+            await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
+            console.log(`Passed ${engine} collapsed phone Chess return to the same seat and board without scrolling.`);
+        }
         if (media && !relay) {
             await verifyTransportRecovery(host, player, matches, calls);
             await player.goto(link.href);
@@ -818,6 +847,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await host.keyboard.press('Escape');
                 assert.equal(host.url(), roomUrl);
                 assert.equal(host.context().pages().length, tabs);
+                const closed = new URL('/beta/game-night/guest', origin);
+                closed.hash = 'invite=invalid-local-fixture';
+                await friend.goto(closed.href);
+                const unavailable = friend.locator('[data-guest-status]');
+                await expect(unavailable).toHaveText('This invite is no longer available. Ask your host for a new one.');
+                await expect(unavailable).toBeFocused();
+                await expect(friend.getByRole('button', { name: 'Join game', exact: true })).toBeHidden();
+                assert.equal(new URL(friend.url()).hash, '');
                 const invitePlayers = host.getByRole('button', { name: 'Invite players', exact: true });
                 await invitePlayers.click();
                 const invitePicker = host.locator('[data-invite-dialog]');
@@ -1317,7 +1354,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.locator('[data-enter]').click();
             await expect(b.locator('[data-eights-table]')).toBeVisible();
             assert.deepEqual(await bCards.evaluateAll(buttons => buttons.map(button => button.dataset.eightsCard)), hand);
-            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         }
         await b.getByRole('button', { name: 'Resign', exact: true }).click();
         await b.getByRole('dialog', { name: 'Resign this match?' }).getByRole('button', { name: 'Resign', exact: true }).click();
@@ -1442,7 +1479,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(b.locator('[data-rummy-table]')).toBeVisible();
             assert.deepEqual(await ids(bCards), hand);
             await expect(drawn).toBeDisabled();
-            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         }
         const card = b.locator('[data-rummy-card]:enabled').first();
         const discarded = await card.getAttribute('aria-label');
@@ -1637,7 +1674,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 throw error;
             } finally { b.off('websocket', observeReload); }
             assert.deepEqual(await ids(b), hand);
-            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         }
         for (const page of [north, east, a]) {
             await page.locator('[data-spades-card]:enabled').first().click();
@@ -1776,7 +1813,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.locator('[data-enter]').click();
             await expect(privateCards(b)).toHaveCount(2);
             assert.deepEqual(await privateCards(b).allTextContents(), hand);
-            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         }
         if (evidence) {
             await mkdir(evidence, { recursive: true });
@@ -1896,7 +1933,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.locator('[data-enter]').click();
             await expect(table(b)).toHaveAttribute('data-sequence', '1');
             await expect(score(b)).toHaveText(recorded);
-            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         }
         if (evidence) {
             await a.screenshot({ path: join(evidence, `tris-${engine}-desktop.png`) });
@@ -2004,7 +2041,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.locator('[data-enter]').click();
             await expect(table(b)).toHaveAttribute('data-move', '1');
             assert.deepEqual(await current(b), prior);
-            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         }
         for (const [move, id] of path.entries()) {
             if (!move) continue;
@@ -2124,7 +2161,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.locator('[data-enter]').click();
             await expect(race(b)).toHaveAttribute('data-sequence', '1');
             await expect(race(b)).toHaveAttribute('data-lane', String(danger));
-            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         }
         if (evidence) {
             await mkdir(evidence, { recursive: true });
@@ -2342,7 +2379,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await b.locator('[data-enter]').click();
             await expect(match(b)).toHaveAttribute('data-sequence', sequence);
             await expect(b.locator('[data-brick-score="b"]')).toContainText(/[1-9]\d* pts/);
-            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+            await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         }
         if (naturalBrickRace) await verifyBrickRaceFinish(a, b, spectator);
         else {
@@ -2411,6 +2448,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             return;
         }
         const a = await guest('stalemate', 'ChessHost', { width: 1280, height: 900 });
+        await expect(a.locator('[data-entry-return][href]')).toHaveCount(0);
         const b = await guest('rad-dad', 'ChessGuest', { width: 375, height: 667 }, true);
         await a.getByRole('button', { name: /Game Night/ }).click();
         await inviteToGame(a, b, 'ChessGuest');
@@ -2438,7 +2476,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
         await expect(b.getByRole('button', { name: 'e5, Black pawn' })).toBeVisible();
         await expect(a.getByRole('button', { name: 'e5, Black pawn' })).toBeVisible();
-        await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toBeVisible();
+        await expect(b.getByRole('link', { name: 'Back to Rad Dad' })).toHaveCount(0);
         await expect(b.locator('[data-buffer]')).not.toContainText('Good game from Rad Dad');
         if (media) await joinCalls(a, b);
         else await expect(b.locator('[data-call-toggle]')).toBeHidden();
