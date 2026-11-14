@@ -1833,7 +1833,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 const returning = arcadeReturning;
                 arcadeReturning = null;
                 const panel = table.controller.open();
-                if (returning.seat && panel?.open) panel.querySelector('summary').focus();
+                if (returning.seat && panel?.open) panel.querySelector('summary').focus({ preventScroll: true });
             }
             return;
         }
