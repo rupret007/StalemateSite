@@ -619,7 +619,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 assert.equal(issues, 1, 'the WebJam handoff prepares exactly one invitation');
                 const status = host.locator('[data-game-invite-link-status]');
                 if (webShare) await expect(status).toHaveText('This link is for one guest. Send it now while your table has a seat available.');
-                else await expect(status).toContainText('Link expires');
+                else {
+                    await expect(status).toContainText('Link expires');
+                    await host.clock.setFixedTime(Date.now() + 30 * 60_000);
+                    await share.click();
+                    await expect(status).toHaveText('This invitation expired. Prepare a new one.');
+                    await expect(host.getByRole('button', { name: 'Invite a friend to Royal Flush Chess', exact: true })).toBeFocused();
+                    await host.clock.setFixedTime(Date.now());
+                    await host.getByRole('button', { name: 'Invite a friend to Royal Flush Chess', exact: true }).click();
+                    await expect(host.getByRole('button', { name: 'Copy invite', exact: true })).toBeFocused();
+                    await expect(share).toBeVisible();
+                    await expect(status).toContainText('Link expires');
+                }
                 assert.equal(await host.evaluate(() => window.testGameShares), 0, 'table readiness never invokes Web Share');
                 assert.ok(!new URL(host.url()).searchParams.has('deliver'), 'the handoff is removed from the address');
                 if (webShare) {
@@ -635,7 +646,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await expect(share).toBeHidden();
                     assert.equal(await host.evaluate(() => window.testGameShares), 2, 'both share calls came from trusted clicks');
                 }
-                assert.equal(issues, 1, 'sharing an already prepared invitation issues no extra link');
+                assert.equal(issues, webShare ? 1 : 2, 'only an explicit replacement issues another link');
             } finally { await host.context().close(); }
         }
     }

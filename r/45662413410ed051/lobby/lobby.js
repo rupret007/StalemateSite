@@ -2595,6 +2595,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             if (request.until === undefined || request.until > Date.now()) return request;
             resetGuestLink();
             guestLinkStatus.textContent = 'This invitation expired. Prepare a new one.';
+            createGuestLink.focus({ preventScroll: true });
             return;
         }
         resetGuestLink();
