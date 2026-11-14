@@ -44,7 +44,7 @@ export function lobbyRoomGrants(lobby) {
         if (!await lobby.controlBudget.take(host.socket, actor)) {
             return reply('Game invitation allowance reached. Try again in a few minutes.', 429);
         }
-        return grantResponse(await grants.registerGrants({ room, game, match, hashes, ref, hostSubject: host.betaSid, now, version }));
+        return grantResponse(await grants.registerGrants({ room, game, match, hashes, ref, hostSubject: host.betaSid, now, version, accessUntil: session.demo === true ? session.exp : null }));
     }
 
     return { request, sweep: grants.sweep };

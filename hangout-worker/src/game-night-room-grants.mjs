@@ -1,3 +1,4 @@
+import { BETA_TTL } from './beta-auth.mjs';
 // WebJam room -> Game Night seat grants.
 //
 // The host attests who is in their WebJam room by registering SHA-256 hashes of
@@ -110,13 +111,14 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
     }
 
     // `hostSubject` must come from the trusted host session, never from request data.
-    function registerGrants({ room, match, game, hostSubject, hashes, now, ref = null, version }) {
+    function registerGrants({ room, match, game, hostSubject, hashes, now, ref = null, version, accessUntil = null }) {
         return serial(async () => {
             const refused = () => fail(403, 'unavailable', { error: REGISTER_COPY });
             if (!text(room) || !text(game) || !matchPattern.test(match || '') || !text(hostSubject) || !Number.isFinite(now)
                 || !Array.isArray(hashes) || !hashes.length || hashes.length > HASHES_PER_REQUEST
                 || !hashes.every(hash => hashPattern.test(hash || '')) || new Set(hashes).size !== hashes.length
                 || typeof ref !== 'string' || !refPattern.test(ref)) return refused();
+            if (accessUntil !== null && (!Number.isFinite(accessUntil) || accessUntil <= now)) return refused();
             const scope = { room, game, match, ref, host: hostSubject, ...(version === undefined ? {} : { version }) };
             // The host is seated by their own session before any grant exists.
             const state = await tableState(scope);
@@ -130,13 +132,13 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
                 return fail(429, 'limit', { error: LIMIT_COPY });
             }
             const held = current.filter(([, record]) => sameTable(record.scope, scope) && live(record, now)).map(([, record]) => record.hold.slot);
-            const until = now + GRANT_TTL;
+            const until = accessUntil === null ? now + GRANT_TTL : Math.min(now + GRANT_TTL, accessUntil);
             let granted = 0, standby = 0;
             for (const hash of fresh) {
                 let slot = 1;
                 while (held.includes(slot)) slot++;
                 // One hold per seat, placed on the table now. The holder is the grant hash, never a value or a player.
-                const row = { kind: 'grant', hash, scope, until, hold: { slot, holder: hash, until } };
+                const row = { kind: 'grant', hash, scope, until, ...(accessUntil === null ? {} : { accessUntil }), hold: { slot, holder: hash, until } };
                 if (slot <= state.free && await table.hold(scope, { holder: hash, until, now, write: { [key(hash)]: row } })) {
                     held.push(slot);
                     if (!table.atomic) await storage.put(key(hash), row);
@@ -168,7 +170,7 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
             const attemptHash = attempt === undefined ? null : await grantHash(attempt);
             const seen = await table.status(scope);
             if (record.kind === 'redeemed') {
-                return present(seen, scope) && sameHash(record.attempt, attemptHash) && record.claimUntil > now
+                return present(seen, scope) && sameHash(record.attempt, attemptHash) && record.claimUntil > now && record.access?.exp > now
                     ? { ok: true, status: 200, body: record.access }
                     : expired();
             }
@@ -186,9 +188,10 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
                 return expired();
             }
             const sid = uuid();
-            const claimUntil = now + CLAIM_WINDOW;
             const guest = { game: scope.game, match: scope.match, room: scope.room, ref: scope.ref, host: scope.host, nameSeed: seed() };
-            const access = { scope: guest, sid, exp: now + GUEST_TTL };
+            const exp = record.accessUntil === undefined ? now + GUEST_TTL : Math.min(now + BETA_TTL, record.accessUntil);
+            const claimUntil = Math.min(now + CLAIM_WINDOW, exp);
+            const access = { scope: guest, sid, exp };
             const tombstone = { kind: 'burned', hash, scope, until: record.until };
             const redeemed = attemptHash ? { ...tombstone, kind: 'redeemed', attempt: attemptHash, claimUntil, access } : tombstone;
             // The live adapter commits the moved hold and redemption together.
