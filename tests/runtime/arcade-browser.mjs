@@ -1547,6 +1547,26 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await surface.evaluate((node, offset) => { node.scrollTop = offset; }, scroll);
         }
     }
+    async function verifyChessDrawClaim(white, black) {
+        const claim = page => page.getByRole('button', { name: 'Claim draw', exact: true });
+        const cycle = [[white, 'g1', 'f3'], [black, 'g8', 'f6'], [white, 'f3', 'g1'], [black, 'f6', 'g8']];
+        for (const [page, from, to] of [...cycle, ...cycle.slice(0, 3)]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            await expect(claim(page)).toBeHidden();
+            for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
+        }
+        await expect(claim(white)).toBeHidden();
+        await expect(claim(black)).toBeVisible();
+        await claim(black).tap();
+        await black.getByRole('dialog', { name: 'Claim a draw' }).getByRole('button', { name: /Ng8.*Threefold repetition/ }).tap();
+        for (const page of [white, black]) await expect(page.locator('[data-chess-status]')).toContainText('Draw · Threefold repetition');
+        await white.getByRole('button', { name: 'Request rematch' }).click();
+        await black.getByRole('button', { name: 'Accept rematch' }).click();
+        await expect(white.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+        await expect(claim(white)).toBeHidden();
+        console.log(`Passed ${engine} Chess claim visibility and intended threefold draw.`);
+    }
+
     async function playChessCheckmate(black, white) {
         const before = media ? await packetCount(white, 'audio') : 0;
         for (const [page, from, to] of [
@@ -3140,6 +3160,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.setViewportSize({ width: 390, height: 844 });
         await fit(b, 'phone-tall');
         await b.setViewportSize({ width: 375, height: 667 });
+        await verifyChessDrawClaim(a, b);
         await playChessCheckmate(b, a);
         await playEights(a, b);
         await playRummy(a, b);
