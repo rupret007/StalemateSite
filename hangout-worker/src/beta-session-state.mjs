@@ -1,6 +1,7 @@
 // Metadata-only lifecycle operations on a supplied storage/transaction handle.
 // Callers own the transaction boundary; no network work belongs in this module.
 import { validRoomId } from './core.mjs';
+import { GAME_NIGHT_IDLE, GAME_NIGHT_LENGTH, validNightSession } from './game-night-lifetime.mjs';
 import { BETA_TTL } from './beta-session-client.mjs';
 
 export const BETA_SESSION_LIMIT = 1000;
@@ -15,7 +16,7 @@ const VERSION = /^[A-Za-z0-9._-]{1,64}$/;
 
 export function validBetaRecord(record, sid) {
     return record?.v === 1 && record.sid === sid && SID.test(sid) && VERSION.test(record.version || '') &&
-        Number.isFinite(record.createdAt) && Number.isFinite(record.exp) && record.exp > record.createdAt && record.exp <= record.createdAt + BETA_TTL &&
+        Number.isFinite(record.createdAt) && Number.isFinite(record.exp) && record.exp > record.createdAt && (record.idleUntil === undefined ? record.exp <= record.createdAt + BETA_TTL : validNightSession(record)) &&
         typeof record.revoked === 'boolean' && typeof record.pending === 'boolean' && (!record.pending || record.revoked) &&
         Number.isInteger(record.attempt) && record.attempt >= 0 && record.attempt <= 20 && Number.isFinite(record.retryAt) && record.retryAt >= 0 && record.retryAt <= record.exp &&
         Array.isArray(record.rooms) && record.rooms.length <= BETA_SESSION_ROOM_LIMIT && record.rooms.every(validRoomId) && new Set(record.rooms).size === record.rooms.length;
@@ -61,7 +62,7 @@ export async function scheduleBetaSessions(storage, rows, now = Date.now()) {
 // Returning a result does not publish a session: the caller must await commit.
 export async function registerBetaSession(tx, body, now = Date.now()) {
     if (!SID.test(body.sid || '') || !VERSION.test(body.version || '') || !Number.isFinite(body.exp)) throw new Error('session request');
-    if (body.exp <= now || body.exp > now + BETA_TTL) return { status: 403, reason: 'expired or revoked' };
+    if (body.exp <= now || body.exp > now + (body.gameNight === true ? GAME_NIGHT_LENGTH : BETA_TTL)) return { status: 403, reason: 'expired or revoked' };
     const key = `session:${body.sid}`, previous = await tx.get(key);
     if (previous && !validBetaRecord(previous, body.sid)) throw new Error('record');
     if (previous) return { status: 409, reason: 'session already exists' };
@@ -72,7 +73,8 @@ export async function registerBetaSession(tx, body, now = Date.now()) {
     if (rate.count >= BETA_MINT_PER_IP_HOUR || !rates[body.iph] && Object.keys(rates).length >= BETA_SESSION_LIMIT) return { status: 429, reason: 'beta invitation mint allowance reached' };
     rates[body.iph] = { ...rate, count: rate.count + 1 };
     await tx.put('mint-rates', rates);
-    const record = { v: 1, sid: body.sid, version: body.version, createdAt: now, exp: body.exp, revoked: false, pending: false, attempt: 0, retryAt: 0, rooms: [] };
+    const record = { v: 1, sid: body.sid, version: body.version, createdAt: now, exp: body.exp, revoked: false, pending: false, attempt: 0, retryAt: 0, rooms: [],
+        ...(body.gameNight === true ? { idleUntil: Math.min(body.exp, now + GAME_NIGHT_IDLE) } : {}) };
     await tx.put(key, record);
     rows.set(key, record);
     await scheduleBetaSessions(tx, rows, now);

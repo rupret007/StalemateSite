@@ -30,7 +30,7 @@ export function lobbyRoomGrants(lobby) {
         const now = Date.now();
         const version = String(lobby.env.HANGOUT_BETA_INVITE_VERSION || '1');
         if (operation === 'redeem') {
-            return grantResponse(await grants.redeemGrant({ value: body.value, attempt: body.attempt,
+            return grantResponse(await grants.redeemGrant({ value: body.value, attempt: body.attempt, passHash: body.passHash,
                 subject: session?.betaSid ?? null, now, version }));
         }
         if (operation !== 'register') return reply('Game invitations are unavailable.', 404);
@@ -44,7 +44,7 @@ export function lobbyRoomGrants(lobby) {
         if (!await lobby.controlBudget.take(host.socket, actor)) {
             return reply('Game invitation allowance reached. Try again in a few minutes.', 429);
         }
-        return grantResponse(await grants.registerGrants({ room, game, match, hashes, ref, hostSubject: host.betaSid, now, version }));
+        return grantResponse(await grants.registerGrants({ room, game, match, hashes, ref, hostSubject: host.betaSid, now, version, accessUntil: session.demo === true ? session.exp : null }));
     }
 
     return { request, sweep: grants.sweep };

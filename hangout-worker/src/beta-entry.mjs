@@ -1,9 +1,10 @@
+import { validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
 // Invitation-only real visitor beta. Never imports the pilot's role selector or synthetic emails.
 import worker, { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } from './index.mjs';
 import { accountId, accessConfigured, hmacKeyOk, ipHash, newDeviceId, signDevice, verifyDevice } from './auth.mjs';
 import { adminGate, ownerGate } from './lobby-do.mjs';
 import { previewKeyOk } from './core.mjs';
-import { BETA_TTL, BETA_COOKIE, BETA_IDENTITY_COOKIE, GAME_GUEST_COOKIE, BetaSessionUnavailable, equalInvite, isDemoInvite, verifyDemoInvite, signBeta, readBeta, betaCookie, betaSession, readBetaBody } from './beta-auth.mjs';
+import { BETA_TTL, BETA_COOKIE, BETA_IDENTITY_COOKIE, GAME_GUEST_COOKIE, gameGuestCookieName, betaGameGuestAssetSession, BetaSessionUnavailable, equalInvite, isDemoInvite, verifyDemoInvite, signBeta, readBeta, betaCookie, betaSession, readBetaBody } from './beta-auth.mjs';
 import { registryRequest } from './beta-session-client.mjs';
 import { betaHealth } from './beta-ops.mjs';
 import { entrySitesFromConfig } from '../../r/45662413410ed051/entry-sites.mjs';
@@ -22,6 +23,7 @@ export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 const ROOT = '/r/45662413410ed051/';
 const LOBBY_PAGE = `${ROOT}lobby/`;
 const GAME_GUEST_QUERY = '?game-guest=1';
+const scopedGuestQuery = tableId => GAME_GUEST_QUERY + (tableId ? '&table=' + tableId : '');
 const CSP = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.youtube.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' wss: https://challenges.cloudflare.com https://www.youtube.com https://*.googlevideo.com; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 const WEB_JOIN_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://webjam-turn-credentials.jeffstory007.workers.dev; media-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const LOBBY_ENTRANCE = `<!doctype html>
@@ -244,16 +246,31 @@ async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0', pro
     const access = { v: 1, sid, exp, scope: gameGuest ? 'game-night' : 'guest', version: String(env.HANGOUT_BETA_INVITE_VERSION || '1'), ...(gameGuest ? { gameGuest } : {}), ...(demo ? { demo: true } : {}) };
     let result;
     try { result = await registryRequest(env, 'register', { sid: access.sid, exp: access.exp, version: access.version, iph: await ipHash(ip, env.HANGOUT_HMAC_KEY),
+        ...(gameGuest ? { gameNight: true } : {}),
         ...(env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1' ? { profile } : {}) }); }
     catch { throw new BetaSessionUnavailable('The community session service is temporarily unavailable.'); }
-    if (gameGuest && result.status === 409) result = await registryRequest(env, 'check', { sid, exp, version: access.version });
+    if (gameGuest && result.status === 409) {
+        try { result = await registryRequest(env, 'check', { sid, exp, version: access.version }); }
+        catch { throw new BetaSessionUnavailable('The community session service is temporarily unavailable.'); }
+        if (result.status === 403) throw new BetaSessionUnavailable(GAME_INVITE_UNAVAILABLE, 410);
+    }
     if (result.status !== 200) throw new BetaSessionUnavailable(result.status === 429 ? 'The beta session allowance is full. Please try again later.' : 'The community session service is temporarily unavailable.', result.status === 429 ? 429 : 503);
-    return { access, cookie: betaCookie(gameGuest ? GAME_GUEST_COOKIE : BETA_COOKIE, await signBeta('access', access, env.HANGOUT_HMAC_KEY), exp - Date.now()) };
+    const token = await signBeta('access', access, env.HANGOUT_HMAC_KEY);
+    return { access, cookie: betaCookie(gameGuest ? GAME_GUEST_COOKIE : BETA_COOKIE, token, exp - Date.now()), token };
+}
+
+function gameGuestReply(access, token, tableId) {
+    const ttl = access.exp - Date.now();
+    const result = json({ next: LOBBY_PAGE + GAME_GUEST_QUERY, ...(tableId ? { tableId } : {}) }, 200, {
+        'Set-Cookie': betaCookie(GAME_GUEST_COOKIE, token, ttl)
+    });
+    if (tableId) result.headers.append('Set-Cookie', betaCookie(gameGuestCookieName(tableId), token, ttl));
+    return result;
 }
 
 async function gameInvitation(request, env, path, body) {
     if (path === 'leave') {
-        const session = await betaSession(request, env, Date.now(), { gameGuest: true, allowRevoked: true });
+        const session = await betaSession(request, env, Date.now(), { gameGuest: true, allowRevoked: true, tableId: body.tableId ?? null });
         if (session && body.sessionRef === await gameGuestSessionRef(session.access.sid)) {
             await disconnect(env, session);
             const scope = gameGuestScope(session.access.gameGuest);
@@ -268,31 +285,46 @@ async function gameInvitation(request, env, path, body) {
         }
         return json({ ok: true });
     }
-    if (!gameGuestEnabled(env) || !['issue', 'details', 'accept'].includes(path)) return json({ error: 'Game invitations are unavailable.' }, 404);
+    if (!gameGuestEnabled(env) || !['issue', 'details', 'accept', 'resume'].includes(path)) return json({ error: 'Game invitations are unavailable.' }, 404);
+    if (path === 'resume' && !allowRoomGrantRedeem(request.headers.get('CF-Connecting-IP') || '0.0.0.0')) {
+        return json({ error: 'Reconnect allowance reached. Try again in a minute.' }, 429);
+    }
     const session = path === 'issue' ? await betaSession(request, env) : null;
     if (path === 'issue' && !session) return json({ error: 'Private invitation required.' }, 401);
-    if (path !== 'issue') {
+    if (path === 'details' || path === 'accept') {
         const invitation = await readBeta('game-invitation', body.code, env.HANGOUT_HMAC_KEY);
         if (!invitation) return json({ error: GAME_INVITE_UNAVAILABLE }, 410);
         body = { ...body, code: invitation.sid };
     }
     const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_INVITATION_PATH}/${path}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true } })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true, exp: session.access.exp } })
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
     if (path === 'issue' && response.ok) {
         const code = await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY);
-        return json({ code, until: data.until });
+        return json({ code, until: data.until, inviteExpiresAt: data.until });
     }
-    if (path !== 'accept' || !response.ok) return json(data, response.status);
+    if ((path !== 'accept' && path !== 'resume') || !response.ok) return json(data, response.status);
+    if (path === 'resume') {
+        const gameGuest = gameGuestScope(data.scope);
+        if (!gameGuest) return json({ error: GAME_INVITE_UNAVAILABLE }, 410);
+        const access = { v: 1, sid: data.sid, exp: data.exp, scope: 'game-night', gameGuest,
+            version: String(env.HANGOUT_BETA_INVITE_VERSION || '1') };
+        let checked;
+        try { checked = await registryRequest(env, 'check', { sid: access.sid, exp: access.exp, version: access.version }); }
+        catch { throw new BetaSessionUnavailable('The community session service is temporarily unavailable.'); }
+        if (checked.status === 403) return json({ error: GAME_INVITE_UNAVAILABLE }, 410);
+        if (checked.status !== 200) throw new BetaSessionUnavailable('The community session service is temporarily unavailable.');
+        return gameGuestReply(access, await signBeta('access', access, env.HANGOUT_HMAC_KEY), gameGuest.tableId);
+    }
     return gameGuestAccess(request, env, data);
 }
 
 async function gameGuestAccess(request, env, data) {
     const scope = gameGuestScope(data.scope);
     if (!scope) return json({ error: 'This invitation could not be confirmed.' }, 503);
-    const { cookie } = await newAccess(env, { gameGuest: scope, sid: data.sid, exp: data.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' });
-    return json({ next: `${LOBBY_PAGE}${GAME_GUEST_QUERY}` }, 200, { 'Set-Cookie': cookie });
+    const { access, token } = await newAccess(env, { gameGuest: scope, sid: data.sid, exp: data.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' });
+    return gameGuestReply(access, token, scope.tableId);
 }
 
 const redeemHits = new Map();
@@ -314,7 +346,8 @@ async function gameRoomGrant(request, env, operation, body) {
         return json({ error: 'Game invitations are unavailable.' }, 404);
     }
     if (operation === 'redeem') {
-        if (body.age13 !== true || !validRoomGrantValue(body.value) || !validRoomGrantValue(body.attempt)) {
+        if (body.age13 !== true || !validRoomGrantValue(body.value) || !validRoomGrantValue(body.attempt) ||
+            body.passHash !== undefined && !validGameNightPassHash(body.passHash)) {
             return json({ error: 'Open the original invitation and confirm the age and house rules to join.' }, 400);
         }
         const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
@@ -324,7 +357,7 @@ async function gameRoomGrant(request, env, operation, body) {
     if (operation === 'register' && !session) return json({ error: 'Private invitation required.' }, 401);
     const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_ROOM_GRANT_PATH}/${operation}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body, session: session && { betaSid: session.access.sid } })
+        body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true, exp: session.access.exp } })
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
     if (operation !== 'redeem' || !response.ok) return json(data, response.status);
@@ -364,6 +397,11 @@ async function betaRequest(request, env, deps = {}) {
         .replace('STALEMATE / INVITATION ONLY', 'HANG OUT / INVITATION ONLY')
         .replace('<script defer src="/beta/client.js">', '<script type="module" src="/beta/client.js">'), 200, 'text/html; charset=utf-8');
     if (url.pathname === '/beta/style.css') return reply(STYLE + GAME_GUEST_STYLE, 200, 'text/css');
+    const invitationAssets = [LOBBY_PAGE + 'game-night.mjs', LOBBY_PAGE + 'game-night-audio.mjs'];
+    if (gameGuestEnabled(env) && ['GET', 'HEAD'].includes(request.method) && invitationAssets.includes(url.pathname)) {
+        const asset = await env.ASSETS.fetch(request);
+        return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript; charset=utf-8');
+    }
     const webJamGuest = url.pathname === WEBJAM_GUEST_PATH;
     if (webJamGuest || url.pathname === GAME_GUEST_PATH || url.pathname === GAME_GUEST_PATH + '.js') {
         if (!(webJamGuest ? gameRoomGrantsEnabled(env) : gameGuestEnabled(env)) || !['GET', 'HEAD'].includes(request.method)) {
@@ -428,11 +466,18 @@ async function betaRequest(request, env, deps = {}) {
     const gameGuestRequested = url.searchParams.get('game-guest') === '1';
     const gameGuestsAvailable = gameGuestEnabled(env);
     if (gameGuestRequested && !gameGuestsAvailable) return reply('Game invitations are unavailable.', 404);
-    const session = await betaSession(request, env, Date.now(), { gameGuest: gameGuestRequested })
+    const requestedTable = gameGuestRequested ? url.searchParams.get('table') : null;
+    if (requestedTable !== null && !validGameNightTableId(requestedTable)) return reply('This Game Night link is not valid.', 400);
+    const session = await betaSession(request, env, Date.now(), { gameGuest: gameGuestRequested, tableId: requestedTable })
         || gameGuestsAvailable && !gameGuestRequested && ['GET', 'HEAD'].includes(request.method) && gameGuestAsset(assetPath)
-            && await betaSession(request, env, Date.now(), { gameGuest: true });
+            && await betaGameGuestAssetSession(request, env);
+    const guestNavigation = gameGuestRequested && assetPath === LOBBY_PAGE && ['GET', 'HEAD'].includes(request.method);
     if (!session) {
-        if (gameGuestRequested && assetPath === LOBBY_PAGE) return reply('Your Game Night access ended. Ask your host for a new invitation.', 401);
+        if (guestNavigation) {
+            const resumePage = GAME_GUEST_ENTRANCE.replace('<main ', '<main data-resume-guest ')
+                .replace('Checking your invitation…', 'Connecting…');
+            return reply(request.method === 'HEAD' ? null : resumePage, 401, 'text/html; charset=utf-8');
+        }
         if (['GET', 'HEAD'].includes(request.method) && !request.headers.get('Upgrade')
             && [`${ROOT}lobby`, `${ROOT}lobby/`, `${ROOT}lobby/index.html`].includes(assetPath)) {
             return reply(request.method === 'HEAD' ? null : LOBBY_ENTRANCE, 401, 'text/html; charset=utf-8', {
@@ -464,7 +509,7 @@ async function betaRequest(request, env, deps = {}) {
     if (url.pathname === '/beta/state') return json({ kind: session.identity?.kind || 'guest', role: session.identity?.role || 'fan', emailConfigured: betaAccessConfigured(env), staffConfigured: betaAccessConfigured(env) });
     if (url.pathname === '/beta/bootstrap.js') {
         const bootstrap = { preview: env.HANGOUT_PREVIEW_KEY, owner: session.identity?.kind === 'owner' };
-        if (guest) bootstrap.gameGuest = { room: guest.room, ref: guest.ref, game: guest.game, match: guest.match, sessionRef: await gameGuestSessionRef(session.access.sid) };
+        if (guest) bootstrap.gameGuest = { room: guest.room, ref: guest.ref, game: guest.game, match: guest.match, tableId: guest.tableId, sessionRef: await gameGuestSessionRef(session.access.sid) };
         return reply(`window.HangoutBootstrap=${JSON.stringify(bootstrap)};window.HangoutEntrySites=${JSON.stringify(Object.values(entrySitesFromConfig(env.HANGOUT_ENTRY_SITES)))};${lobbyParticipationMode(env) ? 'window.HangoutParticipationControls=true;' : ''}${guest ? '' : "try{sessionStorage.setItem('hangout-preview',window.HangoutBootstrap.preview);sessionStorage.setItem('hangout-owner',window.HangoutBootstrap.owner?'1':'0');}catch{}"}`, 200, 'text/javascript');
     }
     if (url.pathname === '/lobby-owner/login' || url.pathname === '/lobby-admin/login') {
@@ -488,7 +533,7 @@ async function betaRequest(request, env, deps = {}) {
     }
     if (arcadePath(url.pathname) || mediaPath(url.pathname)) {
         if (!(mediaPath(url.pathname) ? mediaEnabled(env) : arcadeEnabled(env, arcadeGame(url.pathname)))) return reply('Room service unavailable.', 404);
-        if (!sameOrigin(request) || url.search && (!guest || url.search !== GAME_GUEST_QUERY)) return reply('Admission denied.', 403);
+        if (!sameOrigin(request) || url.search && (!guest || url.search !== scopedGuestQuery(requestedTable))) return reply('Admission denied.', 403);
         const issuing = url.pathname.endsWith('-ticket');
         if (issuing ? request.method !== 'POST' || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')
             : request.method !== 'GET' || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return reply('Invalid match request.', 400);
@@ -567,7 +612,7 @@ async function betaRequest(request, env, deps = {}) {
         .replace(/(<meta name="hangout-turnstile" content=")[^"]*(")/g, `$1${String(env.HANGOUT_TURNSTILE_SITEKEY || '').replace(/[^A-Za-z0-9_-]/g, '')}$2`)
         .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/gi, '').replace(/<script[^>]*goatcounter[^>]*><\/script>/gi, '')
         .replace(/<b data-contact>[\s\S]*?<\/b>/, contactHtml)
-        .replace('<head>', `<head><script src="/beta/bootstrap.js${guest ? GAME_GUEST_QUERY : ''}"></script>`);
+        .replace('<head>', `<head><script src="/beta/bootstrap.js${guest ? scopedGuestQuery(requestedTable) : ''}"></script>`);
     const content = guest && assetPath === LOBBY_PAGE ? page
         .replace('<main class="gate" data-gate>', '<main class="gate" data-gate hidden>')
         .replace('<main class="gate" data-game-guest-connecting hidden>', '<main class="gate" data-game-guest-connecting>')

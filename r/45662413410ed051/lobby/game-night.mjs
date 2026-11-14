@@ -34,5 +34,7 @@ export function gameNightReturnHint(value, validRoom, now = Date.now()) {
     if (!value || !validRoom(value.room) || typeof value.ref !== 'string' || !/^[a-f0-9]{32}$/.test(value.ref)
         || !Number.isFinite(value.until) || value.until <= now) return null;
     const { room, ref, until, game } = value;
-    return { room, ref, until, ...(gameNightRoomName(room) && Object.hasOwn(gameNightLabels, game) ? { game } : {}) };
+    return { room, ref, until, ...(gameNightRoomName(room) && typeof game === 'string' && Object.hasOwn(gameNightLabels, game) ? { game } : {}) };
 }
+
+export const GAME_INVITE_UNAVAILABLE = 'This invite is no longer available. Ask your host for a new one.';

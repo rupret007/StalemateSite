@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +38,7 @@ const fixtureIce = { urls: [process.env.ARCADE_TEST_TURN_URL || 'turn:fixture.in
     username: 'arcade-fixture', credential: 'arcade-local-turn-only' };
 assert.ok(!webJamShare || browserName && !siteGuest && !relay && !mixedRef, 'the isolated WebJam share check needs one browser');
 assert.ok(!browserMedia || browserName === 'chromium', 'the synthetic device media test uses Chromium');
+assert.ok(process.env.ARCADE_BRICK_LATE_AIM !== '1' || browserMedia, 'the late Turdanoid aim check requires --browser=chromium --media');
 assert.ok(['', 'chromium', 'webkit'].includes(browserName), 'choose --browser=chromium or --browser=webkit');
 assert.ok(!relay || !browserName || browserMedia && process.env.ARCADE_TEST_TURN_URL, 'browser relay test needs --media and a local TURN URL');
 assert.ok(!rollback || !browserName, 'the rollback rehearsal uses native workerd');
@@ -47,6 +48,11 @@ const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCAD
 const app = fileURLToPath(new URL('../../', import.meta.url));
 const previewSite = (browserName || serve) ? createArcadePreviewSite(app) : null;
 const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
+if (browserName && !mixedRef) {
+    const chessAssets = await readdir(join(assets, 'play/assets/chess'));
+    assert.ok(chessAssets.includes('GPL-3.0.txt'), 'the packaged Chess helpers include their license');
+    assert.ok(!chessAssets.some(name => /chessground/i.test(name)), 'the protected board ships without Chessground');
+}
 const sharedSource = process.env.ARCADE_TEST_SOURCE ? resolve(process.env.ARCADE_TEST_SOURCE) : null;
 const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST_RAD_DAD) : null;
 assert.equal(!!sharedSource, !!radDad, 'provide both arcade checkouts for the cross-site browser proof');
@@ -57,9 +63,13 @@ assert.ok(siteGuest === undefined || browserName && !mixedRef && !relay &&
     'choose a browser and --site-guest=stalemate or --site-guest=rad-dad (requires ARCADE_PREVIEW_RAD_DAD)');
 const previousAssets = new Map();
 if (mixedRef) {
-    for (const file of ['entry-sites.mjs', 'lobby/index.html', 'lobby/lobby.js', 'lobby/lobby.css']) {
+    for (const file of ['entry-sites.mjs', 'lobby/index.html', 'lobby/lobby.js', 'lobby/lobby.css', 'lobby/game-night-match-client.mjs']) {
         const path = 'r/45662413410ed051/' + file;
-        previousAssets.set('/' + path, execFileSync('git', ['show', `${mixedRef}:${path}`], { cwd: app }));
+        try {
+            previousAssets.set('/' + path, execFileSync('git', ['show', `${mixedRef}:${path}`], { cwd: app, stdio: ['ignore', 'pipe', 'ignore'] }));
+        } catch (error) {
+            if (!file.endsWith('game-night-match-client.mjs')) throw error;
+        }
     }
 }
 const directory = await mkdtemp(join(tmpdir(), 'game-night-arcade-'));
@@ -162,12 +172,11 @@ async function verifyRoomGrants() {
         assert.equal(expiry.status, 200, await expiry.clone().text());
         const { until } = await expiry.json();
         await match.wait(frame => frame.state?.waiting && !frame.state.hasOpenSeat, 'reserved seat');
+        const reservedAt = match.frames.length;
         await new Promise(resolve => setTimeout(resolve, Math.max(0, until - Date.now()) + 50));
-        assert.equal((await redeem(expiring, value())).status, 410);
-        const expirySync = match.frames.length;
-        match.send({ version: 1, action: 'sync' });
         await match.wait(frame => frame.state?.id === state.id && frame.state.waiting && frame.state.hasOpenSeat,
-            'expired hold leaves the original table waiting', expirySync);
+            'alarm reopens the seat before any client command', reservedAt);
+        assert.equal((await redeem(expiring, value())).status, 410);
         console.log('PASS expired grant leaves the original table waiting with its seat available.');
     }
 
@@ -268,16 +277,15 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
             const response = await route.fetch();
             firstStatus = response.status();
             await response.dispose();
+            await page.context().clearCookies();
             await route.abort();
         }, { times: 1 });
         await joinGame.tap();
-        await expect(page.locator('[data-guest-status]')).toHaveText('Couldn’t join just now. Try again.');
-        assert.equal(firstStatus, 200, 'the server accepted before the response was lost');
-        await capture(page, 'interrupted');
-        await page.context().clearCookies();
-        await page.reload({ waitUntil: 'commit' });
         await expect(page.locator('[data-chess-status]')).toContainText('You’re Black');
-        assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'recovery uses the original attempt');
+        assert.equal(firstStatus, 200, 'the server accepted before the response was lost');
+        assert.equal(attempts.length, 2, 'one Join recovers with a single retry');
+        assert.equal(attempts[0], attempts[1], 'recovery uses the original attempt');
+        await capture(page, 'recovered-without-reload');
         assert.ok(await page.evaluate(() => !history.state?.webJamGameNightInvite), 'the seated page has no grant in history state');
         await match.wait(frame => frame.state?.id === matchId && frame.state?.match, 'WebJam guest enters the exact Chess match');
         match.send({ version: 1, action: 'move', id: matchId, revision: 0, move: 'e2e4' });
@@ -292,24 +300,29 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         await match.wait(frame => frame.state?.match?.moves?.[1] === 'd7d5', 'WebJam guest confirms the first move');
         assert.equal((await page.context().request.get(browserOrigin + '/beta/state')).status(), 401, 'guest access stays scoped');
         await capture(page, 'first-move');
+        const resume = page.waitForResponse(response => new URL(response.url()).pathname === '/beta/game-night/invitation/resume');
+        await page.context().clearCookies();
+        await page.reload();
+        assert.equal((await resume).status(), 200);
+        await expect(page.getByRole('button', { name: 'd5, Black pawn' })).toBeVisible();
+        assert.equal(attempts.length, 2, 'the table pass restores the board without redeeming a grant again');
+        await capture(page, 'seat-restored');
 
         const waiting = await open(standby, false);
         await waiting.getByRole('button', { name: 'Join game' }).click();
         await expect(waiting.locator('[data-guest-status]')).toHaveText(/This table is full/);
+        await expect(waiting.getByRole('heading')).toBeFocused();
+        await expect(waiting.getByRole('heading')).toHaveAccessibleDescription(/This table is full/);
         await expect(waiting.getByRole('button', { name: 'Join game' })).toBeHidden();
-        const fullHeading = waiting.locator('[data-guest-game]');
-        await expect(fullHeading).toBeFocused();
-        await expect(fullHeading).toHaveAccessibleDescription(/This table is full/);
         assert.equal((await waiting.context().cookies()).length, 0, 'standby receives no access');
         await capture(waiting, 'standby');
 
         const stale = await open(unavailable, false);
         await stale.getByRole('button', { name: 'Join game' }).click();
         await expect(stale.locator('[data-guest-status]')).toHaveText('This invite is no longer available. Ask your host for a new one.');
+        await expect(stale.getByRole('heading')).toBeFocused();
+        await expect(stale.getByRole('heading')).toHaveAccessibleDescription('This invite is no longer available. Ask your host for a new one.');
         await expect(stale.getByRole('button', { name: 'Join game' })).toBeHidden();
-        const expiredHeading = stale.locator('[data-guest-game]');
-        await expect(expiredHeading).toBeFocused();
-        await expect(expiredHeading).toHaveAccessibleDescription(/This invite is no longer available/);
         assert.equal((await stale.context().cookies()).length, 0, 'expired grant receives no access');
         await capture(stale, 'expired');
         console.log('PASS synthetic WebJam handoff: consent, recovery, exact seat, first move, standby and invalid/expired grant handling.');
@@ -403,7 +416,7 @@ async function verifyEights(white, black, ref, chess) {
     await returning.wait(frame => frame.state?.rematch === 'a', 'Eights rematch invitation');
     returning.send({ version: 1, action: 'rematch', id });
     const rematch = await a.wait(frame => frame.state?.id && frame.state.id !== id, 'fresh Eights rematch');
-    assert.equal(rematch.state.seat, 'b');
+    assert.equal(rematch.state.seat, 'a');
     assert.equal(rematch.state.match.hand.length, 7);
     assert.ok(chess.frames.every(frame => frame.state?.game !== 'crapeights'));
     assert.ok(watch.frames.every(frame => !frame.state?.match?.hand?.length));
@@ -461,7 +474,7 @@ async function verifyRummy(white, black, spectator, ref) {
     await back.wait(frame => frame.state?.rematch === 'a', 'Rummy rematch offer');
     send(back, 'rematch');
     const rematch = await a.wait(frame => frame.state?.id && frame.state.id !== id, 'fresh Rummy rematch');
-    assert.equal(rematch.state.seat, 'b');
+    assert.equal(rematch.state.seat, 'a');
     assert.equal(rematch.state.match.hand.length, 10);
     assert.ok(watch.frames.every(frame => !frame.state?.match?.hand?.length));
     return a;
@@ -703,7 +716,7 @@ async function verifyTurdtris(white, black, spectator, ref) {
     await guest.wait(frame => frame.state?.rematch === 'a', 'Turdtris rematch vote');
     send(guest, 'rematch');
     const fresh = await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turdtris rematch');
-    assert.equal(fresh.state.seat, 'a');
+    assert.equal(fresh.state.seat, 'b');
     assert.equal(fresh.state.match.self.sequence, 0);
     timings.sort((a, b) => a - b);
     console.log(`Turdtris local workerd paired input confirmation, ${timings.length} samples: median ${timings[6].toFixed(1)} ms, max ${timings.at(-1).toFixed(1)} ms.`);
@@ -770,7 +783,7 @@ async function verifyTurdomania(white, black, spectator, ref) {
     await guest.wait(frame => frame.state?.rematch === 'a', 'Turdomania rematch vote');
     send(guest, 'rematch');
     const fresh = await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turdomania rematch');
-    assert.equal(fresh.state.seat, 'a');
+    assert.equal(fresh.state.seat, 'b');
     assert.equal(fresh.state.match.players.a.left, 36);
     console.log(`Passed native Turdomania complete shared puzzle (${path.length} legal moves per player), independent boards, spectator permissions, reconnect, draw and rematch.`);
     return host;
@@ -830,7 +843,7 @@ async function verifyTurdRush(white, black, spectator, ref) {
     await guest.wait(frame => frame.state?.rematch === 'a', 'Turd Rush rematch vote');
     send(guest, 'rematch');
     const fresh = await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turd Rush rematch');
-    assert.equal(fresh.state.seat, 'a');
+    assert.equal(fresh.state.seat, 'b');
     assert.equal(fresh.state.match.runner.sequence, 0);
     console.log(`Passed native Turd Rush same course, both verified collisions, equal result, spectator refusal, reconnect and rematch. Player snapshot ${Buffer.byteLength(JSON.stringify(recovered))} bytes.`);
     return host;
@@ -889,7 +902,7 @@ async function verifyTurdanoid(white, black, spectator, ref) {
     await guest.wait(frame => frame.state?.rematch === 'a', 'Turdanoid rematch vote');
     send(guest, 'rematch');
     const fresh = (await guest.wait(frame => frame.state?.match?.id && frame.state.match.id !== id, 'Turdanoid rematch')).state;
-    assert.equal(fresh.seat, 'a');
+    assert.equal(fresh.seat, 'b');
     assert.equal(fresh.match.runner.sequence, 0);
     assert.equal(fresh.match.players.a.score + fresh.match.players.b.score, 0);
     console.log(`Passed native Turdanoid same wall, verified brick hits on both seats, spectator refusal, reconnect, forfeit and rematch. Player snapshot ${Buffer.byteLength(JSON.stringify(recovered))} bytes.`);
@@ -1107,6 +1120,28 @@ async function verifyRollback(reloadWorker) {
         assert.equal(old.status, 404, prefix + ' upgrade after disable');
         await old.body?.cancel();
     };
+    await reloadWorker({});
+    await reopen('Chat after restarting the Worker with games enabled', true);
+    await pause();
+    await rejoinRoom(white);
+    await rejoinRoom(black);
+    const restoredResponse = await upgrade(black.cookie, await grant(black, ch.keepRef));
+    assert.equal(restoredResponse.status, 101);
+    const restoredChess = observe(restoredResponse.webSocket);
+    const ready = await restoredChess.wait(frame => frame.t === 'match-ready', 'restored Chess socket');
+    assert.equal(ready.snapshots, true);
+    restoredChess.send({ version: 1, t: 'hello', lastSeq: 0 });
+    const snapshot = await restoredChess.wait(frame => frame.t === 'snapshot', 'restored Chess snapshot');
+    assert.equal(snapshot.phase, 'playing');
+    assert.equal(snapshot.currentMatchId, opened.state.id);
+    assert.equal(snapshot.yourSeat, 'b');
+    assert.equal(snapshot.turn, 'b');
+    assert.deepEqual(snapshot.state.match.moves, ['e2e4']);
+    restoredChess.send({ version: 1, action: 'move', id: snapshot.currentMatchId, revision: snapshot.state.match.revision, move: 'e7e5' });
+    await restoredChess.wait(frame => frame.t === 'snapshot' && frame.state?.match?.moves?.[1] === 'e7e5', 'next move after Worker restart');
+    console.log('Passed enabled Worker restart: the original Chess match, seat, turn and move history survived, and the next move committed.');
+    await pause();
+
     await reloadWorker({ HANGOUT_ARCADE_CHESS: '0' });
     await reopen('Chat after disabling Chess', true);
     assert.equal(white.features.arcadeChess, undefined);
@@ -1249,10 +1284,11 @@ try {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;
         if (mixedRef) {
-            await runArcadeBrowser(browserName, browserOrigin, invite, evidence, null, browserMedia, false, { previousClient: true });
+            const previousArcade = previousAssets.has('/r/45662413410ed051/lobby/game-night-match-client.mjs');
+            await runArcadeBrowser(browserName, browserOrigin, invite, evidence, null, browserMedia, false, { previousClient: true, previousArcade });
             options.modules[0].contents = await bundleRollbackSource(mixedRef);
             await mf.setOptions(convertV4MiniflareOptions(options));
-            await runArcadeBrowser(browserName, (await mf.ready).origin, invite, evidence, null, browserMedia, false, { previousWorker: true });
+            await runArcadeBrowser(browserName, (await mf.ready).origin, invite, evidence, null, browserMedia, false, { previousWorker: true, previousArcade });
             console.log(`Passed ${browserName} mixed lobby versions using source ${mixedRef}.`);
         } else {
             await runArcadeBrowser(browserName, browserOrigin, invite, evidence,
@@ -1307,10 +1343,12 @@ try {
     const resumed = await upgrade(black.cookie, await grant(black, ch.keepRef));
     assert.equal(resumed.status, 101);
     const returning = observe(resumed.webSocket);
-    await returning.wait(frame => frame.t === 'match-ready', 'match reconnected');
-    returning.send({ version: 1, action: 'sync' });
-    const synced = await returning.wait(frame => frame.state?.match?.moves?.[0] === 'e2e4', 'restored board');
-    assert.equal(synced.state.seat, 'b');
+    const ready = await returning.wait(frame => frame.t === 'match-ready', 'match reconnected');
+    assert.equal(ready.snapshots, true);
+    returning.send({ version: 1, t: 'hello', lastSeq: 0 });
+    const synced = await returning.wait(frame => frame.t === 'snapshot' && frame.state?.match?.moves?.[0] === 'e2e4', 'restored board');
+    assert.deepEqual([synced.phase, synced.currentMatchId, synced.yourSeat, synced.turn], ['playing', started.state.id, 'b', 'b']);
+    assert.ok(Number.isSafeInteger(synced.seq) && synced.seq > 0);
     await verifyMedia(white, black, ch.keepRef, a, returning);
     const { a: cards, spectator } = await verifyEights(white, black, ch.keepRef, a);
     const rummy = await verifyRummy(white, black, spectator, ch.keepRef);

@@ -1,3 +1,5 @@
+import { GAME_NIGHT_LENGTH } from './game-night-lifetime.mjs';
+import { validGameNightTableId } from './game-night-pass.mjs';
 // Real beta admission is separate from the pilot's synthetic test identities.
 import { accountId, hmacKeyOk, roleForEmail } from './auth.mjs';
 import { BETA_TTL, registryRequest } from './beta-session-client.mjs';
@@ -52,7 +54,8 @@ export async function readBeta(kind, token, secret, now = Date.now()) {
         if (!await crypto.subtle.verify('HMAC', key, decode(signature), enc.encode(`beta:${kind}:${body}`))) return null;
         const claims = JSON.parse(new TextDecoder().decode(decode(body)));
         if (!claims || claims.v !== 1 || !/^[a-z0-9-]{16,64}$/.test(claims.sid) || !Number.isFinite(claims.exp) || claims.exp <= now
-            || claims.exp > now + (['demo-invite', 'game-invitation'].includes(kind) ? DEMO_INVITE_TTL : BETA_TTL)) return null;
+            || claims.exp > now + (['demo-invite', 'game-invitation'].includes(kind) ? DEMO_INVITE_TTL
+                : kind === 'access' && claims.scope === 'game-night' ? GAME_NIGHT_LENGTH : BETA_TTL)) return null;
         return claims;
     } catch { return null; }
 }
@@ -67,9 +70,20 @@ const cookie = (request, name) => (request.headers.get('Cookie') || '').split(';
 export class BetaSessionUnavailable extends Error {
     constructor(message, status = 503) { super(message); this.status = status; }
 }
-export async function betaSession(request, env, now = Date.now(), { allowRevoked = false, gameGuest = false } = {}) {
-    const access = await readBeta('access', cookie(request, gameGuest ? GAME_GUEST_COOKIE : BETA_COOKIE), env.HANGOUT_HMAC_KEY, now);
-    if (!access || access.scope !== (gameGuest ? 'game-night' : 'guest') || access.version !== String(env.HANGOUT_BETA_INVITE_VERSION || '1')) return null;
+export const gameGuestCookieName = tableId => validGameNightTableId(tableId) ? GAME_GUEST_COOKIE + '-' + tableId : GAME_GUEST_COOKIE;
+
+export async function betaSession(request, env, now = Date.now(), { allowRevoked = false, gameGuest = false, tableId = null } = {}) {
+    if (tableId !== null && (!gameGuest || !validGameNightTableId(tableId))) return null;
+    const expected = gameGuest ? 'game-night' : 'guest';
+    const version = String(env.HANGOUT_BETA_INVITE_VERSION || '1');
+    const valid = value => value?.scope === expected && value.version === version
+        && (!tableId || value.gameGuest?.tableId === tableId);
+    const name = gameGuest ? gameGuestCookieName(tableId) : BETA_COOKIE;
+    let access = await readBeta('access', cookie(request, name), env.HANGOUT_HMAC_KEY, now);
+    if (!valid(access) && tableId) {
+        access = await readBeta('access', cookie(request, GAME_GUEST_COOKIE), env.HANGOUT_HMAC_KEY, now);
+    }
+    if (!valid(access)) return null;
     let checked;
     try { checked = await registryRequest(env, 'check', { sid: access.sid, exp: access.exp, version: access.version, allowRevoked }); }
     catch { throw new BetaSessionUnavailable('Beta session registry is unavailable.'); }
@@ -89,6 +103,29 @@ export async function betaSession(request, env, now = Date.now(), { allowRevoked
         if (identity.kind === 'staff' && roleForEmail(identity.email, env) === identity.role) return { access, identity, revoked };
     }
     return { access, identity: null, revoked };
+}
+
+export async function betaGameGuestAssetSession(request, env, now = Date.now()) {
+    const legacy = await betaSession(request, env, now, { gameGuest: true });
+    if (legacy) return legacy;
+
+    // Modules and stylesheets have no table query. Try scoped cookies only
+    // for asset reads, and bound registry work when old cookies accumulate.
+    const prefix = GAME_GUEST_COOKIE + '-';
+    const tables = new Set();
+    for (const part of (request.headers.get('Cookie') || '').split(';')) {
+        const name = part.trim().split('=', 1)[0];
+        if (name.startsWith(prefix)) {
+            const tableId = name.slice(prefix.length);
+            if (validGameNightTableId(tableId)) tables.add(tableId);
+        }
+        if (tables.size === 8) break;
+    }
+    for (const tableId of tables) {
+        const session = await betaSession(request, env, now, { gameGuest: true, tableId });
+        if (session) return session;
+    }
+    return null;
 }
 
 export async function readBetaBody(request) {

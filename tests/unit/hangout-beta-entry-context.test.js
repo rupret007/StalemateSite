@@ -2,13 +2,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
+import { signBeta } from '../../hangout-worker/src/beta-auth.mjs';
 import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
+import { GAME_INVITE_UNAVAILABLE, gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { BetaSessions } from '../../hangout-worker/src/beta-sessions.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
 import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
 import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
-import * as gameNightFunctions from '../../r/45662413410ed051/lobby/game-night.mjs';
 
 const root = '/r/45662413410ed051/';
 function env(extra = {}) {
@@ -16,6 +17,118 @@ function env(extra = {}) {
         ASSETS: { fetch: vi.fn(async () => new Response(readFileSync(new URL('../../r/45662413410ed051/entry-sites.mjs', import.meta.url), 'utf8'))) },
         LOBBY: {}, QUOTA: {}, ROOMS: {}, BETA_SESSIONS: {}, ...extra };
 }
+it('explains an invalid Game Night link before loading the lobby', async () => {
+    const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });
+    const response = await betaFetch(new Request('https://beta.example' + root + 'lobby/?game-guest=1&table=invalid'), config);
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe('This Game Night link is not valid.');
+    expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+});
+
+it('returns unavailable for an invitation replay after its guest session was revoked', async () => {
+    const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });
+    const exp = Date.now() + 60_000;
+    const grant = { sid: 'guest-fixture-session', exp, scope: {
+        game: 'chess', match: '11111111-1111-4111-8111-111111111111',
+        room: '#game-1acbefx23acbe', ref: 'c'.repeat(32), host: 'host-fixture-session', nameSeed: 1,
+        tableId: '11111111-1111-4111-8111-111111111111'
+    } };
+    config.LOBBY = { idFromName: name => name, get: () => ({ fetch: async () => Response.json(grant) }) };
+    const values = new Map();
+    const storage = {
+        get: async key => structuredClone(values.get(key)),
+        put: async (key, value) => values.set(key, structuredClone(value)),
+        delete: async keys => { for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key); },
+        list: async ({ prefix = '', limit = 1000 } = {}) => new Map([...values]
+            .filter(([key]) => key.startsWith(prefix)).slice(0, limit)),
+        setAlarm: async () => {}, deleteAlarm: async () => {},
+        transaction: callback => callback(storage)
+    };
+    const registry = new BetaSessions({ storage, blockConcurrencyWhile: callback => callback() }, config);
+    config.BETA_SESSIONS = { idFromName: name => name, get: () => registry };
+    const origin = 'https://beta.example';
+    const headers = { Origin: origin, 'Content-Type': 'application/json', 'CF-Connecting-IP': '192.0.2.22' };
+    const code = await signBeta('game-invitation', { v: 1, sid: 'a'.repeat(32), exp }, config.HANGOUT_HMAC_KEY);
+    const accept = () => betaFetch(new Request(origin + '/beta/game-night/invitation/accept', {
+        method: 'POST', headers, body: JSON.stringify({ code, age13: true, attempt: 'b'.repeat(32) })
+    }), config);
+    const admitted = await accept();
+    expect(admitted.status).toBe(200);
+    const retry = await accept();
+    expect(retry.status).toBe(200);
+    expect(retry.headers.has('Set-Cookie')).toBe(true);
+    const resume = () => betaFetch(new Request(origin + '/beta/game-night/invitation/resume', {
+        method: 'POST', headers, body: JSON.stringify({ tableId: grant.scope.tableId, pass: 'c'.repeat(64) })
+    }), config);
+    const restored = await resume();
+    expect(restored.status).toBe(200);
+    expect(restored.headers.getSetCookie()).toHaveLength(2);
+    const retired = await registry.fetch(new Request('https://beta-sessions/revoke', {
+        method: 'POST', headers, body: JSON.stringify({ sid: grant.sid, exp, version: '1' })
+    }));
+    expect(retired.status).toBe(200);
+    const replay = await accept();
+    expect(replay.status).toBe(410);
+    expect((await replay.json()).error).toBe('This invite is no longer available. Ask your host for a new one.');
+    expect(replay.headers.has('Set-Cookie')).toBe(false);
+    const revokedPass = await resume();
+    expect(revokedPass.status).toBe(410);
+    expect(revokedPass.headers.has('Set-Cookie')).toBe(false);
+});
+
+it.each(['game-night.mjs', 'game-night-audio.mjs'])('serves %s before admission only when guest invites are enabled', async name => {
+    const modulePath = root + 'lobby/' + name;
+    const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1', ASSETS: {
+        fetch: vi.fn(async () => new Response('export const GAME_INVITE_UNAVAILABLE = "Invite unavailable.";'))
+    } });
+    const request = path => new Request('https://beta.example.test' + path);
+    const response = await betaFetch(request(modulePath), config);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('export const GAME_INVITE_UNAVAILABLE');
+    expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
+    expect((await betaFetch(request(root + 'lobby/lobby.js'), config)).status).toBe(401);
+    expect((await betaFetch(request('/play/assets/suite-sound.js'), config)).status).toBe(401);
+    expect((await betaFetch(request(modulePath), { ...config, HANGOUT_GAME_NIGHT_GUESTS: '0' })).status).toBe(401);
+    expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
+});
+
+it.each(['details', 'accept'])('uses the shared copy on a guest %s 410', async operation => {
+    const pagePath = '/beta/game-night/guest';
+    const config = env({
+        HANGOUT_GAME_NIGHT_GUESTS: '1',
+        ASSETS: { fetch: vi.fn(request => new Response(readFileSync(new URL('../..' + new URL(request.url).pathname, import.meta.url), 'utf8'))) }
+    });
+    const request = path => new Request('https://beta.example.test' + path);
+    const html = await (await betaFetch(request(pagePath), config)).text();
+    const client = await (await betaFetch(request(pagePath + '.js'), config)).text();
+    const dom = new JSDOM(html, { url: request(pagePath).url + '#invite=fixture', runScripts: 'outside-only' });
+    const { window } = dom;
+    const copy = GAME_INVITE_UNAVAILABLE + ' (updated for this test)';
+    try {
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE: copy, unlockGameNightAudio: vi.fn() };
+        window.TextEncoder = TextEncoder;
+        Object.defineProperty(window.crypto, 'subtle', { value: crypto.subtle });
+        window.fetch = vi.fn(async path => path.endsWith('/' + operation)
+            ? Response.json({ error: 'Fixture server says the invitation expired.' }, { status: 410 })
+            : Response.json({ game: 'Royal Flush Chess', host: 'Fixture host' }));
+        // Supply a changed module export. An old literal in either client path must fail this check.
+        window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
+            'const { $1 } = sharedGameNight;'));
+        const join = window.document.querySelector('[data-guest-join]');
+        if (operation === 'accept') {
+            await vi.waitFor(() => expect(join.closest('section').hidden).toBe(false));
+            join.click();
+        }
+        const status = window.document.querySelector('[data-guest-status]');
+        await vi.waitFor(() => expect(status.textContent).toBe(copy));
+        expect(window.fetch).toHaveBeenLastCalledWith('/beta/game-night/invitation/' + operation, expect.any(Object));
+        expect(window.document.activeElement).toBe(status);
+        expect(window.history.state).toBeNull();
+    } finally {
+        window.close();
+    }
+});
+
 async function shell(address, config = env(), prepare) {
     const request = (path) => new Request(new URL(path, address));
     const html = await (await betaFetch(request('/'), config)).text();
@@ -232,7 +345,7 @@ describe('optional storage in the actual private beta client', () => {
                 };
                 window.eval(await bootstrap.text());
                 expect(window.HangoutEntrySites).toContainEqual({ id: 'makers', label: 'Makers' });
-                window.HangoutClientTestModules = { ...entryFunctions, ...gameNightFunctions, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
+                window.HangoutClientTestModules = { ...entryFunctions, gameNightReturnHint, createEntrySharing, createIdleHeartbeat, createChatAnnouncements, mountGameNightSound: vi.fn(), unlockGameNightAudio: vi.fn() };
                 window.eval(discovery);
                 const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
                 window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);

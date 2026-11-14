@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
 const suits = { S: ['♠', 'Spades'], H: ['♥', 'Hearts'], D: ['♦', 'Diamonds'], C: ['♣', 'Clubs'] };
@@ -18,6 +19,7 @@ const markup = `
 <p class="small arcade-card-status" data-eights-status role="status"></p>
 <p class="small arcade-card-error" data-eights-error role="status"></p>
 <button class="btn" type="button" data-eights-main hidden></button>
+    <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
 <div data-eights-table data-card-table hidden>
     <div class="arcade-card-score" aria-label="Match scores">
         <span data-eights-score="a"></span>
@@ -99,6 +101,8 @@ export function mountArcadeCrapeights(container, onMatch) {
             const focused = document.activeElement;
             const focusInTable = showingOutcome && panel.contains(focused);
             if (model?.id !== state?.id || previous?.revision !== match?.revision) closeChoices();
+            if (phase === 'ready' && state?.seat && match && match.id === previous?.id
+                && match.revision !== previous.revision) gameNightCue(match.action?.kind === 'draw' ? 'eights.draw' : 'eights.play');
             phase = 'ready';
             connectionError = undefined;
             model = state;
@@ -168,6 +172,8 @@ export function mountArcadeCrapeights(container, onMatch) {
         return `Round ${match.round} · ${turn}${last}`;
     }
 
+    const startRematch = $('[data-start-rematch]');
+
     function draw() {
         const match = model?.match, seated = !!model?.seat;
         let command = '', label = '';
@@ -191,6 +197,11 @@ export function mountArcadeCrapeights(container, onMatch) {
                 label = model.rematch ? 'Accept Eights rematch' : 'Request Eights rematch';
                 if (!command) status.textContent += ' Waiting for rematch acceptance.';
             } else if (match.roundResult && seated) { command = 'next-round'; label = 'Next round'; }
+        }
+        startRematch.hidden = !(phase === 'ready' && seated && match?.result && model.canStartRematch);
+        startRematch.disabled = !!pending;
+        if (phase === 'ready' && seated && match && model.disconnectedSeats?.length) {
+            status.textContent += ` · Waiting for ${model.disconnectedSeats.map(value => side[value]).join(', ')}, link still works.`;
         }
         main.hidden = !command;
         main.textContent = label;
@@ -256,6 +267,7 @@ export function mountArcadeCrapeights(container, onMatch) {
             suitControls.firstElementChild.focus();
         }
     });
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => {
         if (main.dataset.command === 'retry') client.start(scope);
         else if (main.dataset.command) send(main.dataset.command);

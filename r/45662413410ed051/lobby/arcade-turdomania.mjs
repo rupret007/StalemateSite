@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { POOP_KINDS, findGroup, popGroup } from '/play/games/turdomania-core.js';
 
@@ -11,6 +12,7 @@ const markup = `
 <p class="small arcade-card-error" data-mania-error role="status"></p>
 <div class="arcade-card-actions mania-actions">
     <button class="btn btn--small" type="button" data-mania-main hidden></button>
+    <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
     <button class="btn btn--small btn--ghost" type="button" data-mania-leave hidden>Leave duel</button>
 </div>
 <div data-card-table data-mania-match hidden>
@@ -181,6 +183,8 @@ export function mountArcadeTurdomania(container, onMatch) {
             } else if (!prediction || state.match?.players[state.seat]?.moves > prediction.move) {
                 clearPending();
             }
+            if (connection === 'ready' && state?.seat && state.match && state.match.id === model?.match?.id
+                && state.match.players[state.seat]?.moves > model.match.players[state.seat]?.moves) gameNightCue('mania.blip');
             model = state;
             canOpen = host;
             connection = 'ready';
@@ -235,6 +239,8 @@ export function mountArcadeTurdomania(container, onMatch) {
         if (connection === 'ready' && !match.result && seconds === 0 && now - lastSync >= 1500 && client.send({ action: 'sync' })) lastSync = now;
     }
 
+    const startRematch = $('[data-start-rematch]');
+
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the duel…', action = '', label = '';
@@ -261,8 +267,13 @@ export function mountArcadeTurdomania(container, onMatch) {
             message = !seat ? 'Watching the duel' : own.cleared ? 'Puzzle cleared. Opponent still playing.'
                 : own.over ? 'No matches left. Opponent still playing.' : 'Pop matching groups of two or more.';
         }
+        if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
+            message += ` · Waiting for ${'your opponent'}, link still works.`;
+        }
         setText(status, message);
         status.classList.toggle('mania-playing', !!match && !result && !!seat && !match.players[seat].over);
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = !!busy;
         main.hidden = !action;
         main.dataset.command = action;
         setText(main, label);
@@ -287,6 +298,7 @@ export function mountArcadeTurdomania(container, onMatch) {
         clock();
     }
 
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
     leave.addEventListener('click', () => {
         setText($('[data-mania-confirm-text]'), model?.waiting ? 'The open seat will close.' : 'Leaving forfeits your duel.');

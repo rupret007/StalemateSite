@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import '/play/games/turdanoid-sprites-core.js';
 import { advanceBrickRacer, brickRaceWall, brickRacePaddle, brickRaceTick, BRICK_LIMIT_TICKS, BRICK_WIDTH, BRICK_HEIGHT } from '/play/games/turdanoid-race.js';
@@ -13,6 +14,7 @@ const markup = `
 <p class="small arcade-card-error" data-brick-error role="status"></p>
 <div class="arcade-card-actions brick-race-actions">
     <button class="btn btn--small" type="button" data-brick-main hidden></button>
+    <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
     <button class="btn btn--small btn--ghost" type="button" data-brick-leave hidden>Leave race</button>
 </div>
 <div data-card-table data-brick-match hidden>
@@ -99,7 +101,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     let scope, model, canOpen, connection, connectionError, visual, wall, receivedAt, raf = 0, pending, pointer,
         desiredAim = null, lastAim = -Infinity, lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, redraw = true;
     const inputBufferLimit = 8;
-    let launchPointer = null, desiredAxis = null, keyboardActive = false, pointerStart = null;
+    let launchPointer = null, desiredAxis = null, keyboardActive = false, pointerStart = null, canRetryAim = false, retryAim = null;
     let buffer = [], flights = [], keys = new Set();
     const serverNow = time => model.match.at + Math.max(0, time - receivedAt);
     function clearPending() { clearTimeout(pending); pending = null; }
@@ -111,6 +113,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
         pointerStart = null;
         launchPointer = null;
         desiredAim = desiredAxis = null;
+        canRetryAim = false;
+        retryAim = null;
     }
     function rebuild() {
         visual = model?.match ? structuredClone(model.match.runner) : null;
@@ -141,6 +145,9 @@ export function mountArcadeTurdanoid(container, onMatch) {
                 clearInputs();
                 if (confirm.open) confirm.close();
             } else if (state?.match) flights = flights.filter(flight => flight.sequence > state.match.runner.sequence);
+            if (!reconnecting && !changed && state?.seat && state.match?.runner?.run.score > model?.match?.runner?.run.score) {
+                gameNightCue('ta.brick');
+            }
             model = state;
             canOpen = host;
             receivedAt = performance.now();
@@ -158,7 +165,21 @@ export function mountArcadeTurdanoid(container, onMatch) {
         onError(reason) {
             clearPending();
             const retryKeyboard = keyboardActive && reason !== 'finished';
+            const retryable = ['late-input', 'sequence'].includes(reason);
+            const aimToRetry = retryable && !retryKeyboard
+                ? retryAim ?? (canRetryAim
+                    ? desiredAim ?? [...flights.flatMap(flight => flight.inputs), ...buffer].findLast(([, control]) => control === 'aim')?.[2]
+                    : null)
+                : null;
+            const activePointer = pointer, activeStart = pointerStart;
             clearInputs(retryKeyboard);
+            if (aimToRetry != null) {
+                // Keep the latest absolute position, but stamp it again after resync.
+                retryAim = aimToRetry;
+                pointer = activePointer;
+                pointerStart = activeStart;
+                client.send({ action: 'sync' });
+            }
             rebuild();
             retryAt = performance.now() + 175;
             if (retryKeyboard) {
@@ -207,9 +228,10 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (connection === 'ready' && !match.result) {
             if (flights.length && time - flights[0].sent > 4000) { client.start(scope); return; }
             if (desiredAxis !== null && time >= retryAt && queue('axis', desiredAxis, time)) desiredAxis = null;
-            if (desiredAim !== null && time - lastAim >= 90 && queue('aim', desiredAim, time)) {
+            const nextAim = desiredAim ?? retryAim;
+            if (nextAim !== null && time >= retryAt && time - lastAim >= 90 && queue('aim', nextAim, time)) {
                 lastAim = time;
-                desiredAim = null;
+                desiredAim = retryAim = null;
             }
             if (buffer.length && flights.length < 4 && !pending && time >= retryAt && time - lastSent >= 85) {
                 const sequence = (flights.at(-1)?.sequence ?? match.runner.sequence) + 1, inputs = buffer.splice(0, 4);
@@ -253,6 +275,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (!match.result) raf = requestAnimationFrame(drawFrame);
     }
 
+    const startRematch = $('[data-start-rematch]');
+
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
         let message = 'Connecting to the race…', action = '', label = '';
@@ -274,7 +298,12 @@ export function mountArcadeTurdanoid(container, onMatch) {
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
             if (seat && seat === model.rematch) message += ' · Rematch requested';
         } else if (match) message = match.wall.name;
+        if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
+            message += ` · Waiting for ${'your rival'}, link still works.`;
+        }
         put(status, message);
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = !!pending;
         main.hidden = !action;
         main.dataset.command = action;
         put(main, label);
@@ -287,6 +316,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
     }
 
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
     const hitsLaunch = event => launch.contains(document.elementFromPoint(event.clientX, event.clientY));
     launch.addEventListener('pointerdown', event => {
@@ -325,7 +355,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
         event.preventDefault();
         if (event.repeat) return;
         if (event.key === ' ') { requestServe(); return; }
-        desiredAim = null;
+        desiredAim = retryAim = null;
+        canRetryAim = false;
         keys.add(event.key);
         if (!updateAxis()) keys.delete(event.key);
     });
@@ -338,7 +369,10 @@ export function mountArcadeTurdanoid(container, onMatch) {
     function aim(event) {
         if (pointer !== event.pointerId) return;
         const rect = board.getBoundingClientRect();
-        if (rect.width > 0) desiredAim = Math.round(Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)) * 1000);
+        if (rect.width > 0) {
+            desiredAim = Math.round(Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)) * 1000);
+            canRetryAim = true;
+        }
     }
     // A finger on the painted ball counts. The radius stays inside a nearby aim tap.
     function hitsStuckBall(event) {
@@ -375,7 +409,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
     for (const name of ['pointercancel', 'lostpointercapture']) board.addEventListener(name, event => {
         if (pointer !== event.pointerId) return;
         pointer = null;
-        desiredAim = null;
+        desiredAim = retryAim = null;
+        canRetryAim = false;
         if (name === 'pointercancel') pointerStart = null;
     });
 

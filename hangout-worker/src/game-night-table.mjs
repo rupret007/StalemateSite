@@ -11,12 +11,18 @@ export function createGameNightTable({
         #match = null;
         #votes = [];
         #id;
+        #tableId;
+        #host;
+        #closed = false;
 
-        constructor(id, host) {
-            if (typeof id !== 'string' || !/^[a-zA-Z0-9-]{5,80}$/.test(id) || !subjectValid(host)) {
+        constructor(id, host, tableId = id) {
+            if (typeof id !== 'string' || !/^[a-zA-Z0-9-]{5,80}$/.test(id) || !subjectValid(host)
+                || typeof tableId !== 'string' || !/^[a-zA-Z0-9-]{5,80}$/.test(tableId)) {
                 throw new TypeError('Invalid match or seat identity');
             }
             this.#id = id;
+            this.#tableId = tableId;
+            this.#host = host;
             this.#seats = Object.fromEntries(sides.map(seat => [seat, seat === first ? host : null]));
         }
 
@@ -25,7 +31,11 @@ export function createGameNightTable({
                 || Object.entries(computerSeats).some(([seat, subject]) => record.seats[seat] !== subject)) {
                 throw new TypeError('Invalid room match checkpoint');
             }
-            const game = new GameNightTable(record.id, record.seats[first]);
+            const game = new GameNightTable(record.id, record.seats[first], record.tableId);
+            const host = record.host === undefined ? record.seats[first] : record.host;
+            if (!sides.some(seat => record.seats[seat] === host)) throw new TypeError('Invalid table host');
+            game.#host = host;
+            game.#closed = record.closed === true;
             for (const seat of sides.slice(1)) {
                 const subject = record.seats[seat];
                 if (subject === null) continue;
@@ -39,7 +49,7 @@ export function createGameNightTable({
                 game.#match = Match.restore(record.match);
                 if (manualStart && JSON.stringify(game.#match.players) !== JSON.stringify(occupied)) throw new TypeError('Invalid active seats');
                 const votes = twoSeats ? (record.rematch ? [record.rematch] : []) : record.rematchVotes;
-                if (finished(game.#match) && Array.isArray(votes) && votes.length < occupied.length &&
+                if (finished(game.#match) && Array.isArray(votes) && votes.length <= occupied.length &&
                     new Set(votes).size === votes.length && votes.every(seat => occupied.includes(seat))) game.#votes = [...votes];
             }
             return game;
@@ -52,11 +62,15 @@ export function createGameNightTable({
         }
 
         checkpoint() {
-            return { version, id: this.#id, seats: { ...this.#seats, ...computerSeats }, match: this.#match?.checkpoint() ?? null,
-                ...this.#rematchView(), ...(mode ? { mode } : {}) };
+            return { version, id: this.#id, tableId: this.#tableId, host: this.#host, seats: { ...this.#seats, ...computerSeats }, match: this.#match?.checkpoint() ?? null,
+                ...this.#rematchView(), ...(this.#closed ? { closed: true } : {}), ...(mode ? { mode } : {}) };
         }
 
-        get deadline() { return this.#match?.deadline ?? null; }
+        get deadline() { return this.#closed ? null : this.#match?.deadline ?? null; }
+        get closed() { return this.#closed; }
+        get mode() { return mode; }
+        get host() { return this.#host; }
+        get tableId() { return this.#tableId; }
         get subjects() { return sides.map(seat => this.#seats[seat]).filter(Boolean); }
 
         seat(subject) {
@@ -64,18 +78,18 @@ export function createGameNightTable({
         }
 
         guestSeats(id, host) {
-            if (id !== this.#id || this.#match || this.#seats[first] !== host) return [];
+            if (this.#closed || id !== this.#id || this.#match || this.#host !== host) return [];
             return sides.filter(seat => !this.#seats[seat]);
         }
 
         hasGuestSeat(id, host, reserved = 0) {
-            return id === this.#id && !this.#match && this.#seats[first] === host && this.#occupied().length + reserved < sides.length;
+            return !this.#closed && id === this.#id && !this.#match && this.#host === host && this.#occupied().length + reserved < sides.length;
         }
 
         view(subject, now) {
             const seat = this.seat(subject);
             return {
-                version, game: name, id: this.#id, seat, waiting: !this.#match,
+                version, game: name, id: this.#id, tableId: this.#tableId, seat, waiting: !this.#match,
                 hasOpenSeat: !this.#match && this.#occupied().length < sides.length,
                 match: this.#match ? project(this.#match, seat, now) : null, ...this.#rematchView(),
                 ...(!twoSeats || mode ? { occupied: this.#occupied() } : {}), ...(mode ? { mode } : {}),
@@ -84,7 +98,7 @@ export function createGameNightTable({
         }
 
         join(subject, id, now, requested, reserved = 0, heldSeats = []) {
-            if (id !== this.#id || this.#match || !subjectValid(subject) || this.seat(subject) || this.#occupied().length + reserved >= sides.length) return false;
+            if (this.#closed || id !== this.#id || this.#match || !subjectValid(subject) || this.seat(subject) || this.#occupied().length + reserved >= sides.length) return false;
             const seat = twoSeats ? sides[1] : requested === 'next' ? sides.find(side => !this.#seats[side] && !heldSeats.includes(side)) : requested;
             if (!sides.includes(seat) || this.#seats[seat] || heldSeats.includes(seat)) return false;
             if (!manualStart && this.subjects.length === sides.length - 1) this.#match = create(id, now);
@@ -106,23 +120,45 @@ export function createGameNightTable({
             return true;
         }
 
+        close(subject, id) {
+            if (this.#closed || subject !== this.#host || id !== this.#id) return false;
+            this.#closed = true;
+            this.#votes = [];
+            return true;
+        }
+
+        reopen(subject, id, modeRequested, now) {
+            if (!this.#closed || subject !== this.#host || id === this.#id || modeRequested !== mode) return false;
+            const occupied = this.#occupied();
+            const match = occupied.length >= minSeats ? create(id, now, occupied) : null;
+            this.#id = id;
+            this.#match = match;
+            this.#closed = false;
+            return true;
+        }
+
         command(subject, request, now) {
+            if (this.#closed) return { ok: false, reason: 'waiting' };
             return this.#match?.command(this.seat(subject), request, now) ?? { ok: false, reason: 'waiting' };
         }
 
-        expire(now) { return this.#match?.expire?.(now) ?? false; }
+        expire(now) { return !this.#closed && (this.#match?.expire?.(now) ?? false); }
 
-        requestRematch(subject, id, nextId, now) {
+        requestRematch(subject, id, nextId, now, { connected, force = false } = {}) {
             const seat = this.seat(subject);
-            if (id !== this.#id || !seat || !this.#match || !finished(this.#match) || this.#votes.includes(seat)) return false;
+            if (this.#closed || id !== this.#id || !seat || !this.#match || !finished(this.#match)
+                || nextId === id || (force ? subject !== this.#host : this.#votes.includes(seat))) return false;
+            if (!force) this.#votes.push(seat);
+            this.startReadyRematch(nextId, now, connected, force);
+            return true;
+        }
+
+        startReadyRematch(nextId, now, connected, force = false) {
+            if (this.#closed || !this.#match || !finished(this.#match) || nextId === this.#id) return false;
             const occupied = this.#occupied();
-            if (this.#votes.length < occupied.length - 1) {
-                this.#votes.push(seat);
-                return true;
-            }
-            if (nextId === id) return false;
+            const online = connected ? occupied.filter(side => connected.has(this.#seats[side])) : occupied;
+            if (!force && (!online.length || !online.every(side => this.#votes.includes(side)))) return false;
             const match = create(nextId, now, occupied);
-            if (twoSeats) [this.#seats[first], this.#seats[sides[1]]] = [this.#seats[sides[1]], this.#seats[first]];
             this.#id = nextId;
             this.#match = match;
             this.#votes = [];

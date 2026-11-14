@@ -1,3 +1,4 @@
+import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { suggestSpadesBid } from '/play/games/turdspades-engine.js';
 
@@ -21,6 +22,7 @@ const markup = `
 <div class="arcade-card-actions">
     <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>
     <button class="btn btn--small" type="button" data-spades-main hidden></button>
+    <button class="btn btn--small btn--ghost" type="button" data-spades-start-rematch hidden>Start now</button>
 </div>
 <div class="arcade-card-actions" data-spades-seats hidden></div>
 <div data-card-table data-spades-table hidden>
@@ -58,7 +60,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
     const table = $('[data-spades-table]'), seatsHost = $('[data-spades-seats]'), hand = $('[data-spades-hand]');
     const bid = $('#spades-bid'), confirm = $('[data-spades-confirm]');
     const actions = [...panel.querySelectorAll('[data-spades-action]')];
-    let scope = null, model = null, canOpen = false, partnersSupported = false, connection = 'connecting', connectionError;
+    let scope = null, model = null, canOpen = false, partnersSupported = false, savedMode, connection = 'connecting', connectionError;
     let pending = false, timer, confirmation = '';
     let suggestedBidKey = '', bidEdited = false, applyingBid = false;
 
@@ -75,16 +77,24 @@ export function mountArcadeTurdSpades(container, onMatch) {
             closeConfirmation();
             draw();
         },
-        onState({ state, canOpen: host, partners }) {
+        onState({ state, canOpen: host, partners, reopenMode }) {
             if (state && (state.game !== 'turdspades' || state.version !== 1)) return;
             const revealing = state?.match && (!model?.match || model.id !== state.id);
             if (state?.id !== model?.id || state?.match?.revision !== model?.match?.revision) {
                 closeConfirmation();
                 feedback.textContent = '';
             }
+            const next = state?.match, prior = model?.match;
+            if (connection === 'ready' && state?.seat && next && next.id === prior?.id && next.revision !== prior.revision) {
+                if (next.phase === 'bid') gameNightCue('spades.bid');
+                else if (next.round === prior.round && Object.entries(next.tricks).some(([seat, count]) => count > prior.tricks[seat])) {
+                    gameNightCue('spades.trick');
+                } else if (next.trick.length !== prior.trick.length) gameNightCue('spades.card');
+            }
             model = state;
             canOpen = host;
             partnersSupported = partners === true;
+            savedMode = reopenMode;
             connection = 'ready';
             connectionError = undefined;
             clearPending();
@@ -147,7 +157,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
     bid.value = '3';
     bid.addEventListener('change', () => { if (!applyingBid) bidEdited = true; });
 
-    function showHand(cards) {
+    function showHand(cards, choosingCard = false) {
         const old = new Map([...hand.children].map(button => [button.dataset.spadesCard, button]));
         const next = cards.map(card => {
             const key = String(card.id);
@@ -155,7 +165,9 @@ export function mountArcadeTurdSpades(container, onMatch) {
             button.type = 'button';
             button.dataset.spadesCard = key;
             button.dataset.red = String('HD'.includes(card.suit));
-            button.setAttribute('aria-label', cardLabel(card));
+            const unavailable = choosingCard && !card.playable;
+            button.setAttribute('aria-label', cardLabel(card) + (unavailable ? ', cannot play this turn' : ''));
+            button.toggleAttribute('data-cannot-follow', unavailable);
             button.disabled = connection !== 'ready' || pending || !card.playable;
             if (!old.has(key)) {
                 const index = document.createElement('b');
@@ -167,11 +179,14 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (next.length !== old.size || next.some((button, index) => hand.children[index] !== button)) hand.replaceChildren(...next);
     }
 
+    const startRematch = $('[data-spades-start-rematch]');
+
     function draw() {
         const match = model?.match, seat = model?.seat, occupied = model?.occupied || [];
         const paired = model?.mode === 'partners', people = paired ? 2 : 4;
         const computer = position => paired && ['north', 'east'].includes(position);
         const nameFor = position => names[position] + (computer(position) ? ' (CPU)' : '');
+        const away = model?.disconnectedSeats ?? [];
         const teams = paired ? ['South + North CPU', 'West + East CPU'] : partnerships;
         let command = '', label = '', message = 'Connecting to the table…';
         if (connection === 'unavailable') {
@@ -182,7 +197,14 @@ export function mountArcadeTurdSpades(container, onMatch) {
         } else if (!model) {
             message = canOpen ? (partnersSupported ? 'Play with one friend and a CPU partner on each team, or fill all four seats with friends.'
                 : 'Open a partnership table for four players.') : 'Waiting for the host to open a table.';
-            if (canOpen) { command = 'open'; label = partnersSupported ? 'Open 4-player Spades' : 'Open Spades table'; }
+            if (canOpen) {
+                command = 'open';
+                label = partnersSupported ? 'Open 4-player Spades' : 'Open Spades table';
+                if (savedMode) {
+                    label = savedMode === 'partners' ? 'Reopen 2-player Spades' : 'Reopen 4-player Spades';
+                    message = 'Reopen Spades to keep the same seats.';
+                }
+            }
         } else if (model?.waiting) {
             message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
             if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
@@ -190,7 +212,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
             message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
             if (seat) {
                 const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
-                message += ` ${votes.length}/${people} ready for a rematch.`;
+                const ready = votes.filter(vote => !away.includes(vote)).length;
+                message += ` ${ready}/${occupied.length - away.length} ready for a rematch.`;
                 if (!votes.includes(seat)) { command = 'rematch'; label = votes.length ? 'Accept Spades rematch' : 'Request Spades rematch'; }
             }
         } else if (match?.roundResult) {
@@ -215,12 +238,17 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
             }
         }
+        if (connection === 'ready' && seat && match && away.length) {
+            message += ` · Waiting for ${away.map(nameFor).join(', ')}, link still works.`;
+        }
+        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.disabled = pending;
         if (status.textContent !== message) status.textContent = message;
         main.hidden = !command;
         main.textContent = label;
         main.dataset.command = command;
         main.disabled = pending;
-        partnerButton.hidden = command !== 'open' || !partnersSupported;
+        partnerButton.hidden = command !== 'open' || !partnersSupported || !!savedMode;
         partnerButton.disabled = pending;
         seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
@@ -238,7 +266,9 @@ export function mountArcadeTurdSpades(container, onMatch) {
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
             const called = match.bids[position];
-            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${called === null ? '—' : called || 'Nil'}`;
+            const tricks = match.tricks[position];
+            const bidLabel = called === null ? 'No bid yet' : `Bid ${called || 'Nil'}`;
+            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${bidLabel} · ${tricks} ${tricks === 1 ? 'trick' : 'tricks'}`;
             card.textContent = entry ? face(entry) : '—';
             card.setAttribute('aria-label', entry ? cardLabel(entry) : 'No card played');
             row.dataset.active = String(!match.result && match.phase !== 'round-end' && match.turn === position);
@@ -271,16 +301,18 @@ export function mountArcadeTurdSpades(container, onMatch) {
                     : action === 'resign' && !!match.result);
             control.disabled = connection !== 'ready' || pending;
         }
-        showHand(match.hand);
+        showHand(match.hand, connection === 'ready' && match.phase === 'play' && match.turn === seat && !match.result);
     }
 
     hand.addEventListener('click', event => {
         const button = event.target.closest('[data-spades-card]');
         if (button && !button.disabled) send('play', { card: Number(button.dataset.spadesCard) });
     });
+    startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => {
         const action = main.dataset.command;
         if (action === 'retry') client.start(scope);
+        else if (action === 'open' && savedMode === 'partners') send(action, { mode: savedMode });
         else if (action) send(action);
     });
     partnerButton.addEventListener('click', () => send('open', { mode: 'partners' }));

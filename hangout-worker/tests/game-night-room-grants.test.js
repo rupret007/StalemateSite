@@ -1,11 +1,13 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-    CLAIM_WINDOW, EXPIRED_COPY, GRANT_TTL, GUEST_TTL, HASHES_PER_REQUEST, RECONNECT_WINDOW, ROOM_GRANT_PREFIX, TABLE_FULL_COPY,
+    CLAIM_WINDOW, EXPIRED_COPY, GRANT_TTL, HASHES_PER_REQUEST, RECONNECT_WINDOW, ROOM_GRANT_PREFIX, TABLE_FULL_COPY,
     createRoomGrants, grantHash, grantResponse, keepsSeat, reconnectDeadline
 } from '../src/game-night-room-grants.mjs';
 import { createGameNightTable } from '../src/game-night-table.mjs';
 import { gameInvitationRequest } from '../src/game-night-invitations.mjs';
+import { GAME_NIGHT_LENGTH } from '../src/game-night-lifetime.mjs';
+import { readGameNightPass } from '../src/game-night-pass.mjs';
 
 const ROOM = '#game-abcdefxabcdef', OTHER_ROOM = '#game-123456x123456';
 const MATCH = 'match-0001', HOST = 'host-session-0001', REF = 'a'.repeat(32);
@@ -39,7 +41,7 @@ function realTable(sides, options = {}) {
         port: {
             status: async scope => game && game.view(HOST, NOW).id === scope.match ? {
                 waiting: game.view(HOST, NOW).waiting, host: game.checkpoint().seats[sides[0]], hostSeat: sides[0],
-                free: sides.length - game.subjects.length
+                free: sides.length - game.subjects.length, nightEndsAt: NOW + GAME_NIGHT_LENGTH
             } : null,
             hold: async (scope, { holder, until, now }) => {
                 if (!game || holdsByHolder.has(holder) || !(until > now)) return false;
@@ -160,18 +162,57 @@ describe('registerGrants', () => {
 });
 
 describe('redeemGrant', () => {
+    it('writes the WebJam table pass hash with the redeemed guest seat', async () => {
+        const tableId = '11111111-1111-4111-8111-111111111111', pass = 'd'.repeat(64);
+        const passHash = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass))).toString('hex');
+        async function storeRecords(write) {
+            for (const [key, record] of Object.entries(write)) await storage.put(key, record);
+        }
+        const port = {
+            ...table.port, atomic: true,
+            async status(scope) { return { ...await table.port.status(scope), tableId }; },
+            async hold(scope, claim) {
+                const held = await table.port.hold(scope, claim);
+                if (held) await storeRecords(claim.write);
+                return held;
+            },
+            async seat(scope, claim) {
+                const seat = await table.port.seat(scope, claim);
+                if (seat) await storeRecords(claim.write);
+                return seat;
+            }
+        };
+        grants = createRoomGrants({ storage, table: port, uuid: () => 'guest-session-0001', seed: () => 7 });
+        expect((await register([1], { version: '1' })).ok).toBe(true);
+        const granted = await grants.redeemGrant({ value: value(1), now: NOW + 5, passHash, version: '1' });
+        expect(granted).toMatchObject({ ok: true, seat: 'b', body: { scope: { tableId } } });
+        expect(await readGameNightPass(storage, tableId, pass)).toEqual({ ...granted.body, version: '1' });
+        expect(JSON.stringify([...storage.data])).not.toContain(pass);
+    });
+
     it('seats the guest in the next seat, burns the grant and returns the guest mint data', async () => {
         await register([1]);
         const result = await grants.redeemGrant({ value: value(1), now: NOW + 5 });
         expect(result).toEqual({
             ok: true, status: 200, seat: 'b', claimUntil: NOW + 5 + CLAIM_WINDOW,
-            body: { scope: { game: 'chess', match: MATCH, room: ROOM, ref: REF, host: HOST, nameSeed: 7 }, sid: 'guest-session-1', exp: NOW + 5 + GUEST_TTL }
+            body: { scope: { game: 'chess', match: MATCH, room: ROOM, ref: REF, host: HOST, nameSeed: 7 }, sid: 'guest-session-1', exp: NOW + GAME_NIGHT_LENGTH }
         });
         expect(JSON.stringify(result)).not.toContain(value(1));
         expect(table.game.seat('guest-session-1')).toBe('b');
         expect(table.game.seat(HOST)).toBe('w');
         expect(kinds()).toEqual(['burned']);
         expect(await grants.holds({ room: ROOM, game: 'chess', match: MATCH }, NOW + 5)).toEqual([]);
+    });
+
+    it('caps a demo grant and its confirmed guest access at the host deadline', async () => {
+        const accessUntil = NOW + 5000;
+        expect((await register([1], { accessUntil })).body.until).toBe(accessUntil);
+        const attempt = value(2);
+        const confirmed = await grants.redeemGrant({ value: value(1), attempt, now: accessUntil - 1 });
+        expect(confirmed.status).toBe(200);
+        expect(confirmed.body.exp).toBe(accessUntil);
+        expect(confirmed.claimUntil).toBe(accessUntil);
+        expect((await grants.redeemGrant({ value: value(1), attempt, now: accessUntil })).status).toBe(410);
     });
 
     it('answers a replay with the same 410 shape as a spent stranger invitation', async () => {
