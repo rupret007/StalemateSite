@@ -279,7 +279,6 @@ export function mountArcadeChess(container, onMatch) {
         } else if (match?.result) {
             if (!seated) {
                 status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}. You can watch the next match.`;
-                button('Watch for the next game', 'watch');
             } else {
                 status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
                 if (model.rematch !== model.seat) button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');

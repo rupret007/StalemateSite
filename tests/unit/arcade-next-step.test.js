@@ -59,7 +59,7 @@ describe('Chess next step', () => {
             canOpen: false
         });
         expect(status.textContent).toBe('Black wins · Resignation. You can watch the next match.');
-        expect(button.textContent).toBe('Watch for the next game');
+        expect(button.hidden).toBe(true);
         state({
             state: { id: 'chess-1', seat: 'b', waiting: false, rematch: null, match: { fen: FEN, turn: 'b', result: { winner: 'b', reason: 'Resignation' }, moves: [], revision: 2, clock: { w: 600000, b: 600000 } } },
             canOpen: false
@@ -130,8 +130,8 @@ describe('Spades next step', () => {
             state: { version: 1, game: 'turdspades', id: 'spades-1', seat: null, mode: 'partners', waiting: false, occupied: ['south', 'west'], match: spadesMatch({ result: { winner: 1, reason: 'resigned' } }) },
             canOpen: false, partners: true
         });
-        expect(status.textContent).toBe('West + East CPU win by resignation. You’re watching.');
-        expect(button.textContent).toBe('Watch for the rematch');
+        expect(status.textContent).toBe('West + East CPU win by resignation. Stay here to watch the rematch.');
+        expect(button.hidden).toBe(true);
         const roundResult = [{ delta: 12, nil: [] }, { delta: -3, nil: [] }];
         state({
             state: { version: 1, game: 'turdspades', id: 'spades-1', seat: null, waiting: false, occupied: ['south', 'west', 'north', 'east'], match: spadesMatch({ roundResult }) },
@@ -187,6 +187,9 @@ describe('Turdanoid next step', () => {
         const match = new TurdanoidBrickRace('race-12345', 50_000, null, 1).view('a', 50_000);
         state({ state: { version: 1, game: 'turdanoid', id: 'race-12345', seat: null, waiting: false, rematch: null, match }, canOpen: false });
         expect(status.textContent).toBe('Race full. You’re watching.');
+        client.handlers.onStatus('reconnecting');
+        expect(status.textContent).toBe('Reconnecting to the race · race clock keeps running');
+        state({ state: { version: 1, game: 'turdanoid', id: 'race-12345', seat: null, waiting: false, rematch: null, match }, canOpen: false });
         expect(button.textContent).toBe('Watch this race');
         button.click();
         expect(client.sent).toEqual([]);
@@ -197,8 +200,8 @@ describe('Turdanoid next step', () => {
             state: { version: 1, game: 'turdanoid', id: 'race-12345', seat: null, waiting: false, rematch: null, match: { ...match, result: { winner: 'a', reason: 'clear' } } },
             canOpen: false
         });
-        expect(status.textContent).toBe('Player 1 wins · wall cleared');
-        expect(button.textContent).toBe('Watch for the next race');
+        expect(status.textContent).toBe('Player 1 wins · wall cleared. Stay here to watch the next race.');
+        expect(button.hidden).toBe(true);
         state({
             state: { version: 1, game: 'turdanoid', id: 'race-12345', seat: 'b', waiting: false, rematch: null, match: { ...match, result: { winner: 'a', reason: 'clear' } } },
             canOpen: false
@@ -208,5 +211,9 @@ describe('Turdanoid next step', () => {
         state({ state: null, canOpen: false });
         expect(status.textContent).toBe('This race ended. Wait here for the next race.');
         expect(button.textContent).toBe('Stay for the next race');
+        button.click();
+        expect(status.textContent).toBe('Waiting for the host to open a race.');
+        expect(view.ownerDocument.activeElement).toBe(status);
+        expect(client.sent).toEqual([]);
     });
 });

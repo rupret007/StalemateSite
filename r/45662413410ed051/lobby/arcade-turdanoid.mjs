@@ -265,14 +265,18 @@ export function mountArcadeTurdanoid(container, onMatch) {
             message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
             if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect race'; }
         } else if (connection !== 'ready') {
-            if (match) message = seat && !match.result ? 'Reconnecting to your seat · race clock keeps running' : 'Reconnecting to the race…';
+            if (match) {
+                message = seat && !result ? 'Reconnecting to your seat' : 'Reconnecting to the race';
+                if (!result) message += ' · race clock keeps running';
+            }
         } else if (!model) {
             if (raceEnded && !canOpen) {
                 message = 'This race ended. Wait here for the next race.';
                 action = 'stay';
                 label = 'Stay for the next race';
             } else {
-                message = 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.';
+                message = canOpen ? 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.'
+                    : 'Waiting for the host to open a race.';
                 if (canOpen) { action = 'open'; label = 'Open Turdanoid race'; }
             }
         } else if (model?.waiting) {
@@ -281,9 +285,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         } else if (result) {
             const reason = { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
             if (!seat) {
-                message = (result.winner === null ? 'Draw' : result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins') + ' · ' + reason;
-                action = 'watch';
-                label = 'Watch for the next race';
+                message = (result.winner === null ? 'Draw' : result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins') + ' · ' + reason + '. Stay here to watch the next race.';
             } else {
                 message = (result.winner === null ? 'Draw' : result.winner === seat ? 'You win' : 'Rival wins') + ' · ' + reason;
                 if (seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }

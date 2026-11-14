@@ -203,9 +203,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
         } else if (match?.result) {
             if (!seat) {
-                message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}. You’re watching.`;
-                command = 'watch';
-                label = 'Watch for the rematch';
+                message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}. Stay here to watch the rematch.`;
             } else {
                 message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
                 const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
