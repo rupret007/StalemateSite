@@ -593,7 +593,7 @@ test('an open invite picker updates availability without moving keyboard focus',
         await host.getByRole('button', { name: 'Invite bandmate to room' }).press('Enter');
         const list = host.getByRole('group', { name: 'Online guests' });
         const available = list.getByRole('button', { name: 'Invite Bandmate', exact: true });
-        const busy = list.getByRole('button', { name: 'Invite Bandmate (busy)', exact: true });
+        const busy = list.getByRole('button', { name: 'Invite Bandmate · Busy', exact: true });
         await expect(available).toBeFocused();
         await guest.click('[data-show="rooms"]');
         await guest.click('[data-start="jam"]');
@@ -643,14 +643,14 @@ for (const { width, height, label } of crowdedInviteViewports) test(`the crowded
             return style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0
                 && parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth) <= 0;
         })).toBe(true);
-        await expect(list.getByRole('button', { name: 'Invite BusyBandmate (busy)' })).toHaveText('BusyBandmate · Busy');
+        await expect(list.getByRole('button', { name: 'Invite BusyBandmate · Busy' })).toHaveText('BusyBandmate · Busy');
         expect(await list.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
         await expect(cancel).toBeInViewport({ ratio: 1 });
         const file = testInfo.outputPath(`invite-roster-${width}.png`);
         await host.screenshot({ path: file, animations: 'disabled' });
         await testInfo.attach('crowded invite roster', { path: file, contentType: 'image/png' });
         await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
-        await expect(list.getByRole('button', { name: 'Invite BusyBandmate (busy)' })).toBeInViewport({ ratio: 1 });
+        await expect(list.getByRole('button', { name: 'Invite BusyBandmate · Busy' })).toBeInViewport({ ratio: 1 });
         await expect(cancel).toBeInViewport({ ratio: 1 });
         await cancel.click();
         await expect(host.getByRole('dialog', { name: 'Invite a guest' })).toBeHidden();

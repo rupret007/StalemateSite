@@ -3109,7 +3109,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const label = person.busy ? `${person.nick} · Busy` : person.nick;
             if (button.textContent !== label) {
                 button.textContent = label;
-                button.setAttribute('aria-label', `Invite ${person.nick}${person.busy ? ' (busy)' : ''}`);
+                button.setAttribute('aria-label', `Invite ${label}`);
             }
         }
         $('[data-invite-empty]').hidden = online.size > 0;

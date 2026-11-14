@@ -857,6 +857,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
+  .buffer:focus-visible,
   .buffer:has(:focus-visible),
   .chat:has(.four-match[open]) .buffer { min-height: 64px; flex-shrink: 0; }
   .game-night:has(.four-match[open]) { min-height: 108px; }
