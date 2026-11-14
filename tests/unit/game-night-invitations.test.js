@@ -75,6 +75,10 @@ it('expires demo Chess invites after 72 hours and caps a late guest session', as
         const ordinary = await issue(false), demo = await issue(true);
         expect(ordinary.until - now).toBe(20 * 60_000);
         expect(demo.until - now).toBe(72 * 60 * 60_000);
+        for (let count = 0; count < 6; count += 1) await issue(false);
+        const limited = await gameInvitationRequest(lobby, 'issue', payload, { betaSid: host });
+        expect(limited.status).toBe(429);
+        expect((await limited.json()).error).toBe('Too many invitations are still on record. Share a current link for this game or try again later.');
         vi.setSystemTime(demo.until - 1000);
         const response = await gameInvitationRequest(lobby, 'accept', { code: demo.code, age13: true, attempt: 'e'.repeat(32) });
         expect(response.status).toBe(200);

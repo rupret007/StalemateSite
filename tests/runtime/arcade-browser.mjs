@@ -278,6 +278,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await newGuest.click();
             const deliver = host.getByRole('button', { name: useClipboard ? 'Copy invite' : 'Share invite' });
             await expect(deliver).toBeFocused();
+            await expect(host.locator('[data-game-invite-link-status]')).toHaveText('This link is for one guest. Send it now while your table has a seat available.');
             await captureArcadeInvite(host, viewport, step);
             await deliver.click();
             if (useClipboard) {
@@ -441,6 +442,39 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 } else await expect(guest.getByLabel('Announce new chat messages')).toBeVisible();
                 await guest.reload();
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                if (phone) {
+                    const ticketPath = '/beta/arcade-ticket';
+                    let requests = 0;
+                    const countTicket = request => {
+                        if (new URL(request.url()).pathname === ticketPath) requests++;
+                    };
+                    guest.on('request', countTicket);
+                    try {
+                        await guest.evaluate(() => {
+                            Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+                            window.dispatchEvent(new Event('offline'));
+                            window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+                        });
+                        await expect(guest.locator('[data-chess-status]')).toContainText('Reconnecting');
+                        assert.equal(requests, 0, 'a restored page does not request a ticket while offline');
+                        const recovered = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        await guest.evaluate(() => {
+                            delete navigator.onLine;
+                            window.dispatchEvent(new Event('online'));
+                        });
+                        await recovered;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                        assert.equal(requests, 1, 'coming online restores the seat with one ticket');
+
+                        const restored = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        await guest.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+                        await restored;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                        assert.equal(requests, 2, 'a restored history entry refreshes the match once');
+                    } finally { guest.off('request', countTicket); }
+                }
                 await guest.locator('[data-text]').fill('First visit from the game invite');
                 await guest.locator('[data-send]').click();
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
@@ -701,6 +735,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await player.locator('[data-send]').tap();
         await expect(host.getByRole('log', { name: 'Conversation' }).getByRole('listitem')
             .filter({ hasText: 'Meet me at the chess board' })).toBeVisible();
+        if (!media && !relay) {
+            const waiting = player.locator('[data-game-waiting]');
+            const status = player.locator('[data-chess-status]');
+            await expect(waiting).toBeHidden();
+            await player.evaluate(() => window.dispatchEvent(new Event('offline')));
+            await expect(status).toContainText('Reconnecting');
+            await expect(waiting).toBeHidden();
+            await player.evaluate(() => window.dispatchEvent(new Event('online')));
+            await expect(status).toHaveText('You’re Black · Your turn');
+            await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+            await expect(waiting).toBeHidden();
+        }
         if (!media && !relay) {
             const panel = player.locator('details.arcade-chess');
             const summary = panel.locator('summary');
@@ -2191,7 +2237,36 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Join Turd Rush race' }).click();
         await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(race(b)).toHaveAttribute('data-renderer', '2d');
-        if (engine === 'chromium') await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+        if (engine === 'chromium') {
+            await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+            async function stallFrames(count) {
+                await a.evaluate(count => new Promise(resolve => {
+                    const match = document.querySelector('[data-race-match]');
+                    const original = window.requestAnimationFrame;
+                    let remaining = count;
+                    window.requestAnimationFrame = function (callback) {
+                        if (!remaining || match.dataset.renderer !== '3d') {
+                            window.requestAnimationFrame = original;
+                            return original.call(this, callback);
+                        }
+                        return original.call(this, () => {
+                            const until = performance.now() + 200;
+                            while (performance.now() < until) { /* Simulate a stalled frame. */ }
+                            remaining--;
+                            callback(performance.now());
+                            if (!remaining || match.dataset.renderer !== '3d') {
+                                window.requestAnimationFrame = original;
+                                resolve();
+                            }
+                        });
+                    };
+                }), count);
+            }
+            await stallFrames(1);
+            await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+            await stallFrames(4);
+            await expect(race(a)).toHaveAttribute('data-renderer', '2d');
+        }
         await expect(spectator.locator('[data-race-controls]')).toBeHidden();
         await expect.poll(() => !!opening).toBe(true);
         const danger = unpackRushRacer(opening.runner).run.entities

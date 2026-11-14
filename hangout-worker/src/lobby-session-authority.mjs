@@ -3,6 +3,7 @@
 // policy/guardian qualification. Deployment/drain remains the release owner's job.
 import { accountId, roleForEmail } from './auth.mjs';
 import { validRoomId } from './core.mjs';
+import { validNightSession } from './game-night-lifetime.mjs';
 import { BETA_TTL, betaVersion } from './beta-session-client.mjs';
 import { validBetaRecord } from './beta-session-state.mjs';
 import { createDurableRecordStorage } from './durable-record-storage.mjs';
@@ -34,9 +35,10 @@ export const lobbyAuthorityMode = env => env?.HANGOUT_SESSION_AUTHORITY === LOBB
 const profileValid = value => value === null || exact(value, ['kind', 'account', 'role', 'admin', 'expiresAt'])
     && ['owner', 'staff'].includes(value.kind) && ACCOUNT.test(value.account) && integer(value.expiresAt)
     && (value.kind === 'owner' ? value.role === 'fan' && value.admin === false : ['owner', 'band', 'moderator'].includes(value.role) && value.admin === true);
-const recordValid = value => exact(value, ['v', 'sid', 'version', 'generation', 'createdAt', 'exp', 'revoked', 'pending', 'attempt', 'retryAt', 'rooms', 'profile', 'closureRevision'])
+const recordValid = value => exact(value, ['v', 'sid', 'version', 'generation', 'createdAt', 'exp', 'revoked', 'pending', 'attempt', 'retryAt', 'rooms', 'profile', 'closureRevision',
+    ...(value?.idleUntil === undefined ? [] : ['idleUntil'])])
     && value.v === 2 && SID.test(value.sid) && version(value.version) && integer(value.createdAt) && integer(value.exp)
-    && value.exp > value.createdAt && value.exp <= value.createdAt + BETA_TTL && typeof value.revoked === 'boolean' && typeof value.pending === 'boolean'
+    && value.exp > value.createdAt && (value.idleUntil === undefined ? value.exp <= value.createdAt + BETA_TTL : validNightSession(value)) && typeof value.revoked === 'boolean' && typeof value.pending === 'boolean'
     && (!value.pending || value.revoked) && integer(value.attempt) && value.attempt <= 20 && integer(value.retryAt) && value.retryAt <= value.exp
     && Array.isArray(value.rooms) && value.rooms.length <= ROOM_LIMIT && value.rooms.every(validRoomId) && new Set(value.rooms).size === value.rooms.length
     && Number.isSafeInteger(value.generation) && value.generation > 0 && integer(value.closureRevision) && profileValid(value.profile)
@@ -181,7 +183,9 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         }
         return roleMap;
     }
-    const active = record => !!record && record.exp > now() && record.version === betaVersion(env) && !record.revoked;
+    // This rollback reader preserves ordinary beta admission. Only the
+    // forward Worker implements gameplay admission for the new guest records.
+    const active = record => !!record && record.idleUntil === undefined && record.exp > now() && record.version === betaVersion(env) && !record.revoked;
     async function configuredMarker(tx) {
         const current = await marker(tx), mode = env.HANGOUT_PARTICIPATION_AUTHORITY;
         ensure(mode === undefined || mode === 'c3-v1');
@@ -373,7 +377,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         validate: value => transact(tx => validateBinding(tx, bindingFrom(value))),
         check: value => transact(async tx => {
             const record = await session(tx, value.sid);
-            return record && record.exp > now() && record.generation === (await marker(tx)).generation && record.version === value.version && value.version === betaVersion(env) && value.exp <= record.exp
+            return record && record.idleUntil === undefined && record.exp > now() && record.generation === (await marker(tx)).generation && record.version === value.version && value.version === betaVersion(env) && value.exp <= record.exp
                 && (!record.revoked || value.allowRevoked === true) ? { reason: record.revoked ? 'revoked' : 'active', profile: clone(record.profile) } : null;
         }),
         async register(body) {
@@ -412,7 +416,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             return { status: 200, reason: 'registered' };
         }),
         revoke: body => transact(async tx => {
-            const record = await session(tx, body.sid); if (!record || record.exp <= now() || record.version !== body.version || body.exp > record.exp) return null;
+            const record = await session(tx, body.sid); if (!record || record.idleUntil !== undefined || record.exp <= now() || record.version !== body.version || body.exp > record.exp) return null;
             ensure(Number.isSafeInteger(record.closureRevision + 1));
             const attempt = Math.min(20, record.attempt + 1), changed = { ...record, revoked: true, pending: true, attempt, closureRevision: record.closureRevision + 1,
                 retryAt: Math.min(record.exp, now() + Math.min(3600000, INTERVAL * 2 ** (attempt - 1))) };
@@ -421,19 +425,19 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         }),
         confirmClosed: attempt => transact(async tx => {
             const record = await session(tx, attempt.sid);
-            if (record?.revoked && record.closureRevision === attempt.closureRevision) await tx.put(SESSION + record.sid, { ...record, pending: false });
+            if (record?.revoked && record.idleUntil === undefined && record.closureRevision === attempt.closureRevision) await tx.put(SESSION + record.sid, { ...record, pending: false });
         }),
         schedule: () => transact((tx, raw) => schedule(tx, raw, now())),
         due: () => transact(async tx => {
             const rows = await prune(tx, now()), due = [];
             for (const item of rows.entries) {
                 const record = await session(tx, item.sid, rows); ensure(record && record.exp === item.exp);
-                if (record.pending && record.retryAt <= now()) due.push(record);
+                if (record.idleUntil === undefined && record.pending && record.retryAt <= now()) due.push(record);
             }
             return due.sort((a, b) => a.retryAt - b.retryAt || a.sid.localeCompare(b.sid)).slice(0, BATCH);
         }),
         retry: sid => transact(async tx => {
-            const record = await session(tx, sid); if (!record?.pending || record.retryAt > now()) return null;
+            const record = await session(tx, sid); if (!record?.pending || record.idleUntil !== undefined || record.retryAt > now()) return null;
             ensure(Number.isSafeInteger(record.closureRevision + 1));
             const attempt = Math.min(20, record.attempt + 1), next = { ...record, attempt, closureRevision: record.closureRevision + 1,
                 retryAt: Math.min(record.exp, now() + Math.min(3600000, INTERVAL * 2 ** (attempt - 1))) };

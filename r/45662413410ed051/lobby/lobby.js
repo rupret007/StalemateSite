@@ -1841,7 +1841,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (!scope || table.loading) return;
         table.loading = true;
         table.load().then(mount => {
-            table.controller = mount($('[data-game-night]'), (room, state, sendMatch) => arcadeMatchState(game, table, room, state, sendMatch));
+            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting) =>
+                arcadeMatchState(game, table, room, state, sendMatch, reconnecting));
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn--small arcade-invite-friend';
@@ -1892,7 +1893,12 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (table.inviteButton)
             table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
-    function arcadeMatchState(game, table, scope, state, sendMatch) {
+    function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting) {
+        if (reconnecting) {
+            table.invite = null;
+            updateTableInvite(table, currentGameNight());
+            return;
+        }
         table.matchRef = scope && state?.id ? scope.ref : null;
         table.seatRef = scope && state?.seat ? scope.ref : null;
         const room = currentGameNight();
@@ -2638,7 +2644,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             const sharePrimary = canShare || preferEmail || copyGuestLink.hidden;
             copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
             shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
-            guestLinkStatus.textContent = 'One guest can use this invitation within 20 minutes.';
+            guestLinkStatus.textContent = 'This link is for one guest. Send it now while your table has a seat available.';
             if (deliver && await deliverPreparedLink(request)) return;
             if (pendingGuestLink !== request) return;
             (sharePrimary ? shareGuestLink : copyGuestLink).focus();
