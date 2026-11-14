@@ -349,6 +349,7 @@ for (const viewport of viewports) test(`${viewport.label}: long chat, error and 
         await send(page, roomText); await expect(page.locator('[data-buffer]')).toContainText(roomText);
         await send(page, '/join #another-studio');
         await expect(page.getByRole('status').filter({ hasText: 'One new room per 10 minutes.' })).toBeVisible();
+        await expect(page.locator('[data-toast]')).toHaveText('One new room per 10 minutes.');
         await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
         const geometry = await composerGeometry(page);
         await attachGeometry(testInfo, `geometry-${viewport.label}`, geometry);
