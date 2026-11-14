@@ -51,29 +51,29 @@ export function createArcadeTransport({ state, current, active, approve, charge,
     const pendingRevocations = new Map();
     const { issue, upgrade, member, sockets, send, close } = createGameNightSockets({
         state, current, active, charge, now, uuid, tag, protocol: ARCADE_PROTOCOL,
-        readyType: 'match-ready', readyFeatures: { ping: true },
+        readyType: 'match-ready', snapshots: true, readyFeatures: { ping: true },
         allowed: scope => !pendingRevocations.has(scope?.ref) && allowed()
     });
     const key = scope => prefix + scope.ref;
     const restore = record => (record.mode === 'partners' && PartnerTable ? PartnerTable : Table).restore(record);
     const liveClaims = (claims, time) => (claims || []).filter(claim => claim.until > time);
-    function savedRecord(scope, game, expiresAt, claims) {
-        return { room: scope.room, expiresAt, [name]: game.checkpoint(), ...(claims.length ? { claims } : {}) };
+    function savedRecord(scope, game, expiresAt, claims, seq) {
+        return { room: scope.room, expiresAt, seq, [name]: game.checkpoint(), ...(claims.length ? { claims } : {}) };
     }
-    async function expireTable(scope) {
+    async function expireTable(scope, seq) {
         await state.storage.delete(key(scope));
-        publish(scope, null);
+        publish(scope, null, null, [], seq + 1);
     }
     async function load(scope, reportExpiry = false) {
         const record = await state.storage.get(key(scope));
         if (!record || record.room !== scope.room) return null;
         const time = now();
         if (record.expiresAt <= time) {
-            await expireTable(scope);
+            await expireTable(scope, record.seq ?? 0);
             // A socket command can skip its reply when the broadcast already sent the new view.
             return reportExpiry ? { expired: true } : null;
         }
-        return { expiresAt: record.expiresAt, game: restore(record[name]), claims: liveClaims(record.claims, time) };
+        return { expiresAt: record.expiresAt, seq: record.seq ?? 0, game: restore(record[name]), claims: liveClaims(record.claims, time) };
     }
     async function hasGuestSeat(scope, match, host) {
         const record = await load(scope);
@@ -85,18 +85,18 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         const claims = [...record.claims, { sid, until }];
         // Commit the invitation redemption and its temporary seat together.
         await state.storage.put({
-            [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims),
+            [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims, record.seq + 1),
             [invitationKey]: accepted
         });
-        publish(scope, record.game, null, claims);
+        publish(scope, record.game, null, claims, record.seq + 1);
         return true;
     }
     async function releaseGuestClaim(scope, sid) {
         const record = await load(scope);
         if (!record || !record.claims.some(claim => claim.sid === sid)) return;
         const claims = record.claims.filter(claim => claim.sid !== sid);
-        await state.storage.put(key(scope), savedRecord(scope, record.game, record.expiresAt, claims));
-        publish(scope, record.game, null, claims);
+        await state.storage.put(key(scope), savedRecord(scope, record.game, record.expiresAt, claims, record.seq + 1));
+        publish(scope, record.game, null, claims, record.seq + 1);
     }
     async function grantTable(scope) {
         const record = await load(scope);
@@ -119,8 +119,8 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 .find(side => !record.claims.some(claim => claim.seat === side));
             if (!seat) return false;
             const claims = [...record.claims, { sid: holder, until, seat, grant: true }];
-            await state.storage.put({ ...write, [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims) });
-            publish(scope, record.game, null, claims);
+            await state.storage.put({ ...write, [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims, record.seq + 1) });
+            publish(scope, record.game, null, claims, record.seq + 1);
             return true;
         },
         async seat(scope, { subject, holder, until, write }) {
@@ -128,8 +128,8 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             const held = record?.claims.find(claim => claim.grant && claim.sid === holder);
             if (!held || !record.game.guestSeats(scope.match, scope.host).includes(held.seat)) return null;
             const claims = record.claims.map(claim => claim === held ? { sid: subject, until, seat: held.seat } : claim);
-            await state.storage.put({ ...write, [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims) });
-            publish(scope, record.game, null, claims);
+            await state.storage.put({ ...write, [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims, record.seq + 1) });
+            publish(scope, record.game, null, claims, record.seq + 1);
             return held.seat;
         },
         async releaseHold(scope, holder) {
@@ -137,7 +137,16 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             if (record?.claims.some(claim => claim.grant && claim.sid === holder)) await releaseGuestClaim(scope, holder);
         }
     };
-    function publish(scope, game, requester = null, claims = []) {
+    function sendView(socket, attachment, view, canOpen, seq) {
+        const frame = { t: 'match-state', version: 1, room: attachment.room, state: view, canOpen,
+            ...(PartnerTable ? { partners: true } : {}) };
+        if (!attachment.snapshot) return send(socket, frame);
+        const match = view?.match;
+        return send(socket, { ...frame, t: 'snapshot', seq, phase: match?.result ? 'finished' : match ? 'playing' : 'lobby',
+            currentMatchId: match?.id ?? null, yourSeat: view?.seat ?? null,
+            turn: match?.turn ?? match?.turnSeat ?? (name === 'turdjack' ? match?.active ?? null : null) });
+    }
+    function publish(scope, game, requester, claims, seq) {
         for (const socket of requester ? [requester] : sockets()) {
             const recipient = socket.deserializeAttachment();
             if (recipient?.ref !== scope.ref || recipient.room !== scope.room) continue;
@@ -145,9 +154,10 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             if (!binding) { close(socket, 4403, 'room membership ended'); continue; }
             const subjects = game?.subjects ?? [];
             const permitted = subjects.every(subject => binding.canSee(subject));
-            try { socket.serializeAttachment({ ...recipient, subjects: permitted ? subjects : [] }); }
-            catch { close(socket, 1011, 'match connection unavailable'); continue; }
             const view = permitted && game ? game.view(binding.betaSid, now()) : null;
+            try { socket.serializeAttachment({ ...recipient, subjects: permitted ? subjects : [],
+                playerId: binding.betaSid, seat: view?.seat ?? null, seq }); }
+            catch { close(socket, 1011, 'match connection unavailable'); continue; }
             const invitation = binding.gameGuest;
             if (view?.waiting) {
                 const reserved = claims.some(claim => claim.sid === binding.betaSid);
@@ -162,9 +172,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                     if (binding.canOpen && view.seat) view.pendingGuestMs = Math.max(1, Math.min(...claims.map(claim => claim.until)) - now());
                 }
             }
-            send(socket, { t: 'match-state', version: 1, room: recipient.room,
-                state: view, canOpen: binding.canOpen,
-                ...(PartnerTable ? { partners: true } : {}) });
+            sendView(socket, recipient, view, binding.canOpen, seq);
         }
     }
     async function receive(socket, raw) {
@@ -176,17 +184,28 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         if (typeof raw !== 'string' || raw.length > 768) return close(socket, 4400, 'bad match frame');
         let frame;
         try { frame = JSON.parse(raw); } catch { return close(socket, 4400, 'bad match frame'); }
-        if (frame?.version !== 1 || typeof frame.action !== 'string') return close(socket, 4400, 'bad match frame');
-        if (frame.action === 'ping') {
+        if (frame?.version === 1 && frame.action === 'ping') {
             if (Number.isSafeInteger(frame.nonce)) send(socket, { t: 'pong', nonce: frame.nonce });
             return;
         }
         try {
+            if (frame?.version === 1 && frame.t === 'hello' && Number.isSafeInteger(frame.lastSeq) && frame.lastSeq >= 0) {
+                socket.serializeAttachment({ ...scope, snapshot: true });
+                frame = { version: 1, action: 'sync' };
+            }
+            if (frame?.version !== 1 || typeof frame.action !== 'string') return close(socket, 4400, 'bad match frame');
             const record = await load(scope, true);
             let game = record?.game;
+            const seq = record?.seq ?? 0;
             const subject = binding.betaSid;
             let claims = record?.claims || [];
             if (game && !game.subjects.every(peer => binding.canSee(peer))) {
+                const attachment = socket.deserializeAttachment();
+                if (frame.action === 'sync' && attachment.snapshot) {
+                    socket.serializeAttachment({ ...attachment, subjects: [], playerId: subject, seat: null, seq });
+                    sendView(socket, attachment, null, false, seq);
+                    return;
+                }
                 return send(socket, { t: 'match-error', reason: 'unavailable' });
             }
             let changed = game?.expire(now()) || false;
@@ -234,17 +253,17 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             if (frame.action === 'sync' && !scope.synced) {
                 const claim = claims.find(entry => entry.sid === subject && !entry.connected);
                 if (claim && binding.gameGuest?.game === name &&
-                    game.hasGuestSeat(binding.gameGuest.match, binding.gameGuest.host, claims.length - 1)) {
+                    game?.hasGuestSeat(binding.gameGuest.match, binding.gameGuest.host, claims.length - 1)) {
                     claim.connected = true;
                     claim.until = Math.max(claim.until, now() + CONNECTED_CLAIM_TTL);
                     changed = true;
                 }
             }
             if (changed) {
-                if (game) await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims));
+                if (game) await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims, seq + 1));
                 else await state.storage.delete(key(scope));
-                publish(scope, game, null, claims);
-            } else if (!record?.expired) publish(scope, game, resume ? null : socket, claims);
+                publish(scope, game, null, claims, seq + 1);
+            } else if (!record?.expired) publish(scope, game, resume ? null : socket, claims, seq);
             if (frame.action === 'sync' && !scope.synced) {
                 socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });
             }
@@ -258,9 +277,9 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             const scope = ws.deserializeAttachment(), binding = member(scope);
             if (!binding) close(ws, 4403, 'room membership ended');
             else if (scope.subjects?.some(subject => !binding.canSee(subject))) {
-                try { ws.serializeAttachment({ ...scope, subjects: [] }); }
+                try { ws.serializeAttachment({ ...scope, subjects: [], seat: null }); }
                 catch { close(ws, 1011, 'match connection unavailable'); continue; }
-                send(ws, { t: 'match-state', version: 1, room: scope.room, state: null, canOpen: false });
+                sendView(ws, scope, null, false, scope.seq ?? 0);
             }
         }
     }
@@ -277,16 +296,16 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             if (occupied) {
                 if (game.releaseSeat(subject)) {
                     remaining = game;
-                    await state.storage.put(key(scope), savedRecord(scope, game, record.expiresAt, claims));
+                    await state.storage.put(key(scope), savedRecord(scope, game, record.expiresAt, claims, record.seq + 1));
                 } else await state.storage.delete(key(scope));
             }
             if (!occupied && released) {
                 remaining = game;
-                await state.storage.put(key(scope), savedRecord(scope, game, record.expiresAt, claims));
+                await state.storage.put(key(scope), savedRecord(scope, game, record.expiresAt, claims, record.seq + 1));
             }
             pending.delete(subject);
             if (!pending.size) pendingRevocations.delete(scope.ref);
-            if (occupied || released) publish(scope, remaining, null, claims);
+            if (occupied || released) publish(scope, remaining, null, claims, record.seq + 1);
             return true;
         } catch {
             for (const ws of sockets()) if (ws.deserializeAttachment()?.ref === scope.ref) close(ws, 1011, 'match storage unavailable');
@@ -299,14 +318,14 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         for (const [storageKey, record] of records) {
             const scope = { room: record.room, ref: storageKey.slice(prefix.length) };
             if (record.expiresAt <= now()) {
-                await expireTable(scope);
+                await expireTable(scope, record.seq ?? 0);
             } else {
                 const game = restore(record[name]);
                 const time = now(), claims = liveClaims(record.claims, time);
                 const expiredClaim = claims.length < (record.claims?.length || 0);
                 if (!game.expire(time) && !expiredClaim) continue;
-                await state.storage.put(storageKey, savedRecord(scope, game, record.expiresAt, claims));
-                publish(scope, game, null, claims);
+                await state.storage.put(storageKey, savedRecord(scope, game, record.expiresAt, claims, (record.seq ?? 0) + 1));
+                publish(scope, game, null, claims, (record.seq ?? 0) + 1);
             }
         }
     }

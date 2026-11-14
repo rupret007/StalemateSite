@@ -49,6 +49,38 @@ function fixture() {
 }
 
 describe('Game Night match transport', () => {
+    it('negotiates snapshots per socket and includes the confirmed seat and turn', async () => {
+        const f = fixture(), move = await f.start();
+        await f.send(f.b, undefined, { t: 'hello', lastSeq: 0 });
+        const initial = f.b.frames.at(-1);
+        expect(initial).toMatchObject({
+            t: 'snapshot', seq: expect.any(Number), phase: 'playing',
+            currentMatchId: move.id, yourSeat: 'b', turn: 'w'
+        });
+        expect(f.b.deserializeAttachment()).toMatchObject({ playerId: 'seat-black', seat: 'b' });
+        await f.send(f.a, 'move', move);
+        expect(f.a.frames.at(-1).t).toBe('match-state');
+        const moved = f.b.frames.at(-1);
+        expect(moved).toMatchObject({ t: 'snapshot', currentMatchId: move.id, yourSeat: 'b', turn: 'b' });
+        expect(moved.seq).toBe(initial.seq + 1);
+    });
+
+    it('keeps snapshot metadata when a block clears a seated view', async () => {
+        const f = fixture();
+        await f.start();
+        await f.send(f.a, undefined, { t: 'hello', lastSeq: 0 });
+        const { seq } = f.a.frames.at(-1);
+        f.actors.get(actor).canSee = subject => subject === sid;
+        f.transport.reconcile();
+        expect(f.a.frames.at(-1)).toMatchObject({
+            t: 'snapshot', seq, phase: 'lobby', currentMatchId: null, yourSeat: null, turn: null, state: null
+        });
+        expect(f.a.deserializeAttachment()).toMatchObject({ seat: null, subjects: [] });
+        const before = f.a.frames.length;
+        await f.send(f.a, undefined, { t: 'hello', lastSeq: seq });
+        expect(f.a.frames.slice(before)).toEqual([f.a.frames[before - 1]]);
+    });
+
     it('answers a seated player’s foreground probe without changing the match', async () => {
         const f = fixture();
         await f.start();

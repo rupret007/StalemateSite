@@ -18,7 +18,7 @@ function sameSession(a, b) {
 
 // Each channel gets its own ticket store, subprotocol and socket tag. A grant
 // for one connection cannot authorize a different channel or room instance.
-export function createGameNightSockets({ state, tag, protocol, readyType, readyFeatures, current, active, charge, allowed,
+export function createGameNightSockets({ state, tag, protocol, readyType, readyFeatures, snapshots = false, current, active, charge, allowed,
     now = () => Date.now(), uuid = () => crypto.randomUUID() }) {
     const tickets = new Map();
     const sockets = () => state.getWebSockets(tag).filter(ws => ws.readyState === 1 && ws.deserializeAttachment()?.kind === tag);
@@ -63,7 +63,7 @@ export function createGameNightSockets({ state, tag, protocol, readyType, readyF
         state.acceptWebSocket(pair[1], [tag]);
         pair[1].serializeAttachment({ ...attachment, kind: tag });
         for (const ws of existing) close(ws, 4409, 'room connection replaced');
-        send(pair[1], { t: readyType, version: 1, ...readyFeatures });
+        send(pair[1], { t: readyType, version: 1, ...readyFeatures, ...(snapshots ? { snapshots: true } : {}) });
         return new Response(null, { status: 101, webSocket: pair[0], headers: { 'Sec-WebSocket-Protocol': protocol } });
     }
     return { issue, upgrade, member, sockets, send, close };
