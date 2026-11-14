@@ -278,6 +278,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await newGuest.click();
             const deliver = host.getByRole('button', { name: useClipboard ? 'Copy invite' : 'Share invite' });
             await expect(deliver).toBeFocused();
+            await expect(host.locator('[data-game-invite-link-status]')).toHaveText('This link is for one guest. Send it now while your table has a seat available.');
             await captureArcadeInvite(host, viewport, step);
             await deliver.click();
             if (useClipboard) {
@@ -2248,7 +2249,36 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Join Turd Rush race' }).click();
         await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(race(b)).toHaveAttribute('data-renderer', '2d');
-        if (engine === 'chromium') await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+        if (engine === 'chromium') {
+            await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+            async function stallFrames(count) {
+                await a.evaluate(count => new Promise(resolve => {
+                    const match = document.querySelector('[data-race-match]');
+                    const original = window.requestAnimationFrame;
+                    let remaining = count;
+                    window.requestAnimationFrame = function (callback) {
+                        if (!remaining || match.dataset.renderer !== '3d') {
+                            window.requestAnimationFrame = original;
+                            return original.call(this, callback);
+                        }
+                        return original.call(this, () => {
+                            const until = performance.now() + 200;
+                            while (performance.now() < until) { /* Simulate a stalled frame. */ }
+                            remaining--;
+                            callback(performance.now());
+                            if (!remaining || match.dataset.renderer !== '3d') {
+                                window.requestAnimationFrame = original;
+                                resolve();
+                            }
+                        });
+                    };
+                }), count);
+            }
+            await stallFrames(1);
+            await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+            await stallFrames(4);
+            await expect(race(a)).toHaveAttribute('data-renderer', '2d');
+        }
         await expect(spectator.locator('[data-race-controls]')).toBeHidden();
         await expect.poll(() => !!opening).toBe(true);
         const danger = unpackRushRacer(opening.runner).run.entities

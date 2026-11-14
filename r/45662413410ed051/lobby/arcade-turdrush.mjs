@@ -93,7 +93,7 @@ export function mountArcadeTurdRush(container, onMatch) {
         canvas = $('[data-race-3d]'), flat = $('[data-race-2d]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
     let scope, model, canOpen, connection, connectionError, visual, receivedAt, renderer, fallback = false, raf = 0, previous = 0,
         lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, pending, gesture, redraw = true;
-    let buffer = [], flights = [];
+    let buffer = [], flights = [], slowFrames = 0;
     const serverNow = time => model.match.at + Math.max(0, time - receivedAt);
     const clearInputs = () => { buffer = []; flights = []; gesture = null; };
     const clearPending = () => { clearTimeout(pending); pending = null; };
@@ -227,6 +227,15 @@ export function mountArcadeTurdRush(container, onMatch) {
             try { renderer = new TurdRushRenderer(canvas, { reducedMotion: motion.matches, onLost: fallbackView }); }
             catch { fallbackView(); canvas.hidden = true; flat.hidden = false; }
         }
+        if (renderer && previous && !document.hidden) {
+            // Keep input responsive if the 3D renderer repeatedly stalls the race.
+            slowFrames = time - previous > 180 ? slowFrames + 1 : 0;
+            if (slowFrames >= 3) {
+                fallbackView();
+                canvas.hidden = true;
+                flat.hidden = false;
+            }
+        }
         const resized = renderer?.resize();
         if (redraw || resized || visual.tick !== oldTick) {
             if (renderer) {
@@ -321,7 +330,7 @@ export function mountArcadeTurdRush(container, onMatch) {
         clearPending();
         clearInputs();
         cancelAnimationFrame(raf);
-        raf = previous = 0;
+        raf = previous = slowFrames = 0;
         renderer?.dispose();
         renderer = null;
         model = visual = null;
