@@ -104,10 +104,11 @@ const rememberEntry = () => { try { sessionStorage.setItem(ENTRY_HANDOFF_KEY, en
 const lobby = $('#inside .button');
 lobby.href = '${ROOT}lobby/?entry-return=1' + (game ? '&' + GAME_NIGHT_QUERY
     + (game.table ? '&table=' + encodeURIComponent(game.table) : '')
-    + (game.prepareShare ? '&deliver=share' : '') + gameNightFragment(game.target) : '');
+    + (game.prepareShare ? '&deliver=share' : '') + (game.webJamGrant ? '#grants=' + game.webJamGrant : gameNightFragment(game.target)) : '');
 if (game) {
-    lobby.textContent = 'Enter Game Night ↗';
-    $('.lede').textContent = 'Play and chat with friends in a private Game Night room.';
+    lobby.textContent = game.webJamGrant ? 'Continue to WebJam Chess ↗' : 'Enter Game Night ↗';
+    $('.lede').textContent = game.webJamGrant ? 'Open Chess in your private WebJam room and confirm the guest seat.'
+        : 'Play and chat with friends in a private Game Night room.';
 }
 $('#owner').href = '/lobby-owner/login?entry-return=1';
 lobby.addEventListener('click', rememberEntry);
@@ -256,7 +257,7 @@ async function gameInvitation(request, env, path, body) {
         const session = await betaSession(request, env, Date.now(), { gameGuest: true, allowRevoked: true });
         if (session && body.sessionRef === await gameGuestSessionRef(session.access.sid)) {
             await disconnect(env, session);
-            const scope = gameGuestScope(session.access.gameGuest);
+            const scope = gameGuestScope(session.access.gameGuest, true);
             if (scope) {
                 const released = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(
                     `https://lobby${GAME_INVITATION_PATH}/release`, {
@@ -288,8 +289,8 @@ async function gameInvitation(request, env, path, body) {
     return gameGuestAccess(request, env, data);
 }
 
-async function gameGuestAccess(request, env, data) {
-    const scope = gameGuestScope(data.scope);
+async function gameGuestAccess(request, env, data, allowWebJamChess = false) {
+    const scope = gameGuestScope(data.scope, allowWebJamChess);
     if (!scope) return json({ error: 'This invitation could not be confirmed.' }, 503);
     const { cookie } = await newAccess(env, { gameGuest: scope, sid: data.sid, exp: data.exp, ip: request.headers.get('CF-Connecting-IP') || '0.0.0.0' });
     return json({ next: `${LOBBY_PAGE}${GAME_GUEST_QUERY}` }, 200, { 'Set-Cookie': cookie });
@@ -328,7 +329,7 @@ async function gameRoomGrant(request, env, operation, body) {
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
     if (operation !== 'redeem' || !response.ok) return json(data, response.status);
-    return gameGuestAccess(request, env, data);
+    return gameGuestAccess(request, env, data, true);
 }
 
 function gameGuestAsset(path) {
@@ -370,8 +371,16 @@ async function betaRequest(request, env, deps = {}) {
             return reply('Game invitations are unavailable.', 404);
         }
         if (webJamGuest || url.pathname === GAME_GUEST_PATH) {
-            const page = webJamGuest ? GAME_GUEST_ENTRANCE.replace('<main ', '<main data-webjam-guest ') : GAME_GUEST_ENTRANCE;
-            return reply(request.method === 'HEAD' ? null : page, 200, 'text/html; charset=utf-8');
+            if (request.method === 'HEAD') return reply(null, 200, 'text/html; charset=utf-8');
+            let page = GAME_GUEST_ENTRANCE;
+            if (webJamGuest) {
+                page = page.replace('<main ', '<main data-webjam-guest ');
+                const session = await betaSession(request, env);
+                if (session) {
+                    page = page.replace('</main>', `<a class="button" href="${LOBBY_PAGE}?webjam-return=1" data-guest-return hidden>Return to room</a></main>`);
+                }
+            }
+            return reply(page, 200, 'text/html; charset=utf-8');
         }
         const asset = await env.ASSETS.fetch(new Request(`${url.origin}${LOBBY_PAGE}game-night-guest.js`));
         return reply(request.method === 'HEAD' ? null : asset.body, asset.status, 'text/javascript');
@@ -448,7 +457,7 @@ async function betaRequest(request, env, deps = {}) {
         }
         return reply('Private invitation required. Open your invitation link.', 401);
     }
-    const guest = session.access.scope === 'game-night' && gameGuestScope(session.access.gameGuest);
+    const guest = session.access.scope === 'game-night' && gameGuestScope(session.access.gameGuest, gameRoomGrantsEnabled(env));
     if (session.access.scope === 'game-night' && !guest) return reply('This game invitation could not be confirmed.', 403);
     if (guest && !(url.pathname === '/lobby' || url.pathname === '/beta/bootstrap.js' || url.pathname === '/beta/state'
         || arcadePath(url.pathname) && arcadeGame(url.pathname) === guest.game
@@ -568,11 +577,12 @@ async function betaRequest(request, env, deps = {}) {
         .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/gi, '').replace(/<script[^>]*goatcounter[^>]*><\/script>/gi, '')
         .replace(/<b data-contact>[\s\S]*?<\/b>/, contactHtml)
         .replace('<head>', `<head><script src="/beta/bootstrap.js${guest ? GAME_GUEST_QUERY : ''}"></script>`);
+    const webJamReturn = !guest && assetPath === LOBBY_PAGE && gameRoomGrantsEnabled(env) && url.search === '?webjam-return=1';
     const content = guest && assetPath === LOBBY_PAGE ? page
         .replace('<main class="gate" data-gate>', '<main class="gate" data-gate hidden>')
         .replace('<main class="gate" data-game-guest-connecting hidden>', '<main class="gate" data-game-guest-connecting>')
         .replace('<h1 data-game-guest-title>Game Night</h1>', `<h1 data-game-guest-title>${gameNightLabels[guest.game]}</h1>`)
-        : page;
+        : webJamReturn ? page.replace('<body>', '<body data-webjam-return>') : page;
     return reply(content, asset.status, 'text/html; charset=utf-8');
 }
 export async function betaFetch(request, env, deps = {}) {

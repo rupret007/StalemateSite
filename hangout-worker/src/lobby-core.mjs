@@ -5,7 +5,7 @@ import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRat
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest } from './message-receipts.mjs';
-import { discordCallLink, gameNightInvite, gameNightRoomName, newGameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { discordCallLink, gameNightInvite, gameNightLabels, gameNightRoomName, newGameNightRoomName, webJamRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { personRoomProjection } from './lobby-effect-records.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
@@ -144,7 +144,7 @@ const PERSON_COMMANDS = new Set(['msg', 'query', 'whois', 'ignore', 'unignore', 
 const NAMED_PERSON_COMMANDS = new Set([...PERSON_COMMANDS, 'accept', 'decline', 'report', 'mode']);
 const PERSON_ROOM_COMMANDS = new Set(['slap', 'kick', 'ban', 'invite', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer']);
 
-export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, webJamChess = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     if (typeof incidentSources !== 'boolean') throw Error('incident-source-configuration');
     const L = { ...LOBBY_LIMITS, ...limits };
     const entrySites = L.entrySites || ENTRY_SITES;
@@ -526,10 +526,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     // Only current connection IDs are disclosed to the affected recipient.
     // Device block references remain private session preferences.
     const roomKind = (chan) => gameNight && chan.kind === 'chat' && gameNightRoomName(chan.name) ? 'game' : chan.kind;
-    function arcadeActor({ actor, room, ref }) {
+    const privateWebJam = chan => chan?.kind === 'jam' && webJamRoomName(chan.name);
+    function arcadeActor({ actor, room, ref }, allowWebJamChess = false) {
         const c = conns.get(actor), chan = ch(room);
         if (!c?.nick || c.safetyOnly || !c.betaSid || !chan?.members.has(c.id) || chan.keepRef !== ref ||
-            roomKind(chan) !== 'game' || !chan.modes.i || net.shield || net.lock === 'closed' || roomsBroken) return null;
+            (roomKind(chan) !== 'game' && !(allowWebJamChess && privateWebJam(chan))) || !chan.modes.i || net.shield || net.lock === 'closed' || roomsBroken) return null;
         const peers = subject => membersOf(chan).filter(peer => peer.betaSid === subject);
         const canSee = subject => {
             if (subject === c.betaSid) return true;
@@ -549,7 +550,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
     function invitedGameRoom(guest) {
         const room = ch(guest.room);
-        if (!room || room.keepRef !== guest.ref || roomKind(room) !== 'game' || !room.modes.i || net.shield || roomsBroken) return null;
+        if (!room || room.keepRef !== guest.ref ||
+            (roomKind(room) !== 'game' && !(webJamChess && guest.game === 'chess' && privateWebJam(room))) ||
+            !room.modes.i || net.shield || roomsBroken) return null;
         const host = membersOf(room).find(peer => peer.betaSid === guest.host && !peer.safetyOnly && isOp(peer, room));
         return host ? { room, host } : null;
     }
@@ -570,7 +573,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return { ok: scope.actor === id && mayParticipate(c, actor, tracks) &&
             (!peer || actor.canCall(peer.actor) && mayParticipate(conns.get(peer.actor), arcadeActor(peer), peerTracks)) };
     }
-    const chanView = (chan, viewer) => ({ name: chan.name, kind: roomKind(chan), title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, keepRef: chan.keepRef, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), mediaBlocked: mediaBlocked(chan, viewer), jam: chan.jam ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null,
+    const chanView = (chan, viewer) => ({ name: chan.name, kind: roomKind(chan), title: chan.title, topic: chan.topic, modes: { ...chan.modes, k: chan.modes.k ? true : false }, count: chan.members.size, keepRef: chan.keepRef, persistent: !!chan.owner, expiresAt: chan.owner ? chan.renewed + ROOM_TTL : null, names: names(chan), mediaBlocked: mediaBlocked(chan, viewer), jam: chan.jam && !viewer?.gameGuest ? { desktop: chan.jam.desktop, invitation: chan.jam.invitation || chan.jam.desktop, web: chan.jam.web, webReady: !!chan.jam.web } : null,
         ...(roomKind(chan) === 'game' ? { gameCall: chan.gameCall?.url || '' } : {}) });
     const sendChan = (chan, { presence = false } = {}) => {
         if (chan.gameCall) {
@@ -579,7 +582,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         if (presence && typeof deferPresence === 'function') return queuePresence({ channel: chan.name, generation: chan.generation });
         const view = chanView(chan);
-        for (const member of membersOf(chan)) out(member, { t: 'chan', ch: { ...view, mediaBlocked: mediaBlocked(chan, member) } });
+        for (const member of membersOf(chan)) out(member, { t: 'chan', ch: { ...view, jam: member.gameGuest ? null : view.jam, mediaBlocked: mediaBlocked(chan, member) } });
         for (const c of membersOf(chan)) if (owns(c, chan)) out(c, { t: 'ownership', ch: chan.name,
             cohosts: [...chan.cohosts].map((id) => ({ id, label: chan.cohostLabels[id] || 'Verified co-host' })) });
     };
@@ -1792,9 +1795,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (chan.invites.size >= 150 && !chan.invites.has(t.dev)) return bot(c, 'Room invitation list is full.', 'error');
             chan.invites.add(t.dev);
             const gameRoom = roomKind(chan) === 'game';
-            const arcade = gameRoom && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
-            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(gameRoom ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
-            return bot(c, `Invited ${t.nick} to ${chan.name}.`);
+            const jamChess = webJamChess && privateWebJam(chan) && chan.modes.i && !!boundPeer && game === 'chess';
+            const arcade = (gameRoom || jamChess) && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
+            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(gameRoom || jamChess && arcade ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
+            return arcade ? bot(c, `Invitation sent to ${t.nick} for ${gameNightLabels[arcade.game]}.`, 'game-invite-sent')
+                : bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },
         op(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', true, '+o', peer); },
         deop(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', false, '-o', peer); },
@@ -2609,9 +2614,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return controlledRun(message, [...args, true], safetyMessage(args[1]));
         }, flushPresence,
         transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
-        arcadeActor, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: name => {
+        arcadeActor, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: (name, allowWebJamChess = false) => {
             const room = ch(name);
-            return room && roomKind(room) === 'game' ? room.keepRef : null;
+            return room && (roomKind(room) === 'game' || (allowWebJamChess && privateWebJam(room))) ? room.keepRef : null;
         }, approveArcade: id => execute(approveArcade, [id]),
         approveGameMedia: (scope, ...args) => execute(approveGameMedia, [scope.actor, scope, ...args]),
         completePrivateReportAction: (...args) => execute(completePrivateReportAction, args, true), tick: (...args) => execute(tick, args, false),

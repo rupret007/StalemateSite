@@ -260,7 +260,7 @@ export class HangoutLobby {
         this.arcadeConfigurationReady = false;
         this.roomGrants = lobbyRoomGrants(this);
         this.arcade = new Map(arcadeGames.map(name => [name, createArcadeTransport({
-            name, state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
+            name, state, current: scope => this.arcadeBinding(scope, name), active: binding => this.sessionActive(binding),
             charge: (socket, actor) => this.controlBudget.take(socket, actor),
             approve: async actor => (await this.engine.approveArcade(actor))?.ok === true,
             allowed: () => this.arcadeAvailable(name) && !this.authorityUnavailable
@@ -337,6 +337,7 @@ export class HangoutLobby {
         this.engine = createLobby({
             incidentSources: !!this.incidentSourceMode,
             gameNight: env.HANGOUT_BETA_MODE === 'protected',
+            webJamChess: gameRoomGrantsEnabled(env) && arcadeEnabled(env, 'chess'),
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
             ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority,
                 dispatchStart: request => this.dispatchParticipationStart(request, participationStartOwner) }) } : {}),
@@ -355,7 +356,7 @@ export class HangoutLobby {
                     if (this.closedSockets.has(ws)) return;
                     const a = ws.deserializeAttachment() || {};
                     if (arcadeEnabled(env) && msg.t === 'part' && a.betaSid) {
-                        const ref = this.engine.arcadeRoomRef(msg.ch);
+                        const ref = this.engine.arcadeRoomRef(msg.ch, gameRoomGrantsEnabled(env));
                         if (ref) this.arcadeDepartures.push({ scope: { room: msg.ch, ref }, subject: a.betaSid });
                     }
                     if (socketIdentityInvalid(a, env) || this.authorityMode && !this.bindingLive(a)) {
@@ -477,11 +478,11 @@ export class HangoutLobby {
             .every(key => saved[key] === value[key]);
     }
     lobbySockets() { return this.state.getWebSockets().filter(socket => !isArcadeSocket(socket) && !isMediaSocket(socket)); }
-    arcadeBinding(scope) {
+    arcadeBinding(scope, game) {
         const socket = this.byId(scope.actor), a = socket?.deserializeAttachment();
         if (!a || socket.readyState !== 1 || this.closedSockets.has(socket) ||
             socketIdentityInvalid(a, this.env) || this.authorityMode && !this.bindingLive(a)) return null;
-        const member = this.engine.arcadeActor(scope);
+        const member = this.engine.arcadeActor(scope, game === 'chess' && gameRoomGrantsEnabled(this.env));
         return member ? { ...a, ...member, socket } : null;
     }
     arcadeAvailable(name) {
@@ -1082,6 +1083,7 @@ export class HangoutLobby {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
             else this.delivery.send(pair[1], frame.t === 'hello'
                 ? { ...frame, features: { ...frame.features, transportPing: 1, ...(gameGuestEnabled(this.env) && !identity.gameGuest ? { gameGuestInvites: 1 } : {}), ...(this.arcadeAvailable('chess') ? { arcadeChess: 1 } : {}),
+                    ...(this.arcadeAvailable('chess') && gameRoomGrantsEnabled(this.env) && !identity.gameGuest ? { webJamChess: 1 } : {}),
                     ...(this.arcadeAvailable('crapeights') ? { arcadeCrapeights: 1 } : {}),
                     ...(this.arcadeAvailable('turdrummy') ? { arcadeTurdRummy: 1 } : {}),
                     ...(this.arcadeAvailable('turdspades') ? { arcadeTurdSpades: 1 } : {}),
