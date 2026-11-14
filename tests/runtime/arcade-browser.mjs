@@ -1126,20 +1126,61 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const capture = white.getByRole('button', { name: 'e6, empty' });
         await expect(capture).toHaveAttribute('data-capture', '');
         await expect(capture).not.toHaveAttribute('data-dark');
-        assert.deepEqual(await capture.evaluate(square => {
-            const indicator = getComputedStyle(square, '::after');
-            return [indicator.borderTopColor, indicator.boxShadow.includes('rgb(228, 255, 175)')];
-        }), ['rgb(23, 53, 56)', true], 'the capture ring has dark and light edges');
-        if (evidence) {
+        async function verifyCaptureMarker(target, step, widths) {
             const original = white.viewportSize();
             try {
-                await white.setViewportSize({ width: 390, height: 844 });
-                await captureArcadeInvite(white, white.viewportSize(), 'chess-en-passant');
+                for (const width of widths) {
+                    const viewport = { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 };
+                    await white.setViewportSize(viewport);
+                    const marker = await target.evaluate(square => {
+                        const indicator = getComputedStyle(square, '::after');
+                        const { width, height } = square.getBoundingClientRect();
+                        const luminance = color => {
+                            const rgb = color.match(/\d+/g).slice(0, 3).map(value => {
+                                const channel = Number(value) / 255;
+                                return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
+                            });
+                            return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+                        };
+                        const contrast = (a, b) => (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+                        const border = luminance(indicator.borderTopColor);
+                        const shadowColor = indicator.boxShadow.match(/rgba?\([^)]*\)/)?.[0];
+                        const shadow = shadowColor ? luminance(shadowColor) : border;
+                        const board = luminance(getComputedStyle(square).backgroundColor);
+                        const inset = indicator.boxShadow.includes('inset');
+                        const spread = parseFloat(indicator.boxShadow.replace(shadowColor, '').trim().split(/\s+/)[3]) || 0;
+                        const thickness = parseFloat(indicator.borderTopWidth);
+                        const outerPadding = (indicator.boxSizing === 'border-box' ? 0 : thickness) + (inset ? 0 : spread);
+                        return {
+                            contrast: contrast(board, border),
+                            edgeContrast: contrast(border, shadow),
+                            inside: parseFloat(indicator.width) + 2 * outerPadding <= width &&
+                                parseFloat(indicator.height) + 2 * outerPadding <= height,
+                            inset, thickness, spread
+                        };
+                    });
+                    assert.ok(marker.inside && marker.contrast >= 3 && marker.edgeContrast >= 3 &&
+                        marker.inset && marker.thickness >= 2 && marker.spread >= 2,
+                    `capture marker at ${width}px stays inside the square with two contrasting edges: ${JSON.stringify(marker)}`);
+                    if (evidence) await captureArcadeInvite(white, viewport, step);
+                }
             } finally { await white.setViewportSize(original); }
         }
+        await verifyCaptureMarker(capture, 'chess-en-passant', [375, 390]);
         await tapSquare(white, 'e6');
         await expect(black.getByRole('button', { name: 'e6, White pawn' })).toBeVisible();
         await expect(black.getByRole('button', { name: 'e5, empty' })).toBeVisible();
+        for (const [page, from, to] of [[black, 'b7', 'b5'], [white, 'h2', 'h4'], [black, 'g7', 'g5']]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
+        }
+        await tapSquare(white, 'h4');
+        const darkCapture = white.getByRole('button', { name: 'g5, Black pawn' });
+        await expect(darkCapture).toHaveAttribute('data-dark', '');
+        await expect(darkCapture).toHaveAttribute('data-capture', '');
+        await verifyCaptureMarker(darkCapture, 'chess-dark-capture', [375, 390, 1440]);
+        await tapSquare(white, 'g5');
+        await expect(black.getByRole('button', { name: 'g5, White pawn' })).toBeVisible();
         console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
     }
     async function joinCalls(a, b) {

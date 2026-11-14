@@ -83,7 +83,17 @@
     background: #f5fff4;
     pointer-events: none;
 }
-.arcade-chess-square[data-capture]::after { width: 78%; border: 3px solid #173538; background: transparent; box-shadow: 0 0 0 2px #e4ffaf; }
+.arcade-chess-square[data-capture]::after {
+    box-sizing: border-box;
+    width: 88%;
+    border-color: #173538;
+    background: transparent;
+    box-shadow: inset 0 0 0 2px #e4ffaf;
+}
+.arcade-chess-square[data-dark][data-capture]::after {
+    border-color: #e4ffaf;
+    box-shadow: inset 0 0 0 2px #173538;
+}
 .arcade-chess-square:focus-visible {
     outline: 3px solid #101d2a;
     outline-offset: -3px;
