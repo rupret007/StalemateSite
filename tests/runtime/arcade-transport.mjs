@@ -271,13 +271,10 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
             await route.abort();
         }, { times: 1 });
         await joinGame.tap();
-        await expect(page.locator('[data-guest-status]')).toHaveText('Couldn’t join just now. Try again.');
-        assert.equal(firstStatus, 200, 'the server accepted before the response was lost');
-        await capture(page, 'interrupted');
-        await page.context().clearCookies();
-        await page.reload({ waitUntil: 'commit' });
         await expect(page.locator('[data-chess-status]')).toContainText('You’re Black');
-        assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'recovery uses the original attempt');
+        assert.equal(firstStatus, 200, 'the server accepted before the response was lost');
+        assert.ok(attempts.length === 2 && attempts[0] === attempts[1], 'one Join retries the interrupted response with the original attempt');
+        await capture(page, 'recovered');
         assert.ok(await page.evaluate(() => !history.state?.webJamGameNightInvite), 'the seated page has no grant in history state');
         await match.wait(frame => frame.state?.id === matchId && frame.state?.match, 'WebJam guest enters the exact Chess match');
         match.send({ version: 1, action: 'move', id: matchId, revision: 0, move: 'e2e4' });
