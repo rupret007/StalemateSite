@@ -321,13 +321,17 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                     changed = true;
                 }
             }
-            if (!error && binding.gameGuest && game?.seat(subject) && frame.action !== 'sync') await guestActivity(binding);
             if (changed) {
                 if (game) {
                     await scheduleTableAlarm(expiresAt, claims);
                     await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims, seq + 1));
                 } else await state.storage.delete(key(scope));
                 publish(scope, game, null, claims, seq + 1, nextMatch);
+                // The registry may be a separate Durable Object. Renew only after the
+                // match commits so a failed write does not extend guest access.
+                if (!error && binding.gameGuest && game?.seat(subject) && frame.action !== 'sync') {
+                    try { await guestActivity(binding); } catch { /* Keep the existing idle deadline. */ }
+                }
             } else if (!record?.expired) publish(scope, game, resume ? null : socket, claims, seq);
             if (frame.action === 'sync' && !scope.synced) {
                 socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });

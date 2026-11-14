@@ -467,7 +467,7 @@ async function betaRequest(request, env, deps = {}) {
     const gameGuestsAvailable = gameGuestEnabled(env);
     if (gameGuestRequested && !gameGuestsAvailable) return reply('Game invitations are unavailable.', 404);
     const requestedTable = gameGuestRequested ? url.searchParams.get('table') : null;
-    if (requestedTable !== null && !validGameNightTableId(requestedTable)) return reply('Invalid Game Night table.', 400);
+    if (requestedTable !== null && !validGameNightTableId(requestedTable)) return reply('This Game Night link is not valid.', 400);
     const session = await betaSession(request, env, Date.now(), { gameGuest: gameGuestRequested, tableId: requestedTable })
         || gameGuestsAvailable && !gameGuestRequested && ['GET', 'HEAD'].includes(request.method) && gameGuestAsset(assetPath)
             && await betaGameGuestAssetSession(request, env);

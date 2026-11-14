@@ -237,8 +237,17 @@ describe('Game Night match transport', () => {
         await f.send(f.b, 'move', { id, revision: 0, move: 'e7e5' });
         expect(f.guestActivity).not.toHaveBeenCalled();
         await f.send(f.a, 'move', { id, revision: 0, move: 'e2e4' });
-        await f.send(f.b, 'move', { id, revision: 1, move: 'e7e5' });
+        const move = { id, revision: 1, move: 'e7e5' };
+        f.storage.put.mockRejectedValueOnce(Error('match write failed'));
+        await f.send(f.b, 'move', move);
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'match-error', reason: 'storage-unavailable' });
+        expect(f.guestActivity).not.toHaveBeenCalled();
+
+        f.guestActivity.mockRejectedValueOnce(Error('registry unavailable'));
+        await f.send(f.b, 'move', move);
         expect(f.guestActivity).toHaveBeenCalledExactlyOnceWith(binding);
+        expect(f.board(f.a).match.moves).toEqual(['e2e4', 'e7e5']);
+        expect(f.b.frames.at(-1).t).toBe('match-state');
     });
 
     it('clears the host and guest match views when a read reaches the deadline before the alarm', async () => {

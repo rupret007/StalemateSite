@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { expect, it, vi } from 'vitest';
+import { gameNightPassRecord } from '../../hangout-worker/src/game-night-pass.mjs';
 import { gameGuestScope, gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
 
 import { gameNightReturnHint, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
@@ -106,4 +107,28 @@ it('caps demo Chess links and admitted guests at the demo host session deadline'
     } finally {
         vi.useRealTimers();
     }
+});
+
+it('resumes the hashed pass only for its current table and invite version', async () => {
+    const pass = 'b'.repeat(64);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
+    const hash = Buffer.from(digest).toString('hex');
+    const tableId = '11111111-1111-4111-8111-111111111111';
+    const access = {
+        scope: { game: 'chess', match: tableId, tableId, room: '#game-1acbefx23acbe', ref: 'c'.repeat(32),
+            host: 'host-session-aaaa', nameSeed: 4 },
+        sid: 'guest-session-bbbb', exp: Date.now() + 60000
+    };
+    const rows = gameNightPassRecord(access, hash, '1');
+    const lobby = {
+        env: { HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1' },
+        state: { storage: { get: async key => rows[key] } },
+        arcadeAvailable: game => game === 'chess'
+    };
+    const resume = (table = tableId, candidate = pass) => gameInvitationRequest(lobby, 'resume', { tableId: table, pass: candidate });
+    expect(await (await resume()).json()).toEqual(access);
+    expect((await resume('22222222-2222-4222-8222-222222222222')).status).toBe(410);
+    expect((await resume(tableId, 'a'.repeat(64))).status).toBe(410);
+    lobby.env.HANGOUT_BETA_INVITE_VERSION = '2';
+    expect((await resume()).status).toBe(410);
 });
