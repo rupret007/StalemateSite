@@ -2097,7 +2097,27 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Join Turd Rush race' }).click();
         await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(race(b)).toHaveAttribute('data-renderer', '2d');
-        if (engine === 'chromium') await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+        if (engine === 'chromium') {
+            await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+            if (!media) {
+                await a.evaluate(() => {
+                    const match = document.querySelector('[data-race-match]');
+                    const original = window.requestAnimationFrame;
+                    window.requestAnimationFrame = function (callback) {
+                        if (match.dataset.renderer !== '3d') {
+                            window.requestAnimationFrame = original;
+                            return original.call(this, callback);
+                        }
+                        return original.call(this, () => {
+                            const until = performance.now() + 200;
+                            while (performance.now() < until) { /* Simulate several stalled frames. */ }
+                            callback(performance.now());
+                        });
+                    };
+                });
+                await expect(race(a)).toHaveAttribute('data-renderer', '2d');
+            }
+        }
         await expect(spectator.locator('[data-race-controls]')).toBeHidden();
         await expect.poll(() => !!opening).toBe(true);
         const danger = unpackRushRacer(opening.runner).run.entities
