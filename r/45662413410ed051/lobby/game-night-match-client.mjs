@@ -14,7 +14,8 @@ export const matchConnectionErrors = Object.freeze({
 export const matchHiddenText = 'A game is under way at this table. You can’t see it right now.';
 
 // A match connection can be replaced without changing room, chat or call.
-export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
+export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch, onRematch }) {
+    let shownMatch = null, rematchTimer;
     const tableId = window.HangoutBootstrap?.gameGuest?.tableId;
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1'
         ? '?game-guest=1' + (tableId ? '&table=' + tableId : '') : '';
@@ -61,6 +62,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         clearTimeout(joinTimer);
         clearTimeout(claimTimer);
         clearTimeout(pongTimer);
+        clearTimeout(rematchTimer);
         controller?.abort();
         controller = null;
         const prior = socket;
@@ -145,12 +147,20 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                         claimTimer = setTimeout(() => send({ action: 'sync' }), wait);
                     }
                     const match = frame.state?.match;
+                    shownMatch = frame.state?.id ?? frame.currentMatchId ?? null;
+                    clearTimeout(rematchTimer);
                     // The server names a phase other than lobby when a game is open but hidden.
                     matchOpen = !frame.state && typeof frame.phase === 'string' && frame.phase !== 'lobby';
                     setPlaying(!!match && !!frame.state.seat && frame.phase !== 'finished' && !match.result);
                     onState(frame);
                     if (attempt === generation) onMatch?.(scope, frame.state, send, false,
                         stateFrameType === 'snapshot' ? frame : undefined);
+                } else if (stateFrameType && frame?.t === 'rematch' && typeof frame.matchId === 'string'
+                    && /^[a-zA-Z0-9-]{5,80}$/.test(frame.matchId) && frame.matchId !== shownMatch) {
+                    // The new board normally follows at once. If it does not, ask for it.
+                    onRematch?.(frame.matchId);
+                    clearTimeout(rematchTimer);
+                    rematchTimer = setTimeout(() => send({ action: 'sync' }), 1500);
                 } else if (frame?.t === 'pong' && frame.nonce === pingNonce) clearTimeout(pongTimer);
                 else if (frame?.t === 'match-error') onError(frame.reason);
             });
@@ -195,7 +205,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         pongTimer = setTimeout(reconnect, 1500);
     });
     return {
-        start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; matchOpen = false; void connect(); },
+        start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; matchOpen = false; shownMatch = null; void connect(); },
         stop,
         matchOpen: () => matchOpen,
         send

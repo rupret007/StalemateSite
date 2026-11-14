@@ -162,6 +162,47 @@ describe('Game Night phone wake and history recovery', () => {
         expect(sockets).toHaveLength(2);
     });
 
+    describe('rematch frame', () => {
+        let onRematch, current;
+        const sent = () => current.send.mock.calls.map(([data]) => JSON.parse(data));
+        const frame = data => current.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(data) }));
+        beforeEach(async () => {
+            onRematch = vi.fn();
+            client.stop();
+            client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: vi.fn(), onState: vi.fn(), onError: vi.fn(), onRematch });
+            client.start({ room: '#game-fixture', ref: 'fixture' });
+            await vi.advanceTimersByTimeAsync(0);
+            current = sockets.at(-1);
+            ready(current, { snapshots: true });
+            frame({ t: 'snapshot', version: 1, room: '#game-fixture', seq: 4, phase: 'finished', currentMatchId: 'match-one',
+                state: { id: 'match-one', seat: 'w', match: { result: { winner: 'w' } } } });
+            current.send.mockClear();
+        });
+
+        it('follows the new match when its snapshot arrives', async () => {
+            frame({ t: 'rematch', matchId: 'match-two' });
+            expect(onRematch).toHaveBeenCalledExactlyOnceWith('match-two');
+            frame({ t: 'snapshot', version: 1, room: '#game-fixture', seq: 5, phase: 'playing', currentMatchId: 'match-two',
+                state: { id: 'match-two', seat: 'b', match: {} } });
+            await vi.advanceTimersByTimeAsync(5_000);
+            expect(sent()).toEqual([]);
+        });
+
+        it('asks for the new match when its snapshot does not arrive', async () => {
+            frame({ t: 'rematch', matchId: 'match-two' });
+            await vi.advanceTimersByTimeAsync(1_500);
+            expect(sent()).toEqual([{ version: 1, action: 'sync' }]);
+        });
+
+        it('ignores a malformed rematch frame and one for the match already shown', async () => {
+            frame({ t: 'rematch', matchId: 7 });
+            frame({ t: 'rematch', matchId: 'match-one' });
+            await vi.advanceTimersByTimeAsync(5_000);
+            expect(onRematch).not.toHaveBeenCalled();
+            expect(sent()).toEqual([]);
+        });
+    });
+
     function matchState(state) {
         sockets.at(-1).dispatchEvent(new MessageEvent('message', {
             data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state })
