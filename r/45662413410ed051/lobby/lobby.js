@@ -1841,8 +1841,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (!scope || table.loading) return;
         table.loading = true;
         table.load().then(mount => {
-            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting) =>
-                arcadeMatchState(game, table, room, state, sendMatch, reconnecting));
+            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting, _snapshot, failed) =>
+                arcadeMatchState(game, table, room, state, sendMatch, reconnecting, failed));
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn--small arcade-invite-friend';
@@ -1893,7 +1893,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (table.inviteButton)
             table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
-    function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting) {
+    function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting, failed) {
         if (reconnecting) {
             table.invite = null;
             updateTableInvite(table, currentGameNight());
@@ -1922,7 +1922,15 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             }
         }
         const invite = arcadeInvitation;
-        if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
+        if (!invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
+        if (!sendMatch) {
+            invite.sent = false;
+            if (failed && gameGuest && !gameGuestSeated) {
+                clearTimeout(invite.timer);
+                offerGameGuestReload('Couldn’t reconnect to your seat. Try again.');
+            }
+            return;
+        }
         if (state?.seat && (state.id === invite.match || gameGuest)) {
             if (gameGuest && !gameGuestSeated) {
                 gameGuestSeated = true;
@@ -1933,6 +1941,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 table.controller.panel.querySelector('summary').focus({ preventScroll: true });
             }
             return finishArcadeInvitation();
+        }
+        if (gameGuest && !state) {
+            clearTimeout(invite.timer);
+            gameGuestReloadOffered = false;
+            $('[data-game-guest-retry]').hidden = true;
+            gateStatus('Waiting for the host to open the table. This link still works.');
+            return;
         }
         const replacement = gameGuest && state?.replacementAvailable === true;
         if ((!replacement && state?.id !== invite.match) || !state.waiting || state.hasOpenSeat === false) {

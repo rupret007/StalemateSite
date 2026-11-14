@@ -13,9 +13,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1' ? '?game-guest=1' : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
     let pausedForNetwork = false, terminalError = false;
-    function reset(reconnecting = false) {
+    function reset(reconnecting = false, failed = false) {
         generation++;
-        onMatch?.(scope, undefined, undefined, reconnecting);
+        onMatch?.(scope, undefined, undefined, reconnecting, undefined, failed);
         clearTimeout(reconnectTimer);
         clearTimeout(joinTimer);
         clearTimeout(claimTimer);
@@ -36,7 +36,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         if (attempt !== generation || !scope) return;
         if (!reason && navigator.onLine === false) return pauseForNetwork();
         if (reason || failures >= 3) {
-            reset();
+            reset(false, true);
             terminalError = !!reason;
             onStatus('unavailable', reason);
             return;
