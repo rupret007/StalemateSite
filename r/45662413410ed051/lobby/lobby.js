@@ -1943,6 +1943,14 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         table.load().then(mount => {
             table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting, snapshot, failed) =>
                 arcadeMatchState(game, table, room, state, sendMatch, reconnecting, snapshot, failed));
+            const summary = table.controller.panel.querySelector('summary');
+            const reconnect = document.createElement('span');
+            reconnect.className = 'arcade-reconnect';
+            reconnect.textContent = 'Reconnecting…';
+            reconnect.setAttribute('aria-hidden', 'true');
+            reconnect.hidden = true;
+            summary.append(reconnect);
+            table.reconnect = reconnect;
             table.controller.panel.addEventListener('toggle', () => drawGameWaiting(currentGameNight()));
             const button = document.createElement('button');
             button.type = 'button';
@@ -1953,7 +1961,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             button.addEventListener('click', () => {
                 if (table.invite && arcadeInviteTarget() === table.invite) openInviteDialog(button);
             });
-            table.controller.panel.querySelector('summary').nextElementSibling.after(button);
+            summary.nextElementSibling.after(button);
             table.inviteButton = button;
             drawArcadeTable(currentGameNight(), game, table);
         }).catch(() => {
@@ -1995,6 +2003,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             table.inviteButton.hidden = room?.kind !== 'game' || !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
     function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting, snapshot, failed) {
+        if (table.reconnect) table.reconnect.hidden = !reconnecting;
         const pendingInvite = arcadeInvitation?.game === game && arcadeInvitation.room === scope?.room && arcadeInvitation.ref === scope?.ref;
         if (failed && pendingInvite && gameGuest && !gameGuestSeated) {
             clearTimeout(arcadeInvitation.timer);

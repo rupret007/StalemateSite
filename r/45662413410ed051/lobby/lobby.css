@@ -248,6 +248,16 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam-paste { margin-top: 10px; }
 .game-note { margin: 4px 0 8px; }
 .game-night summary { cursor: pointer; width: fit-content; }
+.arcade-reconnect {
+    display: inline-block;
+    margin-inline-start: .45rem;
+    padding: .15rem .45rem;
+    border: 1px solid var(--amber);
+    border-radius: 1rem;
+    color: var(--amber);
+    font: 600 .72rem/1.25 var(--mono);
+    vertical-align: middle;
+}
 .game-night input { flex: 1 1 220px; min-width: 0; max-width: 100%; font: inherit; font-size: 16px; }
 .game-night [data-game-error]:empty { display: none; }
 .game-offer { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 12px; border-block-end: 1px solid var(--line); background: var(--raised); }

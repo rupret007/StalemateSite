@@ -597,6 +597,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                             window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
                         });
                         await expect(guest.locator('[data-chess-status]')).toContainText('Reconnecting');
+                        const reconnectPill = guest.locator('details.arcade-chess summary .arcade-reconnect');
+                        await expect(reconnectPill).toHaveText('Reconnecting…');
+                        await expect(reconnectPill).toBeInViewport({ ratio: 1 });
                         assert.equal(requests, 0, 'a restored page does not request a ticket while offline');
                         const recovered = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
                         await guest.evaluate(() => {
@@ -606,6 +609,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         await recovered;
                         await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                         await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                        await expect(reconnectPill).toBeHidden();
                         assert.equal(requests, 1, 'coming online restores the seat with one ticket');
 
                         const restored = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
