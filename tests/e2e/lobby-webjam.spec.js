@@ -557,9 +557,15 @@ test('an invite shows when the server has not replied and when a sent offer expi
         await offer.getByRole('button', { name: 'Not now' }).click();
         await expect(status).toHaveText('Bandmate declined the invitation.');
         dropSent = false;
+        await guest.clock.install();
         await send();
         await expect(status).toHaveText('Invitation sent to Bandmate. Waiting for a reply.');
         await expect(invite).toHaveAttribute('aria-disabled', 'true');
+        await offer.getByRole('button', { name: 'Join room' }).focus();
+        await guest.clock.fastForward(120_000);
+        await expect(offer).toBeHidden();
+        await expect(guest.getByRole('tab', { name: '#stalemate' })).toBeFocused();
+        await expect(guest.locator('[data-toast]')).toHaveText('That invitation expired. Ask your host to send another.');
         await host.clock.fastForward(120_000);
         await expect(status).toHaveText('The invitation to Bandmate expired.');
         await expect(invite).toHaveAttribute('aria-disabled', 'false');

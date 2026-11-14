@@ -1350,12 +1350,14 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         case 'room-invite-ended': {
             const offer = [...gameInvites.values()].find(invite => invite.request === m.request);
             if (!offer) break;
-            if (joiningGameRoom === offer.room) {
-                joiningGameRoom = '';
-                if (m.status === 'expired') toast('That invitation expired. Ask your host to send another.');
-                if (m.status === 'unavailable') toast('The room is unavailable. Ask your host to try again.');
+            if (m.status === 'expired') expireGameOffer(offer);
+            else {
+                if (joiningGameRoom === offer.room) {
+                    joiningGameRoom = '';
+                    if (m.status === 'unavailable') toast('The room is unavailable. Ask your host to try again.');
+                }
+                forgetGameRoom(offer.room);
             }
-            forgetGameRoom(offer.room);
             break;
         }
         case 'invite':
@@ -1369,9 +1371,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                         const request = roomNonce(m.request) && Number.isFinite(m.until) ? m.request : '';
                         const offer = { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by, request, arcade };
                         if (request) setTimeout(() => {
-                            if (gameInvites.get(m.ch) !== offer) return;
-                            if (joiningGameRoom === m.ch) joiningGameRoom = '';
-                            forgetGameRoom(m.ch);
+                            if (gameInvites.get(m.ch) === offer) expireGameOffer(offer);
                         }, Math.max(0, Math.min(120000, m.until - Date.now())));
                         if (request || !gameInvites.get(m.ch)?.request) gameInvites.set(m.ch, offer);
                     }
@@ -1739,6 +1739,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function clearGameReturn() {
         gameReturn = null; gameReturnOffered = false;
         removeTab(gameReturnKey);
+    }
+    function expireGameOffer(offer) {
+        const wasVisible = currentGameOffer() === offer;
+        if (joiningGameRoom === offer.room) joiningGameRoom = '';
+        forgetGameRoom(offer.room);
+        if (wasVisible) toast('That invitation expired. Ask your host to send another.');
     }
     function forgetGameRoom(name) {
         const removed = gameInvites.delete(name);
