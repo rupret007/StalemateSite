@@ -1,5 +1,4 @@
 import { Chess, claimReason, colorName, intendedClaims, pieceName } from '/play/games/chess-core.js';
-import { ChessBoard } from '/play/games/chess-board.js';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 
 const files = 'abcdefgh', ranks = '87654321';
@@ -35,7 +34,6 @@ const markup = `
         <button type="button" class="btn btn--small btn--ghost" data-action="resign">Resign</button>
         <button type="button" class="btn btn--small btn--ghost" data-action="leave">Leave match</button>
     </div>
-    <a class="small" href="/play/assets/chess/chessground-10.5.0-source.tar.gz" download>Chess board source</a>
 </div>
 <dialog class="sheet" aria-labelledby="arcade-chess-choice-title" data-chess-choice>
     <h3 id="arcade-chess-choice-title"></h3>
@@ -58,8 +56,6 @@ export function mountArcadeChess(container, onMatch) {
     panel.hidden = true;
     panel.innerHTML = markup;
     container.append(panel);
-    appendStyle(document, '/play/assets/chess/chessground.base.css');
-    appendStyle(document, '/play/assets/chess/chess-board.css');
     appendStyle(document, new URL('./arcade-chess.css', import.meta.url));
     const $ = selector => panel.querySelector(selector);
     const primary = $('[data-chess-primary]');
@@ -71,7 +67,7 @@ export function mountArcadeChess(container, onMatch) {
     const squares = new Map();
     let scope, pendingTimer, clockTimer;
     let pending = false, canOpen = false, connection = 'connecting', connectionError;
-    let model = null, chess = null, board = null, selected = null, focused = 'e2';
+    let model = null, chess = null, selected = null, focused = 'e2';
     let receivedAt = 0, deadlineSynced = false, lastOrientation = null, choiceContext = null;
     const client = createGameNightMatchClient({
         onMatch,
@@ -83,7 +79,6 @@ export function mountArcadeChess(container, onMatch) {
             clearPending();
             closeChoice();
             selected = null;
-            board?.cancel();
             draw();
         },
         onState(frame) {
@@ -133,7 +128,6 @@ export function mountArcadeChess(container, onMatch) {
         clearPending(); closeChoice();
         connection = 'connecting'; connectionError = undefined;
         model = null; chess = null; selected = null; canOpen = false;
-        board?.cancel();
     }
 
     function applyState(frame) {
@@ -178,7 +172,8 @@ export function mountArcadeChess(container, onMatch) {
         const options = chess.moves({ square: from, verbose: true }).filter(option => option.to === to);
         if (!options.length) return;
         if (options[0].promotion) {
-            board.cancel(); selected = null; draw();
+            selected = null;
+            draw();
             showChoice('Promote pawn', 'Choose the piece to place on the board.',
                 options.map(option => [pieceName(option.promotion), () => send('move', { move: option.lan })]));
         } else send('move', { move: options[0].lan });
@@ -192,7 +187,6 @@ export function mountArcadeChess(container, onMatch) {
 
     function drawBoard() {
         if (!chess || !model?.match) return;
-        if (!board) board = new ChessBoard(boardHost, { select, move, cancel: () => { selected = null; draw(); } });
         const flipped = model.seat === 'b';
         if (flipped !== lastOrientation) {
             lastOrientation = flipped;
@@ -209,18 +203,36 @@ export function mountArcadeChess(container, onMatch) {
                     arranged.append(button);
                 }
             }
-            board.grid.replaceChildren(arranged);
+            boardHost.replaceChildren(arranged);
             focused = flipped ? 'e7' : 'e2';
         }
+        const last = model.match.moves.at(-1);
+        const lastSquares = last ? [last.slice(0, 2), last.slice(2, 4)] : [];
+        const targets = new Set(selected && isTurn() ? chess.moves({ square: selected, verbose: true }).map(option => option.to) : []);
         for (const [square, button] of squares) {
             const piece = chess.get(square);
+            const art = piece ? piece.color + piece.type : '';
+            if (button.dataset.piece !== art) {
+                button.dataset.piece = art;
+                button.replaceChildren();
+                if (piece) {
+                    const image = document.createElement('img');
+                    image.alt = '';
+                    image.draggable = false;
+                    image.src = '/play/assets/chess/pieces/spatial-' + art + '.svg';
+                    button.append(image);
+                }
+            }
+            button.toggleAttribute('data-dark', (files.indexOf(square[0]) + Number(square[1])) % 2 === 1);
+            button.toggleAttribute('data-legal', targets.has(square));
+            button.toggleAttribute('data-capture', targets.has(square) && !!piece);
+            button.toggleAttribute('data-last', lastSquares.includes(square));
+            button.toggleAttribute('data-check', piece?.type === 'k' && piece.color === chess.turn() && chess.isCheck());
             button.setAttribute('aria-label', piece ? `${square}, ${colorName(piece.color)} ${pieceName(piece.type)}` : `${square}, empty`);
             button.setAttribute('aria-pressed', String(square === selected));
             button.tabIndex = square === focused ? 0 : -1;
         }
-        const last = model.match.moves.at(-1);
-        board.update({ chess, id: model.id, view: 'live', flipped, selected, allowed: isTurn(),
-            last: last && { from: last.slice(0, 2), to: last.slice(2, 4) } });
+
     }
 
     function drawClocks() {
@@ -311,7 +323,7 @@ export function mountArcadeChess(container, onMatch) {
     choice.addEventListener('close', () => { if (!choice.open) choiceContext = null; });
     boardHost.addEventListener('click', event => {
         const target = event.target.closest('[data-square]')?.dataset.square;
-        if (!target || event.detail !== 0) return;
+        if (!target || !isTurn()) return;
         if (selected && chess.moves({ square: selected, verbose: true }).some(option => option.to === target)) move(selected, target);
         else select(target);
     });
@@ -322,7 +334,7 @@ export function mountArcadeChess(container, onMatch) {
     });
     boardHost.addEventListener('keydown', event => {
         if (!model?.match) return;
-        if (event.key === 'Escape') { selected = null; board.cancel(); draw(); return; }
+        if (event.key === 'Escape') { selected = null; draw(); return; }
         if (!directions[event.key]) return;
         event.preventDefault();
         const [x, y] = directions[event.key], sign = model.seat === 'b' ? -1 : 1;

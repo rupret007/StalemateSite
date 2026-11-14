@@ -81,7 +81,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             });
             socket.on('close', () => longRoomTrace.push({ t: 'socket closed' }));
         });
-        const protectedBoard = await context.request.get(origin + '/play/games/chess-board.js');
+        const protectedBoard = await context.request.get(origin + '/play/games/chess-core.js');
         assert.ok((mixed?.previousWorker ? [401, 404] : [401]).includes(protectedBoard.status()), 'anonymous match asset stays protected');
         const destination = `${origin}/beta/?via=${source}`;
         if (gameUrl) await page.goto(gameUrl);
@@ -412,7 +412,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
                 await expect(guest.locator('details.arcade-chess > summary')).toBeFocused();
-                const pieces = guest.locator('.arcade-chess cg-board piece');
+                const pieces = guest.locator('.arcade-chess [data-square] img');
                 await expect(pieces).toHaveCount(32);
                 await expect(pieces.first()).toBeVisible();
                 await expect(guest.getByLabel('Your nick')).toBeHidden();
@@ -914,8 +914,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                 await tapSquare(friend, 'd7', phone);
+                await expect(friend.locator('[data-square="d5"]')).toHaveAttribute('data-legal', '');
                 await tapSquare(friend, 'd5', phone);
                 await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
+                await expect(friend.locator('[data-square][data-legal]')).toHaveCount(0);
                 await captureArcadeInvite(friend, viewport, step('04-playing'));
                 assert.equal((await friend.context().request.get(origin + '/beta/state')).status(), 401, 'the guest has only game access');
                 console.log(`Passed ${engine} ${viewport.width}x${viewport.height} ${brand} invitation refresh, interrupted acceptance, and first move.`);
