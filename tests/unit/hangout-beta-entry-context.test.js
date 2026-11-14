@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
-import { gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { GAME_INVITE_UNAVAILABLE, gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { BetaSessions } from '../../hangout-worker/src/beta-sessions.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
@@ -30,6 +30,41 @@ it('serves the invitation copy module before admission only when guest invites a
     expect((await betaFetch(request(root + 'lobby/lobby.js'), config)).status).toBe(401);
     expect((await betaFetch(request(modulePath), { ...config, HANGOUT_GAME_NIGHT_GUESTS: '0' })).status).toBe(401);
     expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
+});
+
+it.each(['details', 'accept'])('uses the shared copy on a guest %s 410', async operation => {
+    const pagePath = '/beta/game-night/guest';
+    const config = env({
+        HANGOUT_GAME_NIGHT_GUESTS: '1',
+        ASSETS: { fetch: vi.fn(request => new Response(readFileSync(new URL('../..' + new URL(request.url).pathname, import.meta.url), 'utf8'))) }
+    });
+    const request = path => new Request('https://beta.example.test' + path);
+    const html = await (await betaFetch(request(pagePath), config)).text();
+    const client = await (await betaFetch(request(pagePath + '.js'), config)).text();
+    const dom = new JSDOM(html, { url: request(pagePath).url + '#invite=fixture', runScripts: 'outside-only' });
+    const { window } = dom;
+    const copy = GAME_INVITE_UNAVAILABLE + ' (updated for this test)';
+    try {
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE: copy };
+        window.fetch = vi.fn(async path => path.endsWith('/' + operation)
+            ? Response.json({ error: copy }, { status: 410 })
+            : Response.json({ game: 'Royal Flush Chess', host: 'Fixture host' }));
+        // Supply a changed module export. An old literal in either client path must fail this check.
+        window.eval(client.replace(/^import \{ GAME_INVITE_UNAVAILABLE \} from '[^']+';/,
+            'const { GAME_INVITE_UNAVAILABLE } = sharedGameNight;'));
+        const join = window.document.querySelector('[data-guest-join]');
+        if (operation === 'accept') {
+            await vi.waitFor(() => expect(join.closest('section').hidden).toBe(false));
+            join.click();
+        }
+        const status = window.document.querySelector('[data-guest-status]');
+        await vi.waitFor(() => expect(status.textContent).toBe(copy));
+        expect(window.fetch).toHaveBeenLastCalledWith('/beta/game-night/invitation/' + operation, expect.any(Object));
+        expect(window.document.activeElement).toBe(status);
+        expect(window.history.state).toBeNull();
+    } finally {
+        window.close();
+    }
 });
 
 async function shell(address, config = env(), prepare) {
