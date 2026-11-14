@@ -2008,6 +2008,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function updateTableInvite(table, room) {
         if (table.inviteButton)
             table.inviteButton.hidden = room?.kind !== 'game' || !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
+        if (room?.kind === 'game' && inviteContext === room && inviteInstance === room.keepRef &&
+            $('[data-invite-dialog]').open && !pendingGuestLink && gameGuestInvitesSupported && amOp(room)) {
+            const target = guestLinkTarget();
+            const moveFocus = !target && document.activeElement === createGuestLink;
+            drawGuestInviteChoice(target, true);
+            if (moveFocus) $('[data-game-invite-cancel]').focus();
+        }
     }
     function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting, snapshot, failed) {
         if (table.reconnect) table.reconnect.hidden = !reconnecting;
@@ -2725,15 +2732,21 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         const canInviteNew = isGame && gameGuestInvitesSupported;
         const target = canInviteNew && (exactTable || guestLinkTarget());
-        const inviteHint = $('[data-game-invite-empty]');
-        inviteHint.hidden = !!target || (!canInviteNew && !!roster.childElementCount);
-        inviteHint.textContent = canInviteNew ? 'Open a game with a free seat to invite a friend.' : 'Nobody else is in Hang Out yet.';
-        $('[data-game-invite-link]').hidden = !target;
-        if (target) createGuestLink.textContent = target.watch ? 'Invite a friend to watch' : `Invite a friend to ${gameLabel(target.game)}`;
+        drawGuestInviteChoice(target, canInviteNew);
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal();
         if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
         else $('[data-invite-nick]').focus();
+    }
+    function drawGuestInviteChoice(target, canInviteNew) {
+        const inviteHint = $('[data-game-invite-empty]');
+        inviteHint.hidden = !!target || (!canInviteNew && !!$('[data-game-invite-people]').childElementCount);
+        inviteHint.textContent = canInviteNew ? 'Open a game with a free seat to invite a friend.' : 'Nobody else is in Hang Out yet.';
+        $('[data-game-invite-link]').hidden = !target;
+        if (target) {
+            const label = target.watch ? 'Invite a friend to watch' : `Invite a friend to ${gameLabel(target.game)}`;
+            if (createGuestLink.textContent !== label) createGuestLink.textContent = label;
+        }
     }
     function roomInviteArgs(nick, room) {
         const target = room.kind === 'game' ? arcadeInviteTarget()

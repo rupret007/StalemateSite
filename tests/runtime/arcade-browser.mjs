@@ -3151,8 +3151,30 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const desktop = { width: 1440, height: 900 }, phone = { width: 390, height: 844 };
         const host = await guest(brand, 'FullTableHost', desktop, false, origin + '/beta/?game-night=1&via=' + brand);
         await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+        let confirmOpen;
+        await host.routeWebSocket(url => url.pathname === '/beta/arcade-turdspades-match', route => {
+            const server = route.connectToServer();
+            server.onMessage(message => {
+                const frame = JSON.parse(message);
+                if (isMatchView(frame) && frame.state?.waiting && frame.state.occupied?.length === 1 && !confirmOpen) {
+                    confirmOpen = () => route.send(message);
+                    return;
+                }
+                route.send(message);
+            });
+        });
         await host.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
         await host.getByRole('button', { name: 'Open 4-player Spades' }).click();
+        await expect.poll(() => typeof confirmOpen).toBe('function');
+        await host.getByRole('button', { name: 'Invite players', exact: true }).click();
+        const picker = host.locator('[data-invite-dialog]');
+        const cancel = picker.getByRole('button', { name: 'Cancel', exact: true });
+        await expect(picker.getByText('Open a game with a free seat to invite a friend.')).toBeVisible();
+        await expect(cancel).toBeFocused();
+        confirmOpen();
+        await expect(picker.getByRole('button', { name: 'Invite a friend to TurdSpades', exact: true })).toBeVisible();
+        await expect(cancel).toBeFocused();
+        await cancel.click();
         const players = [host];
         for (const [index, seat] of ['West','North','East'].entries()) {
             const link = await shareGameNightLink(host, desktop, brand + '-seat-' + seat.toLowerCase());
