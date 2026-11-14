@@ -637,11 +637,11 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
     }
 });
 
-test('a fresh cross-band room invite works after expiry', async ({ browser, baseURL }) => {
+for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) test(`a fresh cross-band room invite works after expiry at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
     const fixture = await community(browser, baseURL);
     try {
         const host = await fixture.visitor('ExpiryHost', { width: 1440, height: 900 }, false, 'stalemate');
-        const guest = await fixture.visitor('ExpiryGuest', { width: 390, height: 844 }, false, 'rad-dad');
+        const guest = await fixture.visitor('ExpiryGuest', viewport, false, 'rad-dad');
         await host.locator('[data-start="jam"]').click();
         await expect(host.locator('[data-jam]')).toBeVisible();
         const room = await host.locator('[data-chat-context]').textContent();
@@ -666,7 +666,16 @@ test('a fresh cross-band room invite works after expiry', async ({ browser, base
         await expect(guest.getByRole('tab', { name: '#stalemate' })).toBeFocused();
         await expect(guest.locator('[data-toast]')).toContainText('Ask your host to send another.');
         await expect(status).toContainText('expired.');
+        const toast = guest.locator('[data-toast]');
+        await toast.focus();
+        await expect(toast).toBeFocused();
+        await guest.screenshot({ path: testInfo.outputPath('expired.png') });
         await send();
+        await expect(toast).toBeHidden();
+        await expect(guest.getByRole('tab', { name: '#stalemate' })).toBeFocused();
+        await expect(join).toHaveAccessibleDescription(`ExpiryHost invited you to ${room}.`);
+        await expect(join).toBeInViewport({ ratio: 1 });
+        await guest.screenshot({ path: testInfo.outputPath('replacement.png') });
         await join.press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
         await expect(status).toHaveText('ExpiryGuest accepted and joined.');
