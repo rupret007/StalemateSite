@@ -361,6 +361,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const guest = await context.newPage();
                 guest.setDefaultTimeout(10000);
                 guest.on('pageerror', error => errors.push(`First visit: ${error.message}`));
+                await guest.addInitScript(() => {
+                    window.gameNightWakeLocks = { acquired: 0, released: 0 };
+                    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: {
+                        async request(type) {
+                            if (type !== 'screen') throw Error('Unexpected wake lock type');
+                            window.gameNightWakeLocks.acquired++;
+                            const lock = new EventTarget();
+                            lock.release = async () => {
+                                window.gameNightWakeLocks.released++;
+                                lock.dispatchEvent(new Event('release'));
+                            };
+                            return lock;
+                        }
+                    } });
+                });
                 assert.equal((await context.cookies()).length, 0, 'guest starts with an empty browser profile');
                 const unconfirmed = await context.request.post(origin + '/beta/game-night/invitation/accept', {
                     headers: { Origin: origin }, data: { code: new URLSearchParams(link.hash.slice(1)).get('invite'), age13: false }
@@ -369,6 +384,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 assert.equal((await context.cookies()).length, 0, 'an unconfirmed invitation grants no access');
                 await openGameNightLink(guest, link);
                 await expect(guest.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
+                assert.deepEqual(await guest.evaluate(() => window.gameNightWakeLocks), { acquired: 0, released: 0 });
                 await expect(guest.getByText('LinkHost invited you to play.')).toBeVisible();
                 await expect(guest.getByRole('textbox')).toHaveCount(0);
                 await expect(guest.getByRole('button')).toHaveCount(1);
@@ -379,7 +395,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(join).toBeInViewport({ ratio: 1 });
                 await expect(join).toHaveAccessibleDescription(/13\+ and agree to the house rules/);
                 assert.ok((await join.boundingBox()).height >= 44, 'the first action is a full touch target');
-                let legacyViewSent = false, releaseHello, matchRoom;
+                let legacyViewSent = false, releaseHello, matchRoom, interruptedJoin = false;
                 const holdHello = new Promise(resolve => { releaseHello = resolve; });
                 if (phone) {
                     let connections = 0;
@@ -389,10 +405,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await guest.routeWebSocket(url => url.pathname === '/beta/arcade-match', socket => {
                         const server = socket.connectToServer();
                         socket.onMessage(async payload => {
-                            if (typeof payload === 'string' && JSON.parse(payload).t === 'hello' && !legacyViewSent) {
+                            const frame = typeof payload === 'string' ? JSON.parse(payload) : {};
+                            if (frame.t === 'hello' && !legacyViewSent) {
                                 socket.send(JSON.stringify({ t: 'match-state', version: 1, room: matchRoom, state: null, canOpen: false }));
                                 legacyViewSent = true;
                                 await holdHello;
+                            }
+                            if (frame.action === 'join' && !interruptedJoin) {
+                                interruptedJoin = true;
+                                await Promise.all([socket.close({ code: 1011 }), server.close({ code: 1011 })]);
+                                return;
                             }
                             server.send(payload);
                         });
@@ -451,6 +473,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     } finally { releaseHello(); }
                 }
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                if (phone) assert.equal(interruptedJoin, true, 'the phone automatically retries its first Join on a new socket');
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
                 await expect(guest.locator('details.arcade-chess > summary')).toBeFocused();
                 const pieces = guest.locator('.arcade-chess [data-square] img');
@@ -467,6 +490,55 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                await expect.poll(() => guest.evaluate(() => window.gameNightWakeLocks)).toEqual({ acquired: 1, released: 0 });
+                if (phone) {
+                    const ticketPath = '/beta/arcade-ticket';
+                    let reconnects = 0;
+                    const countReconnects = request => {
+                        if (new URL(request.url()).pathname === ticketPath) reconnects++;
+                    };
+                    guest.on('request', countReconnects);
+                    await guest.evaluate(() => {
+                        window.simulateMatchWake = dropPing => {
+                            const now = Date.now;
+                            const send = WebSocket.prototype.send;
+                            try {
+                                Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+                                document.dispatchEvent(new Event('visibilitychange'));
+                                Date.now = () => now() + 120_000;
+                                Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+                                WebSocket.prototype.send = function (raw) {
+                                    if (typeof raw === 'string' && JSON.parse(raw).action === 'ping') {
+                                        if (dropPing) return;
+                                        this.addEventListener('message', function recordPong(event) {
+                                            if (JSON.parse(event.data).t !== 'pong') return;
+                                            window.matchWakePong = true;
+                                            this.removeEventListener('message', recordPong);
+                                        });
+                                    }
+                                    send.call(this, raw);
+                                };
+                                document.dispatchEvent(new Event('visibilitychange'));
+                            } finally {
+                                WebSocket.prototype.send = send;
+                                Date.now = now;
+                                delete document.hidden;
+                            }
+                        };
+                        window.simulateMatchWake(false);
+                    });
+                    await guest.waitForFunction(() => window.matchWakePong === true);
+                    await expect.poll(() => guest.evaluate(() => window.gameNightWakeLocks)).toEqual({ acquired: 2, released: 1 });
+                    assert.equal(reconnects, 0, 'a healthy socket handles the foreground probe');
+                    const ticket = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                    await guest.evaluate(() => window.simulateMatchWake(true));
+                    await ticket;
+                    await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                    await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
+                    assert.equal(reconnects, 1, 'the missing pong triggers one reconnect');
+
+                    guest.off('request', countReconnects);
+                }
                 await captureArcadeInvite(guest, viewport, 'first-visit-02-seated');
                 const leaveMatch = guest.getByRole('button', { name: 'Leave match', exact: true });
                 await expectUncoveredControl(leaveMatch);
@@ -671,6 +743,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (!phone) await guest.getByRole('button', { name: 'Retry closing invitation', exact: true }).click();
                 await expect.poll(async () => (await context.request.get(origin + '/beta/state?game-guest=1')).status()).toBe(401);
                 await expect(guest.locator('[data-session-reason]')).toHaveText('You left Game Night. Ask your host for a fresh invitation.');
+                await expect.poll(() => guest.evaluate(() => {
+                    const { acquired, released } = window.gameNightWakeLocks;
+                    return acquired > 0 && acquired === released;
+                })).toBe(true);
                 await captureArcadeInvite(guest, viewport, 'first-visit-04-left');
                 await guest.reload();
                 await expect(guest.locator('[data-game-night]')).toHaveCount(0);

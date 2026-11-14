@@ -52,7 +52,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
     const pendingRevocations = new Map();
     const { issue, upgrade, member, sockets, send, close } = createGameNightSockets({
         state, current, active, charge, now, uuid, tag, protocol: ARCADE_PROTOCOL,
-        readyType: 'match-ready', snapshots: true, replaceByPlayer: true, readyFeatures: { ping: true },
+        readyType: 'match-ready', readyFeatures: { ping: true }, snapshots: true, replaceByPlayer: true,
         allowed: scope => !pendingRevocations.has(scope?.ref) && allowed()
     });
     const key = scope => prefix + scope.ref;

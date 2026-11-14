@@ -76,6 +76,66 @@ describe('Game Night phone wake and history recovery', () => {
         expect(sockets).toHaveLength(2);
     });
 
+    function matchState(state) {
+        sockets.at(-1).dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state })
+        }));
+    }
+
+    function fakeWakeLock() {
+        const locks = [];
+        const request = vi.fn(async () => {
+            const lock = new EventTarget();
+            lock.release = vi.fn(async () => lock.dispatchEvent(new Event('release')));
+            locks.push(lock);
+            return lock;
+        });
+        Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request } });
+        return { request, locks };
+    }
+
+    it('keeps the screen awake only for a seated match', async () => {
+        const { request, locks } = fakeWakeLock();
+        try {
+            matchState({ seat: 'w', match: null });
+            matchState({ seat: null, match: {} });
+            expect(request).not.toHaveBeenCalled();
+
+            matchState({ seat: 'w', match: {} });
+            await vi.advanceTimersByTimeAsync(0);
+            expect(request).toHaveBeenCalledExactlyOnceWith('screen');
+
+            visibility(true);
+            expect(locks[0].release).toHaveBeenCalledTimes(1);
+            visibility(false);
+            await vi.advanceTimersByTimeAsync(0);
+            expect(request).toHaveBeenCalledTimes(2);
+
+            matchState({ seat: 'w', match: { result: { winner: 'w' } } });
+            expect(locks[1].release).toHaveBeenCalledTimes(1);
+            matchState({ seat: 'w', match: {} });
+            await vi.advanceTimersByTimeAsync(0);
+            client.stop();
+            expect(locks[2].release).toHaveBeenCalledTimes(1);
+        } finally { delete navigator.wakeLock; }
+    });
+
+    it('releases a wake lock that arrives after leaving', async () => {
+        const { request } = fakeWakeLock();
+        const lock = new EventTarget();
+        lock.release = vi.fn(async () => {});
+        let resolve;
+        request.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+        try {
+            matchState({ seat: 'w', match: {} });
+            client.stop();
+            expect(request).toHaveBeenCalledTimes(1);
+            resolve(lock);
+            await vi.advanceTimersByTimeAsync(0);
+            expect(lock.release).toHaveBeenCalledTimes(1);
+        } finally { delete navigator.wakeLock; }
+    });
+
     it('keeps the returned ticket through an upgrade that has not sent match-ready', async () => {
         restored();
         await vi.advanceTimersByTimeAsync(0);
