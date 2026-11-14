@@ -96,6 +96,12 @@ jobs:
           node tests/runtime/arcade-transport.mjs --room-grants --browser=chromium --webjam-chess=stalemate --webjam-host-confirm
           node tests/runtime/arcade-transport.mjs --room-grants --browser=webkit --webjam-chess=rad-dad --webjam-host-confirm
 
+      - name: Verify private four-player Spades invitations
+        timeout-minutes: 2
+        run: |
+          node tests/runtime/arcade-transport.mjs --room-grants --browser=chromium --webjam-spades=stalemate
+          node tests/runtime/arcade-transport.mjs --room-grants --browser=webkit --webjam-spades=rad-dad
+
       - name: Build the shared-community entry toolkit
         shell: bash
         run: |

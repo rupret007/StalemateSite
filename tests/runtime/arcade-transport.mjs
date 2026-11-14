@@ -32,6 +32,9 @@ const webJamHostConfirm = process.argv.includes('--webjam-host-confirm');
 assert.ok(!webJamHostConfirm || webJamChess && roomGrants, 'host confirmation needs private WebJam Chess');
 assert.ok(webJamChess === undefined || browserName && ['stalemate', 'rad-dad'].includes(webJamChess),
     'choose a browser and a WebJam Chess brand');
+const webJamSpades = process.argv.find(arg => arg.startsWith('--webjam-spades='))?.slice('--webjam-spades='.length);
+assert.ok(webJamSpades === undefined || browserName && roomGrants && ['stalemate', 'rad-dad'].includes(webJamSpades),
+    'choose --room-grants, a browser and a WebJam Spades brand');
 const webJamGuest = process.argv.find(arg => arg.startsWith('--webjam-guest='))?.slice('--webjam-guest='.length);
 const sameWebJamRoom = process.argv.includes('--same-webjam-room');
 assert.ok(!sameWebJamRoom || webJamGuest, 'the same-room grant proof needs a browser guest');
@@ -252,6 +255,92 @@ async function verifyRoomGrants() {
     assert.ok(!excess.headers.has('Set-Cookie'));
     console.log('PASS the standby guest receives 409 after the granted guest joins the exact table.');
     for (const session of [guestMatch, guestLobby, match, host.lobby]) session.socket.close(1000, 'fixture complete');
+}
+
+async function verifyFourSpadesGrants() {
+    const host = await guest('SpadesHost', webJamSpades, '192.0.2.11');
+    host.lobby.send({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
+    const { ch } = await host.lobby.wait(frame => frame.t === 'join' && frame.ch.name === room, 'private Spades room');
+    const response = await upgrade(host.cookie, await grant(host, ch.keepRef, '/beta/arcade-turdspades-ticket'), '/beta/arcade-turdspades-match');
+    assert.equal(response.status, 101);
+    const match = observe(response.webSocket);
+    await match.wait(frame => frame.t === 'match-ready', 'Spades host match upgrade');
+    match.send({ version: 1, action: 'open' });
+    const { state } = await match.wait(frame => frame.state?.waiting, 'open four-player Spades table');
+    const values = Array.from({ length: 4 }, () => randomBytes(32).toString('base64url'));
+    const registered = await call('/beta/game-night/room-grant/register', host.cookie, {
+        actor: host.id, room, ref: ch.keepRef, game: 'turdspades', match: state.id,
+        hashes: values.map(value => createHash('sha256').update(value).digest('hex'))
+    });
+    assert.equal(registered.status, 200);
+    const { granted, standby } = await registered.json();
+    assert.deepEqual([granted, standby], [3, 1]);
+
+    const { chromium, webkit } = await import('playwright');
+    const { expect } = await import('@playwright/test');
+    const browser = await (browserName === 'chromium' ? chromium : webkit).launch();
+    const browserOrigin = (await mf.ready).origin;
+    const hands = [];
+    async function open(value) {
+        const context = await browser.newContext({
+            viewport: { width: 390, height: 844 }, hasTouch: true, ignoreHTTPSErrors: true
+        });
+        const page = await context.newPage();
+        const url = new URL('/beta/game-night/webjam-guest', browserOrigin);
+        url.hash = new URLSearchParams({ grant: value }).toString();
+        try { await page.goto(url.href); }
+        catch { throw new Error('Synthetic Spades invitation could not open'); }
+        const button = page.getByRole('button', { name: 'Join game', exact: true });
+        await expect(button).toBeVisible();
+        assert.equal((await context.cookies()).length, 0);
+        assert.equal(new URL(page.url()).hash, '');
+        return { page, button };
+    }
+
+    try {
+        const players = [];
+        for (const [index, seat] of ['West', 'North', 'East'].entries()) {
+            const { page, button } = await open(values[index]);
+            players.push(page);
+            await button.tap();
+            if (index < 2) await expect(page.locator('[data-spades-status]')).toContainText(`You’re ${seat}`);
+        }
+        for (const [index, page] of players.entries()) {
+            const cards = page.locator('[data-spades-card]');
+            await expect(cards).toHaveCount(13);
+            await expect(page.locator('[data-spades-trick]')).toContainText(`${['West', 'North', 'East'][index]} (you)`);
+            hands.push(...await cards.evaluateAll(nodes => nodes.map(node => node.dataset.spadesCard)));
+        }
+        const deal = await match.wait(frame => frame.state?.match?.phase === 'bid', 'host receives the four-player deal');
+        assert.equal(deal.state.id, state.id);
+        assert.equal(new Set([...deal.state.match.hand.map(card => String(card.id)), ...hands]).size, 52);
+
+        const [west] = players;
+        const originalHand = await west.locator('[data-spades-card]').evaluateAll(nodes => nodes.map(node => node.dataset.spadesCard));
+        await west.context().clearCookies();
+        const resumed = west.waitForResponse(reply => new URL(reply.url()).pathname === '/beta/game-night/invitation/resume');
+        await west.reload();
+        assert.equal((await resumed).status(), 200);
+        const westCards = west.locator('[data-spades-card]');
+        await expect(westCards).toHaveCount(13);
+        assert.deepEqual(await westCards.evaluateAll(nodes => nodes.map(node => node.dataset.spadesCard)), originalHand);
+        await expect(west.getByRole('button', { name: 'Bid for me', exact: true })).toBeInViewport();
+        await west.getByRole('button', { name: 'Bid for me', exact: true }).tap();
+        const bid = await match.wait(frame => frame.state?.id === state.id && frame.state.match?.bids.west !== null
+            && frame.state.match?.turn === 'north', 'host confirms West bid');
+        assert.ok(Number.isInteger(bid.state.match.bids.west));
+
+        const extra = await open(values[3]);
+        await extra.button.tap();
+        await expect(extra.page.locator('[data-guest-status]')).toContainText('This table is full.');
+        assert.equal((await extra.page.context().cookies()).length, 0);
+        await expect(extra.button).toBeHidden();
+        console.log(`PASS ${webJamSpades} ${browserName} four-player Spades: three private hands, same-seat pass recovery, confirmed bid and standby refusal.`);
+    } finally {
+        await browser.close();
+        match.socket.close(1000, 'fixture complete');
+        host.lobby.socket.close(1000, 'fixture complete');
+    }
 }
 
 async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavailable, targetRoom, hostLobby) {
@@ -1619,6 +1708,8 @@ try {
         });
     } else if (webJamChess) {
         await verifyWebJamChess();
+    } else if (webJamSpades) {
+        await verifyFourSpadesGrants();
     } else if (webJamGuest) {
         await verifyRoomGrants();
     } else if (browserName) {
