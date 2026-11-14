@@ -467,22 +467,46 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         assert.equal(requests, 1, 'coming online restores the seat with one ticket');
 
                         const restored = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
-                        await guest.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+                        const restoreTickets = await guest.evaluate(() => {
+                            const now = Date.now, fetch = window.fetch;
+                            let tickets = 0;
+                            window.fetch = (...args) => {
+                                if (new URL(args[0], location.href).pathname === '/beta/arcade-ticket') tickets++;
+                                return fetch(...args);
+                            };
+                            try {
+                                Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+                                document.dispatchEvent(new Event('visibilitychange'));
+                                Date.now = () => now() + 120_000;
+                                Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+                                window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+                                document.dispatchEvent(new Event('visibilitychange'));
+                                return tickets;
+                            } finally {
+                                Date.now = now;
+                                delete document.hidden;
+                                window.fetch = fetch;
+                            }
+                        });
+                        assert.equal(restoreTickets, 1, 'history and foreground events share one in-flight ticket');
                         await restored;
                         await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                         await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
                         assert.equal(requests, 2, 'a restored history entry refreshes the match once');
                         await guest.evaluate(() => {
-                            window.simulateMatchWake = dropPing => {
-                                const now = Date.now;
+                            window.simulateMatchWake = (dropPing, away = 120_000) => {
+                                const now = Date.now, hiddenAt = now();
                                 const send = WebSocket.prototype.send;
+                                let probes = 0;
                                 try {
+                                    Date.now = () => hiddenAt;
                                     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
                                     document.dispatchEvent(new Event('visibilitychange'));
-                                    Date.now = () => now() + 120_000;
+                                    Date.now = () => hiddenAt + away;
                                     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
                                     WebSocket.prototype.send = function (raw) {
                                         if (typeof raw === 'string' && JSON.parse(raw).action === 'ping') {
+                                            probes++;
                                             if (dropPing) return;
                                             this.addEventListener('message', function recordPong(event) {
                                                 if (JSON.parse(event.data).t !== 'pong') return;
@@ -493,14 +517,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                                         return send.call(this, raw);
                                     };
                                     document.dispatchEvent(new Event('visibilitychange'));
+                                    return probes;
                                 } finally {
                                     WebSocket.prototype.send = send;
                                     Date.now = now;
                                     delete document.hidden;
                                 }
                             };
-                            window.simulateMatchWake(false);
                         });
+                        assert.equal(await guest.evaluate(() => window.simulateMatchWake(false, 5000)), 0, 'five seconds hidden needs no probe');
+                        assert.equal(await guest.evaluate(() => window.simulateMatchWake(false)), 1, 'a long hide sends one foreground probe');
                         await guest.waitForFunction(() => window.receivedMatchPong);
                         assert.equal(requests, 2, 'a healthy match answers the foreground probe without a new ticket');
                         const refreshed = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);

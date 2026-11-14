@@ -123,7 +123,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         if (document.hidden) { hiddenAt = Date.now(); return; }
         const away = hiddenAt === undefined ? 0 : Date.now() - hiddenAt;
         hiddenAt = undefined;
-        if (!scope || away <= 5000 || terminalError || pausedForNetwork) return;
+        if (!scope || away <= 5000 || terminalError || pausedForNetwork || controller || !ready && socket) return;
         clearTimeout(pongTimer);
         if (!supportsPing || !send({ action: 'ping', nonce: ++pingNonce })) return reconnect();
         pongTimer = setTimeout(reconnect, 1500);
