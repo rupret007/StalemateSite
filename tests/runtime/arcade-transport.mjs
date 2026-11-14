@@ -296,6 +296,8 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         const waiting = await open(standby, false);
         await waiting.getByRole('button', { name: 'Join game' }).click();
         await expect(waiting.locator('[data-guest-status]')).toHaveText(/This table is full/);
+        await expect(waiting.getByRole('heading')).toBeFocused();
+        await expect(waiting.getByRole('heading')).toHaveAccessibleDescription(/This table is full/);
         await expect(waiting.getByRole('button', { name: 'Join game' })).toBeHidden();
         assert.equal((await waiting.context().cookies()).length, 0, 'standby receives no access');
         await capture(waiting, 'standby');
@@ -303,6 +305,8 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         const stale = await open(unavailable, false);
         await stale.getByRole('button', { name: 'Join game' }).click();
         await expect(stale.locator('[data-guest-status]')).toHaveText('This invite is no longer available. Ask your host for a new one.');
+        await expect(stale.getByRole('heading')).toBeFocused();
+        await expect(stale.getByRole('heading')).toHaveAccessibleDescription('This invite is no longer available. Ask your host for a new one.');
         await expect(stale.getByRole('button', { name: 'Join game' })).toBeHidden();
         assert.equal((await stale.context().cookies()).length, 0, 'expired grant receives no access');
         await capture(stale, 'expired');

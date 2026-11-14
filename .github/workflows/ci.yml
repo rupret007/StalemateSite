@@ -67,7 +67,7 @@ jobs:
           node tests/runtime/arcade-transport.mjs --browser=webkit --webjam-share
 
       - name: Exercise private WebJam room grants in workerd
-        timeout-minutes: 4
+        timeout-minutes: 6
         env:
           ARCADE_BROWSER_EVIDENCE: ${{ github.workspace }}/test-results/arcade-multiplayer
         run: |

@@ -1,4 +1,4 @@
-import { gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { GAME_INVITE_UNAVAILABLE, gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { DEMO_INVITE_TTL } from './beta-auth.mjs';
 import { arcadeRoomRequest } from './game-night-sockets.mjs';
 
@@ -17,7 +17,7 @@ const digest = async value => Array.from(new Uint8Array(await crypto.subtle.dige
     byte => byte.toString(16).padStart(2, '0')).join('');
 export const gameGuestSessionRef = sid => digest('game-guest-session:' + sid);
 const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-export const GAME_INVITE_UNAVAILABLE = 'This invite is no longer available. Ask your host for a new one.';
+export { GAME_INVITE_UNAVAILABLE };
 const unavailable = () => reply({ error: GAME_INVITE_UNAVAILABLE }, 410);
 
 async function waitingGuestSeat(lobby, roomScope, game, match, hostSid) {
