@@ -826,7 +826,27 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(join).toBeEnabled();
                 await captureArcadeInvite(friend, viewport, 'guest-retry-01-error');
                 if (!phone) await expect(join).toBeFocused();
+                let interrupted = 0;
+                if (phone) await friend.routeWebSocket(url => url.pathname === '/beta/arcade-match', socket => {
+                    if (interrupted >= 4) {
+                        socket.connectToServer();
+                        return;
+                    }
+                    interrupted++;
+                    void socket.close({ code: 1011 });
+                });
                 await activate();
+                if (phone) {
+                    const gate = friend.locator('[data-game-guest-connecting]');
+                    await expect(gate.getByRole('status')).toHaveText('Couldn’t reconnect to your seat. Try again.');
+                    assert.equal(interrupted, 4, 'the initial connection and three retries were interrupted');
+                    const retrySeat = gate.getByRole('button', { name: 'Try again', exact: true });
+                    await expect(retrySeat).toBeFocused();
+                    await expectUncoveredControl(retrySeat);
+                    await expect(friend.locator('[data-app]')).toBeHidden();
+                    await captureArcadeInvite(friend, viewport, 'guest-retry-02-seat-connection-error');
+                    await retrySeat.tap();
+                }
                 await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await captureArcadeInvite(friend, viewport, 'guest-retry-02-seated');
                 await friend.locator('[data-leave]').click();
