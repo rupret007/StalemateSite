@@ -861,7 +861,7 @@ test('a held room-host person action stays on its original endpoint and refuses 
         const before = fixture.inbound.filter(frame => frame.name === 'kick').length;
         await sheet.getByRole('button', { name: 'Kick', exact: true }).click();
         await expect(sheet).toBeVisible();
-        await expect(sheet.locator('[data-person-status]')).toContainText('no longer confirmed');
+        await expect(sheet.getByRole('status')).toHaveText('This person menu is out of date. Close it and choose someone from the current room.');
         expect(fixture.inbound.filter(frame => frame.name === 'kick')).toHaveLength(before);
     } finally { await fixture.close(); }
 });
