@@ -143,6 +143,30 @@ for (const width of [375, 390]) test(`mobile keyboard section shortcuts focus th
     } finally { await visitor.close(); }
 });
 
+test('mobile forced colors visibly mark the current section', async ({ browser, browserName, baseURL }, testInfo) => {
+    test.skip(browserName !== 'chromium', 'Chromium emulates the system forced-colors palette');
+    const visitor = await guest(browser, baseURL, 'HighContrastGuest', { width: 390, height: 844 }, undefined,
+        page => page.emulateMedia({ forcedColors: 'active' }));
+    const { page } = visitor;
+    try {
+        const sections = page.getByRole('navigation', { name: 'Sections' });
+        const chat = sections.locator('[data-show="chat"]');
+        const rooms = sections.locator('[data-show="rooms"]');
+        await expect(chat).toHaveCSS('text-decoration-line', 'underline');
+        await expect(rooms).toHaveCSS('text-decoration-line', 'none');
+        await section(page, 'rooms');
+        await expect(rooms).toHaveAttribute('aria-current', 'true');
+        await expect(rooms).toHaveCSS('text-decoration-line', 'underline');
+        await expect(chat).toHaveCSS('text-decoration-line', 'none');
+        await page.screenshot({ path: testInfo.outputPath('mobile-forced-colors-section.png') });
+        await section(page, 'chat');
+        await expect(page.getByRole('tab', { name: '#stalemate' })).toBeFocused();
+        await send(page, 'Keyboard chat in high contrast.');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('Keyboard chat in high contrast.');
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 test('keyboard guest can join, recover a named-room error, chat, navigate tabs and leave host dialogs', async ({ browser, baseURL }, testInfo) => {
     const visitor = await guest(browser, baseURL, 'KeyboardVisitor', { width: 1280, height: 900 });
     const { page } = visitor;
