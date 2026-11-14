@@ -1,6 +1,7 @@
 // Test-only fault/inspection routes around the actual imported BetaSessions.
 // Every injected exception follows an awaited REAL native storage operation.
 import { BetaSessions } from '../../../hangout-worker/src/beta-sessions.mjs';
+import { GAME_NIGHT_IDLE, GAME_NIGHT_LENGTH } from '../../../hangout-worker/src/game-night-lifetime.mjs';
 const SID = 'native-registry-session-0001', LIVE = 'native-still-live-session-0001';
 const IP = 'A'.repeat(22), OTHER_IP = 'B'.repeat(22);
 const guarded = (request, env) => !request.headers.has('Origin') && request.headers.get('X-Fixture-Nonce') === env.FIXTURE_NONCE;
@@ -50,11 +51,11 @@ class InspectBeta extends BetaSessions {
         if (!command || Object.keys(command).sort().join(',') !== 'phase' || typeof command.phase !== 'string') return denied();
         const phase = command.phase;
         if (phase === 'inspect') return Response.json(await this.inspect());
-        if (phase === 'seed-night' || phase === 'seed-pending-night') {
-            const createdAt = Date.now();
+        if (['seed-night', 'seed-pending-night', 'seed-idle-night'].includes(phase)) {
+            const createdAt = Date.now() - (phase === 'seed-idle-night' ? GAME_NIGHT_IDLE : 0);
             const pending = phase === 'seed-pending-night';
             await this.nativeState.storage.put('session:' + LIVE, {
-                v: 1, sid: LIVE, version: '1', createdAt, exp: createdAt + 16 * 60 * 60_000, idleUntil: createdAt + 4 * 60 * 60_000,
+                v: 1, sid: LIVE, version: '1', createdAt, exp: createdAt + GAME_NIGHT_LENGTH, idleUntil: createdAt + GAME_NIGHT_IDLE,
                 revoked: pending, pending, attempt: pending ? 1 : 0, retryAt: pending ? createdAt : 0, rooms: []
             });
             return Response.json(await this.inspect());
@@ -101,7 +102,7 @@ export class LegacyBeta extends InspectBeta {}
 export default { async fetch(request, env) {
     if (!guarded(request, env) || request.method !== 'POST' || request.headers.get('Content-Type') !== 'application/json') return denied();
     const [binding, name] = new URL(request.url).pathname.slice(1).split('/');
-    if (!['SQLITE', 'LEGACY'].includes(binding) || !['budget', 'session', 'alarm', 'prune-register', 'prune-direct', 'forward-night'].includes(name)) return denied();
+    if (!['SQLITE', 'LEGACY'].includes(binding) || !['budget', 'session', 'alarm', 'prune-register', 'prune-direct', 'forward-night', 'idle-night'].includes(name)) return denied();
     const bytes = await request.arrayBuffer(); if (bytes.byteLength > 128) return denied();
     return env[binding].get(env[binding].idFromName(name)).fetch(new Request('https://local-fixture/', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Fixture-Nonce': env.FIXTURE_NONCE }, body: bytes

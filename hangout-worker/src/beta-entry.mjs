@@ -246,6 +246,7 @@ async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0', pro
     const access = { v: 1, sid, exp, scope: gameGuest ? 'game-night' : 'guest', version: String(env.HANGOUT_BETA_INVITE_VERSION || '1'), ...(gameGuest ? { gameGuest } : {}), ...(demo ? { demo: true } : {}) };
     let result;
     try { result = await registryRequest(env, 'register', { sid: access.sid, exp: access.exp, version: access.version, iph: await ipHash(ip, env.HANGOUT_HMAC_KEY),
+        ...(gameGuest ? { gameNight: true } : {}),
         ...(env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1' ? { profile } : {}) }); }
     catch { throw new BetaSessionUnavailable('The community session service is temporarily unavailable.'); }
     if (gameGuest && result.status === 409) {

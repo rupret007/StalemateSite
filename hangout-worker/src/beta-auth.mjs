@@ -1,3 +1,4 @@
+import { GAME_NIGHT_LENGTH } from './game-night-lifetime.mjs';
 import { validGameNightTableId } from './game-night-pass.mjs';
 // Real beta admission is separate from the pilot's synthetic test identities.
 import { accountId, hmacKeyOk, roleForEmail } from './auth.mjs';
@@ -53,7 +54,8 @@ export async function readBeta(kind, token, secret, now = Date.now()) {
         if (!await crypto.subtle.verify('HMAC', key, decode(signature), enc.encode(`beta:${kind}:${body}`))) return null;
         const claims = JSON.parse(new TextDecoder().decode(decode(body)));
         if (!claims || claims.v !== 1 || !/^[a-z0-9-]{16,64}$/.test(claims.sid) || !Number.isFinite(claims.exp) || claims.exp <= now
-            || claims.exp > now + (['demo-invite', 'game-invitation'].includes(kind) ? DEMO_INVITE_TTL : BETA_TTL)) return null;
+            || claims.exp > now + (['demo-invite', 'game-invitation'].includes(kind) ? DEMO_INVITE_TTL
+                : kind === 'access' && claims.scope === 'game-night' ? GAME_NIGHT_LENGTH : BETA_TTL)) return null;
         return claims;
     } catch { return null; }
 }
