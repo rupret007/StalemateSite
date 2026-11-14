@@ -174,6 +174,17 @@ describe('redeemGrant', () => {
         expect(await grants.holds({ room: ROOM, game: 'chess', match: MATCH }, NOW + 5)).toEqual([]);
     });
 
+    it('caps a demo grant and its confirmed guest access at the host deadline', async () => {
+        const accessUntil = NOW + 5000;
+        expect((await register([1], { accessUntil })).body.until).toBe(accessUntil);
+        const attempt = value(2);
+        const confirmed = await grants.redeemGrant({ value: value(1), attempt, now: accessUntil - 1 });
+        expect(confirmed.status).toBe(200);
+        expect(confirmed.body.exp).toBe(accessUntil);
+        expect(confirmed.claimUntil).toBe(accessUntil);
+        expect((await grants.redeemGrant({ value: value(1), attempt, now: accessUntil })).status).toBe(410);
+    });
+
     it('answers a replay with the same 410 shape as a spent stranger invitation', async () => {
         await register([1]);
         await grants.redeemGrant({ value: value(1), now: NOW + 5 });

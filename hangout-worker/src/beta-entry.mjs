@@ -246,7 +246,11 @@ async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0', pro
     try { result = await registryRequest(env, 'register', { sid: access.sid, exp: access.exp, version: access.version, iph: await ipHash(ip, env.HANGOUT_HMAC_KEY),
         ...(env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1' ? { profile } : {}) }); }
     catch { throw new BetaSessionUnavailable('The community session service is temporarily unavailable.'); }
-    if (gameGuest && result.status === 409) result = await registryRequest(env, 'check', { sid, exp, version: access.version });
+    if (gameGuest && result.status === 409) {
+        try { result = await registryRequest(env, 'check', { sid, exp, version: access.version }); }
+        catch { throw new BetaSessionUnavailable('The community session service is temporarily unavailable.'); }
+        if (result.status === 403) throw new BetaSessionUnavailable(GAME_INVITE_UNAVAILABLE, 410);
+    }
     if (result.status !== 200) throw new BetaSessionUnavailable(result.status === 429 ? 'The beta session allowance is full. Please try again later.' : 'The community session service is temporarily unavailable.', result.status === 429 ? 429 : 503);
     return { access, cookie: betaCookie(gameGuest ? GAME_GUEST_COOKIE : BETA_COOKIE, await signBeta('access', access, env.HANGOUT_HMAC_KEY), exp - Date.now()) };
 }
@@ -277,10 +281,13 @@ async function gameInvitation(request, env, path, body) {
         body = { ...body, code: invitation.sid };
     }
     const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_INVITATION_PATH}/${path}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true } })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true, exp: session.access.exp } })
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
-    if (path === 'issue' && response.ok) return json({ code: await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY) });
+    if (path === 'issue' && response.ok) {
+        const code = await signBeta('game-invitation', { v: 1, sid: data.code, exp: data.until }, env.HANGOUT_HMAC_KEY);
+        return json({ code, until: data.until, inviteExpiresAt: data.until });
+    }
     if (path !== 'accept' || !response.ok) return json(data, response.status);
     return gameGuestAccess(request, env, data);
 }
@@ -321,7 +328,7 @@ async function gameRoomGrant(request, env, operation, body) {
     if (operation === 'register' && !session) return json({ error: 'Private invitation required.' }, 401);
     const response = await env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(`https://lobby${GAME_ROOM_GRANT_PATH}/${operation}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body, session: session && { betaSid: session.access.sid } })
+        body: JSON.stringify({ body, session: session && { betaSid: session.access.sid, demo: session.access.demo === true, exp: session.access.exp } })
     });
     const data = await response.json().catch(() => ({ error: 'Game invitations are temporarily unavailable.' }));
     if (operation !== 'redeem' || !response.ok) return json(data, response.status);
