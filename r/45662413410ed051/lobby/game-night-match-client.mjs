@@ -105,7 +105,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         onStatus('reconnecting');
     }
     function reconnect() {
-        if (!scope || terminalError || pausedForNetwork) return;
+        if (!scope || terminalError || pausedForNetwork || controller || (socket && !ready)) return;
         failures = 1;
         reset(true);
         void connect();

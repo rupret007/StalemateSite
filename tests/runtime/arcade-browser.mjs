@@ -502,7 +502,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
                         assert.equal(requests, 2, 'a restored history entry refreshes the match once');
                         await guest.evaluate(() => {
-                            window.simulateMatchWake = (dropPing, away = 120_000) => {
+                            window.simulateMatchWake = (dropPing, away = 120_000, restoreAfterWake = false) => {
                                 const now = Date.now, hiddenAt = now();
                                 const send = WebSocket.prototype.send;
                                 let probes = 0;
@@ -525,6 +525,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                                         return send.call(this, raw);
                                     };
                                     document.dispatchEvent(new Event('visibilitychange'));
+                                    if (restoreAfterWake) window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
                                     return probes;
                                 } finally {
                                     WebSocket.prototype.send = send;
@@ -534,7 +535,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                             };
                         });
                         assert.equal(await guest.evaluate(() => window.simulateMatchWake(false, 5000)), 0, 'five seconds hidden needs no probe');
-                        assert.equal(await guest.evaluate(() => window.simulateMatchWake(false)), 1, 'a long hide sends one foreground probe');
+                        assert.equal(await guest.evaluate(() => window.simulateMatchWake(false, 5001)), 1, 'just over five seconds sends one probe');
                         await guest.waitForFunction(() => window.receivedMatchPong);
                         assert.equal(requests, 2, 'a healthy match answers the foreground probe without a new ticket');
                         const refreshed = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
@@ -561,7 +562,17 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                         await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                         assert.equal(legacyReady, 1, 'the replacement socket advertised the legacy handshake');
                         const legacyWakeTicket = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
-                        assert.equal(await guest.evaluate(() => window.simulateMatchWake(false)), 0, 'a legacy Worker receives no ping');
+                        const legacyRestore = await guest.evaluate(() => {
+                            const fetch = window.fetch;
+                            let tickets = 0;
+                            window.fetch = (...args) => {
+                                if (new URL(args[0], location.href).pathname === '/beta/arcade-ticket') tickets++;
+                                return fetch(...args);
+                            };
+                            try { return { probes: window.simulateMatchWake(false, 120_000, true), tickets }; }
+                            finally { window.fetch = fetch; }
+                        });
+                        assert.deepEqual(legacyRestore, { probes: 0, tickets: 1 }, 'legacy visibility then history restore uses one ticket');
                         await legacyWakeTicket;
                         await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                         await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
