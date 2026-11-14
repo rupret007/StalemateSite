@@ -63,7 +63,7 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         if (expired.length) await storage.delete(expired);
         const hostCount = [...rows.values()].filter(record => record.until > now && record.scope.host === host.betaSid && !record.redeemer).length;
         if (rows.size - expired.length >= LINK_CAP || hostCount >= LINK_CAP_PER_HOST) {
-            return reply({ error: 'Too many invitations are active. Use an existing invitation or try again later.' }, 429);
+            return reply({ error: 'Too many invitations are still on record. Share a current link for this game or try again later.' }, 429);
         }
         const code = randomCode();
         const until = now + (session.demo === true ? DEMO_INVITE_TTL : LINK_TTL);
