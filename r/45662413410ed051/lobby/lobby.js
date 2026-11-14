@@ -2068,6 +2068,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             gateStatus('Waiting for the host to open the table. This link still works.');
             return;
         }
+        if (watchingGuest && !state && (snapshot?.phase === 'playing' || snapshot?.phase === 'finished')) {
+            clearTimeout(invite.timer);
+            gameGuestReloadOffered = false;
+            $('[data-game-guest-retry]').hidden = true;
+            gateStatus('Waiting for the table to become visible. This link still works.');
+            return;
+        }
         const canSeeReplacement = gameGuest && state?.replacementAvailable === true;
         if (watchingGuest && state?.tableId === gameGuest.tableId || canSeeReplacement || state?.seat && (state.id === invite.match || gameGuest)) {
             if (gameGuest && !gameGuestSeated) {

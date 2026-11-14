@@ -3216,6 +3216,23 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await players[1].getByRole('button', { name: 'Bid for me' }).tap();
         await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
         await captureArcadeInvite(page, phone, brand + '-watch-live');
+        // A room disconnect redacts the table for an observer until everyone
+        // is present again. A reconnect must restore the same read-only view.
+        const eastUrl = new URL(players[3].url());
+        await players[3].goto('about:blank');
+        await expect(page.locator('[data-spades-status]')).toHaveText(
+            'A game is under way at this table. You can’t see it right now.');
+        await expect(page.locator('[data-spades-table]')).toBeHidden();
+        await page.reload();
+        await expect(page.locator('[data-game-guest-connecting] [role="status"]')).toHaveText(
+            'Waiting for the table to become visible. This link still works.');
+        await players[3].goto(origin + eastUrl.pathname + eastUrl.search);
+        await expect(players[3].locator('[data-spades-card]')).toHaveCount(13);
+        await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
+        assert.equal(read().match.id, before.id);
+        assert.equal(read().watchOnly, true);
+        assert.deepEqual(read().match.hand, []);
         const passKey = await page.evaluate(() => 'gn:pass:' + window.HangoutBootstrap.gameGuest.tableId);
         const originalPass = await page.evaluate(key => localStorage.getItem(key), passKey);
         assert.match(originalPass, /^[a-f0-9]{64}$/);
