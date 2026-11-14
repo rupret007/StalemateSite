@@ -511,7 +511,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let pendingMusicHandoff = null, directMusicInvitesSupported = false;
     let musicHandoffRecoveryRoom = null;
     let sentMusicInvite = null, musicInviteOutcomesSupported = false;
-    const musicInviteFailed = 'Music invitation couldn’t be sent. Try again from your Jam room.';
+    const musicInviteFailed = 'Music invitation couldn’t be sent. Try again, or copy a fresh browser invite from WebJam and share it with the room.';
     const jamWaitingCopy = $('[data-jam-wait]').textContent;
     let gameNightSupported = false, gameOpenSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
@@ -3312,6 +3312,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         jamInviteOpener = null;
         closeInviteDialog();
         if (connectionState !== 'connected') return;
+        // The native dialog dispatches close asynchronously. Manual sharing
+        // may already have moved focus to the invite field.
+        if (opener?.music && opener.room === currentJam() && document.activeElement === $('[data-jam-link]')) return;
         const current = store(app.active);
         const host = amOp(current);
         const target = host && opener && opener.room === current && !opener.button.hidden
@@ -3379,7 +3382,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         closeMusicHandoff();
         if (!sent) {
             musicHandoffRecoveryRoom = room;
-            showMusicHandoffStatus(musicInviteFailed);
+            showMusicHandoffStatus(musicInviteFailed, { canShareManually: true });
             return;
         }
         if (musicInviteOutcomesSupported) {

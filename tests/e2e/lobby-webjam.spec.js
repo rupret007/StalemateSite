@@ -254,6 +254,18 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         await expect(refusal).toBeVisible();
         await expect(refusal).toContainText('Music invitation couldn’t be sent.');
         await expect(musicButton).toBeEnabled();
+        const fallback = host.getByRole('button', { name: 'Open manual sharing', exact: true });
+        await expect(fallback).toBeVisible();
+        await expect(refusal).toContainText('copy a fresh browser invite from WebJam');
+        await fallback.scrollIntoViewIfNeeded();
+        await expect(fallback).toBeInViewport({ ratio: 1 });
+        await fallback.press('Enter');
+        const input = host.getByRole('textbox', { name: 'WebJam invitation', exact: true });
+        await expect(input).toBeFocused();
+        await expect(input).toBeEmpty();
+        await expect(refusal).toBeEmpty();
+        await host.screenshot({ path: testInfo.outputPath('music-invite-refusal-manual-form.png') });
+        await expect(panel).toBeHidden();
         expect(await returnInvite(invite)).toBe(true);
         await expect(outcome).toHaveText('Music invitation sent to ChosenGuest. Waiting for a reply.');
         await expect(refusal).toBeEmpty();
