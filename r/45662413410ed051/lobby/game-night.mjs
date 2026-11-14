@@ -29,3 +29,10 @@ export const gameInviteCode = value => typeof value === 'string' && /^[A-Za-z0-9
 export function gameNightInvite(game, match) {
     return typeof game === 'string' && Object.hasOwn(gameNightLabels, game) && typeof match === 'string' && matchId.test(match) ? { game, match } : null;
 }
+
+export function gameNightReturnHint(value, validRoom, now = Date.now()) {
+    if (!value || !validRoom(value.room) || typeof value.ref !== 'string' || !/^[a-f0-9]{32}$/.test(value.ref)
+        || !Number.isFinite(value.until) || value.until <= now) return null;
+    const { room, ref, until, game } = value;
+    return { room, ref, until, ...(gameNightRoomName(room) && typeof game === 'string' && Object.hasOwn(gameNightLabels, game) ? { game } : {}) };
+}

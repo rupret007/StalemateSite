@@ -4,7 +4,7 @@ import * as entrance from '../entry-sites.mjs';
 import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
+import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -478,8 +478,9 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         });
         const back = entryReturn(entrySource, entrySites);
         $$('[data-entry-return]').forEach((element) => {
-            element.hidden = !back;
-            if (back) { element.href = back.href; element.textContent = back.label; }
+            element.hidden = !back || betaShell;
+            if (element.hidden) element.removeAttribute('href');
+            else { element.href = back.href; element.textContent = back.label; }
         });
     }
     $$('[data-entry-share]').forEach((element) => element.addEventListener('change', () => {
@@ -1540,15 +1541,19 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (!saved) {
             try { saved = JSON.parse(readTab(gameReturnKey)); } catch { /* Ignore stale tab data. */ }
         }
-        if (saved?.room && offerRoomName(saved.room) && roomNonce(saved.ref) && saved.until > Date.now()) return saved;
+        const hint = gameNightReturnHint(saved, offerRoomName);
+        if (hint) {
+            writeTab(gameReturnKey, JSON.stringify(hint));
+            return hint;
+        }
         removeTab(gameReturnKey);
         return null;
     }
     function rememberGameReturn(room, previousGame) {
         if (!offerRoomName(room.name) || !roomNonce(room.keepRef)) return;
         // Tab-local room reference only. Admission, nicknames and match state stay elsewhere.
-        const activeGame = room.kind === 'game' && (previousGame || (arcadeReturning?.ref === room.keepRef ? arcadeReturning.game : '')
-            || [...arcadeTables].find(([, table]) => table.seatRef === room.keepRef && table.controller?.isOpen())?.[0]);
+        const savedGame = gameReturn?.ref === room.keepRef && gameReturn.room === room.name ? gameReturn.game : '';
+        const activeGame = room.kind === 'game' && (previousGame || (arcadeReturning?.ref === room.keepRef ? arcadeReturning.game : '') || savedGame);
         gameReturn = { room: room.name, ref: room.keepRef, until: Date.now() + 30 * 60 * 1000,
             ...(activeGame ? { game: activeGame } : {}) };
         writeTab(gameReturnKey, JSON.stringify(gameReturn));
@@ -1791,8 +1796,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         const waiting = room && !gameGuest && !amOp(room)
             && ![...arcadeTables.values()].some(table => table.matchRef === room.keepRef);
         const message = waiting ? room.names.some(member => member.prefix === '@')
-            ? 'Wait for your host to open a game.'
-            : 'Your host is offline. Wait here for them to return.' : '';
+            ? 'Choose a game to see whether a table is open.'
+            : 'No room host is online. You can check the games or wait here.' : '';
         if (status.textContent !== message) status.textContent = message;
         status.hidden = !message;
     }
@@ -1829,7 +1834,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 const returning = arcadeReturning;
                 arcadeReturning = null;
                 const panel = table.controller.open();
-                if (returning.seat && panel?.open) panel.querySelector('summary').focus();
+                if (returning.seat && panel?.open) panel.querySelector('summary').focus({ preventScroll: true });
             }
             return;
         }
@@ -1892,7 +1897,13 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         table.seatRef = scope && state?.seat ? scope.ref : null;
         const room = currentGameNight();
         drawGameWaiting(room);
-        if (table.seatRef && room?.keepRef === table.seatRef) rememberGameReturn(room);
+        if (table.seatRef && room?.keepRef === table.seatRef) rememberGameReturn(room, game);
+        else if (sendMatch && !state?.seat && scope?.ref === room?.keepRef && gameReturn?.ref === scope?.ref
+            && gameReturn?.room === scope?.room && gameReturn?.game === game) {
+            const { room, ref, until } = gameReturn;
+            gameReturn = { room, ref, until };
+            writeTab(gameReturnKey, JSON.stringify(gameReturn));
+        }
         table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
         updateTableInvite(table, currentGameNight());
         const share = arcadeShareIntent;
