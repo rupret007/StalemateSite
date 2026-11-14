@@ -13,9 +13,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1' ? '?game-guest=1' : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
     let pausedForNetwork = false, terminalError = false;
-    function reset() {
+    function reset(reconnecting = false) {
         generation++;
-        onMatch?.(scope);
+        onMatch?.(scope, undefined, undefined, reconnecting);
         clearTimeout(reconnectTimer);
         clearTimeout(joinTimer);
         clearTimeout(claimTimer);
@@ -35,12 +35,13 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     function retry(attempt, reason) {
         if (attempt !== generation || !scope) return;
         if (!reason && navigator.onLine === false) return pauseForNetwork();
-        reset();
         if (reason || failures >= 3) {
+            reset();
             terminalError = !!reason;
             onStatus('unavailable', reason);
             return;
         }
+        reset(true);
         onStatus('reconnecting');
         reconnectTimer = setTimeout(connect, 400 * 2 ** failures++ * (0.75 + Math.random() / 2));
     }
@@ -95,13 +96,13 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     function pauseForNetwork() {
         if (!scope || terminalError || pausedForNetwork) return;
         pausedForNetwork = true;
-        reset();
+        reset(true);
         onStatus('reconnecting');
     }
     function reconnect() {
         if (!scope || terminalError || pausedForNetwork) return;
         failures = 1;
-        reset();
+        reset(true);
         void connect();
     }
     window.addEventListener('offline', pauseForNetwork);
