@@ -3533,7 +3533,12 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         }
         else if (record) forgetSavedMessage(record);
     });
-    $$('[data-quick-line]').forEach((b) => b.addEventListener('click', () => send({ t: 'say', ch: app.active, text: b.dataset.quickLine })));
+    $$('[data-quick-line]').forEach((b) => b.addEventListener('click', () => {
+        const sent = send({ t: 'say', ch: app.active, text: b.dataset.quickLine }, () => {
+            toast('Couldn’t send that shortcut. Try it again.', [], 'chat-shortcut-failed');
+        });
+        if (sent && toastKind === 'chat-shortcut-failed') dismissToast();
+    }));
     $$('[data-quick-me]').forEach((b) => b.addEventListener('click', () => cmd('me', [b.dataset.quickMe])));
     $$('[data-quick-cmd]').forEach((b) => b.addEventListener('click', () => {
         const name = b.dataset.quickCmd;
