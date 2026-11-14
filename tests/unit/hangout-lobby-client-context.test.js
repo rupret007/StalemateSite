@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
-import { gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import * as gameNightFunctions from '../../r/45662413410ed051/lobby/game-night.mjs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
 import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
@@ -37,7 +37,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; return this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, gameNightReturnHint, createEntrySharing, createIdleHeartbeat,
+    window.HangoutClientTestModules = { ...entryFunctions, ...gameNightFunctions, createEntrySharing, createIdleHeartbeat,
         createChatAnnouncements: (log) => createChatAnnouncements(log, { frame: (fn) => window.setTimeout(fn, 16), cancel: (id) => window.clearTimeout(id) }) };
     window.eval(discovery);
     // Execute the actual browser client, replacing only module loading, which
@@ -256,13 +256,31 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(ws.sent.at(-1)).toMatchObject({ t: 'say', text: 'Wait for my hidden badge' });
     });
     it('keeps both branded private lobby entrances inside the beta', async () => {
-        for (const brand of ['stalemate', 'rad-dad']) {
-            const { window } = await visitor(brand, { entrySources: 1 }, { beta: true });
+        for (const [brand, label] of [['stalemate', 'via Stalemate'], ['rad-dad', 'via Rad Dad']]) {
+            const { window, welcome, join } = await visitor(brand, { entrySources: 1 }, { beta: true });
+            welcome();
+            join();
+            const badges = [...window.document.querySelectorAll('[data-entry-label]')];
+            expect(badges.length).toBeGreaterThan(0);
+            expect(badges.map(badge => badge.textContent)).toEqual(badges.map(() => label));
             for (const link of window.document.querySelectorAll('[data-entry-return]')) {
                 expect(link.hidden).toBe(true);
                 expect(link.hasAttribute('href')).toBe(false);
             }
         }
+    });
+
+    it('drops unsupported saved games when the lobby offers to reopen a private room', async () => {
+        const { window, welcome, join } = await visitor('stalemate', { entrySources: 1, gameNight: 1 }, { beta: true });
+        const key = 'hangout-game-return';
+        const hint = { room: '#game-1acbefx23acbe', ref: 'a'.repeat(32), until: Date.now() + 60_000 };
+        window.sessionStorage.setItem(key, JSON.stringify({ ...hint, game: 'unsupported-game', session: 'unrelated' }));
+        welcome();
+        join();
+        expect(JSON.parse(window.sessionStorage.getItem(key))).toEqual(hint);
+        const offer = window.document.querySelector('[data-game-offer]');
+        expect(offer.hidden).toBe(false);
+        expect(offer.querySelector('[data-game-offer-join]').textContent).toBe('Return to room');
     });
 
     it('keeps a rollback server usable without unsupported sharing frames or a false badge promise', async () => {
