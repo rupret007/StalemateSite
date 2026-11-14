@@ -192,7 +192,8 @@ it('keeps a Spades watch link read-only and bound to the same table through rede
         const short = await issue({ betaSid: host, demo: true, exp: now + 1000 });
         expect(original.until).toBeGreaterThan(nightEndsAt);
         expect(short.until).toBe(now + 1000);
-        expect(await (await details(original.code)).json()).toMatchObject({ host: 'Host', watch: true });
+        expect(await (await details(original.code)).json()).toMatchObject({ host: 'Host', watch: true, inviteExpiresAt: original.until });
+        expect(await (await details(short.code)).json()).toMatchObject({ inviteExpiresAt: short.until });
         expect((await accept(original.code, { age13: false })).status).toBe(400);
         const admitted = await (await accept(original.code, { watch: false })).json();
         expect(admitted.scope).toMatchObject({ tableId, watch: true });

@@ -403,6 +403,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
                 assert.deepEqual(await guest.evaluate(() => window.gameNightWakeLocks), { acquired: 0, released: 0 });
                 await expect(guest.getByText('LinkHost invited you to play.')).toBeVisible();
+                const expires = guest.locator('[data-guest-expiry] time');
+                await expect(expires).toBeVisible();
+                assert.ok(Date.parse(await expires.getAttribute('datetime')) > Date.now());
                 await expect(guest.getByRole('textbox')).toHaveCount(0);
                 await expect(guest.getByRole('button')).toHaveCount(1);
                 assert.equal(new URL(guest.url()).hash, '');
@@ -3188,6 +3191,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await openGameNightLink(page, link);
         const watch = page.getByRole('button', { name: 'Watch game', exact: true });
         await expect(watch).toBeVisible();
+        const expires = page.locator('[data-guest-expiry] time');
+        await expect(expires).toBeVisible();
+        assert.ok(Date.parse(await expires.getAttribute('datetime')) > Date.now());
         await captureArcadeInvite(page, phone, brand + '-watch-consent');
         await watch.tap();
         await expect(page.locator('[data-spades-table]')).toHaveAttribute('data-phase', 'bid');

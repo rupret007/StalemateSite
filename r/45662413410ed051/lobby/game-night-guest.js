@@ -16,6 +16,7 @@ const lobbyPath = '/r/45662413410ed051/lobby/?game-guest=1';
 const gameDestination = tableId => lobbyPath + (typeof tableId === 'string' && tableIdPattern.test(tableId) ? '&table=' + tableId : '');
 const requestedTable = resumeGuest ? new URLSearchParams(location.search).get('table') : null;
 const inviter = document.querySelector('[data-guest-inviter]');
+const expiry = document.querySelector('[data-guest-expiry]');
 const returnToRoom = document.querySelector('[data-guest-return]');
 const webJam = document.querySelector('[data-webjam-guest]') !== null;
 const historyKey = webJam ? 'webJamGameNightInvite' : 'gameNightInvite';
@@ -102,7 +103,13 @@ async function describe() {
     }
     status.textContent = 'Checking your invitation…';
     try {
-        const { game, host, watch } = await request('details');
+        const { game, host, watch, inviteExpiresAt } = await request('details');
+        if (expiry && Number.isSafeInteger(inviteExpiresAt) && inviteExpiresAt > 0 && inviteExpiresAt <= 8.64e15) {
+            const time = expiry.querySelector('time');
+            time.dateTime = new Date(inviteExpiresAt).toISOString();
+            time.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(inviteExpiresAt);
+            expiry.hidden = false;
+        }
         watching = watch === true;
         join.textContent = watching ? 'Watch game' : 'Join game';
         inviter.textContent = `${host} invited you to ${watching ? 'watch' : 'play'}.`;

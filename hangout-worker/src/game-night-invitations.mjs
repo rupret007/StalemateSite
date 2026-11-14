@@ -119,7 +119,8 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     const tableId = await invitationTableId(table, scope);
     if (!tableId || scope.tableId && scope.tableId !== tableId) return unavailable();
     if (operation === 'details') {
-        return reply({ game: gameNightLabels[scope.game], host: binding.nick, ...(scope.watch ? { watch: true } : {}) });
+        return reply({ game: gameNightLabels[scope.game], host: binding.nick, inviteExpiresAt: record.until,
+            ...(scope.watch ? { watch: true } : {}) });
     }
     scope = { ...scope, tableId };
     const sid = crypto.randomUUID();
