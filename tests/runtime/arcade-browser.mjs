@@ -892,6 +892,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await friend.getByRole('button', { name: 'Join game', exact: true }).tap();
             await expect(table(friend)).toHaveAttribute('data-mode', 'partners');
             await expect(status(friend)).toHaveText('You and a computer partner vs the host and a computer · tap Bid for me');
+            const initialTable = new URL(friend.url()).searchParams.get('table');
+            await host.locator('[data-spades-action="leave"]').click();
+            await host.getByRole('dialog', { name: 'Leave this table?' }).getByRole('button', { name: 'Leave table', exact: true }).click();
+            const reopen = host.getByRole('button', { name: 'Reopen 2-player Spades', exact: true });
+            await expect(reopen).toBeVisible();
+            await expect(host.getByRole('button', { name: 'Open 4-player Spades', exact: true })).toBeHidden();
+            await reopen.click();
+            await expect(table(friend)).toHaveAttribute('data-mode', 'partners');
+            await expect(status(friend)).toContainText('tap Bid for me');
+            assert.equal(new URL(friend.url()).searchParams.get('table'), initialTable);
             await expect(friend.locator('.arcade-card-score')).toBeHidden();
             for (const player of [host, friend]) await expect(cards(player)).toHaveCount(13);
             const suitOf = { Spades: 'S', Hearts: 'H', Diamonds: 'D', Clubs: 'C' };

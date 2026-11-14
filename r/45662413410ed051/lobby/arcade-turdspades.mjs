@@ -60,7 +60,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
     const table = $('[data-spades-table]'), seatsHost = $('[data-spades-seats]'), hand = $('[data-spades-hand]');
     const bid = $('#spades-bid'), confirm = $('[data-spades-confirm]');
     const actions = [...panel.querySelectorAll('[data-spades-action]')];
-    let scope = null, model = null, canOpen = false, partnersSupported = false, connection = 'connecting', connectionError;
+    let scope = null, model = null, canOpen = false, partnersSupported = false, savedMode, connection = 'connecting', connectionError;
     let pending = false, timer, confirmation = '';
     let suggestedBidKey = '', bidEdited = false, applyingBid = false;
 
@@ -77,7 +77,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             closeConfirmation();
             draw();
         },
-        onState({ state, canOpen: host, partners }) {
+        onState({ state, canOpen: host, partners, reopenMode }) {
             if (state && (state.game !== 'turdspades' || state.version !== 1)) return;
             const revealing = state?.match && (!model?.match || model.id !== state.id);
             if (state?.id !== model?.id || state?.match?.revision !== model?.match?.revision) {
@@ -94,6 +94,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             model = state;
             canOpen = host;
             partnersSupported = partners === true;
+            savedMode = reopenMode;
             connection = 'ready';
             connectionError = undefined;
             clearPending();
@@ -196,7 +197,14 @@ export function mountArcadeTurdSpades(container, onMatch) {
         } else if (!model) {
             message = canOpen ? (partnersSupported ? 'Play with one friend and a CPU partner on each team, or fill all four seats with friends.'
                 : 'Open a partnership table for four players.') : 'Waiting for the host to open a table.';
-            if (canOpen) { command = 'open'; label = partnersSupported ? 'Open 4-player Spades' : 'Open Spades table'; }
+            if (canOpen) {
+                command = 'open';
+                label = partnersSupported ? 'Open 4-player Spades' : 'Open Spades table';
+                if (savedMode) {
+                    label = savedMode === 'partners' ? 'Reopen 2-player Spades' : 'Reopen 4-player Spades';
+                    message = 'Reopen Spades to keep the same seats.';
+                }
+            }
         } else if (model?.waiting) {
             message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
             if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
@@ -240,7 +248,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         main.textContent = label;
         main.dataset.command = command;
         main.disabled = pending;
-        partnerButton.hidden = command !== 'open' || !partnersSupported;
+        partnerButton.hidden = command !== 'open' || !partnersSupported || !!savedMode;
         partnerButton.disabled = pending;
         seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
@@ -259,7 +267,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
             const position = seats[index], entry = shown.find(value => value.seat === position);
             const called = match.bids[position];
             const tricks = match.tricks[position];
-            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · Bid ${called === null ? '—' : called || 'Nil'} · ${tricks} ${tricks === 1 ? 'trick' : 'tricks'}`;
+            const bidLabel = called === null ? 'No bid yet' : `Bid ${called || 'Nil'}`;
+            label.textContent = `${nameFor(position)}${seat === position ? ' (you)' : ''} · ${bidLabel} · ${tricks} ${tricks === 1 ? 'trick' : 'tricks'}`;
             card.textContent = entry ? face(entry) : '—';
             card.setAttribute('aria-label', entry ? cardLabel(entry) : 'No card played');
             row.dataset.active = String(!match.result && match.phase !== 'round-end' && match.turn === position);
@@ -303,6 +312,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
     main.addEventListener('click', () => {
         const action = main.dataset.command;
         if (action === 'retry') client.start(scope);
+        else if (action === 'open' && savedMode === 'partners') send(action, { mode: savedMode });
         else if (action) send(action);
     });
     partnerButton.addEventListener('click', () => send('open', { mode: 'partners' }));

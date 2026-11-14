@@ -10,7 +10,7 @@ const sid = 'seat-white';
 const actor = 'c' + '1'.repeat(32);
 const guest = 'c' + '2'.repeat(32);
 
-function fixture() {
+function fixture(name = 'chess') {
     const records = new Map(), actors = new Map(), connections = [];
     let now = 1000, matchCount = 0, alarm = null;
     const storage = {
@@ -29,7 +29,7 @@ function fixture() {
         const binding = { betaSid, betaInviteVersion: 1, canPlay: true, canOpen,
             canJoin: subject => subject !== betaSid, canSee: () => true };
         actors.set(id, binding);
-        let attachment = { actor: id, betaSid, betaInviteVersion: 1, room, ref, kind: ARCADE_TAG };
+        let attachment = { actor: id, betaSid, betaInviteVersion: 1, room, ref, kind: name === 'chess' ? ARCADE_TAG : ARCADE_TAG + ':' + name };
         const socket = { frames: [], readyState: 1, serializeAttachment: data => { attachment = data; },
             deserializeAttachment: () => attachment, send(value) { this.frames.push(JSON.parse(value)); },
             close: vi.fn() };
@@ -38,7 +38,7 @@ function fixture() {
     }
     const a = player(actor, sid, true), b = player(guest, 'seat-black', false);
     const guestActivity = vi.fn(async () => {});
-    const transport = createArcadeTransport({ state: { storage, getWebSockets: () => connections }, guestActivity,
+    const transport = createArcadeTransport({ state: { storage, getWebSockets: () => connections }, name, guestActivity,
         now: () => now, uuid: () => 'c8eb7f10-e113-418f-9900-' + String(++matchCount).padStart(12, '0'),
         current: scope => actors.get(scope.actor), active: async () => true, approve: async () => true,
         charge: async () => true, allowed: () => true });
@@ -325,6 +325,22 @@ describe('Game Night match transport', () => {
         expect(f.board(f.b)).toMatchObject({ id: replacement, replacementAvailable: true, hasOpenSeat: true });
         await f.send(f.b, 'join', { id: replacement, seat: 'next' });
         expect(f.board(f.b)).toMatchObject({ id: replacement, seat: 'b', waiting: false });
+    });
+
+    it.each([['partners', 'partners'], [undefined, 'four']])('offers only the saved Spades mode with a roster (%s)', async (mode, reopenMode) => {
+        const f = fixture('turdspades');
+        await f.send(f.a, 'open', mode ? { mode } : {});
+        const { id, tableId } = f.board(f.a);
+        await f.send(f.b, 'join', { id, seat: 'west' });
+        expect(f.board(f.b)).toMatchObject({ seat: 'west' });
+        await f.send(f.a, 'leave', { id });
+        expect(f.a.frames.at(-1)).toMatchObject({ state: null, reopenMode });
+        expect(f.b.frames.at(-1)).not.toHaveProperty('reopenMode');
+        await f.send(f.a, 'open', mode ? {} : { mode: 'partners' });
+        expect(f.a.frames.at(-1)).toMatchObject({ t: 'match-error', reason: 'unavailable' });
+        await f.send(f.a, 'open', mode ? { mode } : {});
+        expect(f.board(f.b)).toMatchObject({ tableId, seat: 'west' });
+        expect(f.board(f.b).id).not.toBe(id);
     });
 
     it('preserves the table identity and roster when the host reopens, and makes a duplicate join idempotent', async () => {

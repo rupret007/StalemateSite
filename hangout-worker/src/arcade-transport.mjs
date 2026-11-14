@@ -156,9 +156,9 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             if (record?.claims.some(claim => claim.grant && claim.sid === holder)) await releaseGuestClaim(scope, holder);
         }
     };
-    function sendView(socket, attachment, view, canOpen, seq, seat = view?.seat ?? null) {
+    function sendView(socket, attachment, view, canOpen, seq, seat = view?.seat ?? null, reopenMode) {
         const frame = { t: 'match-state', version: 1, room: attachment.room, state: view, canOpen,
-            ...(PartnerTable ? { partners: true } : {}) };
+            ...(PartnerTable ? { partners: true } : {}), ...(reopenMode ? { reopenMode } : {}) };
         if (!attachment.snapshot) return send(socket, frame);
         const match = view?.match;
         return send(socket, { ...frame, t: 'snapshot', seq, phase: match?.result ? 'finished' : match ? 'playing' : 'lobby',
@@ -214,7 +214,9 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 }
             }
             if (view && nextMatch) send(socket, { t: 'rematch', matchId: nextMatch });
-            sendView(socket, recipient, view, binding.canOpen, seq, seat);
+            const reopenMode = PartnerTable && permitted && game?.closed && game.subjects.length > 1
+                && binding.canOpen && game.host === binding.betaSid ? game.mode ?? 'four' : undefined;
+            sendView(socket, recipient, view, binding.canOpen, seq, seat, reopenMode);
         }
     }
     async function receive(socket, raw) {

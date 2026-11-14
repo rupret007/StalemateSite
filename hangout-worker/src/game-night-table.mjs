@@ -68,6 +68,7 @@ export function createGameNightTable({
 
         get deadline() { return this.#closed ? null : this.#match?.deadline ?? null; }
         get closed() { return this.#closed; }
+        get mode() { return mode; }
         get host() { return this.#host; }
         get tableId() { return this.#tableId; }
         get subjects() { return sides.map(seat => this.#seats[seat]).filter(Boolean); }
