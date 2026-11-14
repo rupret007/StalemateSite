@@ -2,6 +2,18 @@
 import { expect, it, vi } from 'vitest';
 import { gameGuestScope, gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
 
+import { gameNightReturnHint, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+
+it('keeps a saved game only in a Game Night room', () => {
+    const fields = { ref: 'a'.repeat(32), until: 2000 };
+    const validRoom = room => gameNightRoomName(room) || room === '#general';
+    const gameRoom = { ...fields, room: '#game-1acbefx23acbe', game: 'chess' };
+    const lobbyRoom = { ...fields, room: '#general' };
+
+    expect(gameNightReturnHint(gameRoom, validRoom, 1000)).toEqual(gameRoom);
+    expect(gameNightReturnHint({ ...lobbyRoom, game: 'chess' }, validRoom, 1000)).toEqual(lobbyRoom);
+});
+
 it('closes legacy invitations for retired games, including previously accepted links', async () => {
     const code = 'a'.repeat(32);
     const attempt = 'b'.repeat(32);

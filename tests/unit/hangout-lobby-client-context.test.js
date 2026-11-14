@@ -270,6 +270,21 @@ describe('browser client privacy and bounded delivery wiring', () => {
         }
     });
 
+    it('updates Game Night guidance when the room host goes offline', async () => {
+        const { window, ws } = await visitor('stalemate', { gameNight: 1 }, { beta: true });
+        const player = { id: 'c' + 'a'.repeat(32), nick: 'Viewer', prefix: '' };
+        const host = { id: 'c' + 'b'.repeat(32), nick: 'Host', prefix: '@' };
+        const room = { name: '#game-1acbefx23acbe', kind: 'game', keepRef: 'c'.repeat(32),
+            title: 'Game Night', topic: '', count: 2, modes: { i: true }, names: [player, host] };
+        ws.receive({ t: 'welcome', nick: player.nick, id: player.id, role: 'fan', band: false });
+        ws.receive({ t: 'join', ch: room });
+        const status = window.document.querySelector('[data-game-waiting]');
+        expect(status.hidden).toBe(false);
+        expect(status.textContent).toBe('Choose a game to see whether a table is open.');
+        ws.receive({ t: 'chan', ch: { ...room, names: [player], count: 1 } });
+        expect(status.textContent).toBe('No room host is online. You can check the games or wait here.');
+    });
+
     it('drops unsupported saved games when the lobby offers to reopen a private room', async () => {
         const { window, welcome, join } = await visitor('stalemate', { entrySources: 1, gameNight: 1 }, { beta: true });
         const key = 'hangout-game-return';

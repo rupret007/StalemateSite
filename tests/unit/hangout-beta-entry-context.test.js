@@ -16,6 +16,22 @@ function env(extra = {}) {
         ASSETS: { fetch: vi.fn(async () => new Response(readFileSync(new URL('../../r/45662413410ed051/entry-sites.mjs', import.meta.url), 'utf8'))) },
         LOBBY: {}, QUOTA: {}, ROOMS: {}, BETA_SESSIONS: {}, ...extra };
 }
+
+it('serves the invitation copy module before admission only when guest invites are enabled', async () => {
+    const modulePath = root + 'lobby/game-night.mjs';
+    const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1', ASSETS: {
+        fetch: vi.fn(async () => new Response('export const GAME_INVITE_UNAVAILABLE = "Invite unavailable.";'))
+    } });
+    const request = path => new Request('https://beta.example.test' + path);
+    const response = await betaFetch(request(modulePath), config);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('export const GAME_INVITE_UNAVAILABLE');
+    expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
+    expect((await betaFetch(request(root + 'lobby/lobby.js'), config)).status).toBe(401);
+    expect((await betaFetch(request(modulePath), { ...config, HANGOUT_GAME_NIGHT_GUESTS: '0' })).status).toBe(401);
+    expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
+});
+
 async function shell(address, config = env(), prepare) {
     const request = (path) => new Request(new URL(path, address));
     const html = await (await betaFetch(request('/'), config)).text();

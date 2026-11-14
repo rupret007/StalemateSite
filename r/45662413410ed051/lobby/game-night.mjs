@@ -36,3 +36,5 @@ export function gameNightReturnHint(value, validRoom, now = Date.now()) {
     const { room, ref, until, game } = value;
     return { room, ref, until, ...(gameNightRoomName(room) && typeof game === 'string' && Object.hasOwn(gameNightLabels, game) ? { game } : {}) };
 }
+
+export const GAME_INVITE_UNAVAILABLE = 'This invite is no longer available. Ask your host for a new one.';
