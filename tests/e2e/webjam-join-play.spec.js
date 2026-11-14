@@ -253,11 +253,12 @@ for (const width of [375, 390]) {
 
 // Ownership regressions exercise the shipped module through the website URL.
 // Adapted from WebJam failure-recovery.spec.js at01ffdc8 (MIT; see join/LICENSE).
-async function openOwnedInvitation(page, width = 390, skipCheck = true) {
+async function openOwnedInvitation(page, width = 390, skipCheck = true, { holdCapture = false } = {}) {
   await page.setViewportSize({ width, height: 844 });
   await page.clock.install();
-  await page.addInitScript(({ skipCheck }) => {
+  await page.addInitScript(({ skipCheck, holdCapture }) => {
     window.captureTracks = [];
+    if (holdCapture) window.pendingCaptures = [];
     const nativeContext = window.AudioContext;
     window.audioContexts = [];
     window.AudioContext = class extends nativeContext {
@@ -283,10 +284,10 @@ async function openOwnedInvitation(page, width = 390, skipCheck = true) {
           track.stop = () => { stop(); context.close().catch(() => {}); };
           window.captureTracks.push(track);
         }
-        return stream;
+        return holdCapture ? new Promise(resolve => pendingCaptures.push(() => resolve(stream))) : stream;
       }
     });
-  }, { skipCheck });
+  }, { skipCheck, holdCapture });
   const expires = Math.floor(Date.now() / 1000) + 300;
   // Local test-only capability, with no corresponding host or mailbox.
   await page.goto(`/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
@@ -401,16 +402,14 @@ test('a retired initial resume cannot enable Join while the next resume is pendi
   await expect.poll(() => page.evaluate(() => audioContexts.every(context => context.state === 'closed'))).toBe(true);
 });
 
-test('capture arriving after Leave releases only its own tracks during the next Join', async ({ page }) => {
-  await openOwnedInvitation(page);
-  await page.evaluate(() => {
-    window.pendingCaptures = [];
-    const capture = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia = async () => {
-      const stream = await capture();
-      return new Promise(resolve => pendingCaptures.push(() => resolve(stream)));
-    };
+test('capture arriving after Leave releases only its own tracks during the next Join', async ({ page, baseURL }) => {
+  const unexpected = [];
+  await page.route('**/*', route => {
+    if (new URL(route.request().url()).origin === new URL(baseURL).origin) return route.continue();
+    unexpected.push(route.request().resourceType());
+    return route.abort();
   });
+  await openOwnedInvitation(page, 390, true, { holdCapture: true });
   const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
   const leave = page.getByRole('button', { name: 'Leave session', exact: true });
   await join.click(); await expect.poll(() => page.evaluate(() => pendingCaptures.length)).toBe(1);
@@ -424,4 +423,5 @@ test('capture arriving after Leave releases only its own tracks during the next 
   await leave.click(); await page.evaluate(() => pendingCaptures[1]());
   await expect.poll(() => page.evaluate(() => captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
   await expect.poll(() => page.evaluate(() => audioContexts.every(context => context.state === 'closed'))).toBe(true);
+  expect(unexpected).toEqual([]);
 });

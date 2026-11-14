@@ -1,5 +1,5 @@
 import { gameNightCue } from './game-night-audio.mjs';
-import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors, matchHiddenText } from './game-night-match-client.mjs';
 import { suggestSpadesBid } from '/play/games/turdspades-engine.js';
 
 const seats = ['south', 'west', 'north', 'east'];
@@ -194,6 +194,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
             if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Reconnect table'; }
         } else if (connection !== 'ready') {
             if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
+        } else if (!model && client.matchOpen()) {
+            message = matchHiddenText;
         } else if (!model) {
             message = canOpen ? (partnersSupported ? 'Play with one friend and a CPU partner on each team, or fill all four seats with friends.'
                 : 'Open a partnership table for four players.') : 'Waiting for the host to open a table.';
