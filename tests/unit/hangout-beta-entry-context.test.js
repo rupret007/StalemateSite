@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
+import { signBeta } from '../../hangout-worker/src/beta-auth.mjs';
 import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
 import { GAME_INVITE_UNAVAILABLE, gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
@@ -16,6 +17,46 @@ function env(extra = {}) {
         ASSETS: { fetch: vi.fn(async () => new Response(readFileSync(new URL('../../r/45662413410ed051/entry-sites.mjs', import.meta.url), 'utf8'))) },
         LOBBY: {}, QUOTA: {}, ROOMS: {}, BETA_SESSIONS: {}, ...extra };
 }
+it('returns unavailable for an invitation replay after its guest session was revoked', async () => {
+    const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });
+    const exp = Date.now() + 60_000;
+    const grant = { sid: 'guest-fixture-session', exp, scope: {
+        game: 'chess', match: '11111111-1111-4111-8111-111111111111',
+        room: '#game-1acbefx23acbe', ref: 'c'.repeat(32), host: 'host-fixture-session', nameSeed: 1
+    } };
+    config.LOBBY = { idFromName: name => name, get: () => ({ fetch: async () => Response.json(grant) }) };
+    const values = new Map();
+    const storage = {
+        get: async key => structuredClone(values.get(key)),
+        put: async (key, value) => values.set(key, structuredClone(value)),
+        delete: async keys => { for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key); },
+        list: async ({ prefix = '', limit = 1000 } = {}) => new Map([...values]
+            .filter(([key]) => key.startsWith(prefix)).slice(0, limit)),
+        setAlarm: async () => {}, deleteAlarm: async () => {},
+        transaction: callback => callback(storage)
+    };
+    const registry = new BetaSessions({ storage, blockConcurrencyWhile: callback => callback() }, config);
+    config.BETA_SESSIONS = { idFromName: name => name, get: () => registry };
+    const origin = 'https://beta.example';
+    const headers = { Origin: origin, 'Content-Type': 'application/json', 'CF-Connecting-IP': '192.0.2.22' };
+    const code = await signBeta('game-invitation', { v: 1, sid: 'a'.repeat(32), exp }, config.HANGOUT_HMAC_KEY);
+    const accept = () => betaFetch(new Request(origin + '/beta/game-night/invitation/accept', {
+        method: 'POST', headers, body: JSON.stringify({ code, age13: true, attempt: 'b'.repeat(32) })
+    }), config);
+    const admitted = await accept();
+    expect(admitted.status).toBe(200);
+    const retry = await accept();
+    expect(retry.status).toBe(200);
+    expect(retry.headers.has('Set-Cookie')).toBe(true);
+    const retired = await registry.fetch(new Request('https://beta-sessions/revoke', {
+        method: 'POST', headers, body: JSON.stringify({ sid: grant.sid, exp, version: '1' })
+    }));
+    expect(retired.status).toBe(200);
+    const replay = await accept();
+    expect(replay.status).toBe(410);
+    expect((await replay.json()).error).toBe('This invite is no longer available. Ask your host for a new one.');
+    expect(replay.headers.has('Set-Cookie')).toBe(false);
+});
 
 it('serves the invitation copy module before admission only when guest invites are enabled', async () => {
     const modulePath = root + 'lobby/game-night.mjs';

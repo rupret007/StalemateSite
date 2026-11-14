@@ -449,6 +449,19 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(reused.getByRole('status')).toHaveText('This invite is no longer available. Ask your host for a new one.');
                 await expect(reused.getByRole('button', { name: 'Join game' })).toBeHidden();
                 await reused.close();
+                if (phone) {
+                    await host.getByRole('button', { name: 'Leave match', exact: true }).click();
+                    await host.getByRole('dialog', { name: 'Leave match?' }).getByRole('button', { name: 'Leave match', exact: true }).click();
+                    await host.getByRole('button', { name: 'Open Chess match', exact: true }).click();
+                    await guest.reload();
+                    await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
+                    await expect(guest.locator('[data-chess-status]')).toHaveText('Black is open. Join to play.');
+                    await guest.getByRole('button', { name: 'Join as Black', exact: true }).tap();
+                    await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                    await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
+                    await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeAttached();
+                    console.log(`Passed ${engine} same-host replacement Chess table using the original admitted guest session.`);
+                }
                 await context.request.post(origin + '/beta/game-night/invitation/leave', { headers: { Origin: origin }, data: { sessionRef: '0'.repeat(64) } });
                 assert.equal((await context.request.get(origin + '/beta/state?game-guest=1')).status(), 200, 'an obsolete tab cannot close a different invitation');
                 if (!phone) await guest.route('**/beta/game-night/invitation/leave', route => route.fulfill({ status: 503 }), { times: 1 });

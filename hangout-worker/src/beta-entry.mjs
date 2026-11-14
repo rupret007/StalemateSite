@@ -245,7 +245,11 @@ async function newAccess(env, { exp = Date.now() + BETA_TTL, ip = '0.0.0.0', pro
     try { result = await registryRequest(env, 'register', { sid: access.sid, exp: access.exp, version: access.version, iph: await ipHash(ip, env.HANGOUT_HMAC_KEY),
         ...(env.HANGOUT_SESSION_AUTHORITY === 'lobby-v1' ? { profile } : {}) }); }
     catch { throw new BetaSessionUnavailable('The community session service is temporarily unavailable.'); }
-    if (gameGuest && result.status === 409) result = await registryRequest(env, 'check', { sid, exp, version: access.version });
+    if (gameGuest && result.status === 409) {
+        try { result = await registryRequest(env, 'check', { sid, exp, version: access.version }); }
+        catch { throw new BetaSessionUnavailable('The community session service is temporarily unavailable.'); }
+        if (result.status === 403) throw new BetaSessionUnavailable(GAME_INVITE_UNAVAILABLE, 410);
+    }
     if (result.status !== 200) throw new BetaSessionUnavailable(result.status === 429 ? 'The beta session allowance is full. Please try again later.' : 'The community session service is temporarily unavailable.', result.status === 429 ? 429 : 503);
     return { access, cookie: betaCookie(gameGuest ? GAME_GUEST_COOKIE : BETA_COOKIE, await signBeta('access', access, env.HANGOUT_HMAC_KEY), exp - Date.now()) };
 }
