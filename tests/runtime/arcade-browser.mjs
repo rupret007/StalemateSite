@@ -81,7 +81,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             });
             socket.on('close', () => longRoomTrace.push({ t: 'socket closed' }));
         });
-        const protectedBoard = await context.request.get(origin + '/play/games/chess-board.js');
+        const protectedBoard = await context.request.get(origin + '/play/games/chess-core.js');
         assert.ok((mixed?.previousWorker ? [401, 404] : [401]).includes(protectedBoard.status()), 'anonymous match asset stays protected');
         const destination = `${origin}/beta/?via=${source}`;
         if (gameUrl) await page.goto(gameUrl);
@@ -413,7 +413,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
                 await expect(guest.locator('details.arcade-chess > summary')).toBeFocused();
-                const pieces = guest.locator('.arcade-chess cg-board piece');
+                const pieces = guest.locator('.arcade-chess [data-square] img');
                 await expect(pieces).toHaveCount(32);
                 await expect(pieces.first()).toBeVisible();
                 await expect(guest.getByLabel('Your nick')).toBeHidden();
@@ -960,8 +960,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                 await tapSquare(friend, 'd7', phone);
+                await expect(friend.locator('[data-square="d5"]')).toHaveAttribute('data-legal', '');
                 await tapSquare(friend, 'd5', phone);
                 await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
+                await expect(friend.locator('[data-square][data-legal]')).toHaveCount(0);
                 await captureArcadeInvite(friend, viewport, step('04-playing'));
                 assert.equal((await friend.context().request.get(origin + '/beta/state')).status(), 401, 'the guest has only game access');
                 console.log(`Passed ${engine} ${viewport.width}x${viewport.height} ${brand} invitation refresh, interrupted acceptance, and first move.`);
@@ -1125,6 +1127,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (const page of [black, white]) {
             await expect(page.locator('[data-chess-status]')).toHaveText('White wins · Checkmate');
             await expect(page.getByRole('button', { name: 'f7, White queen' })).toBeAttached();
+            const king = page.getByRole('button', { name: 'e8, Black king' });
+            await expect(king).toHaveAttribute('data-check', '');
+            await expect(king).toHaveCSS('background-image', /radial-gradient/);
         }
         if (media) {
             await waitForPackets(white, 'audio', before);
@@ -1133,6 +1138,27 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await black.getByRole('button', { name: 'Request rematch' }).click();
         await white.getByRole('button', { name: 'Accept rematch' }).click();
         await expect(black.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+        for (const [page, from, to] of [[black, 'd2', 'd4'], [white, 'e7', 'e5'], [black, 'h2', 'h3'], [white, 'f8', 'b4']]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
+        }
+        for (const page of [black, white]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('White is in check');
+            await expect(page.locator('[data-square="e1"][data-dark][data-check]')).toHaveCSS('background-image', /radial-gradient/);
+        }
+        if (evidence) {
+            const desktop = black.viewportSize();
+            const phone = white.viewportSize();
+            try {
+                await black.setViewportSize({ width: 1440, height: 900 });
+                await white.setViewportSize({ width: 390, height: 844 });
+                await captureArcadeInvite(black, black.viewportSize(), 'chess-check');
+                await captureArcadeInvite(white, white.viewportSize(), 'chess-check');
+            } finally {
+                await black.setViewportSize(desktop);
+                await white.setViewportSize(phone);
+            }
+        }
         console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
     }
     async function joinCalls(a, b) {

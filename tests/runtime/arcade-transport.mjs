@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,6 +47,11 @@ const evidence = process.env.ARCADE_BROWSER_EVIDENCE ? resolve(process.env.ARCAD
 const app = fileURLToPath(new URL('../../', import.meta.url));
 const previewSite = (browserName || serve) ? createArcadePreviewSite(app) : null;
 const assets = fileURLToPath(new URL('../../.beta-assets/', import.meta.url));
+if (browserName && !mixedRef) {
+    const chessAssets = await readdir(join(assets, 'play/assets/chess'));
+    assert.ok(chessAssets.includes('GPL-3.0.txt'), 'the packaged Chess helpers include their license');
+    assert.ok(!chessAssets.some(name => /chessground/i.test(name)), 'the protected board ships without Chessground');
+}
 const sharedSource = process.env.ARCADE_TEST_SOURCE ? resolve(process.env.ARCADE_TEST_SOURCE) : null;
 const radDad = process.env.ARCADE_TEST_RAD_DAD ? resolve(process.env.ARCADE_TEST_RAD_DAD) : null;
 assert.equal(!!sharedSource, !!radDad, 'provide both arcade checkouts for the cross-site browser proof');
