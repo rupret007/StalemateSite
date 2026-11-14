@@ -1841,8 +1841,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (!scope || table.loading) return;
         table.loading = true;
         table.load().then(mount => {
-            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, _reconnecting, _snapshot, failed) =>
-                arcadeMatchState(game, table, room, state, sendMatch, failed));
+            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting, _snapshot, failed) =>
+                arcadeMatchState(game, table, room, state, sendMatch, reconnecting, failed));
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'btn btn--small arcade-invite-friend';
@@ -1893,7 +1893,12 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (table.inviteButton)
             table.inviteButton.hidden = !!gameGuest || !gameGuestInvitesSupported || !table.invite || !room || !amOp(room);
     }
-    function arcadeMatchState(game, table, scope, state, sendMatch, failed) {
+    function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting, failed) {
+        if (reconnecting) {
+            table.invite = null;
+            updateTableInvite(table, currentGameNight());
+            return;
+        }
         table.matchRef = scope && state?.id ? scope.ref : null;
         table.seatRef = scope && state?.seat ? scope.ref : null;
         const room = currentGameNight();

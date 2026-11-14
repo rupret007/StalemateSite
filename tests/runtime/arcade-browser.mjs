@@ -81,7 +81,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             });
             socket.on('close', () => longRoomTrace.push({ t: 'socket closed' }));
         });
-        const protectedBoard = await context.request.get(origin + '/play/games/chess-board.js');
+        const protectedBoard = await context.request.get(origin + '/play/games/chess-core.js');
         assert.ok((mixed?.previousWorker ? [401, 404] : [401]).includes(protectedBoard.status()), 'anonymous match asset stays protected');
         const destination = `${origin}/beta/?via=${source}`;
         if (gameUrl) await page.goto(gameUrl);
@@ -413,7 +413,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
                 await expect(guest.locator('details.arcade-chess > summary')).toBeFocused();
-                const pieces = guest.locator('.arcade-chess cg-board piece');
+                const pieces = guest.locator('.arcade-chess [data-square] img');
                 await expect(pieces).toHaveCount(32);
                 await expect(pieces.first()).toBeVisible();
                 await expect(guest.getByLabel('Your nick')).toBeHidden();
@@ -442,6 +442,39 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 } else await expect(guest.getByLabel('Announce new chat messages')).toBeVisible();
                 await guest.reload();
                 await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                if (phone) {
+                    const ticketPath = '/beta/arcade-ticket';
+                    let requests = 0;
+                    const countTicket = request => {
+                        if (new URL(request.url()).pathname === ticketPath) requests++;
+                    };
+                    guest.on('request', countTicket);
+                    try {
+                        await guest.evaluate(() => {
+                            Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+                            window.dispatchEvent(new Event('offline'));
+                            window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+                        });
+                        await expect(guest.locator('[data-chess-status]')).toContainText('Reconnecting');
+                        assert.equal(requests, 0, 'a restored page does not request a ticket while offline');
+                        const recovered = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        await guest.evaluate(() => {
+                            delete navigator.onLine;
+                            window.dispatchEvent(new Event('online'));
+                        });
+                        await recovered;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                        assert.equal(requests, 1, 'coming online restores the seat with one ticket');
+
+                        const restored = guest.waitForRequest(request => new URL(request.url()).pathname === ticketPath);
+                        await guest.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+                        await restored;
+                        await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                        await expect(guest.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+                        assert.equal(requests, 2, 'a restored history entry refreshes the match once');
+                    } finally { guest.off('request', countTicket); }
+                }
                 await guest.locator('[data-text]').fill('First visit from the game invite');
                 await guest.locator('[data-send]').click();
                 await expect(host.getByRole('log', { name: 'Conversation' })).toContainText('First visit from the game invite');
@@ -743,6 +776,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(host.getByRole('log', { name: 'Conversation' }).getByRole('listitem')
             .filter({ hasText: 'Meet me at the chess board' })).toBeVisible();
         if (!media && !relay) {
+            const waiting = player.locator('[data-game-waiting]');
+            const status = player.locator('[data-chess-status]');
+            await expect(waiting).toBeHidden();
+            await player.evaluate(() => window.dispatchEvent(new Event('offline')));
+            await expect(status).toContainText('Reconnecting');
+            await expect(waiting).toBeHidden();
+            await player.evaluate(() => window.dispatchEvent(new Event('online')));
+            await expect(status).toHaveText('You’re Black · Your turn');
+            await expect(player.getByRole('button', { name: 'e4, White pawn' })).toBeVisible();
+            await expect(waiting).toBeHidden();
+        }
+        if (!media && !relay) {
             const panel = player.locator('details.arcade-chess');
             const summary = panel.locator('summary');
             await summary.tap();
@@ -955,8 +1000,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await moveByKeyboard(host, 'e2', 'ArrowUp', 2);
                 await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
                 await tapSquare(friend, 'd7', phone);
+                await expect(friend.locator('[data-square="d5"]')).toHaveAttribute('data-legal', '');
                 await tapSquare(friend, 'd5', phone);
                 await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
+                await expect(friend.locator('[data-square][data-legal]')).toHaveCount(0);
                 await captureArcadeInvite(friend, viewport, step('04-playing'));
                 assert.equal((await friend.context().request.get(origin + '/beta/state')).status(), 401, 'the guest has only game access');
                 console.log(`Passed ${engine} ${viewport.width}x${viewport.height} ${brand} invitation refresh, interrupted acceptance, and first move.`);
@@ -1120,6 +1167,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (const page of [black, white]) {
             await expect(page.locator('[data-chess-status]')).toHaveText('White wins · Checkmate');
             await expect(page.getByRole('button', { name: 'f7, White queen' })).toBeAttached();
+            const king = page.getByRole('button', { name: 'e8, Black king' });
+            await expect(king).toHaveAttribute('data-check', '');
+            await expect(king).toHaveCSS('background-image', /radial-gradient/);
         }
         if (media) {
             await waitForPackets(white, 'audio', before);
@@ -1128,6 +1178,27 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await black.getByRole('button', { name: 'Request rematch' }).click();
         await white.getByRole('button', { name: 'Accept rematch' }).click();
         await expect(black.locator('[data-chess-status]')).toHaveText('You’re White · Your turn');
+        for (const [page, from, to] of [[black, 'd2', 'd4'], [white, 'e7', 'e5'], [black, 'h2', 'h3'], [white, 'f8', 'b4']]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('Your turn');
+            for (const square of [from, to]) await page.locator(`[data-square="${square}"]`).press('Enter');
+        }
+        for (const page of [black, white]) {
+            await expect(page.locator('[data-chess-status]')).toContainText('White is in check');
+            await expect(page.locator('[data-square="e1"][data-dark][data-check]')).toHaveCSS('background-image', /radial-gradient/);
+        }
+        if (evidence) {
+            const desktop = black.viewportSize();
+            const phone = white.viewportSize();
+            try {
+                await black.setViewportSize({ width: 1440, height: 900 });
+                await white.setViewportSize({ width: 390, height: 844 });
+                await captureArcadeInvite(black, black.viewportSize(), 'chess-check');
+                await captureArcadeInvite(white, white.viewportSize(), 'chess-check');
+            } finally {
+                await black.setViewportSize(desktop);
+                await white.setViewportSize(phone);
+            }
+        }
         console.log(`Passed ${engine} Royal Flush Chess from first move to checkmate, matching results and rematch${media ? ' during the same call' : ''}.`);
     }
     async function joinCalls(a, b) {
@@ -2138,7 +2209,36 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.getByRole('button', { name: 'Join Turd Rush race' }).click();
         await expect(race(b)).toHaveAttribute('data-phase', 'countdown');
         await expect(race(b)).toHaveAttribute('data-renderer', '2d');
-        if (engine === 'chromium') await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+        if (engine === 'chromium') {
+            await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+            async function stallFrames(count) {
+                await a.evaluate(count => new Promise(resolve => {
+                    const match = document.querySelector('[data-race-match]');
+                    const original = window.requestAnimationFrame;
+                    let remaining = count;
+                    window.requestAnimationFrame = function (callback) {
+                        if (!remaining || match.dataset.renderer !== '3d') {
+                            window.requestAnimationFrame = original;
+                            return original.call(this, callback);
+                        }
+                        return original.call(this, () => {
+                            const until = performance.now() + 200;
+                            while (performance.now() < until) { /* Simulate a stalled frame. */ }
+                            remaining--;
+                            callback(performance.now());
+                            if (!remaining || match.dataset.renderer !== '3d') {
+                                window.requestAnimationFrame = original;
+                                resolve();
+                            }
+                        });
+                    };
+                }), count);
+            }
+            await stallFrames(1);
+            await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+            await stallFrames(4);
+            await expect(race(a)).toHaveAttribute('data-renderer', '2d');
+        }
         await expect(spectator.locator('[data-race-controls]')).toBeHidden();
         await expect.poll(() => !!opening).toBe(true);
         const danger = unpackRushRacer(opening.runner).run.entities
@@ -2297,12 +2397,28 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         b.on('websocket', observeLaunch);
         if (media) {
+            const forceLateAim = process.env.ARCADE_BRICK_LATE_AIM === '1';
+            let delayFirstAim = forceLateAim;
             await b.routeWebSocket(/\/beta\/arcade-turdanoid-match$/, route => {
                 const server = route.connectToServer();
+                let waitingForRejection = false;
+                server.onMessage(message => {
+                    if (waitingForRejection && typeof message === 'string' && JSON.parse(message).reason === 'late-input') {
+                        waitingForRejection = false;
+                    }
+                    route.send(message);
+                });
                 route.onMessage(message => {
-                    if (typeof message === 'string' && JSON.parse(message).action === 'input') {
-                        setTimeout(() => server.send(message), 220);
-                    } else server.send(message);
+                    const frame = typeof message === 'string' ? JSON.parse(message) : null;
+                    if (frame?.action !== 'input') return server.send(message);
+                    if (delayFirstAim && frame.inputs?.some(([, action]) => action === 'aim')) {
+                        delayFirstAim = false;
+                        waitingForRejection = true;
+                        setTimeout(() => server.send(message), 520);
+                    } else if (forceLateAim) {
+                        if (!waitingForRejection) server.send(message);
+                    }
+                    else setTimeout(() => server.send(message), 220);
                 });
             });
         }
@@ -2346,7 +2462,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(match(a)).toHaveAttribute('data-sequence', '0');
         }
         const x = field.x + field.width * .5, y = field.y + field.height * .85;
-        const prediction = media ? b.evaluate(async () => {
+        const prediction = media && process.env.ARCADE_BRICK_LATE_AIM !== '1' ? b.evaluate(async () => {
             const table = document.querySelector('[data-brick-match]');
             const start = performance.now();
             while (performance.now() - start < 400) {
@@ -2364,10 +2480,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
             } finally { await connection.detach(); }
         } else await b.touchscreen.tap(x + field.width * .075, y);
-        if (prediction) assert.equal(await prediction, true, 'phone drag moves paddle before delayed server confirmation');
-        await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
-        await expect(match(b)).toHaveAttribute('data-stuck', 'true');
-        await expect(match(b)).toHaveAttribute('data-sequence', /^[1-9]\d*$/);
+        try {
+            if (prediction) assert.equal(await prediction, true, 'phone drag moves paddle before delayed server confirmation');
+            await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
+            await expect(match(b)).toHaveAttribute('data-stuck', 'true');
+            await expect(match(b)).toHaveAttribute('data-sequence', /^[1-9]\d*$/);
+            if (process.env.ARCADE_BRICK_LATE_AIM === '1') {
+                assert.ok(launchFrames.some(frame => frame.reason === 'late-input'), 'the server rejected the delayed aim');
+                await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
+                console.log('Passed Turdanoid late phone aim resync and authoritative retry.');
+            }
+        } catch (error) {
+            const feedback = await b.locator('[data-brick-error]').textContent();
+            console.error('Turdanoid phone drag:', JSON.stringify({ feedback, launchFrames }));
+            throw error;
+        }
         await board(a).focus();
         await a.keyboard.down('ArrowRight');
         await expect.poll(async () => Number(await match(a).getAttribute('data-paddle'))).toBeGreaterThan(248);
@@ -2472,6 +2599,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
+        if (process.env.ARCADE_BRICK_DRAG_ONLY === '1') {
+            const host = await guest('stalemate', 'ChessHost', { width: 1440, height: 900 });
+            const player = await guest('rad-dad', 'ChessGuest', { width: 390, height: 844 }, true);
+            const watcher = await guest('stalemate', 'BrickDragWatcher', { width: 1280, height: 900 });
+            await host.getByRole('button', { name: /Game Night/ }).click();
+            await inviteToGame(host, player, 'ChessGuest');
+            await inviteToGame(host, watcher, 'BrickDragWatcher');
+            if (media) await joinCalls(host, player);
+            await playTurdanoid(host, player, watcher);
+            assert.deepEqual(errors, []);
+            return;
+        }
         if (options.webJamShare) {
             await verifyWebJamShare();
             assert.deepEqual(errors, []);

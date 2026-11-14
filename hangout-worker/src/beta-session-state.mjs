@@ -1,6 +1,7 @@
 // Metadata-only lifecycle operations on a supplied storage/transaction handle.
 // Callers own the transaction boundary; no network work belongs in this module.
 import { validRoomId } from './core.mjs';
+import { validNightSession } from './game-night-lifetime.mjs';
 import { BETA_TTL } from './beta-session-client.mjs';
 
 export const BETA_SESSION_LIMIT = 1000;
@@ -15,7 +16,7 @@ const VERSION = /^[A-Za-z0-9._-]{1,64}$/;
 
 export function validBetaRecord(record, sid) {
     return record?.v === 1 && record.sid === sid && SID.test(sid) && VERSION.test(record.version || '') &&
-        Number.isFinite(record.createdAt) && Number.isFinite(record.exp) && record.exp > record.createdAt && record.exp <= record.createdAt + BETA_TTL &&
+        Number.isFinite(record.createdAt) && Number.isFinite(record.exp) && record.exp > record.createdAt && (record.idleUntil === undefined ? record.exp <= record.createdAt + BETA_TTL : validNightSession(record)) &&
         typeof record.revoked === 'boolean' && typeof record.pending === 'boolean' && (!record.pending || record.revoked) &&
         Number.isInteger(record.attempt) && record.attempt >= 0 && record.attempt <= 20 && Number.isFinite(record.retryAt) && record.retryAt >= 0 && record.retryAt <= record.exp &&
         Array.isArray(record.rooms) && record.rooms.length <= BETA_SESSION_ROOM_LIMIT && record.rooms.every(validRoomId) && new Set(record.rooms).size === record.rooms.length;
