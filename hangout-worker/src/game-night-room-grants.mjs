@@ -1,3 +1,4 @@
+import { gameNightPassRecord } from './game-night-pass.mjs';
 import { BETA_TTL } from './beta-auth.mjs';
 // WebJam room -> Game Night seat grants.
 //
@@ -153,7 +154,7 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
     }
 
     // `subject` is the redeemer's existing session subject, or null for a fresh guest.
-    function redeemGrant({ value, attempt, subject = null, now, version }) {
+    function redeemGrant({ value, attempt, passHash, subject = null, now, version }) {
         return serial(async () => {
             if (!validRoomGrantValue(value) || !Number.isFinite(now) ||
                 attempt !== undefined && !validRoomGrantValue(attempt)) return expired();
@@ -188,7 +189,8 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
                 return expired();
             }
             const sid = uuid();
-            const guest = { game: scope.game, match: scope.match, room: scope.room, ref: scope.ref, host: scope.host, nameSeed: seed() };
+            const guest = { game: scope.game, match: scope.match, room: scope.room, ref: scope.ref, host: scope.host, nameSeed: seed(),
+                ...(state.tableId ? { tableId: state.tableId } : {}) };
             const exp = record.accessUntil === undefined ? now + GUEST_TTL : Math.min(now + BETA_TTL, record.accessUntil);
             const claimUntil = Math.min(now + CLAIM_WINDOW, exp);
             const access = { scope: guest, sid, exp };
@@ -196,7 +198,7 @@ export function createRoomGrants({ storage, table, uuid = () => crypto.randomUUI
             const redeemed = attemptHash ? { ...tombstone, kind: 'redeemed', attempt: attemptHash, claimUntil, access } : tombstone;
             // The live adapter commits the moved hold and redemption together.
             const seat = sid === scope.host || state.free < 1 ? null
-                : await table.seat(scope, { subject: sid, holder: record.hold.holder, seat: 'next', until: claimUntil, now, write: { [name]: redeemed } });
+                : await table.seat(scope, { subject: sid, holder: record.hold.holder, seat: 'next', until: claimUntil, now, write: { [name]: redeemed, ...gameNightPassRecord(access, passHash, version) } });
             const usable = !!seat && seat !== state.hostSeat;
             if (!usable) {
                 await burn(name, record);

@@ -302,6 +302,13 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         await match.wait(frame => frame.state?.match?.moves?.[1] === 'd7d5', 'WebJam guest confirms the first move');
         assert.equal((await page.context().request.get(browserOrigin + '/beta/state')).status(), 401, 'guest access stays scoped');
         await capture(page, 'first-move');
+        const resume = page.waitForResponse(response => new URL(response.url()).pathname === '/beta/game-night/invitation/resume');
+        await page.context().clearCookies();
+        await page.reload();
+        assert.equal((await resume).status(), 200);
+        await expect(page.getByRole('button', { name: 'd5, Black pawn' })).toBeVisible();
+        assert.equal(attempts.length, 2, 'the table pass restores the board without redeeming a grant again');
+        await capture(page, 'seat-restored');
 
         const waiting = await open(standby, false);
         await waiting.getByRole('button', { name: 'Join game' }).click();

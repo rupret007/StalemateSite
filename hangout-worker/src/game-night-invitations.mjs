@@ -1,3 +1,4 @@
+import { readGameNightPass, validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
 import { GAME_INVITE_UNAVAILABLE, gameNightInvite, gameNightLabels, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { BETA_TTL, DEMO_INVITE_TTL } from './beta-auth.mjs';
 import { arcadeRoomRequest } from './game-night-sockets.mjs';
@@ -32,7 +33,9 @@ export function gameGuestScope(value) {
     const game = gameNightInvite(value?.game, value?.match);
     if (!game || !gameNightRoomName(value.room) || !codePattern.test(value.ref || '') || !sidPattern.test(value.host || '')
         || !Number.isInteger(value.nameSeed) || value.nameSeed < 0 || value.nameSeed > 0xffffffff) return null;
-    return { ...game, room: value.room, ref: value.ref, host: value.host, nameSeed: value.nameSeed };
+    if (value.tableId !== undefined && !validGameNightTableId(value.tableId)) return null;
+    return { ...game, room: value.room, ref: value.ref, host: value.host, nameSeed: value.nameSeed,
+        ...(value.tableId === undefined ? {} : { tableId: value.tableId }) };
 }
 
 // Called within the lobby's serialized event path. Only the Worker sends a trusted session for issuance.
@@ -46,6 +49,13 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     if (!gameGuestEnabled(lobby.env)) return reply({ error: 'Game invitations are unavailable.' }, 404);
     const now = Date.now();
     const storage = lobby.state.storage;
+    if (operation === 'resume') {
+        const record = await readGameNightPass(storage, body.tableId, body.pass);
+        const scope = gameGuestScope(record?.scope);
+        if (!scope || scope.tableId !== body.tableId || !sidPattern.test(record.sid || '') || record.exp <= now ||
+            record.version !== String(lobby.env.HANGOUT_BETA_INVITE_VERSION || '1') || !lobby.arcadeAvailable(scope.game)) return unavailable();
+        return reply({ scope, sid: record.sid, exp: record.exp });
+    }
     if (operation === 'issue') {
         const { actor, room, ref, game, match } = body;
         const scope = arcadeRoomRequest({ actor, room, ref });
@@ -53,9 +63,11 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         const [nameSeed] = crypto.getRandomValues(new Uint32Array(1));
         const guest = gameGuestScope({ room, ref, game, match, host: host?.betaSid, nameSeed });
         if (!guest || !host.canOpen || !host.canPlay || host.gameGuest || session?.betaSid !== host.betaSid
-            || !await lobby.sessionActive(host) || !await waitingGuestSeat(lobby, scope, game, match, host.betaSid)) {
+            || !await lobby.sessionActive(host) || !lobby.arcadeAvailable(game)) {
             return reply({ error: 'Open a game table with an available seat before inviting a friend.' }, 403);
         }
+        const tableId = await lobby.arcade.get(game).guestTableId(scope, match, host.betaSid);
+        if (!tableId) return reply({ error: 'Open a game table with an available seat before inviting a friend.' }, 403);
         if (!await lobby.controlBudget.take(host.socket, actor)) return reply({ error: 'Game invitation allowance reached. Try again in a few minutes.' }, 429);
         const rows = await storage.list({ prefix: STORAGE_PREFIX, limit: LINK_CAP });
         const expired = [...rows].filter(([, record]) => record.until <= now).map(([key]) => key);
@@ -69,19 +81,20 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         if (demo && (!Number.isFinite(accessUntil) || accessUntil <= now)) return unavailable();
         const code = randomCode();
         const until = demo ? Math.min(now + DEMO_INVITE_TTL, accessUntil) : now + DEMO_INVITE_TTL;
-        await storage.put(STORAGE_PREFIX + await digest(code), { scope: guest, until, version: host.betaInviteVersion,
+        await storage.put(STORAGE_PREFIX + await digest(code), { scope: { ...guest, tableId }, until, version: host.betaInviteVersion,
             ...(demo ? { demo, accessUntil } : {}) });
         return reply({ code, until });
     }
 
     if (!['details', 'accept'].includes(operation) || !codePattern.test(body.code || '')
-        || operation === 'accept' && (body.age13 !== true || !codePattern.test(body.attempt || ''))) {
+        || operation === 'accept' && (body.age13 !== true || !codePattern.test(body.attempt || '') ||
+            body.passHash !== undefined && !validGameNightPassHash(body.passHash))) {
         return reply({ error: 'Open the original invitation and confirm the age and house rules to join.' }, 400);
     }
     const key = STORAGE_PREFIX + await digest(body.code);
     const record = await storage.get(key);
     if (!record || record.until <= now || record.version !== String(lobby.env.HANGOUT_BETA_INVITE_VERSION || '1')) return unavailable();
-    const scope = gameGuestScope(record.scope);
+    let scope = gameGuestScope(record.scope);
     if (!scope) return unavailable();
     const attempt = operation === 'accept' ? await digest(body.attempt) : null;
     if (record.redeemer && record.redeemer !== attempt) return unavailable();
@@ -96,10 +109,13 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
         if (!await waitingGuestSeat(lobby, scope, scope.game, scope.match, scope.host)) return unavailable();
         return reply({ game: gameNightLabels[scope.game], host: binding.nick });
     }
+    const tableId = await table.guestTableId(scope, scope.match, scope.host);
+    if (!tableId || scope.tableId && scope.tableId !== tableId) return unavailable();
+    scope = { ...scope, tableId };
     const sid = crypto.randomUUID();
     const exp = record.accessUntil !== undefined ? Math.min(now + BETA_TTL, record.accessUntil)
         : record.demo ? Math.min(now + GUEST_TTL, record.until) : now + GUEST_TTL;
-    const accepted = { ...record, sid, exp, redeemer: attempt };
-    if (!await table.reserveGuestSeat(scope, sid, Math.min(now + CLAIM_TTL, exp), key, accepted)) return unavailable();
+    const accepted = { ...record, scope, sid, exp, redeemer: attempt };
+    if (!await table.reserveGuestSeat(scope, sid, Math.min(now + CLAIM_TTL, exp), key, accepted, body.passHash)) return unavailable();
     return reply({ scope, sid, exp });
 }

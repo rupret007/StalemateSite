@@ -11,7 +11,9 @@ export const matchConnectionErrors = Object.freeze({
 
 // A match connection can be replaced without changing room, chat or call.
 export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
-    const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1' ? '?game-guest=1' : '';
+    const tableId = window.HangoutBootstrap?.gameGuest?.tableId;
+    const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1'
+        ? '?game-guest=1' + (tableId ? '&table=' + tableId : '') : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
     let pausedForNetwork = false, terminalError = false, lastSeq = 0;
     let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false;
@@ -82,7 +84,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     stateFrameType = frame.snapshots === true ? 'snapshot' : 'match-state';
                     supportsPing = frame.ping === true;
                     ready = true;
-                    send(stateFrameType === 'snapshot' ? { t: 'hello', lastSeq } : { action: 'sync' });
+                    let pass;
+                    try { if (tableId) pass = localStorage.getItem('gn:pass:' + tableId); } catch { /* The session cookie can still admit this guest. */ }
+                    send(stateFrameType === 'snapshot' ? { t: 'hello', lastSeq, ...(pass ? { pass } : {}) } : { action: 'sync' });
                 } else if (stateFrameType && frame?.t === stateFrameType && frame.version === 1 && frame.room === scope.room) {
                     lastSeq = Number.isSafeInteger(frame.seq) ? frame.seq : 0;
                     clearTimeout(joinTimer);

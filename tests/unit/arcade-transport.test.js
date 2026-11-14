@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { ARCADE_TAG, createArcadeTransport } from '../../hangout-worker/src/arcade-transport.mjs';
+import { readGameNightPass } from '../../hangout-worker/src/game-night-pass.mjs';
 
 const room = '#game-2ca9e1x1be34a';
 const ref = '0'.repeat(32);
@@ -144,6 +145,26 @@ describe('Game Night match transport', () => {
         await f.send(f.b, 'join', { id });
         expect(f.board(f.b)).toMatchObject({ seat: 'b', waiting: false });
         expect((await f.storage.get(ARCADE_TAG + ':' + ref)).claims).toBeUndefined();
+    });
+
+    it('commits only the table-scoped hash with the seat and binds hello to its guest', async () => {
+        const f = fixture();
+        await f.send(f.a, 'open');
+        const { id } = f.board(f.a);
+        const scope = { room, ref, host: sid, match: id, tableId: id, game: 'chess' };
+        const pass = '7'.repeat(64);
+        const hash = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass))).toString('hex');
+        const accepted = { scope, sid: 'seat-black', exp: 60000, version: '1' };
+        expect(await f.transport.reserveGuestSeat(scope, accepted.sid, 59000, 'invite', accepted, hash)).toBe(true);
+        const [write] = f.storage.put.mock.calls.at(-1);
+        expect(JSON.stringify(write)).not.toContain(pass);
+        expect(await readGameNightPass(f.storage, id, pass)).toEqual(accepted);
+        expect(await readGameNightPass(f.storage, '14111111-1111-4111-8111-111111111111', pass)).toBeUndefined();
+        f.actors.get(guest).gameGuest = scope;
+        await f.send(f.b, undefined, { t: 'hello', lastSeq: 0, pass });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'snapshot', phase: 'lobby' });
+        await f.send(f.a, undefined, { t: 'hello', lastSeq: 0, pass });
+        expect(f.a.close).toHaveBeenCalledWith(4403, 'table pass unavailable');
     });
 
     it('extends an accepted seat once when the invited guest reaches the exact match', async () => {

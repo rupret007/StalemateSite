@@ -60,6 +60,7 @@ it('caps demo Chess links and admitted guests at the demo host session deadline'
             engine: { invitedGameHost: () => 'c' + 'a'.repeat(32) },
             arcade: { get: () => ({
                 hasGuestSeat: async () => true,
+                guestTableId: async (_scope, match) => match,
                 reserveGuestSeat: async (_scope, _sid, _until, key, record) => {
                     rows.set(key, record);
                     accepted = record;

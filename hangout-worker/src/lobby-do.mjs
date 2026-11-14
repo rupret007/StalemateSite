@@ -1,3 +1,4 @@
+import { sweepGameNightPasses } from './game-night-pass.mjs';
 // The #stalemate lobby Durable Object + its Worker-side admission. Everything that can be refused is refused here,
 // before a DO request is spent. Missing config/secrets => 503 (fail closed).
 import { originAllowed, previewKeyOk } from './core.mjs';
@@ -520,6 +521,7 @@ export class HangoutLobby {
             await this.restoreArcadeConfiguration().catch(() => {});
         }
         for (const [name, service] of this.arcade) if (this.arcadeAvailable(name)) await service.maintain().catch(() => {});
+        if (gameGuestEnabled(this.env)) await sweepGameNightPasses(this.state.storage, Date.now()).catch(() => {});
         if (gameRoomGrantsEnabled(this.env)) await this.roomGrants.sweep(Date.now()).catch(() => {});
     }
     async sessionActive(value) {
