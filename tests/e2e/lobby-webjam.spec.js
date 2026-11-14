@@ -375,6 +375,13 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         await accept.click();
         await expect(audio).toBeVisible();
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        const jamText = guest.getByRole('textbox', { name: 'Message', exact: true });
+        if (!delayed) {
+            await jamText.fill('Keep this rehearsal note in the Jam room.');
+            await jamText.press('Enter');
+            await expect(guest.getByRole('log')).toContainText('Keep this rehearsal note in the Jam room.');
+            await jamText.fill('Unsent Jam draft for later.');
+        }
         await audio.focus();
         const lobbyTab = guest.locator('[data-tabs] [data-channel-key="#stalemate"]');
         await lobbyTab.dispatchEvent('click');
@@ -402,6 +409,10 @@ for (const { delayed, width, height, hostSite, guestSite } of [
             await accept.press('Enter');
             await expect(guest.locator('[data-chat-context]')).toHaveText(room);
             await expect(audio).toBeFocused();
+            await expect(audio).toBeInViewport();
+            await expect(jamText).toHaveValue('Unsent Jam draft for later.');
+            await expect(guest.getByRole('log')).not.toContainText('Unsent Jam draft for later.');
+            await expect(guest.getByRole('log')).toContainText('Keep this rehearsal note in the Jam room.');
             await audio.press('Enter');
             expect(await guest.evaluate(index => window.browserOpens.slice(index), opensBeforeResend))
                 .toEqual([[fresh, '_blank', 'noopener,noreferrer']]);
