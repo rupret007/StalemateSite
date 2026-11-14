@@ -380,6 +380,20 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         await lobbyTab.dispatchEvent('click');
         await expect(panel).toBeHidden();
         await expect(lobbyTab).toBeFocused();
+
+        if (!delayed) {
+            // Expiry while focused must replace the old action and explain recovery.
+            await guest.clock.install({ time: Date.now() });
+            await guest.clock.pauseAt(new Date(Date.now() + 100));
+            expect(await returnInvite(invite)).toBe(true);
+            await expect(accept).toBeVisible();
+            await accept.focus();
+            await guest.clock.fastForward(121_000);
+            const expired = 'This Music invitation expired. Ask the host to send a fresh one.';
+            await expect(guestStatus).toHaveText(expired);
+            await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
+            await expect(accept).toBeHidden();
+        }
         expect(f.external).toEqual([]);
     } finally { await f.close(); }
 });
