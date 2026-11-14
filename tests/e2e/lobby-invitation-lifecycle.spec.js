@@ -637,6 +637,43 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
     }
 });
 
+test('a fresh cross-band room invite works after expiry', async ({ browser, baseURL }) => {
+    const fixture = await community(browser, baseURL);
+    try {
+        const host = await fixture.visitor('ExpiryHost', { width: 1440, height: 900 }, false, 'stalemate');
+        const guest = await fixture.visitor('ExpiryGuest', { width: 390, height: 844 }, false, 'rad-dad');
+        await host.locator('[data-start="jam"]').click();
+        await expect(host.locator('[data-jam]')).toBeVisible();
+        const room = await host.locator('[data-chat-context]').textContent();
+        const invite = host.getByRole('button', { name: 'Invite bandmate to room', exact: true });
+        const offer = guest.locator('[data-game-offer]');
+        const status = host.locator('[data-room-invite-status]');
+        const join = offer.getByRole('button', { name: 'Join room', exact: true });
+        const send = async () => {
+            await invite.press('Enter');
+            await host.getByRole('button', { name: 'Invite ExpiryGuest', exact: true }).press('Enter');
+            await expect(join).toBeVisible();
+            await expect(status).toContainText('Waiting for a reply.');
+        };
+        await host.clock.install({ time: 1800000000000 });
+        await guest.clock.install({ time: 1800000000000 });
+        await send();
+        await join.focus();
+        fixture.advance(180_000);
+        await guest.clock.fastForward(180_000);
+        await host.clock.fastForward(180_000);
+        await expect(offer).toBeHidden();
+        await expect(guest.getByRole('tab', { name: '#stalemate' })).toBeFocused();
+        await expect(guest.locator('[data-toast]')).toContainText('Ask your host to send another.');
+        await expect(status).toContainText('expired.');
+        await send();
+        await join.press('Enter');
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        await expect(status).toHaveText('ExpiryGuest accepted and joined.');
+        expect(await guest.evaluate(() => window.copiedInvites)).toEqual([]);
+    } finally { await fixture.close(); }
+});
+
 for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionable and a dropped or refreshed bandmate can return at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const fixture = await community(browser, baseURL);
     try {
