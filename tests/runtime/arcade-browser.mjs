@@ -3226,10 +3226,25 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         assert.equal(await page.evaluate(key => localStorage.getItem(key), passKey), null);
         await page.evaluate(({ key, pass }) => localStorage.setItem(key, pass), { key: passKey, pass: originalPass });
         for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
+        const previousMatch = read().match.id;
+        await players[1].locator('[data-spades-action="resign"]').tap();
+        await players[1].getByRole('dialog', { name: 'Resign for your team?' })
+            .getByRole('button', { name: 'Resign', exact: true }).tap();
+        await expect(page.locator('[data-spades-status]')).toContainText('win by resignation');
+        await expect(page.getByRole('button', { name: /Spades rematch|Start now/ })).toBeHidden();
+        await host.getByRole('button', { name: 'Request Spades rematch' }).click();
+        for (const player of players.slice(1)) await player.getByRole('button', { name: 'Accept Spades rematch' }).tap();
+        await expect.poll(() => read()?.match?.id === previousMatch ? null : read()?.match?.id).toBeTruthy();
+        await expect(page.locator('[data-spades-table]')).toHaveAttribute('data-phase', 'bid');
+        await expect(page.locator('[data-spades-card]')).toHaveCount(0);
+        assert.equal(read().watchOnly, true);
+        assert.ok(!read().seat);
+        assert.deepEqual(read().match.hand, []);
+        for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
         await extra.clearCookies();
         await page.reload();
         await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
-        await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · No bid yet');
         await host.locator('[data-spades-action="leave"]').click();
         await host.getByRole('dialog', { name: 'Leave this table?' }).getByRole('button', { name: 'Leave table', exact: true }).click();
         await host.getByRole('button', { name: 'Reopen 4-player Spades', exact: true }).click();
@@ -3238,7 +3253,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(page.locator('[data-spades-trick]')).toContainText('West · No bid yet');
         await expect(page.locator('[data-spades-card]')).toHaveCount(0);
         await extra.close();
-        console.log(`Passed ${engine} ${brand} full Spades table watch link, read-only commands, table pass and host reopen.`);
+        console.log(`Passed ${engine} ${brand} full Spades table watch link, read-only commands, rematch, table pass and host reopen.`);
     }
     try {
         if (process.env.ARCADE_SPADES_WATCH_BRAND) {
