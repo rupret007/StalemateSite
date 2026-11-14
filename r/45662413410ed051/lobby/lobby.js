@@ -3385,7 +3385,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 musicHandoffRecoveryRoom = room;
                 showMusicHandoffStatus(handoff.submitted
                     ? 'Hang Out did not confirm delivery. Check with your bandmate before sending another invitation.'
-                    : 'WebJam did not return an invitation. If a tab opened in another browser profile, choose End browser invite in WebJam. Use the same browser profile for Hang Out and the return tab before retrying.');
+                    : 'WebJam did not return an invitation. If WebJam didn’t open, open the WebJam beta app and start Music → Host, then retry. If your browser asks to open WebJam, choose Open. If the return tab opened in another browser profile, choose End browser invite in WebJam. Open Hang Out in the return tab’s browser profile and retry.');
             }, 90000)
         };
         pendingMusicHandoff = handoff;
@@ -3406,7 +3406,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         document.body.append(launch);
         launch.click();
         launch.remove();
-        showMusicHandoffStatus('Confirm in WebJam. The return tab needs the browser profile you’re using for Hang Out. If no prompt appears, cancel here, start a hosted Music session, then try again.', true);
+        showMusicHandoffStatus('If your browser asks to open WebJam, choose Open. Confirm the invitation in WebJam. If WebJam doesn’t open, cancel here, open the WebJam beta app and start a hosted Music session, then try again.', true);
     }
     function sendInviteToPerson(context, error, music = false) {
         const current = store(app.active);
