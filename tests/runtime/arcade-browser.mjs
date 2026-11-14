@@ -570,8 +570,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (phone) {
                     await guest.setViewportSize({ width: 390, height: 664 });
                     try {
-                        await leaveMatch.scrollIntoViewIfNeeded();
-                        await expectUncoveredControl(leaveMatch);
+                        await guest.locator('[data-game-night]').evaluate(surface => { surface.scrollTop = 0; });
+                        await expectUncoveredControl(guest.getByRole('group', { name: 'Chessboard' }));
+                        const actions = guest.locator('.arcade-chess-actions button:visible');
+                        for (const action of await actions.all()) {
+                            await expectUncoveredControl(action);
+                            assert.ok((await action.boundingBox()).height >= 44, 'the short-phone match action is at least 44px tall');
+                        }
                         await expectUncoveredControl(guest.locator('[data-send]'));
                         await captureArcadeInvite(guest, guest.viewportSize(), 'phone-short-03-controls');
                     } finally { await guest.setViewportSize(viewport); }
