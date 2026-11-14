@@ -518,7 +518,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     ]);
     const gameLabel = game => arcadeTables.get(game)?.label || gameNightLabels[game] || 'Game Night';
     let arcadeReturning = null, arcadeInvitation = null, arcadeShareIntent = null;
-    let webJamChessSupported = false, webJamHostSeatPending = false, webJamWaitingTable = null;
+    let webJamChessSupported = false, webJamHostSeatPending = false, webJamWaitingTable = null, webJamReservation = null;
     const webJamHostSeat = $('[data-webjam-host-seat]');
     const webJamHostSeatStatus = $('[data-webjam-host-seat-status]');
     let arcadeMediaSupported = false, arcadeMedia = null, arcadeMediaLoading = false;
@@ -1851,7 +1851,9 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             .finally(() => { arcadeMediaLoading = false; });
     }
     function webJamHostTarget() {
-        const room = currentJam(), waiting = webJamWaitingTable;
+        const room = currentJam();
+        const waiting = webJamReservation && webJamReservation.hash === gameEntry?.webJamGrant
+            ? webJamReservation.table : webJamWaitingTable;
         return webJamChessSupported && !shieldActive && !!gameEntry?.webJamGrant && room?.modes.i && amOp(room)
             && waiting?.room === room.name && waiting.ref === room.keepRef ? waiting : null;
     }
@@ -1859,30 +1861,34 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         const table = webJamHostTarget();
         if (webJamHostSeatPending || !table) return;
         const hash = gameEntry.webJamGrant;
+        webJamReservation = { hash, table };
         webJamHostSeatPending = webJamHostSeat.disabled = true;
         webJamHostSeatStatus.textContent = 'Reserving the Chess seat…';
         try {
-            const register = recover => fetch('/beta/game-night/room-grant/register', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...table, hashes: [hash], recover }),
-                signal: AbortSignal.timeout(10000)
-            });
-            const response = await register(false).catch(error => {
-                if (!(error instanceof TypeError || error.name === 'TimeoutError')) throw error;
+            const register = async () => {
+                const response = await fetch('/beta/game-night/room-grant/register', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...table, hashes: [hash], recover: true }),
+                    signal: AbortSignal.timeout(10000)
+                });
+                return { response, result: await response.json() };
+            };
+            const { response, result } = await register().catch(error => {
+                if (!(error instanceof TypeError || error instanceof SyntaxError || error.name === 'TimeoutError')) throw error;
                 webJamHostSeatStatus.textContent = 'Reconnecting to confirm the Chess seat…';
-                return register(true);
+                return register();
             });
-            const result = await response.json();
             if (!response.ok || result.granted !== 1) {
                 webJamHostSeatStatus.textContent = response.status === 429 ? result.error
                     : 'Couldn’t confirm the seat. Check the match or start a fresh offer in WebJam.';
                 return;
             }
             if (gameEntry?.webJamGrant === hash) gameEntry = null;
+            webJamReservation = null;
             webJamHostSeatStatus.textContent = 'Chess seat reserved. Your guest can join now.';
             drawGameOffer();
         } catch {
-            webJamHostSeatStatus.textContent = 'Couldn’t confirm the seat. Check the match before sending a fresh offer.';
+            webJamHostSeatStatus.textContent = 'Couldn’t confirm the seat. Try confirming again.';
         } finally {
             webJamHostSeatPending = false;
             drawWebJamHostSeat();
@@ -1988,6 +1994,9 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         updateTableInvite(table, currentGameNight());
         if (game === 'chess') {
             webJamWaitingTable = table.invite && state.seat === 'w' && jamRoomName(scope.room) ? { ...scope, ...table.invite } : null;
+            const prior = webJamReservation?.table;
+            if (prior && sendMatch && scope?.room === prior.room && scope.ref === prior.ref
+                && (state?.id !== prior.match || state.seat !== 'w')) webJamReservation = null;
             drawWebJamHostSeat();
         }
         const share = arcadeShareIntent;
