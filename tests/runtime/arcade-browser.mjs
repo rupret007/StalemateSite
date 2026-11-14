@@ -1029,7 +1029,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     }
     async function verifyGuestTableIsolation() {
         const desktop = { width: 1440, height: 900 }, phone = { width: 390, height: 844 };
-        const context = await browser.newContext({ viewport: phone, hasTouch: true, ignoreHTTPSErrors: true });
+        const context = await browser.newContext({ viewport: phone, hasTouch: true, ignoreHTTPSErrors: true, serviceWorkers: 'block' });
         const hosts = [];
         try {
             const games = [];
@@ -1045,6 +1045,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                 const link = await shareGameNightLink(host, desktop, 'two-tables-' + brand);
                 const player = await context.newPage();
+                player.setDefaultTimeout(10000);
+                player.on('pageerror', error => errors.push(`${brand} scoped Chess: ${error.message}`));
                 await openGameNightLink(player, link);
                 await player.getByRole('button', { name: 'Join game', exact: true }).tap();
                 await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
@@ -1060,6 +1062,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             assert.notEqual(first.table, second.table, 'two games retain distinct table identities');
             const refresh = async ({ player, pawn }) => {
                 await player.reload();
+                await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
                 await expect(player.getByRole('button', { name: pawn })).toBeVisible();
             };
             await refresh(first);
@@ -2086,7 +2089,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 socket.on('framereceived', ({ payload }) => {
                     const frame = JSON.parse(payload.toString());
                     if (frame.t === 'match-error') last.reason = frame.reason;
-                    if (isMatchView(frame)) last.revision = frame.state?.match?.revision;
+                    if (isMatchView(frame)) {
+                        last.revision = frame.state?.match?.revision;
+                        last.state = frame.state;
+                    }
                 });
             });
             return last;
@@ -2099,6 +2105,22 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         for (const [index, [page, seat]] of [[b, 'West'], [north, 'North'], [east, 'East']].entries()) {
             await page.getByRole('button', { name: 'Join ' + seat }).click();
             if (index < 2) await expect(a.locator('[data-spades-status]')).toContainText(`${index + 2}/4 seated`);
+        }
+        for (const page of players) await expect(page.locator('[data-spades-card]')).toHaveCount(13);
+        const tableId = commands[0].state?.tableId;
+        const matchId = commands[0].state?.match?.id;
+        assert.ok(tableId && matchId);
+        await a.locator('[data-spades-action="leave"]').click();
+        await a.getByRole('dialog', { name: 'Leave this table?' }).getByRole('button', { name: 'Leave table', exact: true }).click();
+        const reopen = a.getByRole('button', { name: 'Reopen 4-player Spades', exact: true });
+        await expect(reopen).toBeVisible();
+        await expect(a.getByRole('button', { name: 'Open 2-player Spades', exact: true })).toBeHidden();
+        await reopen.click();
+        await expect.poll(() => commands.map(({ state }) =>
+            state?.match?.id && state.match.id !== matchId ? state.seat : null)).toEqual(['south', 'west', 'north', 'east']);
+        for (const { state } of commands) {
+            assert.equal(state.tableId, tableId);
+            assert.ok(state.match?.id && state.match.id !== matchId);
         }
         const allHands = [];
         for (const page of players) {
