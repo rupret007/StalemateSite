@@ -51,7 +51,8 @@ export function createArcadeTransport({ state, current, active, approve, charge,
     const pendingRevocations = new Map();
     const { issue, upgrade, member, sockets, send, close } = createGameNightSockets({
         state, current, active, charge, now, uuid, tag, protocol: ARCADE_PROTOCOL,
-        readyType: 'match-ready', snapshots: true, allowed: scope => !pendingRevocations.has(scope?.ref) && allowed()
+        readyType: 'match-ready', snapshots: true, readyFeatures: { ping: true },
+        allowed: scope => !pendingRevocations.has(scope?.ref) && allowed()
     });
     const key = scope => prefix + scope.ref;
     const restore = record => (record.mode === 'partners' && PartnerTable ? PartnerTable : Table).restore(record);
@@ -183,6 +184,10 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         if (typeof raw !== 'string' || raw.length > 768) return close(socket, 4400, 'bad match frame');
         let frame;
         try { frame = JSON.parse(raw); } catch { return close(socket, 4400, 'bad match frame'); }
+        if (frame?.version === 1 && frame.action === 'ping') {
+            if (Number.isSafeInteger(frame.nonce)) send(socket, { t: 'pong', nonce: frame.nonce });
+            return;
+        }
         try {
             if (frame?.version === 1 && frame.t === 'hello' && Number.isSafeInteger(frame.lastSeq) && frame.lastSeq >= 0) {
                 socket.serializeAttachment({ ...scope, snapshot: true });
