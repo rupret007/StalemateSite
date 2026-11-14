@@ -2380,12 +2380,28 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         b.on('websocket', observeLaunch);
         if (media) {
+            const forceLateAim = process.env.ARCADE_BRICK_LATE_AIM === '1';
+            let delayFirstAim = forceLateAim;
             await b.routeWebSocket(/\/beta\/arcade-turdanoid-match$/, route => {
                 const server = route.connectToServer();
+                let waitingForRejection = false;
+                server.onMessage(message => {
+                    if (waitingForRejection && typeof message === 'string' && JSON.parse(message).reason === 'late-input') {
+                        waitingForRejection = false;
+                    }
+                    route.send(message);
+                });
                 route.onMessage(message => {
-                    if (typeof message === 'string' && JSON.parse(message).action === 'input') {
-                        setTimeout(() => server.send(message), 220);
-                    } else server.send(message);
+                    const frame = typeof message === 'string' ? JSON.parse(message) : null;
+                    if (frame?.action !== 'input') return server.send(message);
+                    if (delayFirstAim && frame.inputs?.some(([, action]) => action === 'aim')) {
+                        delayFirstAim = false;
+                        waitingForRejection = true;
+                        setTimeout(() => server.send(message), 520);
+                    } else if (forceLateAim) {
+                        if (!waitingForRejection) server.send(message);
+                    }
+                    else setTimeout(() => server.send(message), 220);
                 });
             });
         }
@@ -2429,7 +2445,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(match(a)).toHaveAttribute('data-sequence', '0');
         }
         const x = field.x + field.width * .5, y = field.y + field.height * .85;
-        const prediction = media ? b.evaluate(async () => {
+        const prediction = media && process.env.ARCADE_BRICK_LATE_AIM !== '1' ? b.evaluate(async () => {
             const table = document.querySelector('[data-brick-match]');
             const start = performance.now();
             while (performance.now() - start < 400) {
@@ -2447,10 +2463,21 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
             } finally { await connection.detach(); }
         } else await b.touchscreen.tap(x + field.width * .075, y);
-        if (prediction) assert.equal(await prediction, true, 'phone drag moves paddle before delayed server confirmation');
-        await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
-        await expect(match(b)).toHaveAttribute('data-stuck', 'true');
-        await expect(match(b)).toHaveAttribute('data-sequence', /^[1-9]\d*$/);
+        try {
+            if (prediction) assert.equal(await prediction, true, 'phone drag moves paddle before delayed server confirmation');
+            await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
+            await expect(match(b)).toHaveAttribute('data-stuck', 'true');
+            await expect(match(b)).toHaveAttribute('data-sequence', /^[1-9]\d*$/);
+            if (process.env.ARCADE_BRICK_LATE_AIM === '1') {
+                assert.ok(launchFrames.some(frame => frame.reason === 'late-input'), 'the server rejected the delayed aim');
+                await expect.poll(async () => Number(await match(b).getAttribute('data-paddle'))).toBeGreaterThan(260);
+                console.log('Passed Turdanoid late phone aim resync and authoritative retry.');
+            }
+        } catch (error) {
+            const feedback = await b.locator('[data-brick-error]').textContent();
+            console.error('Turdanoid phone drag:', JSON.stringify({ feedback, launchFrames }));
+            throw error;
+        }
         await board(a).focus();
         await a.keyboard.down('ArrowRight');
         await expect.poll(async () => Number(await match(a).getAttribute('data-paddle'))).toBeGreaterThan(248);
@@ -2555,6 +2582,18 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
+        if (process.env.ARCADE_BRICK_DRAG_ONLY === '1') {
+            const host = await guest('stalemate', 'ChessHost', { width: 1440, height: 900 });
+            const player = await guest('rad-dad', 'ChessGuest', { width: 390, height: 844 }, true);
+            const watcher = await guest('stalemate', 'BrickDragWatcher', { width: 1280, height: 900 });
+            await host.getByRole('button', { name: /Game Night/ }).click();
+            await inviteToGame(host, player, 'ChessGuest');
+            await inviteToGame(host, watcher, 'BrickDragWatcher');
+            if (media) await joinCalls(host, player);
+            await playTurdanoid(host, player, watcher);
+            assert.deepEqual(errors, []);
+            return;
+        }
         if (options.webJamShare) {
             await verifyWebJamShare();
             assert.deepEqual(errors, []);

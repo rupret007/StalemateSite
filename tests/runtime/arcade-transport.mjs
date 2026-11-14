@@ -38,6 +38,7 @@ const fixtureIce = { urls: [process.env.ARCADE_TEST_TURN_URL || 'turn:fixture.in
     username: 'arcade-fixture', credential: 'arcade-local-turn-only' };
 assert.ok(!webJamShare || browserName && !siteGuest && !relay && !mixedRef, 'the isolated WebJam share check needs one browser');
 assert.ok(!browserMedia || browserName === 'chromium', 'the synthetic device media test uses Chromium');
+assert.ok(process.env.ARCADE_BRICK_LATE_AIM !== '1' || browserMedia, 'the late Turdanoid aim check requires --browser=chromium --media');
 assert.ok(['', 'chromium', 'webkit'].includes(browserName), 'choose --browser=chromium or --browser=webkit');
 assert.ok(!relay || !browserName || browserMedia && process.env.ARCADE_TEST_TURN_URL, 'browser relay test needs --media and a local TURN URL');
 assert.ok(!rollback || !browserName, 'the rollback rehearsal uses native workerd');
