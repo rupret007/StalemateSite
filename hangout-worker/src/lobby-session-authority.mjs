@@ -232,11 +232,13 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         if (Object.keys(kept).length !== Object.keys(oldRates).length) await tx.put(RATES, kept);
         return rows;
     }
-    async function schedule(tx, raw, at) {
+    async function schedule(tx, raw, at, afterAlarm = false) {
         const rows = await index(tx), budgets = await rates(tx);
         // Lobby tick/log/private-report maintenance always requires a future
         // alarm, even when the SID registry and mint rates are empty.
-        await raw.setAlarm(Math.min(at + INTERVAL, ...rows.entries.map(row => Math.max(at + 1, row.exp)), ...Object.values(budgets).map(row => Math.max(at + 1, row.until))));
+        const current = await raw.getAlarm();
+        const existing = Number.isFinite(current) && (!afterAlarm || current > at) ? current : Infinity;
+        await raw.setAlarm(Math.min(existing, at + INTERVAL, ...rows.entries.map(row => Math.max(at + 1, row.exp)), ...Object.values(budgets).map(row => Math.max(at + 1, row.until))));
     }
     const transact = operation => records.transaction(async (tx, raw) => {
         await initialized(tx); ensure((await configuredMarker(tx)).inviteVersion === betaVersion(env));
@@ -427,7 +429,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             const record = await session(tx, attempt.sid);
             if (record?.revoked && record.idleUntil === undefined && record.closureRevision === attempt.closureRevision) await tx.put(SESSION + record.sid, { ...record, pending: false });
         }),
-        schedule: () => transact((tx, raw) => schedule(tx, raw, now())),
+        schedule: ({ afterAlarm = false } = {}) => transact((tx, raw) => schedule(tx, raw, now(), afterAlarm)),
         due: () => transact(async tx => {
             const rows = await prune(tx, now()), due = [];
             for (const item of rows.entries) {

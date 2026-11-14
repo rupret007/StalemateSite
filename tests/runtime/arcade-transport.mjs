@@ -168,13 +168,13 @@ async function verifyRoomGrants() {
         assert.equal(expiry.status, 200, await expiry.clone().text());
         const { until } = await expiry.json();
         await match.wait(frame => frame.state?.waiting && !frame.state.hasOpenSeat, 'reserved seat');
-        await new Promise(resolve => setTimeout(resolve, Math.max(0, until - Date.now()) + 50));
-        assert.equal((await redeem(expiring, value())).status, 410);
-        const expirySync = match.frames.length;
-        match.send({ version: 1, action: 'sync' });
+        const beforeExpiry = match.frames.length;
+        await new Promise(resolve => setTimeout(resolve, Math.max(0, until - Date.now())));
+        // Observe the alarm's broadcast before a redeem or sync can release the hold.
         await match.wait(frame => frame.state?.id === state.id && frame.state.waiting && frame.state.hasOpenSeat,
-            'expired hold leaves the original table waiting', expirySync);
-        console.log('PASS expired grant leaves the original table waiting with its seat available.');
+            'expired hold releases the seat without a browser command', beforeExpiry);
+        assert.equal((await redeem(expiring, value())).status, 410);
+        console.log('PASS the alarm releases the expired hold on the original table without a browser command.');
     }
 
     const seated = value(), standby = value(), attempt = value();

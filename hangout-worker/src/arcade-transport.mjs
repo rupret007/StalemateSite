@@ -56,6 +56,12 @@ export function createArcadeTransport({ state, current, active, approve, charge,
     const key = scope => prefix + scope.ref;
     const restore = record => (record.mode === 'partners' && PartnerTable ? PartnerTable : Table).restore(record);
     const liveClaims = (claims, time) => (claims || []).filter(claim => claim.until > time);
+    async function scheduleTableAlarm(expiresAt, claims, afterAlarm = false) {
+        if (typeof state.storage.getAlarm !== 'function') return;
+        const next = Math.min(expiresAt, ...claims.map(claim => claim.until));
+        const current = await state.storage.getAlarm();
+        if (!Number.isFinite(current) || current > next || afterAlarm && current <= now()) await state.storage.setAlarm(next);
+    }
     function savedRecord(scope, game, expiresAt, claims) {
         return { room: scope.room, expiresAt, [name]: game.checkpoint(), ...(claims.length ? { claims } : {}) };
     }
@@ -74,6 +80,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         const record = await load(scope);
         if (!record?.game.hasGuestSeat(scope.match, scope.host, record.claims.length)) return false;
         const claims = [...record.claims, { sid, until }];
+        await scheduleTableAlarm(record.expiresAt, claims);
         // Commit the invitation redemption and its temporary seat together.
         await state.storage.put({
             [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims),
@@ -110,6 +117,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 .find(side => !record.claims.some(claim => claim.seat === side));
             if (!seat) return false;
             const claims = [...record.claims, { sid: holder, until, seat, grant: true }];
+            await scheduleTableAlarm(record.expiresAt, claims);
             await state.storage.put({ ...write, [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims) });
             publish(scope, record.game, null, claims);
             return true;
@@ -119,6 +127,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             const held = record?.claims.find(claim => claim.grant && claim.sid === holder);
             if (!held || !record.game.guestSeats(scope.match, scope.host).includes(held.seat)) return null;
             const claims = record.claims.map(claim => claim === held ? { sid: subject, until, seat: held.seat } : claim);
+            await scheduleTableAlarm(record.expiresAt, claims);
             await state.storage.put({ ...write, [key(scope)]: savedRecord(scope, record.game, record.expiresAt, claims) });
             publish(scope, record.game, null, claims);
             return held.seat;
@@ -228,7 +237,10 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 }
             }
             if (changed) {
-                if (game) await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims));
+                if (game) {
+                    await scheduleTableAlarm(expiresAt, claims);
+                    await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims));
+                }
                 else await state.storage.delete(key(scope));
                 publish(scope, game, null, claims);
             } else publish(scope, game, resume ? null : socket, claims);
@@ -291,6 +303,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
             } else {
                 const game = restore(record[name]);
                 const time = now(), claims = liveClaims(record.claims, time);
+                await scheduleTableAlarm(record.expiresAt, claims, true);
                 const expiredClaim = claims.length < (record.claims?.length || 0);
                 if (!game.expire(time) && !expiredClaim) continue;
                 await state.storage.put(storageKey, savedRecord(scope, game, record.expiresAt, claims));

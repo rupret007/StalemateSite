@@ -890,14 +890,7 @@ export class HangoutLobby {
                     await this.state.storage.setAlarm(Number.isFinite(earlier) && earlier > now ? Math.min(earlier, at) : at);
                 } catch { this.authorityUnavailable = true; this.storageFailed(); }
             };
-            const schedule = async () => {
-                const earlier = this.pendingClosed.size ? await this.state.storage.getAlarm() : null;
-                await this.authority.schedule();
-                if (Number.isFinite(earlier) && earlier > Date.now()) {
-                    const next = await this.state.storage.getAlarm();
-                    if (next === null || next === undefined || next > earlier) await this.state.storage.setAlarm(earlier);
-                }
-            };
+            const schedule = () => this.authority.schedule({ afterAlarm: true });
             await retirementGate(this, async gate => {
                 try {
                     if (this.authorityUnavailable) { await retryAlarm(); return; }
