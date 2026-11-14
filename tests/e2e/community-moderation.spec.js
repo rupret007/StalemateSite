@@ -210,16 +210,23 @@ test('three entrances share a guest-hosted creative room, real report review and
     } finally { await app.close(); }
 });
 
-test('a real local staff disconnect clears evidence and withdrawing the fixture credential denies a new review session', async ({ browser, baseURL }) => {
+test('a real local staff disconnect clears evidence and withdrawing the fixture credential denies a new review session', async ({ browser, baseURL }, testInfo) => {
     const app = await scenario(browser, baseURL);
     try {
         const author = await app.guest('stalemate', 'ReportAuthor');
         const witness = await app.guest('rad-dad', 'ReportWitness');
         const moderator = await app.moderator('FirstReviewer');
+        await moderator.setViewportSize({ width: 390, height: 844 });
         const text = 'Synthetic evidence must not remain in a disconnected staff panel';
         await say(author, text); await expect(received(witness, text)).toHaveCount(1);
         await received(witness, text).locator('.flag').click();
-        await expect(reportRow(moderator, text)).toHaveCount(1);
+        const pending = reportRow(moderator, text);
+        await expect(pending).toHaveCount(1);
+        await expect(moderator.getByRole('heading', { name: 'Reports', exact: true })).toBeInViewport();
+        await expect(pending.getByText(text, { exact: true })).toBeInViewport();
+        await expect(pending.getByRole('button', { name: 'Dismiss', exact: true })).toBeInViewport();
+        await expect(moderator.getByRole('heading', { name: 'AI-assisted review' })).toBeVisible();
+        await moderator.screenshot({ path: testInfo.outputPath('moderator-visitor-report-first-390.png') });
         await moderator.evaluate(() => {
             window.__oldReviewButton = document.querySelector('[data-reports] button');
             window.__admin.ws.close(1000, 'explicit local staff fixture ended');
