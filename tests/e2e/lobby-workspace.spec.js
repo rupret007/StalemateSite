@@ -22,6 +22,42 @@ test('chat shortcuts explain what they do and can send from the keyboard', async
     await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('🤘 SHRED');
 });
 
+for (const [width, height] of [[1440, 900], [390, 844]]) {
+    test(`a chat send failure is explained and can be retried at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await enter(page, baseURL);
+        const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+        const message = 'Keep this message until Send succeeds.';
+        const log = page.getByRole('log', { name: 'Conversation' });
+        const status = page.locator('[data-toast]');
+        await page.evaluate(() => {
+            const socket = window.__lobby.ws;
+            const send = socket.send;
+            socket.send = function (data) {
+                if (JSON.parse(data).t === 'say') {
+                    socket.send = send;
+                    throw new Error('Synthetic transport failure');
+                }
+                return send.call(this, data);
+            };
+        });
+        await composer.fill(message);
+        await composer.press('Enter');
+        await expect(composer).toHaveValue(message);
+        await expect(composer).toBeFocused();
+        await expect(log).not.toContainText(message);
+        await expect(status).toHaveText('Couldn’t send your message. Your draft is still here. Try sending it again.');
+        await expect(status).toHaveAttribute('role', 'status');
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        await page.screenshot({ path: testInfo.outputPath('send-failed-draft-retained.png') });
+        await composer.press('Enter');
+        await expect(log.getByRole('listitem').filter({ hasText: message })).toHaveCount(1);
+        await expect(composer).toBeEmpty();
+        await expect(status).toBeHidden();
+        await page.screenshot({ path: testInfo.outputPath('send-retried.png') });
+    });
+}
+
 for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 812], [390, 844]]) {
     test(`workspace fills ${width}x${height} and keeps the composer visible`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
