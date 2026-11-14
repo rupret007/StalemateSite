@@ -2099,24 +2099,33 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(race(b)).toHaveAttribute('data-renderer', '2d');
         if (engine === 'chromium') {
             await expect(race(a)).toHaveAttribute('data-renderer', '3d');
-            if (!media) {
-                await a.evaluate(() => {
+            async function stallFrames(count) {
+                await a.evaluate(count => new Promise(resolve => {
                     const match = document.querySelector('[data-race-match]');
                     const original = window.requestAnimationFrame;
+                    let remaining = count;
                     window.requestAnimationFrame = function (callback) {
-                        if (match.dataset.renderer !== '3d') {
+                        if (!remaining || match.dataset.renderer !== '3d') {
                             window.requestAnimationFrame = original;
                             return original.call(this, callback);
                         }
                         return original.call(this, () => {
                             const until = performance.now() + 200;
-                            while (performance.now() < until) { /* Simulate several stalled frames. */ }
+                            while (performance.now() < until) { /* Simulate a stalled frame. */ }
+                            remaining--;
                             callback(performance.now());
+                            if (!remaining || match.dataset.renderer !== '3d') {
+                                window.requestAnimationFrame = original;
+                                resolve();
+                            }
                         });
                     };
-                });
-                await expect(race(a)).toHaveAttribute('data-renderer', '2d');
+                }), count);
             }
+            await stallFrames(1);
+            await expect(race(a)).toHaveAttribute('data-renderer', '3d');
+            await stallFrames(4);
+            await expect(race(a)).toHaveAttribute('data-renderer', '2d');
         }
         await expect(spectator.locator('[data-race-controls]')).toBeHidden();
         await expect.poll(() => !!opening).toBe(true);
