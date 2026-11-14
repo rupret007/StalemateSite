@@ -5,15 +5,17 @@ const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
 const retry = document.querySelector('[data-guest-retry]');
 const gameTitle = document.querySelector('[data-guest-game]');
-const restored = !location.hash && !location.search ? history.state?.gameNightInvite : null;
-const code = restored?.code ?? new URLSearchParams(location.hash.slice(1)).get('invite');
+const webJam = document.querySelector('[data-webjam-guest]') !== null;
+const historyKey = webJam ? 'webJamGameNightInvite' : 'gameNightInvite';
+const restored = !location.hash && !location.search ? history.state?.[historyKey] : null;
+const code = restored?.code ?? new URLSearchParams(location.hash.slice(1)).get(webJam ? 'grant' : 'invite');
 const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
 const confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
-const hasInvitation = typeof code === 'string' && code.length > 0 && code.length <= 250;
+const hasInvitation = typeof code === 'string' && (webJam ? /^[A-Za-z0-9_-]{32,128}$/.test(code) : code.length > 0 && code.length <= 250);
 
 function retainInvitation(confirmedGame) {
     // A refresh can use this history entry, without putting the link back in the address.
-    history.replaceState({ gameNightInvite: { code, attempt, confirmedGame } }, '', location.pathname);
+    history.replaceState({ [historyKey]: { code, attempt, confirmedGame } }, '', location.pathname);
 }
 
 function clearInvitation() {
@@ -24,8 +26,10 @@ if (hasInvitation) retainInvitation(confirmedGame);
 else if (location.hash || location.search || restored) clearInvitation();
 
 async function request(action, data) {
-    const response = await fetch('/beta/game-night/invitation/' + action, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, ...data }),
+    const path = webJam ? '/beta/game-night/room-grant/redeem' : '/beta/game-night/invitation/' + action;
+    const body = webJam ? { value: code, ...data } : { code, ...data };
+    const response = await fetch(path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         signal: AbortSignal.timeout(10000)
     });
     const value = await response.json();
@@ -37,6 +41,12 @@ async function describe() {
     retry.hidden = true;
     if (!hasInvitation) {
         status.textContent = 'Open the Game Night invitation your host sent you.';
+        return;
+    }
+    if (webJam) {
+        status.textContent = 'You were invited from WebJam.';
+        invite.hidden = false;
+        if (document.activeElement === document.body || document.activeElement === retry) join.focus({ preventScroll: true });
         return;
     }
     status.textContent = 'Checking your invitation…';
@@ -69,13 +79,23 @@ async function accept() {
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
         location.replace(next);
     } catch (error) {
-        status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE
-            : [429, 503].includes(error.status) ? error.message : 'Couldn’t join just now. Try again.';
-        if (error.status === 410) {
+        const tableFull = webJam && error.status === 409;
+        const closed = tableFull || error.status === 410;
+        status.textContent = 'Couldn’t join just now. Try again.';
+        if (tableFull) status.textContent = 'This table is full. Ask your host for a new invite when a seat opens.';
+        else if (closed) status.textContent = GAME_INVITE_UNAVAILABLE;
+        else if ([429, 503].includes(error.status)) status.textContent = error.message;
+        if (closed) {
             clearInvitation();
             invite.hidden = true;
-            status.tabIndex = -1;
-            status.focus({ preventScroll: true });
+            if (webJam) {
+                gameTitle.tabIndex = -1;
+                gameTitle.setAttribute('aria-describedby', status.id);
+                gameTitle.focus();
+            } else {
+                status.tabIndex = -1;
+                status.focus({ preventScroll: true });
+            }
         } else if (invite.hidden) {
             retry.hidden = false;
             if (document.activeElement === document.body) retry.focus({ preventScroll: true });
