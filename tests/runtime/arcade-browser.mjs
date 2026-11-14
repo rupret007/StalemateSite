@@ -972,6 +972,59 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             } finally { await host.context().close(); }
         }
     }
+    async function verifyGuestTableIsolation() {
+        const desktop = { width: 1440, height: 900 }, phone = { width: 390, height: 844 };
+        const context = await browser.newContext({ viewport: phone, hasTouch: true, ignoreHTTPSErrors: true });
+        const hosts = [];
+        try {
+            const games = [];
+            for (const [brand, name, whiteMove, blackMove] of [
+                ['stalemate', 'TableOneHost', ['e2', 'e4'], ['e7', 'e5']],
+                ['rad-dad', 'TableTwoHost', ['d2', 'd4'], ['d7', 'd5']]
+            ]) {
+                const host = await guest(brand, name, desktop, false, origin + '/beta/?game-night=1&via=' + brand);
+                hosts.push(host);
+                await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+                await host.getByRole('combobox', { name: 'Switch game' }).selectOption('chess');
+                await host.getByRole('button', { name: 'Open Chess match' }).click();
+                await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
+                const link = await shareGameNightLink(host, desktop, 'two-tables-' + brand);
+                const player = await context.newPage();
+                await openGameNightLink(player, link);
+                await player.getByRole('button', { name: 'Join game', exact: true }).tap();
+                await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                for (const square of whiteMove) await tapSquare(host, square, false);
+                await expect(player.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                for (const square of blackMove) await tapSquare(player, square, true);
+                await expect(host.getByRole('button', { name: blackMove[1] + ', Black pawn' })).toBeVisible();
+                const table = new URL(player.url()).searchParams.get('table');
+                assert.ok(table && await player.evaluate(id => !!localStorage.getItem('gn:pass:' + id), table));
+                games.push({ player, table, pawn: blackMove[1] + ', Black pawn' });
+            }
+            const [first, second] = games;
+            assert.notEqual(first.table, second.table, 'two games retain distinct table identities');
+            const refresh = async ({ player, pawn }) => {
+                await player.reload();
+                await expect(player.getByRole('button', { name: pawn })).toBeVisible();
+            };
+            await refresh(first);
+            await context.clearCookies();
+            await refresh(first);
+            await refresh(second);
+            const leaving = first.player.waitForResponse(response =>
+                new URL(response.url()).pathname === '/beta/game-night/invitation/leave' && response.ok());
+            await first.player.locator('[data-leave]').tap();
+            await leaving;
+            await expect(first.player.locator('[data-game-night]')).toBeHidden();
+            await refresh(second);
+            await context.clearCookies();
+            await refresh(second);
+            console.log(`Passed ${engine} two Game Night seats in one phone profile with independent pass recovery and Leave.`);
+        } finally {
+            await context.close();
+            for (const host of hosts) await host.context().close();
+        }
+    }
     async function verifyGameNightEntry() {
         const host = await guest('rad-dad', 'LinkHost', { width: 1280, height: 900 }, false, origin + '/beta/?game-night=1&via=rad-dad');
         await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
@@ -2882,6 +2935,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
     try {
+        if (process.env.ARCADE_GUEST_TABLE_ISOLATION_ONLY === '1') {
+            await verifyGuestTableIsolation();
+            assert.deepEqual(errors, []);
+            return;
+        }
         if (process.env.ARCADE_GUEST_RECOVERY_ONLY === '1') {
             await verifyGameNightEntry();
             assert.deepEqual(errors, []);
@@ -3064,6 +3122,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(b.locator('[data-connection]')).toHaveText('Connected');
         await expect(b.locator('[data-game-night]')).toBeHidden();
         await verifyGameNightEntry();
+        if (!media && engine === 'webkit') await verifyGuestTableIsolation();
         await verifyPrivateSiteEntry();
         assert.deepEqual(errors, []);
         console.log(`Passed ${engine} ${entrances ? 'both generated arcade entry links' : 'protected entry with both brand contexts'}, invitation, keyboard/touch Chess, room chat, draw and rematch.`);
