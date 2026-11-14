@@ -650,6 +650,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
         await expect(host.locator('[data-chat-context]')).toHaveText(/^#art-/);
         const room = await host.locator('[data-chat-context]').textContent();
         await expect(invite).toBeInViewport({ ratio: 1 });
+        await guest.clock.install();
         await invite.press('Enter');
         const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
         const recipient = dialog.getByRole('button', { name: 'Invite ArtGuest', exact: true });
@@ -658,9 +659,18 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
         await recipient.press('Enter');
         await expect(dialog).toBeHidden();
         await expect(invite).toBeFocused();
-        const join = guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true });
+        const panel = guest.locator('[data-game-offer]');
+        const join = panel.getByRole('button', { name: 'Join room', exact: true });
         await expect(join).toBeInViewport({ ratio: 1 });
+        await guest.clock.fastForward(13000);
+        await expect(join).toHaveAccessibleDescription(`ArtHost invited you to ${room}.`);
         await guest.screenshot({ path: testInfo.outputPath('art-room-invite.png') });
+        await panel.getByRole('button', { name: 'Not now', exact: true }).press('Enter');
+        await expect(panel).toBeHidden();
+        await expect(guest.getByRole('tab', { name: '#stalemate', exact: true })).toBeFocused();
+        await invite.press('Enter');
+        await recipient.press('Enter');
+        await expect(join).toBeInViewport({ ratio: 1 });
         await join.press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
         await expect(guest.locator('[data-act-canvas]')).toBeVisible();

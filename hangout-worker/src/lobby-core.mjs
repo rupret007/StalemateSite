@@ -2005,7 +2005,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             chan.invites.add(t.dev);
             const gameRoom = roomKind(chan) === 'game';
             const arcade = gameRoom && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
-            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(gameRoom ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
+            const includeInstance = gameRoom || ['art', 'bobross', 'watch'].includes(chan.kind);
+            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(includeInstance ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
             return bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },
         op(c, chan, [n], _r, _m, peer) { return setRank(c, chan, n, 'ops', true, '+o', peer); },

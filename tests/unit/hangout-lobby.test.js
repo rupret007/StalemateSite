@@ -94,6 +94,25 @@ it('lets a host send a fresh room invitation at the deadline without waiting for
     expect(got(guest).at(-1)).toMatchObject({ t: 'invite', request: fresh });
 });
 
+it('binds a creative invitation to the original room without admitting the guest early', () => {
+    boot({ roomPerDevice: 1 });
+    const host = join('CreativeHost'), guest = join('CreativeGuest');
+    const room = '#art-sketch';
+    cmd(host, 'join', [room]);
+    namedCmd(host, 'invite', [guest.nick], room);
+    const notice = got(guest).find(m => m.t === 'invite' && m.ch === room);
+    expect(notice.roomInstance).toMatch(/^[a-f0-9]{32}$/);
+    expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
+    cmd(host, 'close', [], room);
+    clock += 2;
+    cmd(host, 'join', [room]);
+    const replacement = got(host).filter(m => m.t === 'join' && m.ch.name === room).at(-1);
+    expect(replacement.ch.keepRef).not.toBe(notice.roomInstance);
+    L.message(guest.id, JSON.stringify({ t: 'cmd', name: 'join', args: [room], ch: LOBBY, roomInstance: notice.roomInstance }));
+    expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
+    expect(got(guest).at(-1)).toMatchObject({ t: 'notice', kind: 'error', text: expect.stringContaining('changed or closed') });
+});
+
 it('lets the same live guest accept a pending room invitation after engine recovery', () => {
     boot();
     const host = join('InviteHost'), guest = join('InviteGuest');
