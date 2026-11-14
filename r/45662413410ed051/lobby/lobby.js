@@ -512,7 +512,6 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     let musicHandoffRecoveryRoom = null;
     let sentMusicInvite = null, musicInviteOutcomesSupported = false;
     const musicInviteFailed = 'Music invitation couldn’t be sent. Try again from your Jam room.';
-    const musicInviteConfirm = 'Confirm the invitation in WebJam.';
     const jamWaitingCopy = $('[data-jam-wait]').textContent;
     let gameNightSupported = false, gameOpenSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
@@ -3363,17 +3362,17 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const { room, request, nick } = pendingMusicHandoff;
         pendingMusicHandoff.channel.postMessage({ returned: sent });
         closeMusicHandoff();
-        if (sent && musicInviteOutcomesSupported) {
-            if ([musicInviteFailed, musicInviteConfirm].includes(toastRegion.textContent)) {
-                clearTimeout(toastTimer);
-                toastRegion.replaceChildren();
-                toastRegion.hidden = true;
-            }
+        if (!sent) {
+            musicHandoffRecoveryRoom = room;
+            showMusicHandoffStatus(musicInviteFailed);
+            return;
+        }
+        if (musicInviteOutcomesSupported) {
             sentMusicInvite = { room, request, nick, status: 'sent' };
             drawMusicInviteOutcome();
             return;
         }
-        toast(sent ? 'Music invitation sent.' : musicInviteFailed);
+        toast('Music invitation sent.');
     }
     function startMusicHandoff(room, context) {
         clearMusicHandoffRecovery();

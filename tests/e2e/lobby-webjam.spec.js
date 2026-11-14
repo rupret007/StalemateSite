@@ -244,12 +244,19 @@ for (const { delayed, width, height, hostSite, guestSite } of [
         }
         const panel = guest.locator('[data-music-invite]');
         const outcome = host.locator('[data-music-invite-outcome]');
+        await host.clock.install();
         expect(await returnInvite(invite.replace(/&e=\d+$/, '&e=1'))).toBe(false);
         await expect(panel).toBeHidden();
-        await expect(host.locator('[data-toast]')).toContainText('Music invitation couldn’t be sent.');
+        const refusal = host.locator('[data-music-handoff-status]');
+        await host.screenshot({ path: testInfo.outputPath('music-invite-refusal-before-wait.png') });
+        await host.clock.fastForward(5_000);
+        await host.screenshot({ path: testInfo.outputPath('music-invite-refusal-after-wait.png') });
+        await expect(refusal).toBeVisible();
+        await expect(refusal).toContainText('Music invitation couldn’t be sent.');
         await expect(musicButton).toBeEnabled();
         expect(await returnInvite(invite)).toBe(true);
         await expect(outcome).toHaveText('Music invitation sent to ChosenGuest. Waiting for a reply.');
+        await expect(refusal).toBeEmpty();
         await expect(host.locator('[data-toast]')).toBeHidden();
         await expect(musicButton).toBeEnabled();
         await expect(panel).toContainText('MusicHost invited you to join Music');
