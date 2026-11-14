@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 
@@ -35,6 +36,40 @@ describe('pinned WebJam browser assets', () => {
         expect(html).toContain("default-src 'none'; script-src 'self'; style-src 'self'");
         expect(html).not.toMatch(/<script(?![^>]*\bsrc=)/i);
         expect(read('handoff.js')).not.toMatch(/\bimport\b/);
+    });
+
+    it('distinguishes an unconfirmed return from an explicit invite refusal', () => {
+        const status = { textContent: '' };
+        let expire, channel;
+        const createPage = () => {
+            status.textContent = '';
+            runInNewContext(read('handoff.js'), {
+                location: {
+                    hash: '#' + 'a'.repeat(32) + '&k=' + 'A'.repeat(43) + '&s=' + '0'.repeat(64) + '&g=1&e=1',
+                    protocol: 'https:', pathname: '/join/handoff.html', origin: 'https://fixture.invalid',
+                },
+                history: { replaceState() {} },
+                document: { getElementById: () => status },
+                BroadcastChannel: class {
+                    constructor() { channel = this; }
+                    postMessage() {}
+                    close() {}
+                },
+                setTimeout(callback) { expire = callback; return 1; },
+                clearTimeout() { expire = null; },
+            });
+        };
+        createPage();
+        expire();
+        expect(status.textContent).toContain('Check with your bandmate before sending another invite.');
+        createPage();
+        channel.onmessage({ data: { returned: false } });
+        expect(status.textContent).toBe('End the browser invite in WebJam, then retry from your Jam room in this browser profile.');
+        expect(expire).toBeNull();
+        createPage();
+        channel.onmessage({ data: { returned: true } });
+        expect(status.textContent).toBe('Return to your Jam room. You can close this tab.');
+        expect(expire).toBeNull();
     });
 
     it('resolves the entire static module and stylesheet graph within the packaged client', () => {
