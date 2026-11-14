@@ -65,9 +65,16 @@ describe('real invitation-only beta boundary', () => {
         const now = Date.now();
         const send = key => betaFetch(request('/beta/unlock', { method: 'POST', body: { key } }), config, deps);
         const ttl = 72 * 60 * 60_000;
+        const fresh = await send(await makeDemoInvite(secret, '1', now));
+        expect(fresh.status).toBe(200);
+        const freshAccess = await readBeta('access', cookieOf(fresh).split('=')[1], secret);
+        expect(freshAccess.demo).toBe(true);
+        expect(freshAccess.exp - now).toBeGreaterThanOrEqual(BETA_TTL);
+        expect(freshAccess.exp - now).toBeLessThanOrEqual(BETA_TTL + 1000);
         const active = await send(await makeDemoInvite(secret, '1', now - ttl + 60_000));
         expect(active.status).toBe(200);
         const access = await readBeta('access', cookieOf(active).split('=')[1], secret);
+        expect(access.demo).toBe(true);
         expect(access.exp).toBe(now + 60_000);
         const expired = await send(await makeDemoInvite(secret, '1', now - ttl));
         expect(expired.status).toBe(410);
