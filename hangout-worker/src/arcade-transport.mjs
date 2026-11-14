@@ -59,11 +59,19 @@ export function createArcadeTransport({ state, current, active, approve, charge,
     function savedRecord(scope, game, expiresAt, claims) {
         return { room: scope.room, expiresAt, [name]: game.checkpoint(), ...(claims.length ? { claims } : {}) };
     }
-    async function load(scope) {
+    async function expireTable(scope) {
+        await state.storage.delete(key(scope));
+        publish(scope, null);
+    }
+    async function load(scope, reportExpiry = false) {
         const record = await state.storage.get(key(scope));
         if (!record || record.room !== scope.room) return null;
         const time = now();
-        if (record.expiresAt <= time) { await state.storage.delete(key(scope)); return null; }
+        if (record.expiresAt <= time) {
+            await expireTable(scope);
+            // A socket command can skip its reply when the broadcast already sent the new view.
+            return reportExpiry ? { expired: true } : null;
+        }
         return { expiresAt: record.expiresAt, game: restore(record[name]), claims: liveClaims(record.claims, time) };
     }
     async function hasGuestSeat(scope, match, host) {
@@ -169,7 +177,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         try { frame = JSON.parse(raw); } catch { return close(socket, 4400, 'bad match frame'); }
         if (frame?.version !== 1 || typeof frame.action !== 'string') return close(socket, 4400, 'bad match frame');
         try {
-            const record = await load(scope);
+            const record = await load(scope, true);
             let game = record?.game;
             const subject = binding.betaSid;
             let claims = record?.claims || [];
@@ -231,7 +239,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
                 if (game) await state.storage.put(key(scope), savedRecord(scope, game, expiresAt, claims));
                 else await state.storage.delete(key(scope));
                 publish(scope, game, null, claims);
-            } else publish(scope, game, resume ? null : socket, claims);
+            } else if (!record?.expired) publish(scope, game, resume ? null : socket, claims);
             if (frame.action === 'sync' && !scope.synced) {
                 socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });
             }
@@ -286,8 +294,7 @@ export function createArcadeTransport({ state, current, active, approve, charge,
         for (const [storageKey, record] of records) {
             const scope = { room: record.room, ref: storageKey.slice(prefix.length) };
             if (record.expiresAt <= now()) {
-                await state.storage.delete(storageKey);
-                publish(scope, null);
+                await expireTable(scope);
             } else {
                 const game = restore(record[name]);
                 const time = now(), claims = liveClaims(record.claims, time);

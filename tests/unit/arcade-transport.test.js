@@ -132,6 +132,33 @@ describe('Game Night match transport', () => {
         expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
     });
 
+    it('clears the host and guest match views when a read reaches the deadline before the alarm', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        const checkpoint = await f.storage.get(ARCADE_TAG + ':' + ref);
+        f.advance(checkpoint.expiresAt - 1000);
+
+        expect(await f.transport.hasGuestSeat({ room, ref }, id, sid)).toBe(false);
+        for (const socket of [f.a, f.b]) {
+            expect(f.board(socket)).toBeNull();
+            expect(socket.deserializeAttachment().subjects).toEqual([]);
+        }
+        const count = f.a.frames.length;
+        await f.transport.maintain();
+        expect(f.a.frames).toHaveLength(count);
+    });
+
+    it('sends one cleared match view when a guest sync reaches the deadline', async () => {
+        const f = fixture();
+        await f.start();
+        const checkpoint = await f.storage.get(ARCADE_TAG + ':' + ref);
+        f.advance(checkpoint.expiresAt - 1000);
+        const count = f.b.frames.length;
+        await f.send(f.b, 'sync');
+        expect(f.board(f.a)).toBeNull();
+        expect(f.b.frames.slice(count)).toEqual([expect.objectContaining({ t: 'match-state', state: null })]);
+    });
+
     it('transfers a WebJam hold atomically and only admits its scoped session to the reserved match', async () => {
         const f = fixture();
         await f.send(f.a, 'open');
