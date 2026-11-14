@@ -57,6 +57,18 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
+it('keeps the external Arcade note description-only in the ordinary lobby', async () => {
+    const { window } = await visitor('rad-dad');
+    const link = window.document.querySelector('[data-game-arcade-external]');
+    const note = window.document.getElementById(link.getAttribute('aria-describedby'));
+    expect(link.hidden).toBe(false);
+    expect(link.textContent).toContain('Open Rad Dad Arcade');
+    expect(new URL(link.href).pathname).toBe('/play/');
+    expect(link.target).toBe('_blank');
+    expect(note.hidden).toBe(true);
+    expect(note.textContent).toBe('Opens in a new tab');
+});
+
 it('rewrites a saved Game Night hint with only navigation fields', async () => {
     const { window, welcome } = await visitor('stalemate', { gameNight: 1 }, { beta: true });
     const key = 'hangout-game-return';
