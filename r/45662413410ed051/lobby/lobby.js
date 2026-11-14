@@ -90,6 +90,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         externalArcade.href = new URL('play/', gameArcadeBrand.home).href;
         $('[data-game-arcade-label]').textContent = arcadeLabel;
         externalArcade.hidden = false;
+        $('#game-arcade-tab-note').hidden = false;
     }
     let shareEntry = (handoff || resumeEntry)?.share !== false;
     let entrySourcesSupported = null;
