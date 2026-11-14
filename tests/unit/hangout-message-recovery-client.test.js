@@ -32,7 +32,7 @@ async function visitor(features = { messageResults: 1, privateMessageContext: 1,
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, gameNightReturnHint, createEntrySharing, createIdleHeartbeat,
+    window.HangoutClientTestModules = { ...entryFunctions, mountGameNightSound: vi.fn(), unlockGameNightAudio: vi.fn(), gameNightReturnHint, createEntrySharing, createIdleHeartbeat,
         createChatAnnouncements: log => createChatAnnouncements(log, { frame: fn => window.setTimeout(fn, 16), cancel: id => window.clearTimeout(id) }) };
     window.eval(discovery);
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');

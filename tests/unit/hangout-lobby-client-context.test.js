@@ -37,7 +37,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; return this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, ...gameNightFunctions, createEntrySharing, createIdleHeartbeat,
+    window.HangoutClientTestModules = { ...entryFunctions, mountGameNightSound: vi.fn(), unlockGameNightAudio: vi.fn(), ...gameNightFunctions, createEntrySharing, createIdleHeartbeat,
         createChatAnnouncements: (log) => createChatAnnouncements(log, { frame: (fn) => window.setTimeout(fn, 16), cancel: (id) => window.clearTimeout(id) }) };
     window.eval(discovery);
     // Execute the actual browser client, replacing only module loading, which
