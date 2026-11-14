@@ -903,3 +903,23 @@ for (const width of [375, 390]) test(`short Jam instructions and manual invite c
         await expect(page).toHaveURL(admittedURL); expect(popups).toBe(0); expect(visitor.errors).toEqual([]);
     } finally { await visitor.close(); }
 });
+
+for (const width of [1440, 390]) {
+    test(`People roster: self badge stays together at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        const visitor = await guest(browser, baseURL, 'FullscreenWriter', { width, height: width === 1440 ? 900 : 844 });
+        try {
+            const { page } = visitor;
+            await section(page, 'people');
+            const self = page.locator('[data-nicks] button[data-self="true"]');
+            await expect(self).toBeInViewport();
+            await page.screenshot({ path: testInfo.outputPath('self-badge.png') });
+            const badge = await self.evaluate(element => {
+                const style = getComputedStyle(element, '::after');
+                return { text: style.content, display: style.display, wrap: style.whiteSpace };
+            });
+            expect(badge).toEqual({ text: '"you"', display: 'inline-block', wrap: 'nowrap' });
+            expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+            expect(visitor.errors).toEqual([]);
+        } finally { await visitor.close(); }
+    });
+}
