@@ -324,10 +324,13 @@ export function mountArcadeChess(container, onMatch) {
     }
 
     function chooseClaim() {
-        const entries = availableClaims().map(({ san, reason, move }) => [
+        const claims = availableClaims();
+        if (!claims.length) return;
+        const entries = claims.map(({ san, reason, move }) => [
             san ? `${san} · ${reason}` : reason, () => send('claim-draw', move ? { move } : undefined)
         ]);
-        if (entries.length) showChoice('Claim a draw', 'Select a claim to send to the server.', entries);
+        showChoice('Claim a draw', claims[0].move
+            ? 'Choose the move that qualifies for a draw.' : 'Confirm the draw based on the current position.', entries);
     }
 
     startRematch.addEventListener('click', () => send('start-rematch'));
