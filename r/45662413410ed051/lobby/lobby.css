@@ -496,6 +496,9 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .arcade-brick-race { position: relative; }
 .arcade-brick-race summary, .arcade-brick-race [data-brick-leave] { min-height: 44px; }
 .arcade-brick-race [data-brick-leave] { position: absolute; inset: 1px 0 auto auto; }
+@media (max-width: 600px) {
+  .arcade-brick-race .brick-race-actions .btn { min-height: 44px; }
+}
 .brick-race-actions:has([data-brick-main][hidden]) { display: none; }
 .brick-race-actions:has([data-brick-main][hidden]):has([data-brick-leave]:not([hidden])) { display: contents; }
 .brick-race-actions:has([data-brick-back]:not([hidden])) { display: flex; }
