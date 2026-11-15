@@ -139,6 +139,60 @@ describe('Game Night phone wake and history recovery', () => {
             expect(source.slice(hidden, waiting)).toContain('matchHiddenText');
         });
 
+    it('treats a 4403 after the table is on screen as a drop, including a following 403', async () => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const current = sockets.at(-1);
+        ready(current);
+        current.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state: { id: 'match-1', seat: 'b', match: {} } })
+        }));
+        const before = sockets.length;
+        issue.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'Room membership required.' }), { status: 403 }));
+        current.dispatchEvent(new CloseEvent('close', { code: 4403, reason: 'room membership ended' }));
+        expect(status).toHaveBeenLastCalledWith('reconnecting');
+        expect(status).not.toHaveBeenCalledWith('unavailable', 'room');
+        const tickets = issue.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(issue.mock.calls.length).toBe(tickets + 1);
+        expect(sockets).toHaveLength(before);
+        expect(status).toHaveBeenLastCalledWith('reconnecting');
+        expect(status).not.toHaveBeenCalledWith('unavailable', 'room');
+    });
+
+    it('cancels a pending match retry when the lobby stops a seated match', async () => {
+        const socket = sockets[0];
+        socket.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({
+                t: 'match-state', version: 1, room: '#game-fixture',
+                state: { id: 'match-1', seat: 'b', match: {} }
+            })
+        }));
+        socket.dispatchEvent(new CloseEvent('close', { code: 4403, reason: 'room membership ended' }));
+        const tickets = issue.mock.calls.length;
+        client.stop();
+        await vi.advanceTimersByTimeAsync(20_000);
+        expect(issue).toHaveBeenCalledTimes(tickets);
+        expect(sockets).toHaveLength(1);
+    });
+
+    it('still ends a 4403 that arrives before any table view', async () => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const before = sockets.length;
+        ready(sockets.at(-1));
+        sockets.at(-1).dispatchEvent(new CloseEvent('close', { code: 4403, reason: 'table pass unavailable' }));
+        expect(status).toHaveBeenCalledWith('unavailable', 'room');
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(sockets).toHaveLength(before);
+    });
+
     it('keeps trying to reconnect with a capped wait while the page is visible', async () => {
         const status = vi.fn();
         client.stop();
