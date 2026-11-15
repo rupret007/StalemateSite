@@ -2999,7 +2999,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (origin && amOp(origin)) {
             act('Kick', () => peerCommand('kick', [nick, 'take a breather']), 'btn--danger');
             act('Ban', () => { const why = prompt(`Ban ${personLabel(selected)}. Reason?`); return why?.trim() ? peerCommand('ban', [nick, ...why.trim().split(' ')]) : false; }, 'btn--danger');
-            if (origin.kind !== 'lobby') { act('Make @', () => peerCommand('op', [nick])); act('Give voice', () => peerCommand('voice', [nick])); act('Invite here', () => peerCommand('invite', [nick, origin.name])); }
+            if (origin.kind !== 'lobby') { act('Add guest co-host', () => peerCommand('op', [nick])); act('Give voice', () => peerCommand('voice', [nick])); act('Invite here', () => peerCommand('invite', [nick, origin.name])); }
             if (app.band) act('Mute 10m', () => peerCommand('mute', [nick, '10m']), 'btn--danger');
         }
         sheet.showModal();
