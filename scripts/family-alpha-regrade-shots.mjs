@@ -80,8 +80,7 @@ async function createFixture(browser, origin, sourceRoot, viewport) {
     const lobby = createLobby({ gameNight: true, now: () => at, limits: { defaultSlow: 0, roomPerDevice: 1 }, send: (id, frame) => {
         const person = connection(id);
         if (frame.t === 'part' && person) { const ref = lobby.arcadeRoomRef(frame.ch, false); if (ref) departures.push({ scope: { room: frame.ch, ref }, subject: person.sid }); }
-        const sent = frame.t === 'hello' ? { ...frame, features: { ...frame.features, arcadeChess: 1, arcadeTurdSpades: 1, arcadeTurdanoid: 1 } } : frame;
-        lobbySockets.get(id)?.send(JSON.stringify(sent));
+        lobbySockets.get(id)?.send(JSON.stringify(frame));
     } });
     const transports = new Map(['chess', 'turdspades', 'turdanoid'].map(name => [name, createArcadeTransport({
         name, state,
@@ -96,7 +95,9 @@ async function createFixture(browser, origin, sourceRoot, viewport) {
     globalThis.WebSocketPair = class { constructor() { this[0] = {}; this[1] = upgrading; } };
     const retire = async (socket, transport) => {
         if (socket.readyState !== 1) return;
-        const scope = socket.deserializeAttachment(); socket.serializeAttachment({ ...scope, retired: true }); socket.readyState = 3; await transport.presenceChanged(scope);
+        const scope = socket.deserializeAttachment(); socket.serializeAttachment({ ...scope, retired: true }); socket.readyState = 3;
+        try { await transport.presenceChanged(scope); }
+        finally { const index = matchSockets.indexOf(socket); if (index !== -1) matchSockets.splice(index, 1); }
     };
     async function phone(nick) {
         const sid = randomUUID(), session = { betaSid: sid, betaInviteVersion: '1' };
@@ -165,7 +166,28 @@ async function capture(browser, origin, sourceRoot, spec, viewport, target, sha)
         for (let index = 1; index < spec.seats; index++) await pages[index].getByRole('button', { name: spec.joins[index - 1] }).click();
         for (const page of pages.slice(0, spec.seats)) {
             await expect(page.locator(spec.board)).toBeVisible();
-            await expect(page.locator(spec.status)).not.toBeEmpty();
+            const status = (await page.locator(spec.status).innerText()).trim();
+            if (!status || /waiting for players|waiting for opponent|waiting for .*player/i.test(status)) {
+                throw new Error(`${spec.label} did not start with all ${spec.seats} seats occupied (${status || 'empty status'}).`);
+            }
+            const board = page.locator(spec.board);
+            if (spec.game === 'chess' && await board.locator('[data-square]').count() < 32) throw new Error('Chess board has no complete starting position.');
+            if (spec.game === 'turdspades' && await board.locator('[data-card]').count() < 1) throw new Error('Spades table has no dealt cards.');
+            if (spec.game === 'turdanoid' && await board.locator('canvas, [data-wall], [data-brick]').count() < 1) throw new Error('Turdanoid race has no visible wall.');
+        }
+        for (const page of pages) {
+            const layout = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: innerWidth }));
+            if (layout.width > layout.viewport + 1) throw new Error(`Horizontal overflow at ${viewport.width}x${viewport.height}.`);
+            const controls = page.locator('button:visible, a:visible, input:visible, select:visible');
+            for (let i = 0; i < await controls.count(); i++) {
+                const control = controls.nth(i);
+                if (!(await control.isEnabled().catch(() => false))) continue;
+                await control.scrollIntoViewIfNeeded();
+                const box = await control.boundingBox();
+                if (!box || box.width < 24 || box.height < 24 || box.x < 0 || box.y < 0 || box.x + box.width > viewport.width + 1 || box.y + box.height > viewport.height + 1) {
+                    throw new Error(`Unreachable or undersized control at ${viewport.width}x${viewport.height}.`);
+                }
+            }
         }
         await host.waitForTimeout(250);
         if (fixture.errors().length) throw new Error(`Browser errors: ${fixture.errors().join('; ')}`);
@@ -177,10 +199,11 @@ async function capture(browser, origin, sourceRoot, spec, viewport, target, sha)
 
 async function main() {
     if (!Number.isInteger(port) || port < 8700 || port > 8799) throw new Error('REGRADE_PORT must be within 8700–8799.');
+    await rm(output, { recursive: true, force: true });
     await mkdir(output, { recursive: true });
     const temp = await mkdtemp(path.join(tmpdir(), 'family-alpha-regrade-'));
     const manifest = [];
-    let browser, site;
+    let browser, site, complete = false;
     try {
         const roots = new Map();
         for (const entry of versions) {
@@ -201,10 +224,12 @@ async function main() {
         }
         await writeFile(path.join(output, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
         process.stdout.write(`Wrote ${manifest.length} PNGs and manifest.json\n`);
+        complete = true;
     } finally {
         if (browser) await browser.close();
         if (site) await site.close();
         await rm(temp, { recursive: true, force: true });
+        if (!complete) await rm(output, { recursive: true, force: true });
     }
 }
 
