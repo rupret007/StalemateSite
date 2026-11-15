@@ -12,4 +12,8 @@ describe('Chess phone status copy', () => {
         expect(chessResultText({ winner: 'w', reason: 'checkmate' })).toBe('Checkmate · White wins');
         expect(chessResultText({ winner: null, reason: 'stalemate' })).toBe('Draw · stalemate');
     });
+
+    it('keeps resignation distinct from checkmate', () => {
+        expect(chessResultText({ winner: 'w', reason: 'resignation' })).toBe('White wins · resignation');
+    });
 });
