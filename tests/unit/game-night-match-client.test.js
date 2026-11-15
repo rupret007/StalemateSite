@@ -199,6 +199,32 @@ describe('Game Night phone wake and history recovery', () => {
         expect(sockets).toHaveLength(before);
     });
 
+    it('does not treat a hidden table snapshot as proof that this guest saw the table', async () => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        const before = sockets.length;
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const current = sockets.at(-1);
+        ready(current, { snapshots: true });
+        current.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'snapshot', version: 1, room: '#game-fixture', seq: 1,
+                phase: 'playing', currentMatchId: 'match-hidden', state: null })
+        }));
+        current.dispatchEvent(new CloseEvent('close', { code: 4403, reason: 'room membership ended' }));
+        expect(status).toHaveBeenCalledWith('unavailable', 'room');
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(sockets).toHaveLength(before + 1);
+    });
+
+    it('classifies 4003 banned as removal in the lobby close handler', async () => {
+        const { readFileSync } = await import('node:fs');
+        const source = readFileSync('r/45662413410ed051/lobby/lobby.js', 'utf8');
+        const handler = source.slice(source.indexOf('const onClose = async'), source.indexOf('ws.onclose = onClose'));
+        expect(handler).toMatch(/\[4403, 4003\]\.includes\(e\.code\) && e\.reason === 'banned'/);
+    });
+
     it('keeps trying to reconnect with a capped wait while the page is visible', async () => {
         const status = vi.fn();
         client.stop();
