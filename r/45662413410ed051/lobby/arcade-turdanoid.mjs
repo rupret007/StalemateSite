@@ -8,6 +8,14 @@ const tileColors = [['#72efad', '#1f8b66'], ['#68d5ed', '#236c9b'], ['#f6d677', 
     ['#f294d5', '#9c4383'], ['#b8a7ff', '#6d56be']];
 const capsules = { wide: ['Wide Load', 'W', '#9effc8'], sticky: ['Plunger Catch', 'C', '#ffd76a'], slow: ['Air Freshener', 'S', '#7ae6ff'] };
 const put = (node, text) => { if (node.textContent !== text) node.textContent = text; };
+
+export function turdanoidResultText(result, seat) {
+    const winner = result.winner === null ? 'The game ended in a draw'
+        : seat ? (result.winner === seat ? 'You win' : 'Rival wins')
+            : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
+    const reason = { clear: 'after clearing the wall', time: 'when time ran out', out: 'after running out of balls', resign: 'by forfeit' }[result.reason];
+    return `${winner}${result.winner === null ? '' : ` ${reason}`}.`;
+}
 const markup = `
 <summary>Turdanoid Brick Race</summary>
 <p class="small arcade-card-status brick-race-status" data-brick-status role="status"></p>
@@ -298,20 +306,18 @@ export function mountArcadeTurdanoid(container, onMatch) {
             message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
             if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect race'; }
         } else if (connection !== 'ready') {
-            if (match) message = match.result ? 'Reconnecting to the race…' : 'Reconnecting · race clock keeps running';
+            if (match) message = match.result ? 'Reconnecting to the race…' : 'Reconnecting · race clock keeps running.';
         } else if (!model) {
             message = 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.';
             if (canOpen) { action = 'open'; label = 'Open Turdanoid race'; }
         } else if (model?.waiting) {
-            if (watchOnly) message = 'Watching · waiting for players';
+            if (watchOnly) message = 'Watching · waiting for players.';
             else {
                 message = seat ? 'Waiting for a second player.' : 'An opponent is ready.';
                 if (!seat) { action = 'join'; label = 'Join Turdanoid race'; }
             }
         } else if (result) {
-            message = result.winner === null ? 'Draw' : seat ? (result.winner === seat ? 'You win' : 'Rival wins')
-                : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
-            message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
+            message = turdanoidResultText(result, seat);
             if (!watchOnly && seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
             if (!watchOnly && seat && seat === model.rematch) message += ' · Rematch requested. Waiting for your rival.';
         } else if (match) message = match.wall.name;

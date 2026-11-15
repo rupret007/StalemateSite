@@ -262,7 +262,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 }
             }
         } else if (model?.waiting) {
-            message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
+            message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}.`;
             if (model.watchOnly) {
                 message += occupied.length < people
                     ? ' · A seat opened. The host can invite you in. Stay here to watch when the next hand starts.'

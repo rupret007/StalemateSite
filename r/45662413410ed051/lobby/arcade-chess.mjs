@@ -26,10 +26,10 @@ export function chessTurnText(seat, turn) {
 
 export function chessResultText(result) {
     if (!result) return '';
-    if (!result.winner) return `Draw · ${result.reason}`;
+    if (!result.winner) return `Draw · ${result.reason}.`;
     return result.reason?.toLowerCase().includes('checkmate')
-        ? `Checkmate · ${colorName(result.winner)} wins`
-        : `${colorName(result.winner)} wins · ${result.reason}`;
+        ? `Checkmate · ${colorName(result.winner)} wins.`
+        : `${colorName(result.winner)} wins · ${result.reason}.`;
 }
 const markup = `
 <summary>Royal Flush Chess</summary>
