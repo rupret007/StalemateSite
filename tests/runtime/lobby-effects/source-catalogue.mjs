@@ -11,6 +11,7 @@ export const NATIVE_LOBBY_INPUTS = Object.freeze([
         'transport-budget.mjs', 'participation-checkpoint.mjs',
         'lobby-incident-sources.mjs', 'incident-cases.mjs'
     ].map(name => 'application/hangout-worker/src/' + name),
+    'application/join/crypto.js',
     'application/r/45662413410ed051/sync-core.js',
     'application/r/45662413410ed051/entry-sites.mjs',
     'application/r/45662413410ed051/lobby/game-night.mjs',
