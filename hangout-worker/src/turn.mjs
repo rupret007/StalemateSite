@@ -1,6 +1,7 @@
 // Credentials never enter storage/logs. One global DO serializes reservations across rooms.
 import { originAllowed, previewKeyOk, validRoomId } from './core.mjs';
 import { hmacKeyOk, verifyDevice } from './auth.mjs';
+import { buildRuntimeTurnEntries, hangoutTurnServiceEnabled, runtimeTurnConfigured } from './turn-config.mjs';
 
 export const TURN_TTL = 600;
 const WINDOW = 10 * 60 * 1000;
@@ -36,8 +37,10 @@ export async function admitTurn(request, env) {
     headers['Access-Control-Allow-Headers'] = 'Content-Type';
     if (request.method === 'OPTIONS') return finish(new Response(null, { status: 204 }));
     if (request.method !== 'POST') return finish(reply(405, 'POST required'));
-    if (env.HANGOUT_TURN_ENABLED !== '1') return finish(reply(503, 'TURN disabled'));
-    if (!env.TURN_BUDGET || !hmacKeyOk(env.HANGOUT_HMAC_KEY) || !previewKeyOk(env.HANGOUT_PREVIEW_KEY, env.HANGOUT_PREVIEW_KEY)) return finish(reply(503, 'not-configured'));
+    if (!hangoutTurnServiceEnabled(env)) return finish(reply(503, 'TURN disabled'));
+    const staticTurn = runtimeTurnConfigured(env);
+    if (!hmacKeyOk(env.HANGOUT_HMAC_KEY) || !previewKeyOk(env.HANGOUT_PREVIEW_KEY, env.HANGOUT_PREVIEW_KEY)) return finish(reply(503, 'not-configured'));
+    if (!staticTurn && (!env.TURN_BUDGET || env.HANGOUT_TURN_ENABLED !== '1')) return finish(reply(503, 'not-configured'));
     try {
         // Bound the body even when Content-Length is absent or dishonest.
         const reader = request.body?.getReader();
@@ -59,6 +62,12 @@ export async function admitTurn(request, env) {
         if (!validRoomId(body.room)) return finish(reply(400, 'room'));
         const device = await verifyDevice(body.device, env.HANGOUT_HMAC_KEY);
         if (!device) return finish(reply(403, 'device'));
+        if (staticTurn && env.HANGOUT_TURN_ENABLED !== '1') {
+            const iceServers = buildRuntimeTurnEntries(env);
+            if (!iceServers) return finish(reply(503, 'not-configured'));
+            const now = Date.now();
+            return finish(Response.json({ iceServers, ttl: TURN_TTL, expiresAt: now + TURN_TTL * 1000 }));
+        }
         return finish(await budgetRequest(env, 'issue', body.room, device));
     } catch { return finish(reply(503, 'TURN unavailable')); }
 }

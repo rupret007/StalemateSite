@@ -17,6 +17,7 @@ import { mediaEnabled, mediaPath } from './game-night-media.mjs';
 import { GAME_GUEST_PATH, GAME_INVITATION_PATH, GAME_INVITE_UNAVAILABLE, gameGuestEnabled, gameGuestScope, gameGuestSessionRef } from './game-night-invitations.mjs';
 import { GAME_ROOM_GRANT_PATH, gameRoomGrantsEnabled } from './game-night-room-grant-routes.mjs';
 import { validRoomGrantValue } from './game-night-room-grants.mjs';
+import { hangoutTurnServiceEnabled } from './turn-config.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -618,7 +619,7 @@ async function betaRequest(request, env, deps = {}) {
         ? `<a data-contact href="mailto:${contact}">${contact}</a>`
         : '<b data-contact>Moderation contact is not configured yet. Use the in-chat Report action to contact community moderators.</b>';
     const page = (await asset.text()).replace(/(<meta name="hangout-relay" content=")[^"]*(")/g, `$1${url.origin.replace(/^http/, 'ws')}$2`)
-        .replace(/(<meta name="hangout-turn" content=")[^"]*(")/g, `$1${env.HANGOUT_TURN_ENABLED === '1' ? `${url.origin}/turn` : ''}$2`)
+        .replace(/(<meta name="hangout-turn" content=")[^"]*(")/g, `$1${hangoutTurnServiceEnabled(env) ? `${url.origin}/turn` : ''}$2`)
         .replace(/(<meta name="hangout-turnstile" content=")[^"]*(")/g, `$1${String(env.HANGOUT_TURNSTILE_SITEKEY || '').replace(/[^A-Za-z0-9_-]/g, '')}$2`)
         .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/gi, '').replace(/<script[^>]*goatcounter[^>]*><\/script>/gi, '')
         .replace(/<b data-contact>[\s\S]*?<\/b>/, contactHtml)

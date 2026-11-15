@@ -40,6 +40,8 @@ new_sqlite_classes = ["HangoutTurnBudget"]
 [vars]
 HANGOUT_OPEN = "1"
 HANGOUT_TURN_ENABLED = "0"
+# Optional static relay (cellular-friendly): comma-separated turn:/turns: URLs in HANGOUT_TURN_URLS;
+# put HANGOUT_TURN_USERNAME and HANGOUT_TURN_CREDENTIAL in wrangler secrets. Unset => STUN-only video.
 HANGOUT_TURN_MONTHLY_GB = "800"
 HANGOUT_CF_ACCOUNT_ID = ""
 HANGOUT_ACCESS_TEAM = ""
