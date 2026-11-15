@@ -154,7 +154,7 @@ async function accept() {
         const tableFull = webJam && error.status === 409 && error.tableFull;
         const closed = tableFull || error.status === 410;
         status.textContent = 'Couldn’t join just now. Try again.';
-        if (tableFull) status.textContent = returnToRoom ? 'This table is full. Return to your room for the next game.'
+        if (tableFull) status.textContent = returnToRoom ? 'This table is full. Return to your room to wait for an open seat.'
             : 'This table is full. Ask your host for a new invite when a seat opens.';
         else if (closed) status.textContent = webJam && waitUntil > 0
             ? 'Your Chess seat wasn’t confirmed. Ask your host for a new WebJam invite.' : GAME_INVITE_UNAVAILABLE;

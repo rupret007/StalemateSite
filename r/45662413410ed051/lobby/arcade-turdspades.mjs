@@ -20,7 +20,7 @@ export const WATCH_SYNC_INTERVAL = 5 * 60_000;
 const markup = `
 <summary>TurdSpades</summary>
 <p class="small arcade-card-status" data-spades-status role="status"></p>
-<p class="small arcade-next-game" data-next-game hidden>Table full, you're up next game</p>
+<p class="small arcade-next-game" data-next-game hidden>Table full. You’re in line for the next open seat.</p>
 <p class="small arcade-card-error" data-spades-error role="status"></p>
 <div class="arcade-card-actions">
     <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>

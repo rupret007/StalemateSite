@@ -271,7 +271,7 @@ for (const game of Object.values(GAMES)) {
         // Up to five phone browsers share one worker.
         test.beforeEach(() => test.slow());
 
-        test(`2. one phone too many is told the table is full and that it is up next game`, async ({ browser, baseURL }) => {
+        test(`2. one phone too many can see it is waiting for an open seat`, async ({ browser, baseURL }) => {
             const fixture = await gameNight(browser, baseURL);
             try {
                 const pages = await seated(fixture, game, nicks);
@@ -279,8 +279,9 @@ for (const game of Object.values(GAMES)) {
                 await invite(pages[0], extra, 'ExtraPhone');
                 await showTable(extra, game);
                 await expect(extra.locator(game.board)).toBeVisible();
-                await expect(panel(extra, game)).toContainText(/table (is )?full/i);
-                await expect(panel(extra, game)).toContainText(/up next|next game/i);
+                await expect(panel(extra, game).locator('[data-next-game]')).toBeVisible();
+                await expect(panel(extra, game).locator('[data-next-game]')).toHaveText(
+                    'Table full. You’re in line for the next open seat.');
             } finally { await fixture.close(); }
         });
 

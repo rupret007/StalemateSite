@@ -20,7 +20,7 @@ const reasonText = {
 const markup = `
 <summary>Royal Flush Chess</summary>
 <p class="small arcade-chess-status" data-chess-status role="status"></p>
-<p class="small arcade-next-game" data-next-game hidden>Table full, you're up next game</p>
+<p class="small arcade-next-game" data-next-game hidden>Table full. You’re in line for the next open seat.</p>
 <p class="small arcade-chess-feedback" data-chess-error role="status"></p>
 <button type="button" class="btn btn--small" data-chess-primary hidden></button>
 <button type="button" class="btn btn--small btn--ghost" data-chess-start-rematch hidden>Start now</button>
