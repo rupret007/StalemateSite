@@ -2072,11 +2072,25 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await connection.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
             } finally { await connection.detach(); }
         } else await b.touchscreen.tap(controlBox.x + controlBox.width / 2, controlBox.y + controlBox.height / 2);
-        await a.keyboard.press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
+        // Focus may have changed during the simulated reconnect or phone swipe.
+        // Send the real desktop key to the region that handles it.
+        await track(a).press(danger === 0 ? 'ArrowLeft' : 'ArrowRight');
         if (prediction) assert.equal(await prediction, true, 'native phone swipe moves locally before delayed confirmation');
-        for (const page of [a, b]) {
-            await expect(race(page)).toHaveAttribute('data-sequence', '1');
-            await expect(race(page)).toHaveAttribute('data-lane', String(danger));
+        for (const [device, page] of [['desktop key', a], ['phone swipe', b]]) {
+            try {
+                await expect(race(page), device).toHaveAttribute('data-sequence', '1');
+                await expect(race(page), device).toHaveAttribute('data-lane', String(danger));
+            } catch (error) {
+                const summary = await race(page).evaluate(table => ({
+                    phase: table.dataset.phase,
+                    lane: table.dataset.lane,
+                    confirmedSequence: table.dataset.sequence,
+                    confirmedTick: table.dataset.confirmedTick,
+                    trackFocused: table.querySelector('[data-race-track]') === document.activeElement,
+                    raceErrorVisible: Boolean(table.parentElement.querySelector('[data-race-error]')?.textContent),
+                })).catch(() => null);
+                throw new Error(`Turd Rush did not confirm the ${device}: ${JSON.stringify(summary)}`, { cause: error });
+            }
         }
         await expect.poll(async () => {
             const meters = await b.locator('[data-race-score] progress').evaluateAll(bars => bars.map(bar => bar.value));
