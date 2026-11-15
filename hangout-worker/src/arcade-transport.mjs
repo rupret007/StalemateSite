@@ -82,7 +82,25 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             // A socket command can skip its reply when the broadcast already sent the new view.
             return reportExpiry ? { expired: true } : null;
         }
-        return { expiresAt: record.expiresAt, seq: record.seq ?? 0, game: restore(record[name]), claims: liveClaims(record.claims, time) };
+        const game = restore(record[name]);
+        dropWatchers(scope, game);
+        return { expiresAt: record.expiresAt, seq: record.seq ?? 0, game, claims: liveClaims(record.claims, time) };
+    }
+    // Privacy ruling #557/#560: an explicit watch invitation is read-only. It is
+    // never lined up, never treated as seated and never shown a seat's view,
+    // whatever the stored table says.
+    const watchOnly = binding => !!binding?.gameGuest?.watch;
+    const seatOf = (game, binding) => watchOnly(binding) ? null : game?.seat(binding.betaSid) ?? null;
+    // A checkpoint written before the invitation was known to be watch-only may
+    // still hold the watcher in the next-game line (record.nextGame). Take them
+    // out on every load, before a reopen or rematch can seat from the line.
+    function dropWatchers(scope, game) {
+        for (const peer of sockets()) {
+            const attachment = peer.deserializeAttachment();
+            if (!attachment || attachment.ref !== scope.ref || attachment.room !== scope.room) continue;
+            const peerBinding = member(attachment);
+            if (watchOnly(peerBinding)) game.dequeue(peerBinding.betaSid);
+        }
     }
     async function guestTableId(scope, match, host) {
         const record = await load(scope);
@@ -205,13 +223,13 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             if (!attachment || attachment.ref !== scope.ref || attachment.room !== scope.room) continue;
             const peerBinding = member(attachment);
             // An explicit watch invite is read-only: it is never lined up for a seat (#557/#560).
-            if (peerBinding?.canPlay && !peerBinding.gameGuest?.watch && canView(game, peerBinding, attachment)
+            if (peerBinding?.canPlay && !watchOnly(peerBinding) && canView(game, peerBinding, attachment)
                 && game.enqueue(peerBinding.betaSid)) added = true;
         }
         return added;
     }
     function canView(game, binding, scope) {
-        const seated = !!game?.seat(binding.betaSid);
+        const seated = !!seatOf(game, binding);
         if (game && otherTable(game, binding.gameGuest, scope)) return false;
         return !game || game.subjects.every(subject =>
             binding.canSee(subject) || seated && binding.isPresent?.(subject) === false);
@@ -225,8 +243,13 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             if (!binding) { close(socket, 4403, 'room membership ended'); continue; }
             const subjects = game?.subjects ?? [];
             const permitted = canView(game, binding, recipient);
-            const seat = permitted && game ? game.seat(binding.betaSid) : null;
-            const view = permitted && game && !game.closed ? game.view(binding.betaSid, now()) : null;
+            const invitation = binding.gameGuest;
+            // A watch-only invitation is projected as a spectator before anything is
+            // derived from a seat: no seat, no hand, no playable list, no place in line.
+            const spectator = watchOnly(binding);
+            const seat = permitted && game ? seatOf(game, binding) : null;
+            const view = permitted && game && !game.closed ? game.view(spectator ? null : binding.betaSid, now()) : null;
+            if (view && spectator) view.watchOnly = true;
             if (view?.seat) {
                 view.disconnectedSeats = subjects.filter(subject => !online.has(subject)).map(subject => game.seat(subject));
                 view.canStartRematch = game.host === binding.betaSid && binding.canOpen;
@@ -239,8 +262,6 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             try { socket.serializeAttachment({ ...kept, subjects: permitted ? subjects : [],
                 playerId: binding.betaSid, seat, seq, ...(remembered ? { hidden: remembered } : {}) }); }
             catch { close(socket, 1011, 'match connection unavailable'); continue; }
-            const invitation = binding.gameGuest;
-            if (view && invitation?.watch) view.watchOnly = true;
             if (view?.waiting && !view.watchOnly) {
                 const reserved = claims.some(claim => claim.sid === binding.betaSid);
                 const unreservedSeat = game.hasGuestSeat(view.id, game.host, claims.length);
@@ -303,14 +324,14 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 return send(socket, { t: 'match-error', reason: 'unavailable' });
             }
             // Lost join replies can be retried after the host closes or reopens the table.
-            if (frame.action === 'join' && game?.seat(subject)) frame = { version: 1, action: 'sync' };
+            if (frame.action === 'join' && seatOf(game, binding)) frame = { version: 1, action: 'sync' };
             let changed = game?.expire(now()) || false;
             if (game && !game.closed && queueArrivals(scope, game)) changed = true;
-            const resume = frame.action === 'sync' && game?.seat(subject) && !scope.synced;
+            const resume = frame.action === 'sync' && seatOf(game, binding) && !scope.synced;
             let expiresAt = record?.expiresAt;
             let error = '', nextMatch;
             if (frame.action !== 'sync') {
-                if (binding.gameGuest?.watch || !binding.canPlay || !await approve(scope.actor)) error = 'unavailable';
+                if (watchOnly(binding) || !binding.canPlay || !await approve(scope.actor)) error = 'unavailable';
                 else if (frame.action === 'open') {
                     const SelectedTable = frame.mode === undefined ? Table : frame.mode === 'partners' ? PartnerTable : null;
                     if (!binding.canOpen || !SelectedTable) error = 'unavailable';
@@ -374,7 +395,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 publish(scope, game, null, claims, seq + 1, nextMatch);
                 // The registry may be a separate Durable Object. Renew only after the
                 // match commits so a failed write does not extend guest access.
-                if (!error && binding.gameGuest && game?.seat(subject) && frame.action !== 'sync') {
+                if (!error && binding.gameGuest && seatOf(game, binding) && frame.action !== 'sync') {
                     try { await guestActivity(binding); } catch { /* Keep the existing idle deadline. */ }
                 }
             } else if (!record?.expired) publish(scope, game, resume ? null : socket, claims, seq);

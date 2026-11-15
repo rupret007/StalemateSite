@@ -124,6 +124,14 @@ export function createGameNightTable({
             return true;
         }
 
+        // Take someone out of the line, e.g. a watch-only invitation that an older
+        // checkpoint had lined up. They are never seated from it.
+        dequeue(subject) {
+            if (!this.#next.includes(subject)) return false;
+            this.#next = this.#next.filter(entry => entry !== subject);
+            return true;
+        }
+
         join(subject, id, now, requested, reserved = 0, heldSeats = []) {
             if (this.#closed || id !== this.#id || this.#match || !subjectValid(subject) || this.seat(subject) || this.#occupied().length + reserved >= sides.length) return false;
             const seat = twoSeats ? sides[1] : requested === 'next' ? sides.find(side => !this.#seats[side] && !heldSeats.includes(side)) : requested;

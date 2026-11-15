@@ -55,7 +55,7 @@ function fixture(name) {
     const view = socket => last(socket)?.state;
     // The phone's socket ends without a leave, as when it loses signal.
     const drop = async socket => { socket.readyState = 3; await transport.presenceChanged(socket.deserializeAttachment()); };
-    return { phone, send, hello, last, view, drop, advance: ms => { now += ms; } };
+    return { phone, send, hello, last, view, drop, binding: index => actors.get(actorId(index)), advance: ms => { now += ms; } };
 }
 
 async function seated(game) {
@@ -196,6 +196,27 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         await resign(f, phones.at(-1));
         expect(f.last(watcher)).toMatchObject({ phase: 'finished', yourSeat: null });
         if (game.privateHands) expect(f.view(watcher).match.hand).toEqual([]);
+    });
+
+    it('5b. a watch-only invite is shown no seat and no hand, even if the table lists it in a seat, through reconnect and rematch', async () => {
+        const { f, phones, id } = await seated(game);
+        const index = game.seats - 1;
+        const { tableId } = f.view(phones[0]);
+        f.binding(index).gameGuest = { room, ref, host: sidFor(0), match: id, tableId, game: game.name, watch: true };
+        const watcher = f.phone(index);
+        await f.hello(watcher);
+        const readOnly = next => {
+            expect(f.last(watcher)).toMatchObject({ t: 'snapshot', currentMatchId: next, yourSeat: null, canOpen: false });
+            expect(f.view(watcher)).toMatchObject({ watchOnly: true, seat: null });
+            if (game.privateHands) expect(f.view(watcher).match.hand).toEqual([]);
+            expect(JSON.stringify(watcher.frames)).not.toMatch(/"playable":/);
+        };
+        readOnly(id);
+        await resign(f, phones[0]);
+        await f.send(phones[0], 'start-rematch', { id });
+        const next = f.view(phones[0]).id;
+        expect(next).not.toBe(id);
+        readOnly(next);
     });
 });
 
