@@ -80,6 +80,62 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         expect(await page.evaluate(() => window.captureRequests)).toBe(0);
     });
 
+    test(`camera layout restores keyboard focus after blocked playback at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.addInitScript(() => {
+            window.captureRequests = 0;
+            window.playbackAttempts = 0;
+            navigator.mediaDevices.getUserMedia = async () => {
+                window.captureRequests++;
+                throw new Error('The listener did not request capture');
+            };
+            HTMLMediaElement.prototype.play = async function () {
+                if (this.id === 'host-audio' && ++window.playbackAttempts === 1) {
+                    throw new DOMException('Playback needs a guest action', 'NotAllowedError');
+                }
+            };
+        });
+        await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
+        await page.route('**/join/', async route => {
+            const response = await route.fetch();
+            const body = await response.text();
+            const marker = '<meta name="webjam-video" content="disabled">';
+            expect(body).toContain(marker);
+            await route.fulfill({ response, body: body.replace(marker, '<meta name="webjam-video" content="private">') });
+        });
+        await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+            export class WebJoinSession {
+                constructor({ stream, onTrack }) {
+                    if (stream) throw new Error('Unexpected capture stream');
+                    window.deliverHostAudio = () => onTrack(new MediaStream());
+                }
+                async join() { this.authorized = true; }
+                close() { this.authorized = false; }
+            }` }));
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        await page.getByRole('button', { name: 'Join to listen' }).press('Enter');
+
+        const leave = page.getByRole('button', { name: 'Leave', exact: true });
+        const play = page.getByRole('button', { name: 'Play session audio', exact: true });
+        await expect(leave).toBeFocused();
+        await page.evaluate(() => window.deliverHostAudio());
+        await expect(play).toBeFocused();
+        await expect(play).toBeInViewport();
+        await expect(play).toHaveAccessibleDescription(/you’re still connected/i);
+        await page.screenshot({ path: testInfo.outputPath(`camera-playback-recovery-${width}x${height}.png`) });
+
+        await play.press('Enter');
+        await expect(play).toBeHidden();
+        await expect(leave).toBeFocused();
+        expect(await page.evaluate(() => [window.captureRequests, window.playbackAttempts])).toEqual([0, 2]);
+        await page.screenshot({ path: testInfo.outputPath(`camera-playback-restored-${width}x${height}.png`) });
+
+        await leave.press('Enter');
+        await expect(page.locator('#status')).toBeFocused();
+        await expect(page.locator('#status')).toHaveAccessibleDescription(/return to your Jam room to accept it/i);
+    });
+
     test(`an admitted listener gets a fresh-invite path after a connection drops at ${width}px`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
         await page.addInitScript(() => {
