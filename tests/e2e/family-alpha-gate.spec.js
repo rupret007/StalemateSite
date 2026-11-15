@@ -18,11 +18,15 @@ const PREVIEW = 'local-preview-key-0001';
 const WAIT_FOR_HOST = /wait(ing)? for (the )?host/i;
 const arcadeFeatures = { arcadeChess: 1, arcadeTurdSpades: 1, arcadeTurdanoid: 1 };
 
-// route.send() is asynchronous. A frame counts as browser-received only after
-// delivery completes; transport senders may ignore its returned promise.
+// route.send() is asynchronous. Serialize sends so frames stay in wire order,
+// and record a frame only after successful delivery.
+const sendTails = new WeakMap();
 function sendAndRecord(route, frames, raw) {
-    const delivery = route.send(raw);
-    return Promise.resolve(delivery).then(() => { frames.push(String(raw)); }, () => {});
+    const previous = sendTails.get(frames) || Promise.resolve();
+    const delivery = previous.then(() => route.send(raw));
+    const recorded = delivery.then(() => { frames.push(String(raw)); }, () => {});
+    sendTails.set(frames, recorded);
+    return recorded;
 }
 
 function hasPrivateSpadesHand(frame) {
@@ -43,13 +47,27 @@ test('match socket delivery records only successful sends and watcher frames sta
     expect(frames).toEqual(['{"n":1}']);
     expect(await sendAndRecord({ send: () => Promise.reject(new Error('delivery failed')) }, frames, '{"n":2}')).toBeUndefined();
     expect(frames).toEqual(['{"n":1}']);
-    expect(() => sendAndRecord({ send: () => { throw new Error('send threw'); } }, frames, '{"n":3}')).toThrow('send threw');
+    await expect(sendAndRecord({ send: () => { throw new Error('send threw'); } }, frames, '{"n":3}')).resolves.toBeUndefined();
     expect(frames).toEqual(['{"n":1}']);
 
     await sendAndRecord({ send: raw => { sent.push(String(raw)); return Promise.resolve(); } }, frames, '{"n":4}');
     await sendAndRecord({ send: raw => { sent.push(String(raw)); return Promise.resolve(); } }, frames, '{"n":5}');
     expect(sent).toEqual(['{"n":1}', '{"n":4}', '{"n":5}']);
     expect(frames).toEqual(['{"n":1}', '{"n":4}', '{"n":5}']);
+
+    const ordered = [], releases = [];
+    const queuedRoute = { send(raw) { ordered.push(String(raw)); return new Promise(resolve => releases.push(resolve)); } };
+    const third = sendAndRecord(queuedRoute, frames, '{"n":6}');
+    const fourth = sendAndRecord(queuedRoute, frames, '{"n":7}');
+    await Promise.resolve();
+    expect(ordered).toEqual(['{"n":6}']);
+    releases.shift()();
+    await third;
+    await Promise.resolve();
+    expect(ordered).toEqual(['{"n":6}', '{"n":7}']);
+    releases.shift()();
+    await fourth;
+    expect(frames.slice(-2)).toEqual(['{"n":6}', '{"n":7}']);
 
     const publicState = { state: { match: { hand: [] } } };
     const privateMarker = { state: { match: { hand: ['PRIVATE_CARD_HAND_MARKER'] } } };
