@@ -14,6 +14,15 @@ import '../../hangout-worker/arcade/games/turdrummy-rules.js';
 
 const runProcess = promisify(execFile);
 const isMatchView = frame => frame.t === 'snapshot' || frame.t === 'match-state';
+// The Game Night Spades status line ([data-spades-status]) is the only place the
+// page shows the round and whose turn it is. tests/unit/spades-phone-polish.test.js
+// checks these helpers against the real renderer so the two cannot drift.
+export const spadesTurnPrompt = round => `Round ${round} · Your turn · tap a card`;
+// Indexes of the status lines prompting a card in `round`; empty until every line shows that round.
+export function spadesTurnSeats(messages, round) {
+    if (!messages.every(message => message.startsWith(`Round ${round} · `))) return [];
+    return messages.flatMap((message, index) => message.startsWith(spadesTurnPrompt(round)) ? [index] : []);
+}
 
 export async function runArcadeBrowser(engine, origin, invitation, evidence, entrances, media, relay = false, options = {}) {
     const mixed = options.previousClient || options.previousWorker ? options : null;
@@ -938,8 +947,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(table(host)).toHaveAttribute('data-phase', 'play');
             await expect(friend.locator('[data-spades-trick]')).toContainText('North (CPU)');
             await expect(friend.locator('[data-spades-trick]')).toContainText('East (CPU)');
-            await expect(status(friend)).toHaveText('Round 1 · Your turn · tap a card');
-            await expect(friend.locator('#tableCaption')).toContainText(/^Round 1 ·/);
+            await expect(status(friend)).toHaveText(spadesTurnPrompt(1));
             await captureArcadeInvite(host, desktop, 'spades-02-playing');
             await captureArcadeInvite(friend, phone, 'spades-02-playing');
 
@@ -951,11 +959,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 let turn;
                 await expect.poll(async () => {
                     const messages = await Promise.all(players.map(page => status(page).textContent()));
-                    const captions = await Promise.all(players.map(page => page.locator('#tableCaption').textContent()));
-                    assert.ok(captions.every(caption => /^Round 1 ·/.test(caption)), 'both players still show the round-one indicator');
-                    turn = messages.flatMap((message, index) => message.startsWith('Round 1 · Your turn · tap a card') ? [index] : []);
-                    assert.ok(messages.every((message, index) => index === turn[0] || !message.startsWith('Round 1 · Your turn · tap a card')),
-                        'only the active player sees the round-one turn prompt');
+                    // Both players must show the round-one indicator, and exactly one the turn prompt.
+                    turn = spadesTurnSeats(messages, 1);
                     return turn.length;
                 }).toBe(1);
                 const index = turn[0], page = players[index], card = page.locator('[data-spades-card]:enabled').first();
@@ -2188,11 +2193,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             let turn;
             await expect.poll(async () => {
                 const messages = await Promise.all(players.map(page => status(page).textContent()));
-                const captions = await Promise.all(players.map(page => page.locator('#tableCaption').textContent()));
-                assert.ok(captions.every(caption => /^Round 1 ·/.test(caption)), 'both players still show the round-one indicator');
-                turn = messages.flatMap((message, index) => message.startsWith('Round 1 · Your turn · tap a card') ? [index] : []);
-                assert.ok(messages.every((message, index) => index === turn[0] || !message.startsWith('Round 1 · Your turn · tap a card')),
-                    'only the active player sees the round-one turn prompt');
+                // Every seated page must show the round-one indicator, and exactly one the turn prompt.
+                turn = spadesTurnSeats(messages, 1);
                 return turn.length;
             }).toBe(1);
             const index = turn[0], page = players[index];

@@ -31,6 +31,41 @@ function mount() {
     return { container, panel: view.panel, find: selector => view.panel.querySelector(selector) };
 }
 
+const harnessSource = readFileSync(join(root, 'tests/runtime/arcade-browser.mjs'), 'utf8');
+// The phone playthrough harness keeps its turn detection in two pure helpers.
+// Evaluate them straight from the harness source so this test exercises the
+// exact code the browser run uses, without launching a browser.
+function harnessTurnHelpers() {
+    const prompt = harnessSource.match(/^export const spadesTurnPrompt = .*;$/m)?.[0];
+    const seats = harnessSource.match(/^export function spadesTurnSeats\([\s\S]*?^}$/m)?.[0];
+    expect(prompt, 'harness exports spadesTurnPrompt').toBeTruthy();
+    expect(seats, 'harness exports spadesTurnSeats').toBeTruthy();
+    return new Function(`${prompt.replace('export ', '')}\n${seats.replace('export ', '')}\nreturn { spadesTurnPrompt, spadesTurnSeats };`)();
+}
+
+const request = (match, fields) => ({ version: match.version, id: match.id, revision: match.revision, ...fields });
+// Bids for both humans (the CPUs bid on their own) so the table reaches play.
+function playingPartnersTable() {
+    const table = partnersTable();
+    const subjects = { south: 'host', west: 'friend' };
+    for (let turn = 0; turn < 2; turn++) {
+        const subject = subjects[table.view('watcher').match.turn];
+        const match = table.view(subject).match;
+        expect(match.phase).toBe('bid');
+        expect(table.command(subject, request(match, { action: 'bid', bid: 3 }))).toEqual({ ok: true });
+    }
+    const open = table.view('watcher').match;
+    expect(open.phase).toBe('play');
+    const active = subjects[open.turn];
+    return { table, active, idle: Object.values(subjects).find(subject => subject !== active) };
+}
+function statusFor(state) {
+    document.body.replaceChildren();
+    const view = mount();
+    client.handlers.onState({ state, canOpen: false, partners: true });
+    return view.find('[data-spades-status]').textContent;
+}
+
 function partnersTable() {
     const table = new GameNightSpadesPartners('spades-phone-fixture', 'host');
     expect(table.join('friend', 'spades-phone-fixture', 0, 'next')).toBe(true);
@@ -100,5 +135,48 @@ describe('Spades phone table', () => {
         expect(phone).toMatch(/\.arcade-spades \.spades-trick\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
         expect(phone).toMatch(/\.arcade-spades \.arcade-card-hand button\s*\{[^}]*min-height:\s*50px/);
         expect(css).toMatch(/\.game-night :is\(\.arcade-eights, \.arcade-rummy, \.arcade-spades, \.arcade-jack\) :is\(\.btn, select\)\s*\{[^}]*min-height:\s*44px/);
+    });
+
+    it('renders a seated phone’s play line as `Round N · Your turn · tap a card`, which the playthrough harness detects', () => {
+        const { table, active, idle } = playingPartnersTable();
+        const activeState = table.view(active), idleState = table.view(idle);
+        const lines = [activeState, idleState, table.view('watcher')].map(statusFor);
+        expect(lines[0]).toBe('Round 1 · Your turn · tap a card');
+        expect(lines[1]).toMatch(/^Round 1 · (South|West) to play$/);
+        expect(lines[2]).toBe(lines[1]);
+
+        const { spadesTurnPrompt, spadesTurnSeats } = harnessTurnHelpers();
+        expect(spadesTurnPrompt(1)).toBe(lines[0]);
+        // Exactly the active seat is picked, wherever it sits in the page list.
+        expect(spadesTurnSeats([lines[0], lines[1]], 1)).toEqual([0]);
+        expect(spadesTurnSeats([lines[1], lines[0]], 1)).toEqual([1]);
+        expect(spadesTurnSeats([lines[1], lines[2]], 1)).toEqual([]);
+        // A page that is reconnecting, or showing another round, is never treated as ready to play.
+        expect(spadesTurnSeats([lines[0], 'Reconnecting to the table… Your hand is paused.'], 1)).toEqual([]);
+        expect(spadesTurnSeats([lines[0], lines[1]], 2)).toEqual([]);
+
+        // Later rounds and the partners "won the last trick" suffix keep the same prefix.
+        for (const round of [2, 7]) {
+            const later = state => ({ ...state, match: { ...state.match, round, lastWinner: 'north', trick: [] } });
+            const laterLines = [later(activeState), later(idleState)].map(statusFor);
+            expect(laterLines[0]).toBe(`Round ${round} · Your turn · tap a card · North (CPU) won the last trick`);
+            expect(laterLines[0].startsWith(spadesTurnPrompt(round))).toBe(true);
+            expect(spadesTurnSeats(laterLines, round)).toEqual([0]);
+            expect(spadesTurnSeats(laterLines, 1)).toEqual([]);
+        }
+    });
+
+    it('keeps the playthrough harness waiting only on elements the Game Night Spades page renders', () => {
+        const { table, active } = playingPartnersTable();
+        mount();
+        client.handlers.onState({ state: table.view(active), canOpen: false, partners: true });
+        expect(document.querySelector('[data-spades-status]')).not.toBeNull();
+        expect(document.querySelector('#tableCaption')).toBeNull();
+        expect(harnessSource.includes('tableCaption'), 'harness must not wait on #tableCaption').toBe(false);
+        // Every Spades turn-detection site goes through the shared helpers; no bare prompt literal remains.
+        const literal = harnessSource.split('\n').filter(line => line.includes('Your turn · tap a card'));
+        expect(literal).toHaveLength(1);
+        expect(literal[0]).toMatch(/^export const spadesTurnPrompt = /);
+        expect(harnessSource.match(/spadesTurnSeats\(messages, \d+\)/g)).toHaveLength(2);
     });
 });
