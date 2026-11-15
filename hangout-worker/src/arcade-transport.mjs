@@ -89,6 +89,14 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
     async function hasGuestSeat(scope, match, host) {
         return !!await guestTableId(scope, match, host);
     }
+    async function watchTableId(scope) {
+        const record = name === 'turdspades' && await load(scope);
+        if (!record || record.game.host !== scope.host) return null;
+        if (scope.tableId) return scope.tableId === record.game.tableId ? scope.tableId : null;
+        const view = record.game.view(scope.host, now());
+        return !record.game.closed && view.id === scope.match && !view.waiting
+            && view.occupied?.length === 4 ? record.game.tableId : null;
+    }
     async function guestNightEndsAt(scope) {
         const record = await load(scope);
         return record && record.game.tableId === scope.tableId && record.game.host === scope.host ? record.expiresAt : 0;
@@ -156,10 +164,25 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             if (record?.claims.some(claim => claim.grant && claim.sid === holder)) await releaseGuestClaim(scope, holder);
         }
     };
-    function sendView(socket, attachment, view, canOpen, seq, seat = view?.seat ?? null, reopenMode) {
+    // A match the viewer may not see is still reported as open, so the page never
+    // tells them to wait for the host. A guest invited to another table learns
+    // only that this one is unavailable.
+    const otherTable = (game, invitation, scope) => !!invitation && (invitation.game !== name || invitation.room !== scope.room ||
+        invitation.ref !== scope.ref || invitation.host !== game.host ||
+        !!invitation.tableId && invitation.tableId !== game.tableId);
+    function hiddenMatch(game, binding, scope) {
+        const open = game?.openMatch;
+        if (!open) return undefined;
+        if (binding && otherTable(game, binding.gameGuest, scope)) return { phase: 'unavailable', id: null };
+        return { phase: open.finished ? 'finished' : 'playing', id: open.id };
+    }
+    function sendView(socket, attachment, view, canOpen, seq, seat = view?.seat ?? null, reopenMode, hidden) {
         const frame = { t: 'match-state', version: 1, room: attachment.room, state: view, canOpen,
             ...(PartnerTable ? { partners: true } : {}), ...(reopenMode ? { reopenMode } : {}) };
         if (!attachment.snapshot) return send(socket, frame);
+        if (!view && hidden) {
+            return send(socket, { ...frame, t: 'snapshot', seq, phase: hidden.phase, currentMatchId: hidden.id, yourSeat: seat, turn: null });
+        }
         const match = view?.match;
         return send(socket, { ...frame, t: 'snapshot', seq, phase: match?.result ? 'finished' : match ? 'playing' : 'lobby',
             currentMatchId: match?.id ?? null, yourSeat: seat,
@@ -174,10 +197,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
     }
     function canView(game, binding, scope) {
         const seated = !!game?.seat(binding.betaSid);
-        const invitation = binding.gameGuest;
-        if (game && invitation && (invitation.game !== name || invitation.room !== scope.room ||
-            invitation.ref !== scope.ref || invitation.host !== game.host ||
-            invitation.tableId && invitation.tableId !== game.tableId)) return false;
+        if (game && otherTable(game, binding.gameGuest, scope)) return false;
         return !game || game.subjects.every(subject =>
             binding.canSee(subject) || seated && binding.isPresent?.(subject) === false);
     }
@@ -196,11 +216,17 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 view.disconnectedSeats = subjects.filter(subject => !online.has(subject)).map(subject => game.seat(subject));
                 view.canStartRematch = game.host === binding.betaSid && binding.canOpen;
             }
-            try { socket.serializeAttachment({ ...recipient, subjects: permitted ? subjects : [],
-                playerId: binding.betaSid, seat, seq }); }
+            const shown = view ? undefined : hiddenMatch(game, binding, recipient);
+            const { hidden: _stale, ...kept } = recipient;
+            // reconcile() has no table in hand. Keep the redacted match when this
+            // viewer is blocked, or the next wake replays a lobby snapshot.
+            const remembered = shown ?? (game?.openMatch ? hiddenMatch(game) : undefined);
+            try { socket.serializeAttachment({ ...kept, subjects: permitted ? subjects : [],
+                playerId: binding.betaSid, seat, seq, ...(remembered ? { hidden: remembered } : {}) }); }
             catch { close(socket, 1011, 'match connection unavailable'); continue; }
             const invitation = binding.gameGuest;
-            if (view?.waiting) {
+            if (view && invitation?.watch) view.watchOnly = true;
+            if (view?.waiting && !view.watchOnly) {
                 const reserved = claims.some(claim => claim.sid === binding.betaSid);
                 const unreservedSeat = game.hasGuestSeat(view.id, game.host, claims.length);
                 view.hasOpenSeat = reserved || unreservedSeat;
@@ -214,9 +240,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 }
             }
             if (view && nextMatch) send(socket, { t: 'rematch', matchId: nextMatch });
+            const canOpen = !invitation?.watch && binding.canOpen;
             const reopenMode = PartnerTable && permitted && game?.closed && game.subjects.length > 1
-                && binding.canOpen && game.host === binding.betaSid ? game.mode ?? 'four' : undefined;
-            sendView(socket, recipient, view, binding.canOpen, seq, seat, reopenMode);
+                && canOpen && game.host === binding.betaSid ? game.mode ?? 'four' : undefined;
+            sendView(socket, recipient, view, canOpen, seq, seat, reopenMode, shown);
         }
     }
     async function receive(socket, raw) {
@@ -252,8 +279,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             if (!canView(game, binding, scope)) {
                 const attachment = socket.deserializeAttachment();
                 if (frame.action === 'sync' && attachment.snapshot) {
-                    socket.serializeAttachment({ ...attachment, subjects: [], playerId: subject, seat: null, seq });
-                    sendView(socket, attachment, null, false, seq);
+                    const hidden = hiddenMatch(game, binding, scope);
+                    const { hidden: _stale, ...kept } = attachment;
+                    socket.serializeAttachment({ ...kept, subjects: [], playerId: subject, seat: null, seq, ...(hidden ? { hidden } : {}) });
+                    sendView(socket, attachment, null, false, seq, null, undefined, hidden);
                     return;
                 }
                 return send(socket, { t: 'match-error', reason: 'unavailable' });
@@ -265,7 +294,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             let expiresAt = record?.expiresAt;
             let error = '', nextMatch;
             if (frame.action !== 'sync') {
-                if (!binding.canPlay || !await approve(scope.actor)) error = 'unavailable';
+                if (binding.gameGuest?.watch || !binding.canPlay || !await approve(scope.actor)) error = 'unavailable';
                 else if (frame.action === 'open') {
                     const SelectedTable = frame.mode === undefined ? Table : frame.mode === 'partners' ? PartnerTable : null;
                     if (!binding.canOpen || !SelectedTable) error = 'unavailable';
@@ -290,11 +319,11 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                     else { changed = true; }
                 } else if (frame.action === 'leave') {
                     if (!game.seat(subject) || game.view(subject, now()).id !== frame.id) error = 'match-changed';
-                    else {
-                        if (binding.canOpen && game.close(subject, frame.id)) claims = [];
-                        else if (!game.releaseSeat(subject)) game = null;
-                        changed = true;
-                    }
+                    else if (binding.canOpen && game.close(subject, frame.id)) { claims = []; changed = true; }
+                    // Only the host can end the table. A guest frees the seat, or keeps it
+                    // while a match is being played, and the roster and tableId stay.
+                    else if (game.releaseSeat(subject) || game.vacate(subject, uuid())) changed = true;
+                    else error = 'seat-held';
                 } else if (frame.action === 'rematch' || frame.action === 'start-rematch') {
                     const force = frame.action === 'start-rematch';
                     const candidate = uuid();
@@ -360,9 +389,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             if (!binding) close(ws, 4403, 'room membership ended');
             else if (scope.subjects?.some(subject => !binding.canSee(subject) &&
                 !(scope.seat && binding.isPresent?.(subject) === false))) {
-                try { ws.serializeAttachment({ ...scope, subjects: [], seat: null }); }
+                const hidden = scope.hidden;
+                try { ws.serializeAttachment({ ...scope, subjects: [], seat: null, ...(hidden ? { hidden } : {}) }); }
                 catch { close(ws, 1011, 'match connection unavailable'); continue; }
-                sendView(ws, scope, null, false, scope.seq ?? 0);
+                sendView(ws, scope, null, false, scope.seq ?? 0, null, undefined, hidden);
             }
         }
     }
@@ -417,5 +447,5 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
         const records = await state.storage.list({ prefix, limit: MATCH_CAP });
         if (records.size) await state.storage.delete([...records.keys()]);
     }
-    return { issue, upgrade, receive, reconcile, presenceChanged, revoke, maintain, retireDisabled, hasGuestSeat, guestTableId, guestNightEndsAt, reserveGuestSeat, releaseGuestClaim, roomGrants };
+    return { issue, upgrade, receive, reconcile, presenceChanged, revoke, maintain, retireDisabled, hasGuestSeat, guestTableId, watchTableId, guestNightEndsAt, reserveGuestSeat, releaseGuestClaim, roomGrants };
 }

@@ -5,7 +5,7 @@ import { createChatAnnouncements } from './chat-announcements.mjs';
 import { createEntrySharing } from './entry-sharing.mjs';
 import { mountGameNightSound, unlockGameNightAudio } from './game-night-audio.mjs';
 import { createIdleHeartbeat } from './idle-heartbeat.mjs';
-import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName, webJamRoomName } from './game-night.mjs';
+import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvite, gameNightLabels, gameNightReturnHint, gameNightRoomName, newGameNightRoomName, placeArcadePanelInLobbyOrder, webJamRoomName } from './game-night.mjs';
 (() => {
     'use strict';
     const { createEntrySiteRegistry, entryBadge, entryReturn, entrySourceFromParams, ENTRY_HANDOFF_KEY, entryHandoff,
@@ -43,6 +43,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     const betaShell = !!$('script[src="/beta/bootstrap.js"], script[src^="/beta/bootstrap.js?game-guest=1"]');
     const betaBootstrap = betaShell && window.HangoutBootstrap;
     const gameGuest = betaBootstrap?.gameGuest;
+    const watchingGuest = gameGuest?.watch === true;
     const gameGuestQuery = gameGuest ? '?game-guest=1' + (gameGuest.tableId ? '&table=' + gameGuest.tableId : '') : '';
     const guestInvitationChanged = gameGuest && history.state?.gameSessionRef && history.state.gameSessionRef !== gameGuest.sessionRef;
     let gameGuestExit = gameGuest && ['left', 'canceled', 'closed', 'removed'].includes(history.state?.gameExit) ? history.state.gameExit : '';
@@ -507,17 +508,18 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     let jamShareResultsSupported = false, jamShareTimer;
     let gameNightSupported = false, gameOpenSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
-    const arcadeTables = new Map([
-        ['chess', { label: 'Royal Flush Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
-        ['crapeights', { label: 'Crappy Eights', load: () => import('./arcade-crapeights.mjs').then(module => module.mountArcadeCrapeights) }],
-        ['turdrummy', { label: 'TurdRummy', load: () => import('./arcade-turdrummy.mjs').then(module => module.mountArcadeTurdRummy) }],
-        ['turdspades', { label: 'TurdSpades', load: () => import('./arcade-turdspades.mjs').then(module => module.mountArcadeTurdSpades) }],
-        ['turdjack', { label: 'Crapjack 21', load: () => import('./arcade-turdjack.mjs').then(module => module.mountArcadeTurdJack) }],
-        ['turdtris', { label: 'Turdtris Sprint', load: () => import('./arcade-turdtris.mjs').then(module => module.mountArcadeTurdtris) }],
-        ['turdomania', { label: 'Turdomania Duel', load: () => import('./arcade-turdomania.mjs').then(module => module.mountArcadeTurdomania) }],
-        ['turdrush', { label: 'Turd Rush Race', load: () => import('./arcade-turdrush.mjs').then(module => module.mountArcadeTurdRush) }],
-        ['turdanoid', { label: 'Turdanoid Brick Race', load: () => import('./arcade-turdanoid.mjs').then(module => module.mountArcadeTurdanoid) }]
-    ]);
+    const arcadeTableDefs = {
+        chess: { label: 'Royal Flush Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) },
+        crapeights: { label: 'Crappy Eights', load: () => import('./arcade-crapeights.mjs').then(module => module.mountArcadeCrapeights) },
+        turdrummy: { label: 'TurdRummy', load: () => import('./arcade-turdrummy.mjs').then(module => module.mountArcadeTurdRummy) },
+        turdspades: { label: 'TurdSpades', load: () => import('./arcade-turdspades.mjs').then(module => module.mountArcadeTurdSpades) },
+        turdjack: { label: 'Crapjack 21', load: () => import('./arcade-turdjack.mjs').then(module => module.mountArcadeTurdJack) },
+        turdtris: { label: 'Turdtris Sprint', load: () => import('./arcade-turdtris.mjs').then(module => module.mountArcadeTurdtris) },
+        turdomania: { label: 'Turdomania Duel', load: () => import('./arcade-turdomania.mjs').then(module => module.mountArcadeTurdomania) },
+        turdrush: { label: 'Turd Rush Race', load: () => import('./arcade-turdrush.mjs').then(module => module.mountArcadeTurdRush) },
+        turdanoid: { label: 'Turdanoid Brick Race', load: () => import('./arcade-turdanoid.mjs').then(module => module.mountArcadeTurdanoid) }
+    };
+    const arcadeTables = new Map(GAME_NIGHT_LOBBY_ORDER.map(game => [game, arcadeTableDefs[game]]));
     const gameLabel = game => arcadeTables.get(game)?.label || gameNightLabels[game] || 'Game Night';
     let arcadeReturning = null, arcadeInvitation = null, arcadeShareIntent = null;
     let webJamChessSupported = false, webJamHostSeatPending = false, webJamWaitingTable = null, webJamReservation = null;
@@ -1810,7 +1812,9 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         open.hidden = !link;
         const status = $('[data-game-call-status]');
         const guidance = !c ? '' : link ? 'Voice and video open in Discord. Hang Out chat stays here.'
-            : canCall ? 'Voice and video are optional. A host can share a Discord call link.' : 'Discord calls are unavailable in this session. You can still play and chat.';
+            : canCall ? 'Voice and video are optional. A host can share a Discord call link.'
+                : watchingGuest ? 'Discord calls are unavailable in this session. You can still watch and chat.'
+                    : 'Discord calls are unavailable in this session. You can still play and chat.';
         if (status.textContent !== guidance) status.textContent = guidance;
         editor.hidden = !canManage;
         $('[data-game-clear]').hidden = !link;
@@ -1924,7 +1928,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         option.hidden = option.disabled = inWebJam || !scope || !table.controller;
         if (table.controller) {
             const moved = table.controller.panel.parentElement !== container;
-            if (moved) container.append(table.controller.panel);
+            if (!inWebJam) placeArcadePanelInLobbyOrder(container, table.controller.panel, game);
+            else if (moved) container.append(table.controller.panel);
             table.controller.setRoom(scope);
             if (inWebJam && scope && (moved || table.webJamRef !== scope.ref)) table.controller.open();
             table.webJamRef = inWebJam ? scope?.ref : undefined;
@@ -1941,8 +1946,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         if (!scope || table.loading) return;
         table.loading = true;
         table.load().then(mount => {
-            table.controller = mount($('[data-game-night]'), (room, state, sendMatch, reconnecting, snapshot, failed) =>
+            const gameNight = $('[data-game-night]');
+            table.controller = mount(gameNight, (room, state, sendMatch, reconnecting, snapshot, failed) =>
                 arcadeMatchState(game, table, room, state, sendMatch, reconnecting, snapshot, failed));
+            placeArcadePanelInLobbyOrder(gameNight, table.controller.panel, game);
             const summary = table.controller.panel.querySelector('summary');
             const reconnect = document.createElement('span');
             reconnect.className = 'arcade-reconnect';
@@ -1976,7 +1983,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         finishArcadeInvitation();
         arcadeInvitation = { ...target, room: room.name, ref: room.keepRef, sent: false,
             timer: setTimeout(() => {
-                if (gameGuest && !gameGuestSeated) offerGameGuestReload('Still waiting for your seat. Try again.');
+                if (gameGuest && !gameGuestSeated) offerGameGuestReload(watchingGuest ? 'Still connecting to the table. Try again.' : 'Still waiting for your seat. Try again.');
                 else finishArcadeInvitation('The seat could not be confirmed. Ask the host for a fresh game invitation.');
             }, 15000) };
     }
@@ -2007,7 +2014,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         const pendingInvite = arcadeInvitation?.game === game && arcadeInvitation.room === scope?.room && arcadeInvitation.ref === scope?.ref;
         if (failed && pendingInvite && gameGuest && !gameGuestSeated) {
             clearTimeout(arcadeInvitation.timer);
-            offerGameGuestReload('Couldn’t reconnect to your seat. Try again.');
+            offerGameGuestReload(watchingGuest ? 'Couldn’t reconnect to the table. Try again.' : 'Couldn’t reconnect to your seat. Try again.');
         }
         if (reconnecting) {
             if (pendingInvite) {
@@ -2015,6 +2022,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 if (gameGuest && !gameGuestSeated) gateStatus('Reconnecting…');
             }
             table.invite = null;
+            table.watchInvite = null;
             updateTableInvite(table, currentGameNight());
             return;
         }
@@ -2030,7 +2038,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             writeTab(gameReturnKey, JSON.stringify(gameReturn));
         }
         drawGameWaiting(room);
-        table.invite = scope && state?.seat && state.waiting && state.hasOpenSeat !== false ? gameNightInvite(game, state.id) : null;
+        const inviteTarget = scope && state?.seat ? gameNightInvite(game, state.id) : null;
+        table.invite = state?.waiting && state.hasOpenSeat !== false ? inviteTarget : null;
+        table.watchInvite = inviteTarget && game === 'turdspades' && state.seat === 'south' &&
+            !state.waiting && state.occupied?.length === 4 ? { ...inviteTarget, watch: true } : null;
         updateTableInvite(table, currentGameNight());
         if (game === 'chess') {
             webJamWaitingTable = table.invite && state.seat === 'w' && jamRoomName(scope.room) ? { ...scope, ...table.invite } : null;
@@ -2058,7 +2069,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             return;
         }
         const canSeeReplacement = gameGuest && state?.replacementAvailable === true;
-        if (canSeeReplacement || state?.seat && (state.id === invite.match || gameGuest)) {
+        if (watchingGuest && state?.tableId === gameGuest.tableId || canSeeReplacement || state?.seat && (state.id === invite.match || gameGuest)) {
             if (gameGuest && !gameGuestSeated) {
                 gameGuestSeated = true;
                 gameGuestReloadOffered = false;
@@ -2076,7 +2087,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
                 : 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.';
             return finishArcadeInvitation(message);
         }
-        if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
+        if (!watchingGuest && !invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
     }
     $('[data-game-seat-return]')?.addEventListener('click', () => revealArcadeTable(seatReturnController(currentGameNight())));
     $('[data-arcade-game]').addEventListener('change', event => {
@@ -2387,7 +2398,12 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             if (gameNightSupported) openGameRoom();
             return;
         }
-        count(`room-start-${kind}`); cmd('join', [`#${kind}-${slug()}`]);
+        const label = slug();
+        const code = kind === 'jam' ? crypto.randomUUID().replaceAll('-', '') : '';
+        // Distinct private rooms can share the same generated display words.
+        const suffix = code ? `-${code.slice(0, 4)}x${code.slice(4, 8)}` : '';
+        count(`room-start-${kind}`);
+        cmd('join', [`#${kind}-${label}${suffix}`]);
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
     $('[data-channel-dialog]').addEventListener('close', () => {
@@ -2701,12 +2717,12 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             }
         }
         const canInviteNew = isGame && gameGuestInvitesSupported;
-        const target = canInviteNew && (exactTable || arcadeInviteTarget());
+        const target = canInviteNew && (exactTable || guestLinkTarget());
         const inviteHint = $('[data-game-invite-empty]');
         inviteHint.hidden = !!target || (!canInviteNew && !!roster.childElementCount);
         inviteHint.textContent = canInviteNew ? 'Open a game with a free seat to invite a friend.' : 'Nobody else is in Hang Out yet.';
         $('[data-game-invite-link]').hidden = !target;
-        if (target) createGuestLink.textContent = `Invite a friend to ${gameLabel(target.game)}`;
+        if (target) createGuestLink.textContent = target.watch ? 'Invite a friend to watch' : `Invite a friend to ${gameLabel(target.game)}`;
         $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
         $('[data-invite-dialog]').showModal();
         if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
@@ -2719,6 +2735,10 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     }
     function arcadeInviteTarget() {
         return [...arcadeTables.values()].find(table => table.invite && table.controller?.isOpen())?.invite;
+    }
+    function guestLinkTarget() {
+        const spades = arcadeTables.get('turdspades');
+        return arcadeInviteTarget() || (spades?.controller?.isOpen() ? spades.watchInvite : null);
     }
     const createGuestLink = $('[data-game-invite-new]'), shareGuestLink = $('[data-game-invite-share]');
     const copyGuestLink = $('[data-game-invite-copy]'), guestLinkStatus = $('[data-game-invite-link-status]');
@@ -2736,9 +2756,9 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         copyGuestLink.hidden = true; shareGuestLink.hidden = true; guestLinkStatus.textContent = '';
     }
     function readyGuestLink() {
-        const request = pendingGuestLink, target = arcadeInviteTarget();
+        const request = pendingGuestLink, target = guestLinkTarget();
         if (request?.link && request.room === currentGameNight() &&
-            request.target.game === target?.game && request.target.match === target.match) {
+            request.target.game === target?.game && request.target.match === target.match && request.target.watch === target.watch) {
             if (request.expiresAt === undefined || request.expiresAt > Date.now()) return request;
             resetGuestLink();
             guestLinkStatus.textContent = 'This invitation expired. Create a new one to share.';
@@ -2748,9 +2768,9 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         resetGuestLink();
         guestLinkStatus.textContent = 'The table changed. Prepare a new invitation.';
     }
-    createGuestLink.addEventListener('click', () => void prepareGuestLink(arcadeInviteTarget()));
+    createGuestLink.addEventListener('click', () => void prepareGuestLink(guestLinkTarget()));
     async function deliverPreparedLink(request) {
-        const title = `Join me for ${gameLabel(request.target.game)}`;
+        const title = `${request.target.watch ? 'Watch' : 'Join me for'} ${gameLabel(request.target.game)}`;
         if (typeof navigator.share === 'function') {
             try {
                 await navigator.share({ title, url: request.link });
@@ -2799,7 +2819,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             const sharePrimary = canShare || preferEmail || copyGuestLink.hidden;
             copyGuestLink.classList.toggle('btn--ghost', sharePrimary);
             shareGuestLink.classList.toggle('btn--ghost', !sharePrimary);
-            guestLinkStatus.textContent = 'This link is for one guest. Send it now while your table has a seat available.';
+            guestLinkStatus.textContent = target.watch ? 'This link lets one friend watch this table.'
+                : 'This link is for one guest. Send it now while your table has a seat available.';
             const expiresAt = value.inviteExpiresAt ?? value.until;
             if (Number.isSafeInteger(expiresAt) && expiresAt > 0 && expiresAt <= 8.64e15) {
                 request.expiresAt = expiresAt;
@@ -2838,7 +2859,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     shareGuestLink.addEventListener('click', async () => {
         const request = readyGuestLink();
         if (!request) return;
-        const title = `Join me for ${gameLabel(request.target.game)}`;
+        const title = `${request.target.watch ? 'Watch' : 'Join me for'} ${gameLabel(request.target.game)}`;
         if (shareGuestLink.textContent === 'Email invite') {
             location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(request.link)}`;
             guestLinkStatus.textContent = 'Choose a friend in the email draft.';

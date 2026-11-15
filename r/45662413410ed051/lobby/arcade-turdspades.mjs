@@ -1,5 +1,5 @@
 import { gameNightCue } from './game-night-audio.mjs';
-import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors, matchHiddenText, matchUnavailableText } from './game-night-match-client.mjs';
 import { suggestSpadesBid } from '/play/games/turdspades-engine.js';
 
 const seats = ['south', 'west', 'north', 'east'];
@@ -194,6 +194,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
             if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Reconnect table'; }
         } else if (connection !== 'ready') {
             if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
+        } else if (!model && client.matchUnavailable()) {
+            message = matchUnavailableText;
+        } else if (!model && client.matchOpen()) {
+            message = matchHiddenText;
         } else if (!model) {
             message = canOpen ? (partnersSupported ? 'Play with one friend and a CPU partner on each team, or fill all four seats with friends.'
                 : 'Open a partnership table for four players.') : 'Waiting for the host to open a table.';
@@ -250,12 +254,13 @@ export function mountArcadeTurdSpades(container, onMatch) {
         main.disabled = pending;
         partnerButton.hidden = command !== 'open' || !partnersSupported || !!savedMode;
         partnerButton.disabled = pending;
-        seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat;
+        seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat || model.watchOnly === true;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
         table.hidden = !match;
         if (!match) { showHand([]); return; }
         table.dataset.phase = match.phase;
         table.dataset.mode = paired ? 'partners' : 'four';
+        table.toggleAttribute('data-watching', !seat);
 
         for (let team = 0; team < 2; team++) {
             $(`[data-spades-score="${team}"]`).textContent = `${teams[team]} · ${match.scores[team]}/${match.target} · ${match.bags[team]} bags`;

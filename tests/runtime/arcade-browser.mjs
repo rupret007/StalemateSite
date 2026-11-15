@@ -403,6 +403,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(guest.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
                 assert.deepEqual(await guest.evaluate(() => window.gameNightWakeLocks), { acquired: 0, released: 0 });
                 await expect(guest.getByText('LinkHost invited you to play.')).toBeVisible();
+                const expires = guest.locator('[data-guest-expiry] time');
+                await expect(expires).toBeVisible();
+                assert.ok(Date.parse(await expires.getAttribute('datetime')) > Date.now());
                 await expect(guest.getByRole('textbox')).toHaveCount(0);
                 await expect(guest.getByRole('button')).toHaveCount(1);
                 assert.equal(new URL(guest.url()).hash, '');
@@ -846,16 +849,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await activate();
                 if (phone) {
                     const gate = friend.locator('[data-game-guest-connecting]');
-                    await expect(gate.getByRole('status')).toHaveText('Couldn’t reconnect to your seat. Try again.');
-                    assert.equal(interrupted, 4, 'the initial connection and three retries were interrupted');
-                    const retrySeat = gate.getByRole('button', { name: 'Try again', exact: true });
-                    await expect(retrySeat).toBeFocused();
-                    await expectUncoveredControl(retrySeat);
+                    await expect(gate.getByRole('status')).toHaveText('Reconnecting…');
                     await expect(friend.locator('[data-app]')).toBeHidden();
-                    await captureArcadeInvite(friend, viewport, 'guest-retry-02-seat-connection-error');
-                    await retrySeat.tap();
+                    await captureArcadeInvite(friend, viewport, 'guest-retry-02-reconnecting');
                 }
-                await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · White to move');
+                await expect(friend.locator('[data-chess-status]')).toHaveText('You’re Black · White to move', { timeout: 15000 });
+                if (phone) assert.equal(interrupted, 4, 'the seat reconnects automatically after four interruptions');
                 await captureArcadeInvite(friend, viewport, 'guest-retry-02-seated');
                 await friend.locator('[data-leave]').click();
                 await expect(friend.locator('[data-game-night]')).toBeHidden();
@@ -1380,8 +1379,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(host.locator('[data-entry-label]').first()).toHaveText(`via ${brand}`);
                 await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
                 await expect(host.getByRole('combobox', { name: 'Switch game' }).locator('option:not([disabled])')).toHaveText([
-                    'Games', 'Royal Flush Chess', 'Crappy Eights', 'TurdRummy', 'TurdSpades', 'Crapjack 21',
-                    'Turdtris Sprint', 'Turdomania Duel', 'Turd Rush Race', 'Turdanoid Brick Race'
+                    'Games', 'Royal Flush Chess', 'TurdSpades', 'Turdanoid Brick Race', 'Crappy Eights', 'TurdRummy',
+                    'Crapjack 21', 'Turdtris Sprint', 'Turdomania Duel', 'Turd Rush Race'
                 ]);
                 const privateArcade = host.getByRole('button', { name: `Open ${brand} Arcade`, exact: true });
                 const roomUrl = host.url();
@@ -1463,6 +1462,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(friend.locator('[data-square="d5"]')).toHaveAttribute('data-legal', '');
                 await tapSquare(friend, 'd5', phone);
                 await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
+                if (!phone) {
+                    const closedGames = host.locator('[data-game-night] > details:not([open]):not([hidden]) > summary');
+                    await expect.poll(async () => closedGames.evaluateAll(nodes => nodes
+                        .map(node => ({ label: node.innerText.trim(), top: node.getBoundingClientRect().top }))
+                        .sort((a, b) => a.top - b.top).map(node => node.label))).toEqual([
+                        'TurdSpades', 'Turdanoid Brick Race', 'Crappy Eights', 'TurdRummy',
+                        'Crapjack 21', 'Turdtris Sprint', 'Turdomania Duel', 'Turd Rush Race'
+                    ]);
+                    await captureArcadeInvite(host, viewport, step('04-active-chess-lineup'));
+                }
                 await expect(friend.locator('[data-square][data-legal]')).toHaveCount(0);
                 await captureArcadeInvite(friend, viewport, step('04-playing'));
                 assert.equal((await friend.context().request.get(origin + '/beta/state')).status(), 401, 'the guest has only game access');
@@ -3134,14 +3143,140 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
+    async function verifyGuestEntrances() {
+        await verifyGameNightEntry();
+        await verifyPrivateSiteEntry();
+    }
+    async function verifySpadesWatchInvitation(brand) {
+        const desktop = { width: 1440, height: 900 }, phone = { width: 390, height: 844 };
+        const host = await guest(brand, 'FullTableHost', desktop, false, origin + '/beta/?game-night=1&via=' + brand);
+        await host.getByRole('button', { name: 'Start Game Night', exact: true }).click();
+        await host.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
+        await host.getByRole('button', { name: 'Open 4-player Spades' }).click();
+        const players = [host];
+        for (const [index, seat] of ['West','North','East'].entries()) {
+            const link = await shareGameNightLink(host, desktop, brand + '-seat-' + seat.toLowerCase());
+            const context = await browser.newContext({ viewport: phone, hasTouch: true, ignoreHTTPSErrors: true });
+            const player = await context.newPage();
+            await openGameNightLink(player, link);
+            await player.getByRole('button', { name: 'Join game', exact: true }).tap();
+            players.push(player);
+            if (index < 2) await expect(host.locator('[data-spades-status]')).toContainText((index + 2) + '/4 seated');
+        }
+        for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
+        await host.evaluate(() => {
+            Object.defineProperty(navigator, 'share', { configurable: true, value: async ({ url }) => { window.testWatchLink = url; } });
+        });
+        await host.getByRole('button', { name: 'Invite players', exact: true }).click();
+        const watchInvite = host.getByRole('button', { name: 'Invite a friend to watch' });
+        await expect(watchInvite).toBeFocused();
+        await captureArcadeInvite(host, desktop, brand + '-watch-picker');
+        await watchInvite.click();
+        await expect(host.locator('[data-game-invite-link-status]')).toHaveText('This link lets one friend watch this table.');
+        await host.getByRole('button', { name: 'Share invite', exact: true }).click();
+        const link = new URL(await host.evaluate(() => window.testWatchLink));
+        const extra = await browser.newContext({ viewport: phone, hasTouch: true, ignoreHTTPSErrors: true });
+        const page = await extra.newPage();
+        const read = watchCardMatch(page, 'turdspades');
+        let upstream;
+        const rejections = [];
+        await page.routeWebSocket(url => url.pathname === '/beta/arcade-turdspades-match', route => {
+            upstream = route.connectToServer();
+            upstream.onMessage(message => {
+                const frame = JSON.parse(message);
+                if (frame.t === 'match-error') rejections.push(frame.reason);
+                route.send(message);
+            });
+        });
+        await openGameNightLink(page, link);
+        const watch = page.getByRole('button', { name: 'Watch game', exact: true });
+        await expect(watch).toBeVisible();
+        await expect(watch).toHaveAccessibleDescription(/By choosing Watch game/);
+        const expires = page.locator('[data-guest-expiry] time');
+        await expect(expires).toBeVisible();
+        assert.ok(Date.parse(await expires.getAttribute('datetime')) > Date.now());
+        await captureArcadeInvite(page, phone, brand + '-watch-consent');
+        await watch.tap();
+        await expect(page.locator('[data-spades-table]')).toHaveAttribute('data-phase', 'bid');
+        await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
+        await expect(page.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
+        await expect(page.getByText('Discord calls are unavailable in this session. You can still watch and chat.')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Bid for me' })).toBeHidden();
+        await expect(page.locator('[data-spades-card]')).toHaveCount(0);
+        await expect.poll(() => read()?.watchOnly).toBe(true);
+        assert.ok(!read().seat);
+        assert.deepEqual(read().match.hand, []);
+        assert.equal(read().match.canBid, false);
+        const before = read().match;
+        upstream.send(JSON.stringify({ version: 1, action: 'join', id: before.id, seat: 'next' }));
+        upstream.send(JSON.stringify({ version: 1, action: 'bid', id: before.id, revision: before.revision, bid: 1 }));
+        await expect.poll(() => rejections).toEqual(['unavailable', 'unavailable']);
+        assert.equal(read().match.revision, before.revision);
+        await players[1].getByLabel('Your bid').selectOption('1');
+        await players[1].getByRole('button', { name: 'Bid for me' }).tap();
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
+        await captureArcadeInvite(page, phone, brand + '-watch-live');
+        const passKey = await page.evaluate(() => 'gn:pass:' + window.HangoutBootstrap.gameGuest.tableId);
+        const originalPass = await page.evaluate(key => localStorage.getItem(key), passKey);
+        assert.match(originalPass, /^[a-f0-9]{64}$/);
+        await page.evaluate(key => localStorage.setItem(key, '0'.repeat(64)), passKey);
+        await page.reload();
+        await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
+        assert.equal(await page.evaluate(key => localStorage.getItem(key), passKey), null);
+        await page.evaluate(({ key, pass }) => localStorage.setItem(key, pass), { key: passKey, pass: originalPass });
+        for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
+        const previousMatch = read().match.id;
+        await players[1].locator('[data-spades-action="resign"]').tap();
+        await players[1].getByRole('dialog', { name: 'Resign for your team?' })
+            .getByRole('button', { name: 'Resign', exact: true }).tap();
+        await expect(page.locator('[data-spades-status]')).toContainText('win by resignation');
+        await expect(page.getByRole('button', { name: /Spades rematch|Start now/ })).toBeHidden();
+        await host.getByRole('button', { name: 'Request Spades rematch' }).click();
+        for (const player of players.slice(1)) await player.getByRole('button', { name: 'Accept Spades rematch' }).tap();
+        await expect.poll(() => read()?.match?.id === previousMatch ? null : read()?.match?.id).toBeTruthy();
+        await expect(page.locator('[data-spades-table]')).toHaveAttribute('data-phase', 'bid');
+        await expect(page.locator('[data-spades-card]')).toHaveCount(0);
+        assert.equal(read().watchOnly, true);
+        assert.ok(!read().seat);
+        assert.deepEqual(read().match.hand, []);
+        for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
+        await extra.clearCookies();
+        await page.reload();
+        await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · No bid yet');
+        await host.locator('[data-spades-action="leave"]').click();
+        await host.getByRole('dialog', { name: 'Leave this table?' }).getByRole('button', { name: 'Leave table', exact: true }).click();
+        await host.getByRole('button', { name: 'Reopen 4-player Spades', exact: true }).click();
+        await expect(page.locator('[data-spades-table]')).toHaveAttribute('data-phase', 'bid');
+        await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
+        await expect(page.locator('[data-spades-trick]')).toContainText('West · No bid yet');
+        await expect(page.locator('[data-spades-card]')).toHaveCount(0);
+        const lobbyAddress = new URL(page.url());
+        await page.locator('[data-leave]').tap();
+        await expect(page.locator('[data-session-reason]')).toHaveText('You left Game Night. Ask your host for a fresh invitation.');
+        assert.equal((await extra.request.get(origin + '/beta/state' + lobbyAddress.search)).status(), 401);
+        await page.reload();
+        await expect(page.locator('[data-spades-table]')).toBeHidden();
+        for (const player of players) await expect(player.locator('[data-spades-card]')).toHaveCount(13);
+        await extra.close();
+        console.log(`Passed ${engine} ${brand} full Spades table watch link, read-only commands, rematch, table pass, host reopen and Leave.`);
+    }
     try {
+        if (process.env.ARCADE_SPADES_WATCH_BRAND) {
+            const brand = process.env.ARCADE_SPADES_WATCH_BRAND;
+            assert.ok(['stalemate', 'rad-dad'].includes(brand));
+            await verifySpadesWatchInvitation(brand);
+            assert.deepEqual(errors, []);
+            return;
+        }
         if (process.env.ARCADE_GUEST_TABLE_ISOLATION_ONLY === '1') {
             await verifyGuestTableIsolation();
             assert.deepEqual(errors, []);
             return;
         }
         if (process.env.ARCADE_GUEST_RECOVERY_ONLY === '1') {
-            await verifyGameNightEntry();
+            await verifyGuestEntrances();
             assert.deepEqual(errors, []);
             return;
         }
@@ -3322,8 +3457,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.locator('[data-enter]').click();
         await expect(b.locator('[data-connection]')).toHaveText('Connected');
         await expect(b.locator('[data-game-night]')).toBeHidden();
-        await verifyGameNightEntry();
-        await verifyPrivateSiteEntry();
+        if (process.env.ARCADE_SEPARATE_GUEST_RECOVERY !== '1') await verifyGuestEntrances();
         assert.deepEqual(errors, []);
         console.log(`Passed ${engine} ${entrances ? 'both generated arcade entry links' : 'protected entry with both brand contexts'}, invitation, keyboard/touch Chess, room chat, draw and rematch.`);
     } finally { await browser.close(); }

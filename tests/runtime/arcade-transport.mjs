@@ -73,14 +73,12 @@ assert.ok(siteGuest === undefined || browserName && !mixedRef && !relay &&
     'choose a browser and --site-guest=stalemate or --site-guest=rad-dad (requires ARCADE_PREVIEW_RAD_DAD)');
 const previousAssets = new Map();
 if (mixedRef) {
-    for (const file of ['entry-sites.mjs', 'lobby/index.html', 'lobby/lobby.js', 'lobby/lobby.css', 'lobby/game-night-match-client.mjs']) {
-        const path = 'r/45662413410ed051/' + file;
-        try {
-            previousAssets.set('/' + path, execFileSync('git', ['show', `${mixedRef}:${path}`], { cwd: app, stdio: ['ignore', 'pipe', 'ignore'] }));
-        } catch (error) {
-            if (!file.endsWith('game-night-match-client.mjs')) throw error;
-        }
-    }
+    const root = 'r/45662413410ed051/';
+    const files = execFileSync('git', ['ls-tree', '-r', '--name-only', '-z', mixedRef, '--', root + 'entry-sites.mjs', root + 'lobby/'],
+        { cwd: app, encoding: 'utf8' }).split('\0').filter(Boolean);
+    // The old page, lazy game adapters and their imports must come from the
+    // same revision to model a browser tab that was open before the update.
+    for (const path of files) previousAssets.set('/' + path, execFileSync('git', ['show', mixedRef + ':' + path], { cwd: app }));
 }
 const directory = await mkdtemp(join(tmpdir(), 'game-night-arcade-'));
 const arcadeCapabilities = {
@@ -370,6 +368,8 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
             await page.locator('[data-enter]').click();
             await expect(page.locator('[data-connection]')).toHaveText('Connected');
             if (phone) await page.locator('.phonetabs [data-show="rooms"]').tap();
+            // Give both guests the same display words to exercise private room name collisions.
+            await page.evaluate(() => { Math.random = () => 0; });
             await page.locator('[data-start="jam"]').click();
             await expect(page.locator('[data-jam]')).toBeVisible();
             originalRoom = await page.evaluate(() => window.__lobby.active);
@@ -491,8 +491,12 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         await expect(stale.getByRole('link', { name: 'Return to room' })).toHaveCount(0);
         await capture(stale, 'expired');
 
+        const originalRooms = new Set();
         for (const [value, step] of [[standby, 'standby'], [unavailable, 'expired']]) {
             const { page: member, originalRoom } = await open(value, step === 'expired', true);
+            assert.match(originalRoom, /^#jam-happy-tree-[a-f0-9]{4}x[a-f0-9]{4}$/);
+            assert.ok(!originalRooms.has(originalRoom), 'each guest opens a distinct private room');
+            originalRooms.add(originalRoom);
             const back = member.getByRole('link', { name: 'Return to room' });
             await expect(back).toBeHidden();
             await member.getByRole('button', { name: 'Join game' }).click();

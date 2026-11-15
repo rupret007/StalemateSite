@@ -1,5 +1,6 @@
 const requestErrors = { 401: 'sign-in', 403: 'room', 404: 'disabled', 429: 'rate-limited' };
 const socketErrors = { 4403: 'room', 4409: 'replaced', 4429: 'rate-limited' };
+const RECONNECT_CAP = 10_000;
 
 export const matchConnectionErrors = Object.freeze({
     'sign-in': 'Sign in to the private beta again, then return to this room.',
@@ -9,14 +10,23 @@ export const matchConnectionErrors = Object.freeze({
     'rate-limited': 'This match reached a connection or activity limit. Try again later.'
 });
 
+// Shown in place of "Waiting for the host" when the table has a game this person cannot see.
+export const matchHiddenText = 'A game is under way at this table. You can’t see it right now.';
+
+// A guest opened an invite for a different table. This is not a hidden game.
+export const matchUnavailableText = 'This table isn\'t available from this invite. Ask the host for a fresh link.';
+
 // A match connection can be replaced without changing room, chat or call.
-export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch }) {
+export function createGameNightMatchClient({ prefix, onStatus, onState, onError, onMatch, onRematch }) {
+    let shownMatch = null, rematchTimer;
     const tableId = window.HangoutBootstrap?.gameGuest?.tableId;
+    const passKey = tableId ? 'gn:pass:' + tableId : null;
     const guestQuery = new URLSearchParams(location.search).get('game-guest') === '1'
         ? '?game-guest=1' + (tableId ? '&table=' + tableId : '') : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
-    let pausedForNetwork = false, terminalError = false, lastSeq = 0;
-    let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false;
+    let pausedForNetwork = false, terminalError = false, lastSeq = 0, matchOpen = false, matchUnavailable = false;
+    let rejectedPass;
+    let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false, waitingForPage = false;
     let playing = false, wakeLock, pendingWakeLock = false, retryWakeLock = false;
     async function updateWakeLock() {
         if (!playing || document.hidden) {
@@ -51,11 +61,13 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     }
     function reset(reconnecting = false, failed = false) {
         generation++;
+        waitingForPage = false;
         onMatch?.(scope, undefined, undefined, reconnecting, undefined, failed);
         clearTimeout(reconnectTimer);
         clearTimeout(joinTimer);
         clearTimeout(claimTimer);
         clearTimeout(pongTimer);
+        clearTimeout(rematchTimer);
         controller?.abort();
         controller = null;
         const prior = socket;
@@ -79,16 +91,20 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     function retry(attempt, reason) {
         if (attempt !== generation || !scope) return;
         if (!reason && navigator.onLine === false) return pauseForNetwork();
-        if (reason || failures >= 3) {
+        if (reason) {
             reset(false, true);
-            terminalError = !!reason;
+            terminalError = true;
             setPlaying(false);
             onStatus('unavailable', reason);
             return;
         }
+        // An ordinary drop is never final: keep trying while the page is on screen.
         reset(true);
         onStatus('reconnecting');
-        reconnectTimer = setTimeout(connect, 400 * 2 ** failures++ * (0.75 + Math.random() / 2));
+        if (document.hidden) { waitingForPage = true; return; }
+        const wait = Math.min(RECONNECT_CAP, 400 * 2 ** failures * (0.75 + Math.random() / 2));
+        failures = Math.min(failures + 1, 8);
+        reconnectTimer = setTimeout(connect, wait);
     }
     async function connect() {
         if (!scope || controller || socket) return;
@@ -112,8 +128,20 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
             url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             const connection = new WebSocket(url, [grant.protocol, grant.ticket]);
             socket = connection;
-            let stateFrameType;
-            connection.addEventListener('close', event => retry(attempt, socketErrors[event.code]));
+            let stateFrameType, offeredPass;
+            connection.addEventListener('close', event => {
+                if (attempt !== generation) return;
+                if (offeredPass && event.code === 4403 && event.reason === 'table pass unavailable') {
+                    // The match ticket already authenticated the cookie. Reconnect without the rejected
+                    // local hint, keeping any newer pass installed by another tab.
+                    rejectedPass = offeredPass;
+                    try {
+                        if (localStorage.getItem(passKey) === offeredPass) localStorage.removeItem(passKey);
+                    } catch { /* Ignore the rejected pass in memory if storage is unavailable. */ }
+                    return retry(attempt);
+                }
+                retry(attempt, socketErrors[event.code]);
+            });
             connection.addEventListener('message', event => {
                 if (attempt !== generation) return;
                 let frame;
@@ -123,9 +151,14 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     stateFrameType = frame.snapshots === true ? 'snapshot' : 'match-state';
                     supportsPing = frame.ping === true;
                     ready = true;
-                    let pass;
-                    try { if (tableId) pass = localStorage.getItem('gn:pass:' + tableId); } catch { /* The session cookie can still admit this guest. */ }
-                    send(stateFrameType === 'snapshot' ? { t: 'hello', lastSeq, ...(pass ? { pass } : {}) } : { action: 'sync' });
+                    if (stateFrameType === 'snapshot' && passKey) {
+                        try {
+                            const saved = localStorage.getItem(passKey);
+                            if (saved && saved !== rejectedPass) offeredPass = saved;
+                        } catch { /* The session cookie can still admit this guest. */ }
+                    }
+                    send(stateFrameType === 'snapshot'
+                        ? { t: 'hello', lastSeq, ...(offeredPass ? { pass: offeredPass } : {}) } : { action: 'sync' });
                 } else if (stateFrameType && frame?.t === stateFrameType && frame.version === 1 && frame.room === scope.room) {
                     lastSeq = Number.isSafeInteger(frame.seq) ? frame.seq : 0;
                     clearTimeout(joinTimer);
@@ -136,10 +169,21 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                         claimTimer = setTimeout(() => send({ action: 'sync' }), wait);
                     }
                     const match = frame.state?.match;
+                    shownMatch = frame.state?.id ?? frame.currentMatchId ?? null;
+                    clearTimeout(rematchTimer);
+                    // playing/finished: a game is open but hidden. unavailable: wrong-table invite.
+                    matchUnavailable = !frame.state && frame.phase === 'unavailable';
+                    matchOpen = !frame.state && (frame.phase === 'playing' || frame.phase === 'finished');
                     setPlaying(!!match && !!frame.state.seat && frame.phase !== 'finished' && !match.result);
                     onState(frame);
                     if (attempt === generation) onMatch?.(scope, frame.state, send, false,
                         stateFrameType === 'snapshot' ? frame : undefined);
+                } else if (stateFrameType && frame?.t === 'rematch' && typeof frame.matchId === 'string'
+                    && /^[a-zA-Z0-9-]{5,80}$/.test(frame.matchId) && frame.matchId !== shownMatch) {
+                    // The new board normally follows at once. If it does not, ask for it.
+                    onRematch?.(frame.matchId);
+                    clearTimeout(rematchTimer);
+                    rematchTimer = setTimeout(() => send({ action: 'sync' }), 1500);
                 } else if (frame?.t === 'pong' && frame.nonce === pingNonce) clearTimeout(pongTimer);
                 else if (frame?.t === 'match-error') onError(frame.reason);
             });
@@ -176,14 +220,18 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         if (document.hidden) { hiddenAt = Date.now(); return; }
         const away = hiddenAt === undefined ? 0 : Date.now() - hiddenAt;
         hiddenAt = undefined;
+        // A drop while the page was hidden waited here instead of spending retries.
+        if (waitingForPage) return reconnect();
         if (!scope || away <= 5000 || terminalError || pausedForNetwork || controller || !ready && socket) return;
         clearTimeout(pongTimer);
         if (!supportsPing || !send({ action: 'ping', nonce: ++pingNonce })) return reconnect();
         pongTimer = setTimeout(reconnect, 1500);
     });
     return {
-        start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; void connect(); },
+        start(next) { stop(); scope = next; terminalError = false; failures = 0; lastSeq = 0; matchOpen = false; matchUnavailable = false; shownMatch = null; void connect(); },
         stop,
+        matchOpen: () => matchOpen,
+        matchUnavailable: () => matchUnavailable,
         send
     };
 }

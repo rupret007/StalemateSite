@@ -50,7 +50,8 @@ function fixture(name = 'chess') {
         await send(b, 'join', { id });
         return { id, revision: 0, move: 'e2e4' };
     };
-    return { a, b, board, send, start, storage, actors, transport, guestActivity, advance: ms => { now += ms; } };
+    const connect = (id, betaSid, canOpen = false) => player(id, betaSid, canOpen);
+    return { a, b, board, send, start, storage, actors, transport, guestActivity, connect, advance: ms => { now += ms; } };
 }
 
 describe('Game Night match transport', () => {
@@ -70,20 +71,95 @@ describe('Game Night match transport', () => {
         expect(moved.seq).toBe(initial.seq + 1);
     });
 
-    it('keeps snapshot metadata when a block clears a seated view', async () => {
+    it('reports a hidden match as open, never as a lobby, when a block clears a seated view', async () => {
         const f = fixture();
-        await f.start();
+        const { id } = await f.start();
         await f.send(f.a, undefined, { t: 'hello', lastSeq: 0 });
         const { seq } = f.a.frames.at(-1);
         f.actors.get(actor).canSee = subject => subject === sid;
         f.transport.reconcile();
+        // The board stays hidden, but the open match is not described as "no table yet".
         expect(f.a.frames.at(-1)).toMatchObject({
-            t: 'snapshot', seq, phase: 'lobby', currentMatchId: null, yourSeat: null, turn: null, state: null
+            t: 'snapshot', seq, phase: 'playing', currentMatchId: id, yourSeat: null, turn: null, state: null
         });
         expect(f.a.deserializeAttachment()).toMatchObject({ seat: null, subjects: [] });
         const before = f.a.frames.length;
         await f.send(f.a, undefined, { t: 'hello', lastSeq: seq });
         expect(f.a.frames.slice(before)).toEqual([f.a.frames[before - 1]]);
+        // A change published while the view is hidden keeps saying so.
+        await f.send(f.b, 'resign', { id, revision: 0 });
+        expect(f.a.frames.at(-1)).toMatchObject({
+            t: 'snapshot', phase: 'finished', currentMatchId: id, yourSeat: null, state: null
+        });
+    });
+
+    it('keeps a blocked spectator hidden so reconcile cannot send a lobby snapshot', async () => {
+        const f = fixture();
+        const watch = 'c' + '3'.repeat(32);
+        const spectator = f.connect(watch, 'seat-watch');
+        const move = await f.start();
+        await f.send(spectator, undefined, { t: 'hello', lastSeq: 0 });
+        f.actors.get(watch).canSee = () => false;
+        await f.send(f.a, 'move', move);
+        expect(spectator.frames.at(-1)).toMatchObject({
+            t: 'snapshot', phase: 'playing', currentMatchId: move.id, yourSeat: null, turn: null, state: null
+        });
+        const blocked = spectator.deserializeAttachment();
+        // A privacy block must leave the redacted match on the socket. reconcile()
+        // does not load the table and replays only this summary.
+        expect(blocked.hidden).toEqual({ phase: 'playing', id: move.id });
+        spectator.serializeAttachment({ ...blocked, subjects: [sid, 'seat-black'] });
+        f.transport.reconcile();
+        expect(spectator.frames.at(-1)).toMatchObject({
+            t: 'snapshot', phase: 'playing', currentMatchId: move.id, yourSeat: null, turn: null, state: null
+        });
+        expect(spectator.deserializeAttachment().hidden).toEqual({ phase: 'playing', id: move.id });
+        const lateId = 'c' + '4'.repeat(32);
+        const late = f.connect(lateId, 'seat-late');
+        f.actors.get(lateId).canSee = () => false;
+        await f.send(late, undefined, { t: 'hello', lastSeq: 0 });
+        expect(late.deserializeAttachment().hidden).toEqual({ phase: 'playing', id: move.id });
+        late.serializeAttachment({ ...late.deserializeAttachment(), subjects: [sid] });
+        f.transport.reconcile();
+        expect(late.frames.at(-1)).toMatchObject({
+            t: 'snapshot', phase: 'playing', currentMatchId: move.id, state: null, yourSeat: null
+        });
+    });
+
+    it('keeps the table, its tableId and the roster when a guest leaves mid-match', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        const saved = () => f.storage.get(ARCADE_TAG + ':' + ref);
+        await f.send(f.b, 'leave', { id });
+        expect(f.b.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-held' });
+        expect((await saved()).chess).toMatchObject({ id, tableId: id, seats: { w: sid, b: 'seat-black' } });
+        expect(f.board(f.a)).toMatchObject({ id, tableId: id, seat: 'w', waiting: false });
+        expect(f.board(f.b)).toMatchObject({ id, seat: 'b' });
+        expect(f.storage.delete).not.toHaveBeenCalled();
+    });
+
+    it('frees a guest seat after the match ends without deleting the table', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        await f.send(f.b, 'resign', { id, revision: 0 });
+        await f.send(f.b, 'leave', { id });
+        expect(f.storage.delete).not.toHaveBeenCalled();
+        const record = (await f.storage.get(ARCADE_TAG + ':' + ref)).chess;
+        expect(record).toMatchObject({ tableId: id, host: sid, seats: { w: sid, b: null }, match: null });
+        expect(record.id).not.toBe(id);
+        // The host keeps the same table with an open seat, and the same guest can sit down again.
+        expect(f.board(f.a)).toMatchObject({ id: record.id, tableId: id, seat: 'w', waiting: true, hasOpenSeat: true });
+        expect(f.board(f.b)).toMatchObject({ id: record.id, tableId: id, seat: null });
+        await f.send(f.b, 'join', { id: record.id });
+        expect(f.board(f.b)).toMatchObject({ tableId: id, seat: 'b', waiting: false });
+    });
+
+    it('still says lobby when the host has closed the table', async () => {
+        const f = fixture();
+        const { id } = await f.start();
+        await f.send(f.b, undefined, { t: 'hello', lastSeq: 0 });
+        await f.send(f.a, 'leave', { id });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'snapshot', phase: 'lobby', currentMatchId: null, state: null });
     });
 
     it('answers a seated player’s foreground probe without changing the match', async () => {
@@ -384,7 +460,7 @@ describe('Game Night match transport', () => {
         const before = f.storage.put.mock.calls.length;
         f.actors.get(guest).gameGuest = { room, ref, host: sid, match: id, tableId: id, game: 'chess', ...override };
         await f.send(f.b, undefined, { t: 'hello', lastSeq: 0 });
-        expect(f.b.frames.at(-1)).toMatchObject({ t: 'snapshot', state: null, yourSeat: null, currentMatchId: null });
+        expect(f.b.frames.at(-1)).toMatchObject({ t: 'snapshot', phase: 'unavailable', state: null, yourSeat: null, currentMatchId: null });
         expect(f.b.deserializeAttachment()).toMatchObject({ seat: null, subjects: [] });
         await f.send(f.b, 'move', { id, revision: 0, move: 'e7e5' });
         expect(f.b.frames.at(-1)).toMatchObject({ t: 'match-error', reason: 'unavailable' });
