@@ -48,7 +48,7 @@ test('a failed chat shortcut can be retried without changing the composer draft'
     await expect(message).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('shortcut-after-failed-send.png') });
     await expect(status).toHaveText('Couldn’t send that shortcut. Try it again.');
-    await expect(status).toHaveAttribute('role', 'status');
+    await expect(page.locator('[data-toast-announcement]')).toHaveText('Couldn’t send that shortcut. Try it again.');
 
     await shortcut.press('Enter');
     await expect(message).toHaveCount(1);
@@ -82,7 +82,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
         await expect(composer).toBeFocused();
         await expect(log).not.toContainText(message);
         await expect(status).toHaveText('Couldn’t send your message. Your draft is still here. Try sending it again.');
-        await expect(status).toHaveAttribute('role', 'status');
+        await expect(page.locator('[data-toast-announcement]')).toHaveText('Couldn’t send your message. Your draft is still here. Try sending it again.');
         await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
         await page.screenshot({ path: testInfo.outputPath('send-failed-draft-retained.png') });
         await composer.press('Enter');
@@ -127,7 +127,7 @@ for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 812
     });
 }
 
-test('fullscreen rejection gives recovery and preserves the unsent message', async ({ page, baseURL }) => {
+test('fullscreen rejection announces recovery without moving focus or losing the draft', async ({ page, baseURL, browserName }) => {
     await page.addInitScript(() => {
         Object.defineProperty(document, 'fullscreenEnabled', { value: true });
         // Init scripts run before documentElement exists. Patch the prototype
@@ -137,10 +137,30 @@ test('fullscreen rejection gives recovery and preserves the unsent message', asy
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await enter(page, baseURL);
+    const announcement = page.locator('[data-toast-announcement]');
+    await expect(announcement).toHaveRole('status');
+    await expect(announcement).toHaveAttribute('aria-atomic', 'true');
+    await expect(announcement).toBeVisible();
+    await expect(announcement).toBeEmpty();
+    if (browserName === 'chromium') {
+        const cdp = await page.context().newCDPSession(page);
+        const { root } = await cdp.send('DOM.getDocument');
+        const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '[data-toast-announcement]' });
+        const { nodes: [node] } = await cdp.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false });
+        expect(node.ignored).toBe(false);
+        expect(node.properties.some(({ name, value }) => name === 'live' && value.value === 'polite')).toBe(true);
+        await cdp.detach();
+    }
     await page.fill('[data-text]', 'An unsent draft');
-    await page.locator('[data-fullscreen]').click();
-    await expect(page.locator('[data-toast]')).toHaveText('Full screen is unavailable here. You can keep chatting in this window.');
-    await expect(page.locator('[data-fullscreen]')).toHaveAttribute('aria-pressed', 'false');
+    const fullScreen = page.getByRole('button', { name: 'Full screen', exact: true });
+    await fullScreen.press('Enter');
+    const message = 'Full screen is unavailable here. You can keep chatting in this window.';
+    await expect(page.locator('[data-toast]')).toHaveText(message);
+    await expect(page.locator('[data-toast]')).toHaveAttribute('aria-live', 'off');
+    await expect(announcement).toHaveText(message);
+    await expect(page.getByRole('status').filter({ hasText: message })).toHaveCount(1);
+    await expect(fullScreen).toHaveAttribute('aria-pressed', 'false');
+    await expect(fullScreen).toBeFocused();
     await expect(page.locator('[data-text]')).toHaveValue('An unsent draft');
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
     expect(errors).toEqual([]);

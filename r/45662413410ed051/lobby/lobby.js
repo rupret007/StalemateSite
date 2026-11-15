@@ -3695,6 +3695,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
 
     let toastTimer, toastDuration = 4000, toastKind;
     const toastRegion = $('[data-toast]');
+    const toastAnnouncement = $('[data-toast-announcement]');
     if (gameGuest) {
         $('[data-gate]').hidden = true;
         $('[data-game-guest-exit-retry]').addEventListener('click', () => void closeGameGuestAccess());
@@ -3717,6 +3718,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     function dismissToast() {
         clearTimeout(toastTimer);
         toastRegion.hidden = true;
+        toastAnnouncement.textContent = '';
         toastKind = undefined;
     }
 
@@ -3733,8 +3735,16 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const t = toastRegion;
         toastKind = kind;
         t.replaceChildren(text);
-        for (const [label, fn] of actions) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label; b.addEventListener('click', () => { fn(); t.hidden = true; }); t.append(' ', b); }
+        for (const [label, fn] of actions) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'btn btn--small';
+            b.textContent = label;
+            b.addEventListener('click', () => { fn(); dismissToast(); });
+            t.append(' ', b);
+        }
         t.hidden = false;
+        toastAnnouncement.replaceChildren(text);
         toastDuration = actions.length ? 12000 : 4000;
         scheduleToastDismiss();
     }
