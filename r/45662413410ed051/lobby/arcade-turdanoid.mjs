@@ -10,11 +10,15 @@ const capsules = { wide: ['Wide Load', 'W', '#9effc8'], sticky: ['Plunger Catch'
 const put = (node, text) => { if (node.textContent !== text) node.textContent = text; };
 
 export function turdanoidResultText(result, seat) {
-    const winner = result.winner === null ? 'The game ended in a draw'
+    const draw = result.winner === null;
+    const winner = draw ? 'Draw'
         : seat ? (result.winner === seat ? 'You win' : 'Rival wins')
             : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
-    const reason = { clear: 'after clearing the wall', time: 'when time ran out', out: 'after running out of balls', resign: 'by forfeit' }[result.reason];
-    return `${winner}${result.winner === null ? '' : ` ${reason}`}.`;
+    const reason = (draw
+        ? { clear: 'wall cleared', time: 'time limit', out: 'out of balls' }
+        : { clear: 'after clearing the wall', time: 'when time ran out', out: 'after running out of balls', resign: 'by forfeit' }
+    )[result.reason];
+    return `${winner}${reason ? (draw ? ` · ${reason}` : ` ${reason}`) : ''}.`;
 }
 const markup = `
 <summary>Turdanoid Brick Race</summary>
