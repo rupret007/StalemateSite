@@ -1019,6 +1019,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
     max-width: 100%;
     overflow-wrap: anywhere;
   }
+  .game-night > .arcade-chess[open] > summary:focus-visible { outline-offset: -2px; }
   .game-night > .arcade-chess[open] > summary .arcade-reconnect:not([hidden]) {
     display: block;
     width: fit-content;
@@ -1043,10 +1044,11 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   }
 }
 
-/* Tall phones can enlarge the board without using the compact layout’s space. */
+/* Reserve room for the clocks, match actions and composer on tall phones.
+   An outer width of 354px leaves eight 44px squares inside the border. */
 @media (max-width: 900px) and (min-height: 800px) {
   .game-night > .arcade-chess[open] #board {
-    width: 100%;
+    width: min(100%, max(354px, calc(100dvh - 490px)));
     max-width: 25rem;
     min-width: 0;
   }

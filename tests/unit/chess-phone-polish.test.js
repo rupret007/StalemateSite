@@ -52,24 +52,24 @@ describe('Chess 390×844 layout bounds', () => {
         expect(parseFloat(pane.getPropertyValue('padding-inline'))).toBe(0);
         expect(panel.getPropertyValue('width')).toBe('100%');
         expect(panel.getPropertyValue('padding-inline')).toBe('4px');
-        expect(board.getPropertyValue('width')).toBe('100%');
+        // jsdom's CSSStyleDeclaration omits this nested dynamic-viewport value.
+        expect(css).toContain('.game-night > .arcade-chess[open] #board {\n    width: min(100%, max(354px, calc(100dvh - 490px)));');
         expect(board.getPropertyValue('max-width')).toBe('25rem');
         // The panel and board each have a 1px border in their base styles.
-        const available = 390 - 17 - 2 - 2 * parseFloat(panel.getPropertyValue('padding-inline')) - 2;
-        const boardWidth = Math.min(available, 25 * 16);
-        expect(boardWidth / 8).toBeGreaterThanOrEqual(44);
-        expect(boardWidth).toBeLessThanOrEqual(390 - 17);
+        const available = 390 - 17 - 2 - 2 * parseFloat(panel.getPropertyValue('padding-inline'));
+        const outerBoard = Math.min(available, 25 * 16, Math.max(354, 844 - 490));
+        expect((outerBoard - 2) / 8).toBeGreaterThanOrEqual(44);
     });
 
-    it('keeps the turn cue in normal flow beneath the board within the phone width', () => {
+    it('keeps the turn cue in normal flow with an inset focus outline on the heading', () => {
         const status = phoneStyle('.game-night > .arcade-chess[open] :is([data-chess-status], [data-chess-error])');
-        const boardSelector = '.game-night > .arcade-chess[open] #board';
+        const heading = phoneStyle('.game-night > .arcade-chess[open] > summary:focus-visible');
         const source = readFileSync(new URL('../../r/45662413410ed051/lobby/arcade-chess.mjs', import.meta.url), 'utf8');
         expect(status.getPropertyValue('min-width')).toBe('0px');
         expect(status.getPropertyValue('max-width')).toBe('100%');
         expect(status.getPropertyValue('overflow-wrap')).toBe('anywhere');
-        expect(phoneStyle(boardSelector).getPropertyValue('max-width')).toBe('25rem');
-        // The status paragraph follows the board as a sibling in normal document flow.
+        expect(heading.getPropertyValue('outline-offset')).toBe('-2px');
+        // The turn cue precedes the playing area in normal document flow.
         expect(source).toMatch(/data-chess-status[\s\S]*?data-chess-playing[\s\S]*?<div id="board"[\s\S]*?<\/div>[\s\S]*?<\/div>/);
         expect(source).toContain("status.textContent = chessTurnText(model.seat, match.turn)");
     });

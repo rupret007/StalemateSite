@@ -580,6 +580,11 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expectUncoveredControl(leaveMatch);
                 await expectUncoveredControl(guest.locator('[data-send]'));
                 if (phone) {
+                    await expectUncoveredControl(guest.getByRole('button', { name: 'Offer draw', exact: true }));
+                    await expectUncoveredControl(guest.getByRole('button', { name: 'Resign', exact: true }));
+                    await expect(guest.locator('[data-chess-status]')).toBeInViewport({ ratio: 1 });
+                    const square = await guest.locator('.arcade-chess-square').first().boundingBox();
+                    assert.ok(square && Math.min(square.width, square.height) >= 44, 'the tall-phone board has 44px squares');
                     await guest.setViewportSize({ width: 390, height: 664 });
                     try {
                         await guest.locator('[data-game-night]').evaluate(surface => { surface.scrollTop = 0; });
