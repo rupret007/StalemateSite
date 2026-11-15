@@ -147,6 +147,65 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.launch.hidden).toBe(true);
     });
 
+    it('gives an unseated phone the public board and no racer control state', () => {
+        const opened = 50_000;
+        const privateRace = new TurdanoidBrickRace('race-unseated', opened, null, 1);
+        const starts = opened + 3_000;
+        const send = (seat, sequence, inputs, now) => {
+            expect(privateRace.command(seat, {
+                id: privateRace.checkpoint().id, version: 1, action: 'input', sequence, inputs
+            }, now)).toMatchObject({ ok: true });
+        };
+        send('a', 1, [[1, 'aim', 640]], starts);
+        send('b', 1, [[1, 'axis', -1]], starts);
+        const later = starts + 400;
+        send('a', 2, [[20, 'aim', 100]], later);
+        send('b', 2, [[21, 'axis', 1]], later);
+
+        const view = mount();
+        const watcher = view.publish(later, null, privateRace);
+        view.pump();
+        const seatA = privateRace.view('a', later);
+        const seatB = privateRace.view('b', later);
+        expect(seatA.runner.queue).toEqual([[20, 'aim', 100]]);
+        expect(seatB.runner.queue).toEqual([[21, 'axis', 1]]);
+        expect(seatA.runner.queue).not.toEqual(seatB.runner.queue);
+        expect(seatA.runner.run).toHaveProperty('aim');
+        expect(seatB.runner.run).toHaveProperty('axis');
+
+        expect(watcher.seat).toBeNull();
+        expect(watcher.match.runner.queue).toEqual([]);
+        expect(watcher.match.runner.queue).not.toEqual(seatA.runner.queue);
+        expect(watcher.match.runner.queue).not.toEqual(seatB.runner.queue);
+        expect(watcher.match.runner).not.toEqual(seatA.runner);
+        expect(watcher.match.runner).not.toEqual(seatB.runner);
+        expect(watcher.match.runner.run).not.toHaveProperty('aim');
+        expect(watcher.match.runner.run).not.toHaveProperty('axis');
+        expect(watcher.match.runner).not.toHaveProperty('sequence');
+        expect(watcher.match.runner).not.toHaveProperty('credits');
+        expect(watcher.match.runner).not.toHaveProperty('lastInputTick');
+        expect(watcher.match.runner).not.toHaveProperty('chargedAt');
+        const snapshot = JSON.stringify(watcher.match);
+        expect(snapshot).not.toContain('"aim"');
+        expect(snapshot).not.toContain('"axis"');
+        expect(snapshot).not.toContain(JSON.stringify(seatA.runner.queue));
+        expect(snapshot).not.toContain(JSON.stringify(seatB.runner.queue));
+        expect(view.hint.hidden).toBe(true);
+        expect(view.launch.hidden).toBe(true);
+        expect(view.table.dataset.sequence).toBe('');
+        expect(view.table.querySelector('[data-brick-score="a"] b').textContent).toBe('Player 1');
+        expect(view.table.querySelector('[data-brick-score="b"] b').textContent).toBe('Player 2');
+
+        const seatedA = view.publish(later, 'a', privateRace);
+        const seatedB = view.publish(later, 'b', privateRace);
+        expect(seatedA.match.runner).toEqual(seatA.runner);
+        expect(seatedB.match.runner).toEqual(seatB.runner);
+        expect(seatedA.match.runner).toHaveProperty('sequence');
+        expect(seatedB.match.runner).toHaveProperty('credits');
+        expect(seatedA.match.runner.run).toHaveProperty('aim');
+        expect(seatedB.match.runner.run).toHaveProperty('axis');
+    });
+
     it('tells a touch player to drag and tap instead of using arrow keys and Space', () => {
         const touch = mount({ coarse: true });
         expect(touch.help.textContent).toBe('Drag to move. Tap the stuck ball or press Launch.');
@@ -186,14 +245,13 @@ function mount({ coarse = true } = {}) {
         help: container.querySelector('.brick-race-help'),
         launch: container.querySelector('[data-brick-serve]'),
         table: container.querySelector('[data-brick-match]'),
-        publish(now, seat = 'b') {
-            client.handlers.onState({
-                state: {
-                    version: 1, game: 'turdanoid', id: 'race-12345', seat, waiting: false, rematch: null,
-                    match: race.view(seat || 'a', now)
-                },
-                canOpen: false
-            });
+        publish(now, seat = 'b', source = race) {
+            const match = source.view(seat, now);
+            const state = {
+                version: 1, game: 'turdanoid', id: match.id, seat, waiting: false, rematch: null, match
+            };
+            client.handlers.onState({ state, canOpen: false });
+            return state;
         },
         pump(ms = 100) {
             clock = (clock || performance.now()) + ms;
