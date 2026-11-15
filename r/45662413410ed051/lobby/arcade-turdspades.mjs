@@ -242,7 +242,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             const turn = yourTurn ? (match.phase === 'bid' ? `Your bid · tap ${bidEdited ? 'Lock bid' : 'Bid for me'}` : 'Your turn · tap a card')
                 : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
             message = `Round ${match.round} · ${turn}`;
-            if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
+            if (match.phase !== 'bid' && match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
         }
         if (connection === 'ready' && seat && match && away.length) {
             message += ` · Waiting for ${away.map(nameFor).join(', ')}, link still works.`;
@@ -279,7 +279,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             : match.phase === 'round-end' || match.result
                 ? `${match.result ? 'Game over' : completed >= 13 ? '13 tricks complete' : 'Hand over'}${match.lastWinner ? ` · Last won by ${nameFor(match.lastWinner)}` : ''}`
                 : `Trick ${Math.min(completed + 1, 13)} of 13${!match.trick.length && match.lastTrick.length ? ' · showing last trick' : ''}`;
-        const shown = match.trick.length ? match.trick : match.lastTrick;
+        const shown = match.phase === 'bid' ? [] : match.trick.length ? match.trick : match.lastTrick;
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
             const called = match.bids[position];

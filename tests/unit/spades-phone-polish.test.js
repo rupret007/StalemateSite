@@ -211,6 +211,97 @@ describe('Spades phone table', () => {
         expect(view.find('[data-spades-trick]').hidden).toBe(true);
     });
 
+    it.each(['partners', 'four'])('shows no last trick or last winner while bidding round 2, on reconnect or after a rematch in %s mode', mode => {
+        const id = `spades-${mode}-stale-winner`, nextId = `spades-${mode}-stale-next`;
+        const subjects = mode === 'partners' ? { south: 'host', west: 'friend' }
+            : { south: 'host', west: 'west-player', north: 'north-player', east: 'east-player' };
+        const table = mode === 'partners' ? new GameNightSpadesPartners(id, 'host') : new GameNightTurdSpades(id, 'host');
+        for (const [position, subject] of Object.entries(subjects)) {
+            if (subject !== 'host') expect(table.join(subject, id, 0, mode === 'partners' ? 'next' : position)).toBe(true);
+        }
+        const frame = match => ({ version: match.version, id: match.id, revision: match.revision });
+        const act = () => {
+            const subject = subjects[table.view('watcher').match.turn];
+            const match = table.view(subject).match;
+            const action = match.phase === 'bid' ? { action: 'bid', bid: 3 }
+                : { action: 'play', card: match.hand.find(card => card.playable).id };
+            expect(table.command(subject, { ...frame(match), ...action })).toEqual({ ok: true });
+        };
+        const view = mount();
+        const show = state => client.handlers.onState({ state, canOpen: state.seat === 'south', partners: mode === 'partners' });
+        const trick = view.find('[data-spades-trick]');
+        const cards = () => [...trick.querySelectorAll('b')];
+        const expectCleanBid = () => {
+            expect(view.find('[data-spades-table]').dataset.phase).toBe('bid');
+            expect(trick.hidden).toBe(true);
+            expect(view.find('[data-spades-trick-summary]').textContent).toBe('Bids · no cards played yet');
+            expect(view.find('[data-spades-status]').textContent).not.toMatch(/won the last trick|Last won by|showing last trick/);
+            expect(cards().map(card => card.textContent)).toEqual(['—', '—', '—', '—']);
+            expect(cards().map(card => card.getAttribute('aria-label'))).toEqual(Array(4).fill('No card played'));
+            expect([...trick.children].map(row => row.dataset.red)).toEqual(Array(4).fill('false'));
+        };
+
+        // Play the first hand from the real table so the last trick is on screen.
+        for (let turn = 0; turn < 60 && table.view('watcher').match.phase !== 'round-end'; turn++) act();
+        const scored = table.view('host');
+        expect(scored.match.lastTrick).toHaveLength(4);
+        show(scored);
+        expect(trick.hidden).toBe(false);
+        expect(cards().map(card => card.textContent)).not.toContain('—');
+        expect(view.find('[data-spades-trick-summary]').textContent).toContain('Last won by');
+
+        // Round 2 bidding, as the table projects it for a bidder and a watcher.
+        expect(table.command('host', { ...frame(scored.match), action: 'next-round' })).toEqual({ ok: true });
+        for (const viewer of ['host', 'watcher']) {
+            show(scored);
+            show(table.view(viewer));
+            expectCleanBid();
+        }
+        expect(view.find('[data-spades-seat]').textContent).toBe('Watching · hands are private');
+        expect(view.find('[data-spades-hand]').children).toHaveLength(0);
+
+        // A bid-phase payload that still carries the previous hand's trick must
+        // not put it back: not live, not through a mid-bid reconnect.
+        const stale = { lastTrick: scored.match.lastTrick, lastWinner: scored.match.lastWinner };
+        for (const viewer of ['host', 'watcher']) {
+            const bidding = table.view(viewer);
+            const carried = { ...bidding, match: { ...bidding.match, ...stale } };
+            show(scored);
+            show(carried);
+            expectCleanBid();
+            client.handlers.onStatus('reconnecting');
+            expectCleanBid();
+            show(carried);
+            expectCleanBid();
+            if (viewer === 'watcher') {
+                expect(view.find('[data-spades-seat]').textContent).toBe('Watching · hands are private');
+                expect(view.find('[data-spades-hand]').children).toHaveLength(0);
+                expect(view.find('[data-spades-bid]').hidden).toBe(true);
+            }
+        }
+
+        // Resign with cards on the table, then rematch into a fresh bid.
+        while (table.view('watcher').match.phase === 'bid') act();
+        for (let turn = 0; turn < 6; turn++) act();
+        const playing = table.view('host');
+        show(playing);
+        expect(cards().map(card => card.textContent).some(text => text !== '—')).toBe(true);
+        expect(table.command('host', { ...frame(playing.match), action: 'resign' }).ok).toBe(true);
+        const finished = table.view('host');
+        show(finished);
+        for (const subject of Object.values(subjects)) expect(table.requestRematch(subject, id, nextId, 1)).toBe(true);
+        const rematch = table.view('host');
+        expect(rematch).toMatchObject({ id: nextId, seat: 'south', match: { round: 1, phase: 'bid' } });
+        show(rematch);
+        expectCleanBid();
+        show(finished);
+        show({ ...rematch, match: { ...rematch.match, ...stale } });
+        expectCleanBid();
+        show(table.view('watcher'));
+        expectCleanBid();
+        expect(view.find('[data-spades-hand]').children).toHaveLength(0);
+    });
+
     it('gives watchers the exact privacy sentence and no private card controls', () => {
         const table = partnersTable();
         const view = mount();
