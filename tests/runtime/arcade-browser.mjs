@@ -102,12 +102,17 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
     async function sendGameInvite(host, nick, capture) {
         await host.getByRole('button', { name: 'Invite players' }).click();
         const dialog = host.locator('[data-invite-dialog]');
-        if (await dialog.locator('[data-game-invite-picker]').isVisible()) {
+        const picker = dialog.locator('[data-game-invite-picker]');
+        const form = dialog.locator('[data-invite-form]');
+        await expect(dialog, 'Invite players opens the invitation dialog').toBeVisible();
+        await expect(picker.or(form).filter({ visible: true }),
+            'the dialog shows the current or legacy invite controls').toHaveCount(1);
+        if (await picker.isVisible()) {
             if (capture) await capture();
-            await dialog.getByRole('button', { name: `Invite ${nick}`, exact: true }).click();
+            await picker.getByRole('button', { name: `Invite ${nick}`, exact: true }).click();
         } else {
-            await dialog.getByRole('combobox').selectOption({ label: nick });
-            await dialog.getByRole('button', { name: 'Invite selected person' }).click();
+            await form.getByRole('combobox').selectOption({ label: nick });
+            await form.getByRole('button', { name: 'Invite selected person' }).click();
         }
     }
     async function inviteToGame(host, guest, nick) {
