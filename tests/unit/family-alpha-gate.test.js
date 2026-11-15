@@ -116,13 +116,14 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         expect(extra.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
     });
 
-    it('2b. the extra phone is seated when the next game starts', async () => {
-        const { f, phones, id } = await seated(game);
+    it('2b. the extra phone is up next and a rematch keeps every player in the same seat', async () => {
+        const { f, phones, id, seats } = await seated(game);
         const extra = f.phone(game.seats);
         await f.hello(extra);
         await resign(f, phones.at(-1));
         await f.send(phones[0], 'start-rematch', { id });
-        expect(f.view(extra).seat).toBeTruthy();
+        expect(phones.map(socket => f.view(socket).seat)).toEqual(seats);
+        expect(f.view(extra)).toMatchObject({ seat: null, upNext: true });
     });
 
     it('2c. after the game ends, a guest who steps away frees the seat for the waiting phone', async () => {
