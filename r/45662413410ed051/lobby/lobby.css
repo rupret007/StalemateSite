@@ -409,6 +409,16 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
      hand from the 600px rule so a card cannot fall under 44px wide. */
   .arcade-spades .arcade-card-hand { grid-template-columns: repeat(7, minmax(0, 1fr)); }
   .arcade-spades .arcade-card-hand button { min-height: 44px; }
+  /* Two bid columns wrap "(you)" / "(CPU)" onto a second line and that line
+     is what leaves the hand short of a 375×667 fold. One line still fits. */
+  @media (max-width: 600px) {
+    .arcade-spades [data-spades-table][data-phase="bid"] .spades-trick li { padding: 1px 2px; }
+    .arcade-spades [data-spades-table][data-phase="bid"] .spades-trick span {
+      font-size: 11px;
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+  }
 }
 .jack-dealer, .jack-hand { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 5px 0; }
 .jack-dealer > b, .jack-hand > b { min-width: 75px; }

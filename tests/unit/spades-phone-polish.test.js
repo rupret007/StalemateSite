@@ -474,6 +474,17 @@ describe('Spades phone table', () => {
             expect(hand.columns, `${label} hand`).toContain(layout.columns);
             expect(hand.minHeight, `${label} card min-height`).toBe(layout.minHeight);
             expect(hand.trick, `${label} trick`).toContain(layout.trick);
+            const table = document.querySelector('[data-spades-table]');
+            table.dataset.phase = 'bid';
+            const bidLabel = getComputedStyle(document.querySelector('.spades-trick span'));
+            const singleLine = layout.width >= 375 && layout.width <= 600 && layout.height <= 720;
+            if (singleLine) {
+                expect(bidLabel.whiteSpace, `${label} bid line`).toBe('nowrap');
+                expect(bidLabel.fontSize, `${label} bid font`).toBe('11px');
+            } else {
+                expect(bidLabel.whiteSpace, `${label} bid line`).not.toBe('nowrap');
+                if (layout.width <= 600) expect(bidLabel.fontSize, `${label} bid font`).toBe('13px');
+            }
         }
     }, 20000);
 
