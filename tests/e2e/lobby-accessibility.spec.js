@@ -422,7 +422,17 @@ test('native Chromium zoom keeps Jam invitations and the composer usable', async
         const composer = page.getByRole('textbox', { name: 'Message', exact: true });
         const sendButton = page.getByRole('button', { name: 'Send', exact: true });
         const inviteButton = page.getByRole('button', { name: 'Invite bandmate to room', exact: true });
-        await page.screenshot({ path: testInfo.outputPath('jam-native-zoom-100.png') });
+        const cdp = await context.newCDPSession(page);
+        const capture = async name => {
+            // Native zoom reports layout in CSS pixels. Capture the actual
+            // browser surface so zoomed evidence includes the whole viewport.
+            const { data } = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+            const png = Buffer.from(data, 'base64');
+            const minimumWidth = await page.evaluate(() => Math.floor(innerWidth * devicePixelRatio) - 4);
+            expect(png.readUInt32BE(16)).toBeGreaterThanOrEqual(minimumWidth);
+            await writeFile(testInfo.outputPath(name), png);
+        };
+        await capture('jam-native-zoom-100.png');
         for (const zoom of [2, 4]) {
             const reported = await worker.evaluate(async factor => {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -442,7 +452,7 @@ test('native Chromium zoom keeps Jam invitations and the composer usable', async
             await expect(roster.getByRole('button', { name: 'Invite ZoomBandmate', exact: true })).toBeVisible();
             await tabTo(page, cancel);
             await expect(cancel).toBeInViewport({ ratio: 1 });
-            await page.screenshot({ path: testInfo.outputPath(`jam-native-roster-${zoom * 100}.png`) });
+            await capture(`jam-native-roster-${zoom * 100}.png`);
             await page.keyboard.press('Enter');
             await expect(cancel).toBeHidden();
 
@@ -451,11 +461,13 @@ test('native Chromium zoom keeps Jam invitations and the composer usable', async
             await page.keyboard.type(message);
             await tabTo(page, sendButton);
             const geometry = await composerGeometry(page);
-            contained(geometry);
             await attachGeometry(testInfo, `jam-native-geometry-${zoom * 100}`, { zoom: reported, ...geometry });
-            await page.screenshot({ path: testInfo.outputPath(`jam-native-composer-${zoom * 100}.png`) });
+            await capture(`jam-native-composer-${zoom * 100}.png`);
+            contained(geometry);
             await page.keyboard.press('Space');
-            await expect(page.getByRole('log', { name: 'Conversation' })).toContainText(message);
+            const sent = page.getByRole('log', { name: 'Conversation' }).getByText(message, { exact: true });
+            await expect(sent).toBeInViewport();
+            await capture(`jam-native-message-${zoom * 100}.png`);
         }
         expect(host.errors).toEqual([]);
         expect(peer.errors).toEqual([]);
