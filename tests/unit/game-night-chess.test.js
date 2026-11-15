@@ -1,10 +1,28 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { GameNightChess } from '../../hangout-worker/src/game-night-chess.mjs';
+import { chessTurnText } from '../../r/45662413410ed051/lobby/arcade-chess.mjs';
 
 const now = 1000;
 const white = 'member-one';
 const black = 'member-two';
+
+describe('Game Night Chess turn status text', () => {
+    it('identifies the seated player when it is their turn', () => {
+        expect(chessTurnText('w', 'w')).toBe('You’re White · Your turn');
+        expect(chessTurnText('b', 'b')).toBe('You’re Black · Your turn');
+    });
+
+    it('names the other player when a seated player is waiting', () => {
+        expect(chessTurnText('w', 'b')).toBe('You’re White · Black to move');
+        expect(chessTurnText('b', 'w')).toBe('You’re Black · White to move');
+    });
+
+    it('shows watchers who is to move without assigning them a seat', () => {
+        expect(chessTurnText(null, 'w')).toBe('Watching · White to move');
+        expect(chessTurnText(null, 'b')).toBe('Watching · Black to move');
+    });
+});
 
 function send(game, person, action, move) {
     const { match } = game.view(person, now);
