@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createGameNightMatchClient, matchUnavailableText } from '../../r/45662413410ed051/lobby/game-night-match-client.mjs';
+import { createGameNightMatchClient, matchConnectionErrors, matchUnavailableText } from '../../r/45662413410ed051/lobby/game-night-match-client.mjs';
+
+describe('match connection error copy', () => {
+    it('explains terminal kicks and bans without promising another connection', () => {
+        expect(matchConnectionErrors.kicked).toBe('The host removed you from this table.');
+        expect(matchConnectionErrors.banned).toBe('You can’t rejoin this table.');
+        expect(matchConnectionErrors.kicked).not.toMatch(/reconnect|try again/i);
+        expect(matchConnectionErrors.banned).not.toMatch(/reconnect|try again/i);
+    });
+});
 
 describe('Game Night phone wake and history recovery', () => {
     let client, sockets, issue, hidden, events;

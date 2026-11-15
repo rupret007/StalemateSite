@@ -16,6 +16,7 @@ vi.mock('/play/games/turdspades-engine.js', () => ({ suggestSpadesBid: () => 3 }
 
 import { mountArcadeTurdSpades } from '../../r/45662413410ed051/lobby/arcade-turdspades.mjs';
 import { mountArcadeTurdanoid } from '../../r/45662413410ed051/lobby/arcade-turdanoid.mjs';
+import { mountArcadeChess } from '../../r/45662413410ed051/lobby/arcade-chess.mjs';
 import { TurdanoidBrickRace } from '../../play/games/turdanoid-race.js';
 
 afterEach(() => {
@@ -25,6 +26,32 @@ afterEach(() => {
 });
 
 function room() { return { room: '#game-fixture', ref: 'fixture', actor: 'actor' }; }
+
+describe('terminal match connection copy', () => {
+    it.each([
+        ['kicked', 'The host removed you from this table.'],
+        ['banned', 'You can’t rejoin this table.']
+    ])('shows the %s message without a reconnect action', (reason, copy) => {
+        const container = document.createElement('div');
+        document.body.append(container);
+        const view = mountArcadeChess(container, () => {});
+        view.setRoom(room());
+        clients.at(-1).onStatus('unavailable', reason);
+        expect(container.querySelector('[data-chess-status]').textContent).toBe(copy);
+        expect(container.querySelector('[data-chess-primary]').hidden).toBe(true);
+    });
+
+    it('keeps reconnect copy and action for an ordinary drop', () => {
+        const container = document.createElement('div');
+        document.body.append(container);
+        const view = mountArcadeChess(container, () => {});
+        view.setRoom(room());
+        clients.at(-1).onStatus('unavailable');
+        expect(container.querySelector('[data-chess-status]').textContent).toBe('Chess couldn’t reconnect. Try again from this room.');
+        expect(container.querySelector('[data-chess-primary]').hidden).toBe(false);
+        expect(container.querySelector('[data-chess-primary]').textContent).toBe('Reconnect to Chess');
+    });
+});
 
 describe('terminal match close clears real private game views', () => {
     it.each(['partners', 'four'])('clears a seated %s Spades hand through its terminal status handler', mode => {

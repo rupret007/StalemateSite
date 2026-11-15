@@ -7,7 +7,9 @@ export const matchConnectionErrors = Object.freeze({
     'replaced': 'This match is open in another tab. Continue there, or reload to play here.',
     'room': 'Return to your Game Night room and try again.',
     'disabled': 'This game is unavailable in this room right now.',
-    'rate-limited': 'This match reached a connection or activity limit. Try again later.'
+    'rate-limited': 'This match reached a connection or activity limit. Try again later.',
+    'kicked': 'The host removed you from this table.',
+    'banned': 'You can’t rejoin this table.'
 });
 
 // Shown in place of "Waiting for the host" when the table has a game this person cannot see.
