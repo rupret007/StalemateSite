@@ -8,7 +8,7 @@ const css = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.css', imp
 const document = new JSDOM('<style></style>').window.document;
 document.querySelector('style').textContent = css;
 const phoneRules = [...document.styleSheets[0].cssRules]
-    .filter(rule => rule.conditionText === '(max-width: 900px)')
+    .filter(rule => ['(max-width: 900px)', '(max-width: 900px) and (min-height: 800px)'].includes(rule.conditionText))
     .flatMap(rule => [...rule.cssRules]);
 const phoneStyle = selector => phoneRules.find(rule => rule.selectorText === selector)?.style;
 

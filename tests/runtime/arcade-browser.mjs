@@ -1717,7 +1717,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }
         }
         for (const page of [black, white]) {
-            await expect(page.locator('[data-chess-status]')).toHaveText('White wins · Checkmate');
+            await expect(page.locator('[data-chess-status]')).toHaveText('Checkmate · White wins');
             await expect(page.getByRole('button', { name: 'f7, White queen' })).toBeAttached();
             const king = page.getByRole('button', { name: 'e8, Black king' });
             await expect(king).toHaveAttribute('data-check', '');
