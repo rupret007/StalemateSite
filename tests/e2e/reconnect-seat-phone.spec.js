@@ -7,8 +7,6 @@ const { randomBytes, randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
-test.describe.configure({ mode: 'serial' });
-
 const PHONE = { width: 390, height: 844 };
 const LOBBY = '/r/45662413410ed051/lobby/';
 const PREVIEW = 'local-preview-key-0001';
@@ -77,16 +75,8 @@ async function gameNight(browser, baseURL) {
         const sid = randomUUID(), session = { betaSid: sid, betaInviteVersion: '1' };
         const person = { nick, sid, identity: null, matches: new Map(), matchFrames: [] };
         people.set(nick, person);
-        const context = await browser.newContext({ viewport, hasTouch: true });
+        const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
         contexts.push(context);
-        await context.addInitScript(() => {
-            const native = window.matchMedia.bind(window);
-            window.matchMedia = query => {
-                if (query === '(pointer: coarse)') return native('(max-width: 1px)');
-                if (query === '(pointer: fine)') return native('(min-width: 99999px)');
-                return native(query);
-            };
-        });
         await context.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
         await context.route(url => url.pathname === LOBBY, async route => {
             const response = await route.fetch();
@@ -235,9 +225,16 @@ async function midMatch(game, pages) {
         await expect(status(host, game)).not.toHaveText(/^You’re White · Your turn$/);
     }
     if (game.game === 'turdspades') {
-        for (const page of pages.slice(0, game.seats)) {
-            const bid = page.getByRole('button', { name: /Bid for me/i });
-            if (await bid.isVisible()) await bid.tap();
+        const seated = pages.slice(0, game.seats);
+        for (let round = 0; round < game.seats; round++) {
+            for (const page of seated) {
+                const bid = page.getByRole('button', { name: /Bid for me/i });
+                try {
+                    await expect(bid).toBeVisible({ timeout: 2_000 });
+                    await bid.tap();
+                    break;
+                } catch { /* another seat bids next */ }
+            }
         }
         await expect(guest.locator('[data-spades-hand] button')).not.toHaveCount(0, { timeout: 20_000 });
     }
@@ -251,8 +248,25 @@ async function midMatch(game, pages) {
 
 function primaryControl(page, game) {
     if (game.game === 'chess') return page.locator('.arcade-chess-actions button:visible').first();
-    if (game.game === 'turdspades') return page.locator('[data-send]');
+    if (game.game === 'turdspades') {
+        const bid = page.locator('[data-spades-bid]:not([hidden])').getByRole('button', { name: /Bid for me/i });
+        const playable = page.locator('[data-spades-hand] button:not([disabled])').first();
+        const hand = page.locator('[data-spades-hand] button').first();
+        return bid.or(playable).or(hand);
+    }
     return page.getByRole('button', { name: 'Launch ball' });
+}
+
+function currentMatchId(fixture, nick, gameName) {
+    const frames = fixture.people.get(nick).matchFrames;
+    for (let i = frames.length - 1; i >= 0; i--) {
+        try {
+            const frame = JSON.parse(frames[i]);
+            if (frame.t === 'snapshot' && frame.currentMatchId) return frame.currentMatchId;
+            if (frame.t === 'match-state' && frame.state?.id) return frame.state.id;
+        } catch { /* ignore non-json frames */ }
+    }
+    return null;
 }
 
 async function expectUncovered(control) {
@@ -346,6 +360,8 @@ for (const game of Object.values(GAMES)) {
                 await midMatch(game, pages);
                 const guest = pages.at(-1);
                 const seat = fixture.view(absentNick, game.game).deserializeAttachment().seat;
+                const matchBefore = currentMatchId(fixture, absentNick, game.game);
+                expect(matchBefore).toBeTruthy();
                 const handBefore = game.game === 'turdspades' ? await spadesHandLabels(guest) : [];
                 await guest.reload();
                 await expect(guest.locator('[data-nick]')).toHaveValue(absentNick);
@@ -353,6 +369,10 @@ for (const game of Object.values(GAMES)) {
                 await showTable(guest, game);
                 await expect(guest.locator(game.board)).toBeVisible();
                 await expect.poll(() => fixture.view(absentNick, game.game).deserializeAttachment().seat).toBe(seat);
+                await expect.poll(() => currentMatchId(fixture, absentNick, game.game)).toBe(matchBefore);
+                if (game.game === 'chess') {
+                    await expect(guest.locator('[data-square="e4"][data-piece="wp"]')).toBeVisible();
+                }
                 if (game.game === 'turdspades' && handBefore.length) {
                     expect(await spadesHandLabels(guest)).toEqual(handBefore);
                 }
