@@ -10,6 +10,8 @@ export function createGameNightTable({
         #seats;
         #match = null;
         #votes = [];
+        // Arrival order of people who found a full table. The next game seats them.
+        #next = [];
         #id;
         #tableId;
         #host;
@@ -52,6 +54,15 @@ export function createGameNightTable({
                 if (finished(game.#match) && Array.isArray(votes) && votes.length <= occupied.length &&
                     new Set(votes).size === votes.length && votes.every(seat => occupied.includes(seat))) game.#votes = [...votes];
             }
+            const queued = [];
+            if (record.nextGame !== undefined) {
+                if (!Array.isArray(record.nextGame)) throw new TypeError('Invalid room match checkpoint');
+                for (const subject of record.nextGame) {
+                    if (!subjectValid(subject) || queued.includes(subject) || queued.length >= 32) throw new TypeError('Invalid room match checkpoint');
+                    if (!game.seat(subject)) queued.push(subject);
+                }
+            }
+            game.#next = queued;
             return game;
         }
 
@@ -63,7 +74,8 @@ export function createGameNightTable({
 
         checkpoint() {
             return { version, id: this.#id, tableId: this.#tableId, host: this.#host, seats: { ...this.#seats, ...computerSeats }, match: this.#match?.checkpoint() ?? null,
-                ...this.#rematchView(), ...(this.#closed ? { closed: true } : {}), ...(mode ? { mode } : {}) };
+                ...this.#rematchView(), ...(this.#next.length ? { nextGame: [...this.#next] } : {}),
+                ...(this.#closed ? { closed: true } : {}), ...(mode ? { mode } : {}) };
         }
 
         get deadline() { return this.#closed ? null : this.#match?.deadline ?? null; }
@@ -90,15 +102,26 @@ export function createGameNightTable({
             return !this.#closed && id === this.#id && !this.#match && this.#host === host && this.#occupied().length + reserved < sides.length;
         }
 
+        #full() { return !!this.#match || this.#occupied().length >= sides.length; }
+
         view(subject, now) {
             const seat = this.seat(subject);
+            const upNext = !seat && this.#full() && this.#next.includes(subject);
             return {
                 version, game: name, id: this.#id, tableId: this.#tableId, seat, waiting: !this.#match,
                 hasOpenSeat: !this.#match && this.#occupied().length < sides.length,
+                ...(upNext ? { upNext: true } : {}),
                 match: this.#match ? project(this.#match, seat, now) : null, ...this.#rematchView(),
                 ...(!twoSeats || mode ? { occupied: this.#occupied() } : {}), ...(mode ? { mode } : {}),
                 ...(manualStart ? { canStart: !this.#match && seat === first && this.#occupied().length >= minSeats } : {})
             };
+        }
+
+        // A connected person with no seat at a full table is lined up for the next game.
+        enqueue(subject) {
+            if (this.#closed || !this.#full() || !subjectValid(subject) || this.seat(subject) || this.#next.includes(subject) || this.#next.length >= 32) return false;
+            this.#next.push(subject);
+            return true;
         }
 
         join(subject, id, now, requested, reserved = 0, heldSeats = []) {
@@ -107,6 +130,7 @@ export function createGameNightTable({
             if (!sides.includes(seat) || this.#seats[seat] || heldSeats.includes(seat)) return false;
             if (!manualStart && this.subjects.length === sides.length - 1) this.#match = create(id, now);
             this.#seats[seat] = subject;
+            this.#next = this.#next.filter(entry => entry !== subject);
             return true;
         }
 
@@ -147,13 +171,14 @@ export function createGameNightTable({
             return true;
         }
 
-        reopen(subject, id, modeRequested, now) {
+        reopen(subject, id, modeRequested, now, connected) {
             if (!this.#closed || subject !== this.#host || id === this.#id || modeRequested !== mode) return false;
+            this.#closed = false;
+            this.#admitNext(connected);
             const occupied = this.#occupied();
             const match = occupied.length >= minSeats ? create(id, now, occupied) : null;
             this.#id = id;
             this.#match = match;
-            this.#closed = false;
             return true;
         }
 
@@ -178,11 +203,52 @@ export function createGameNightTable({
             const occupied = this.#occupied();
             const online = connected ? occupied.filter(side => connected.has(this.#seats[side])) : occupied;
             if (!force && (!online.length || !online.every(side => this.#votes.includes(side)))) return false;
-            const match = create(nextId, now, occupied);
+            this.#admitNext(connected);
+            const match = create(nextId, now, this.#occupied());
             this.#id = nextId;
             this.#match = match;
             this.#votes = [];
             return true;
+        }
+
+        #online(connected, subject) { return !connected || connected.has(subject); }
+
+        // Fill an open seat from the line. When the table is still full, the last
+        // guest sits this one out so the person who was waiting can play.
+        #admitNext(connected) {
+            const waiting = this.#next.filter(subject => this.#online(connected, subject) && !this.seat(subject));
+            if (!waiting.length) {
+                if (connected) this.#next = this.#next.filter(subject => connected.has(subject) && !this.seat(subject));
+                return;
+            }
+            const open = sides.filter(seat => seat !== first && !this.#seats[seat]);
+            const displaced = [];
+            const yieldSeat = seat => {
+                if (seat === first || open.includes(seat)) return;
+                const subject = this.#seats[seat];
+                if (!subject) return;
+                this.#seats[seat] = null;
+                open.push(seat);
+                if (this.#online(connected, subject)) displaced.push(subject);
+            };
+            if (connected) {
+                for (const seat of [...sides].reverse()) {
+                    if (open.length >= waiting.length) break;
+                    if (this.#seats[seat] && !connected.has(this.#seats[seat])) yieldSeat(seat);
+                }
+            }
+            for (const seat of [...sides].reverse()) {
+                if (open.length >= waiting.length) break;
+                yieldSeat(seat);
+            }
+            open.sort((left, right) => sides.indexOf(left) - sides.indexOf(right));
+            const leftover = [];
+            for (const subject of waiting) {
+                const seat = open.shift();
+                if (seat) this.#seats[seat] = subject;
+                else leftover.push(subject);
+            }
+            this.#next = [...leftover, ...displaced].filter(subject => !this.seat(subject));
         }
     };
 }

@@ -271,14 +271,7 @@ for (const game of Object.values(GAMES)) {
         // Up to five phone browsers share one worker.
         test.beforeEach(() => test.slow());
 
-        // BUG: a phone that arrives at a full table is never told the table is full
-        // or that it is up next. It gets the watcher view with no seat control:
-        // Chess r/45662413410ed051/lobby/arcade-chess.mjs:303 ("Watching · …"),
-        // Spades arcade-turdspades.mjs:239-242 and :300, Turdanoid
-        // arcade-turdanoid.mjs:300 (the wall name only). The server has no queue
-        // either (hangout-worker/src/game-night-table.mjs:164-176 re-seats the
-        // same roster on every rematch).
-        test.fixme(`2. one phone too many is told the table is full and that it is up next game`, async ({ browser, baseURL }) => {
+        test(`2. one phone too many is told the table is full and that it is up next game`, async ({ browser, baseURL }) => {
             const fixture = await gameNight(browser, baseURL);
             try {
                 const pages = await seated(fixture, game, nicks);
@@ -303,7 +296,6 @@ for (const game of Object.values(GAMES)) {
                 await expect(status(extra, game)).not.toHaveText(WAIT_FOR_HOST);
                 await expect(panel(extra, game).getByRole('button', { name: /^Join /, includeHidden: false })).toHaveCount(0);
                 expect(fixture.view('ExtraPhone', game.game).deserializeAttachment().seat).toBeNull();
-                // Chat is the only way forward this phone has today.
                 await expect(extra.locator('[data-send]')).toBeInViewport();
                 expect(await extra.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(PHONE.width);
             } finally { await fixture.close(); }
