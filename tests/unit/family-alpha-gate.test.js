@@ -218,6 +218,35 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         expect(next).not.toBe(id);
         readOnly(next);
     });
+
+    it('5c. a stored watch-only seat is freed on rematch for the phone that was up next', async () => {
+        const { f, phones, id, seats } = await seated(game);
+        const index = game.seats - 1;
+        const { tableId } = f.view(phones[0]);
+        const extra = f.phone(game.seats);
+        await f.hello(extra);
+        expect(f.view(extra)).toMatchObject({ seat: null, upNext: true });
+        f.binding(index).gameGuest = { room, ref, host: sidFor(0), match: id, tableId, game: game.name, watch: true };
+        const watcher = f.phone(index);
+        await f.hello(watcher);
+        // Still the live hand: the waiting phone does not take the seat yet.
+        expect(f.view(extra)).toMatchObject({ seat: null, upNext: true });
+        expect(f.view(watcher)).toMatchObject({ watchOnly: true, seat: null });
+        await resign(f, phones[0]);
+        await f.send(phones[0], 'start-rematch', { id });
+        const next = f.view(phones[0]).id;
+        expect(next).not.toBe(id);
+        phones.slice(0, -1).forEach((socket, seat) => expect(f.view(socket).seat).toBe(seats[seat]));
+        expect(f.view(extra)).toMatchObject({ id: next, seat: seats[index] });
+        expect(f.view(extra).upNext).toBeUndefined();
+        expect(f.view(watcher)).toMatchObject({ watchOnly: true, seat: null });
+        if (game.privateHands) {
+            expect(f.view(watcher).match.hand).toEqual([]);
+            expect(f.view(extra).match.hand).toHaveLength(13);
+            expect(JSON.stringify(watcher.frames)).not.toContain(JSON.stringify(f.view(extra).match.hand));
+            expect(JSON.stringify(watcher.frames)).not.toMatch(/"playable":/);
+        }
+    });
 });
 
 describe('family alpha: an expired invite', () => {
