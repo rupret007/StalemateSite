@@ -36,12 +36,17 @@ function fixture() {
         uuid: () => 'c8eb7f10-e113-418f-9900-' + String(++matchCount).padStart(12, '0') });
     const send = (socket, action, fields = {}) => transport.receive(socket, JSON.stringify({ version: 1, action, ...fields }));
     const board = socket => socket.frames.findLast(frame => frame.t === 'match-state' || frame.t === 'snapshot')?.state;
-    return { host, guest, connect, send, board, storage };
+    function disconnect(actor, socket) {
+        actors.delete(actor);
+        connections.splice(connections.indexOf(socket), 1);
+        socket.readyState = 3;
+    }
+    return { host, guest, connect, disconnect, send, board, storage };
 }
 
 describe('offline next-game queue at seat open', () => {
     // Known bug: reopening after a queued guest disconnects leaves the newly opened seat empty.
-    it.fails('skips an offline queued guest and seats the next connected guest on reopen', async () => {
+    it('skips an offline queued guest and seats the next connected guest on reopen', async () => {
         const f = fixture();
         const north = f.connect('c' + '3'.repeat(32), 'seat-north');
         const east = f.connect('c' + '4'.repeat(32), 'seat-east');
@@ -62,7 +67,7 @@ describe('offline next-game queue at seat open', () => {
         expect(checkpoint.turdspades.nextGame).toEqual(['seat-offline', 'seat-next']);
 
         // The queued guest has gone offline before the host opens the next table.
-        offline.readyState = 3;
+        f.disconnect(offlineActor, offline);
         await f.send(f.host, 'resign', { id, revision: f.board(f.host).match.revision ?? 0 });
         await f.send(east, 'leave', { id });
         await f.send(f.host, 'leave', { id });
@@ -71,11 +76,46 @@ describe('offline next-game queue at seat open', () => {
         checkpoint = await f.storage.get(tableKey);
         expect(checkpoint.turdspades.seats.east).toBe('seat-next');
         expect(Object.values(checkpoint.turdspades.seats)).not.toContain('seat-offline');
-        expect(offline.frames.some(frame => frame.state?.match?.hand?.length)).toBe(false);
+        expect(checkpoint.turdspades.nextGame ?? []).not.toContain('seat-offline');
+        expect(f.board(next)).toMatchObject({ seat: 'east', match: expect.objectContaining({ id: expect.any(String) }) });
+        expect(f.board(next).match).not.toBeNull();
 
-        // Returning later does not reveal a hand to the guest who missed the seat.
+        // Returning later does not reveal private state to the guest who missed the seat.
         const returned = f.connect(offlineActor, 'seat-offline');
         await f.send(returned, 'sync');
-        expect(f.board(returned)).toMatchObject({ seat: null, match: null });
+        expect(f.board(returned)).toMatchObject({ seat: null, match: expect.anything() });
+        for (const frame of returned.frames) {
+            expect(frame.state?.match?.hand ?? []).toEqual([]);
+            expect(JSON.stringify(frame)).not.toMatch(/"(?:hand|hands|privateHand|playable)"\s*:\s*(?!\[\s*\])(?:\[|\{)/);
+        }
+    });
+
+    it('seats a queued guest who reconnects before the host reopens', async () => {
+        const f = fixture();
+        const north = f.connect('c' + '3'.repeat(32), 'seat-north');
+        const east = f.connect('c' + '4'.repeat(32), 'seat-east');
+        const queuedActor = 'c' + '5'.repeat(32);
+        const queued = f.connect(queuedActor, 'seat-queued');
+        const next = f.connect('c' + '6'.repeat(32), 'seat-next');
+
+        await f.send(f.host, 'open');
+        const { id } = f.board(f.host);
+        await f.send(f.guest, 'join', { id, seat: 'west' });
+        await f.send(north, 'join', { id, seat: 'north' });
+        await f.send(east, 'join', { id, seat: 'east' });
+        await f.send(queued, 'sync');
+        await f.send(next, 'sync');
+        f.disconnect(queuedActor, queued);
+        const reconnected = f.connect(queuedActor, 'seat-queued');
+        await f.send(reconnected, 'sync');
+
+        await f.send(f.host, 'resign', { id, revision: f.board(f.host).match.revision ?? 0 });
+        await f.send(east, 'leave', { id });
+        await f.send(f.host, 'leave', { id });
+        await f.send(f.host, 'open');
+
+        const checkpoint = await f.storage.get('game-night-turdspades:' + ref);
+        expect(checkpoint.turdspades.seats.east).toBe('seat-queued');
+        expect(f.board(reconnected)).toMatchObject({ seat: 'east', match: expect.objectContaining({ id: expect.any(String) }) });
     });
 });
