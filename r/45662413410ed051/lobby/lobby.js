@@ -1601,6 +1601,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         drawTabs(); drawChan(); drawMessageRecovery();
         drawCommunity(); drawRooms();
         show('chat');
+        if (prev !== key) $('[data-quick]').scrollLeft = 0;
         if (directoryRoom?.dataset.room === key) focusChannelTab(key, { preventScroll: false });
         const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
         const r = room();

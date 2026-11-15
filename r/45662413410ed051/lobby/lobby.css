@@ -86,6 +86,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .window-chrome { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -26px -26px 4px; padding: 12px 18px; border-bottom: 1px solid var(--line); background: #1a211b; color: var(--muted); font: 9px var(--mono); letter-spacing: .05em; border-radius: 6px 6px 0 0; }
 .window-chrome i { display: inline-block; width: 5px; height: 5px; background: var(--lime); margin-right: 6px; }
 .gate-card h2 { font-size: 20px; margin: 0; letter-spacing: -.025em; }
+[data-gate-private-entry] { margin-top: 8px; }
 .nickrow { display: grid; gap: 8px; font: 11px var(--mono); color: var(--muted); }
 .nickbox { display: flex; gap: 8px; }
 .nickbox input { width: 0; flex: 1; font: 14px var(--mono); }
@@ -923,6 +924,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
     min-height: 0;
   }
   [data-invite-quick] .invite-people {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
     min-height: 0;
     margin: 0;
   }
