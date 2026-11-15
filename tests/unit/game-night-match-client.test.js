@@ -190,6 +190,32 @@ describe('Game Night phone wake and history recovery', () => {
     });
 
     it.each([
+        ['ban reason', { code: 1000, reason: 'banned' }, 'banned'],
+        ['room close carrying a ban', { code: 4403, reason: 'banned' }, 'banned'],
+        ['kick code', { code: 4001 }, 'kicked']
+    ])('never enters reconnecting after a lobby %s', async (_, close, reason) => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const active = sockets.at(-1);
+        const priorRequests = issue.mock.calls.length;
+        const priorSockets = sockets.length;
+
+        active.dispatchEvent(new CloseEvent('close', close));
+
+        expect(status).toHaveBeenLastCalledWith('unavailable', reason);
+        expect(status).not.toHaveBeenCalledWith('reconnecting');
+        expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(issue).toHaveBeenCalledTimes(priorRequests);
+        expect(sockets).toHaveLength(priorSockets);
+        expect(status).not.toHaveBeenCalledWith('reconnecting');
+    });
+
+    it.each([
         ['kick', { code: 1008, reason: 'kicked' }, 'kicked'],
         ['ban', { code: 1008, reason: 'banned' }, 'banned']
     ])('ends an offline %s and ignores late private state after coming online', async (_, close, reason) => {
@@ -280,6 +306,38 @@ describe('Game Night phone wake and history recovery', () => {
         await vi.advanceTimersByTimeAsync(600);
         expect(sockets).toHaveLength(priorSockets + 1);
         expect(issue).toHaveBeenCalledTimes(priorRequests + 1);
+    });
+
+    it.each([4403, 1006])('reconnects after an ordinary online %s close with the same seat scope', async code => {
+        const status = vi.fn();
+        const onState = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState, onError: vi.fn() });
+        const scope = { room: '#game-fixture', ref: 'fixture' };
+        client.start(scope);
+        await vi.advanceTimersByTimeAsync(0);
+        const original = sockets.at(-1);
+        ready(original, { snapshots: true });
+        original.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({
+            t: 'snapshot', version: 1, room: scope.room, seq: 1, phase: 'playing', currentMatchId: 'match-fixture',
+            state: { id: 'match-fixture', seat: 'w', match: {} }
+        }) }));
+        const priorRequests = issue.mock.calls.length;
+        original.dispatchEvent(new CloseEvent('close', { code }));
+        expect(status).toHaveBeenLastCalledWith('reconnecting');
+        expect(status.mock.calls.flat()).toContain('reconnecting');
+
+        await vi.advanceTimersByTimeAsync(600);
+        const replacement = sockets.at(-1);
+        expect(replacement).not.toBe(original);
+        expect(issue).toHaveBeenCalledTimes(priorRequests + 1);
+        expect(JSON.parse(issue.mock.calls.at(-1)[1].body)).toEqual(scope);
+        ready(replacement, { snapshots: true });
+        replacement.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({
+            t: 'snapshot', version: 1, room: scope.room, seq: 2, phase: 'playing', currentMatchId: 'match-fixture',
+            state: { id: 'match-fixture', seat: 'w', match: {} }
+        }) }));
+        expect(onState.mock.calls.at(-1)[0].state.seat).toBe('w');
     });
 
     it('waits while the page is hidden and reconnects when it is shown again', async () => {
