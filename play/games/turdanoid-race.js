@@ -187,6 +187,15 @@ function resultReason(a, b, tick) {
     : a.status === 'out' && b.status === 'out' ? 'out' : tick === BRICK_LIMIT_TICKS ? 'time' : null;
 }
 
+// Unseated watchers paint one board. Seat controls (queue contents, pacing, aim, axis) stay on the seated view.
+// The empty queue is the buffer the watcher appends locally; it is not either racer's input queue.
+function publicRunner(racer) {
+  const run = clone(racer.run);
+  delete run.aim;
+  delete run.axis;
+  return { tick: racer.tick, queue: [], run };
+}
+
 export class TurdanoidBrickRace {
   #state;
   #wall;
@@ -259,7 +268,7 @@ export class TurdanoidBrickRace {
     return { version: TURDANOID_RACE_VERSION, game: 'turdanoid', id, seed, startsAt, at: now, tick,
       endsAt: startsAt + duration - ACTION_INPUT_BUFFER_MS, phase: result ? 'finished' : now < startsAt ? 'countdown' : 'play',
       result: result ? { ...result } : null, wall: { name: this.#wall.name, total: this.#wall.total },
-      runner: clone(racers[seat === 'b' ? 'b' : 'a']),
+      runner: seats.includes(seat) ? clone(racers[seat]) : publicRunner(racers.a),
       players: mapSeats(position => {
         const { status, lives, broken, score } = racers[position].run;
         return { status, lives, broken, score };
