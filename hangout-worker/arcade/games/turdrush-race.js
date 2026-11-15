@@ -73,6 +73,13 @@ function packRacer(racer) {
   };
 }
 
+// Unseated watchers paint one runner. Seat controls (queue, sequence, credits, pending) stay on the seated view.
+// The empty queue is the buffer the watcher appends locally; it is not either racer's input queue.
+function publicRunner(racer) {
+  const { tick, status, run } = packRacer(racer);
+  return { tick, status, queue: [], run };
+}
+
 export function unpackRushRacer(receipt) {
   const racer = clone(receipt);
   racer.run.entities = racer.run.entities.map(([id, kind, lane, at]) => ({ id, kind: kinds[kind], lane, at }));
@@ -188,7 +195,8 @@ export class TurdRushRace {
     return {
       version: TURD_RUSH_RACE_VERSION, game: 'turdrush', id, seed, startsAt, at: now, tick, course: RUSH_COURSE_METRES,
       phase: result ? 'finished' : now < startsAt ? 'countdown' : 'play',
-      result: result ? { ...result } : null, runner: packRacer(racers[seat === 'b' ? 'b' : 'a']),
+      result: result ? { ...result } : null,
+      runner: seats.includes(seat) ? packRacer(racers[seat]) : publicRunner(racers.a),
       players: mapSeats(position => {
         const { run, status } = racers[position];
         return { status, distance: run.distance, picks: run.picks };
