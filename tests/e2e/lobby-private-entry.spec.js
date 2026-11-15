@@ -76,6 +76,8 @@ for (const { width, status } of [{ width: 375, status: 401 }, { width: 390, stat
             await expect(page.locator('[data-gate]')).toBeVisible();
             if (status === 401) {
                 await expect(entry).toBeVisible(); await expect(entry).toHaveAttribute('href', '/beta/');
+                await expect(entry).toBeInViewport({ ratio: 1 });
+                await expect(entry).toHaveAccessibleDescription('Your private access needs renewal. Reopen your invitation link or enter its code.');
                 await entry.focus(); await expect(entry).toBeFocused(); await contained(page, entry);
                 await page.screenshot({ path: testInfo.outputPath(`private-entry-renewal-${width}.png`) });
                 await entry.press('Enter'); await expect(page).toHaveURL(baseURL + '/beta/');
