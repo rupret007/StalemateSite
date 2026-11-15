@@ -11,6 +11,7 @@ const mobile = css.slice(mobileStart, css.indexOf('@media (prefers-reduced-motio
 describe('Turdanoid phone layout contract', () => {
     it('uses a viewport bounded play surface with visible return and launch controls', () => {
         expect(mobile).toMatch(/\.arcade-brick-race\[open\]:has\(\[data-brick-match\]:not\(\[hidden\]\)\)[\s\S]*?position: fixed;[\s\S]*?inset: 0;[\s\S]*?height: 100dvh;/);
+        expect(css).toMatch(/\.brick-race-actions:has\(\[data-brick-back\]:not\(\[hidden\]\)\)\s*\{[^}]*display: flex/);
         expect(mobile).toMatch(/\.brick-race-actions \.btn\s*\{[^}]*min-height: 44px/);
         expect(mobile).toMatch(/\.brick-race-rail \[data-brick-serve\]\s*\{[^}]*grid-column: 1 \/ -1/);
         expect(mobile).toMatch(/\.brick-race-help\s*\{[^}]*position: static/);
