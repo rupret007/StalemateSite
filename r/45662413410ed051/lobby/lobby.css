@@ -390,8 +390,6 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 @media (max-width: 900px) and (max-height: 720px) {
   .arcade-spades [data-spades-bid]:not([hidden]) { display: flex; }
   .arcade-spades [data-spades-bid] :is(select, button) { width: auto; min-width: 44px; }
-  .arcade-spades .arcade-card-hand { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-  .arcade-spades .arcade-card-hand button { min-height: 44px; }
   .spades-trick { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .spades-trick li { padding: 2px 4px; }
   .spades-trick span { font-size: .66rem; }
@@ -399,6 +397,12 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .arcade-spades [data-spades-table][data-phase="bid"]:not([data-watching]) .arcade-card-hand-label {
     display: none;
   }
+}
+@media (min-width: 601px) and (max-width: 900px) and (max-height: 720px) {
+  /* Seven columns only when each card still clears 44px. Phones at 600px and
+     below keep the four-column hand from the narrow rule above. */
+  .arcade-spades .arcade-card-hand { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .arcade-spades .arcade-card-hand button { min-height: 44px; }
 }
 .jack-dealer, .jack-hand { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 5px 0; }
 .jack-dealer > b, .jack-hand > b { min-width: 75px; }

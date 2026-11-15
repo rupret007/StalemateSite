@@ -60,9 +60,10 @@ function finishMatch(table, subject) {
     expect(table.command(subject, { version: match.version, id: match.id, revision: match.revision, action: 'resign' }).ok).toBe(true);
 }
 
-function installPhoneStyles() {
-    // jsdom does not resolve media queries. Apply the rules active at 390×844
-    // so computed styles can drive the bounds checks below.
+function installPhoneStyles(width = phoneWidth, height = phoneHeight) {
+    // jsdom does not resolve media queries. Flatten every block that matches
+    // this viewport, later blocks included, so computed style is the cascade.
+    document.querySelectorAll('[data-phone-cascade]').forEach(node => node.remove());
     const css = readFileSync(join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
     const source = document.createElement('style');
     source.textContent = css;
@@ -73,14 +74,31 @@ function installPhoneStyles() {
         if (/prefers-|pointer:|orientation:/.test(condition)) return [];
         const dimensions = [...condition.matchAll(/(min|max)-(width|height):\s*(\d+)px/g)];
         if (dimensions.some(([, limit, axis, value]) =>
-            limit === 'min' ? (axis === 'width' ? phoneWidth : phoneHeight) < Number(value)
-                : (axis === 'width' ? phoneWidth : phoneHeight) > Number(value))) return [];
+            limit === 'min' ? (axis === 'width' ? width : height) < Number(value)
+                : (axis === 'width' ? width : height) > Number(value))) return [];
         return active(rule.cssRules);
     });
     const flattened = document.createElement('style');
+    flattened.dataset.phoneCascade = '';
     flattened.textContent = active(source.sheet.cssRules).join('\n');
     source.remove();
     document.head.append(flattened);
+}
+
+function effectiveHand(width, height) {
+    installPhoneStyles(width, height);
+    const view = mount();
+    view.panel.hidden = false;
+    view.panel.open = true;
+    view.find('[data-spades-table]').hidden = false;
+    const button = document.createElement('button');
+    button.type = 'button';
+    view.find('[data-spades-hand]').append(button);
+    return {
+        columns: getComputedStyle(view.find('[data-spades-hand]')).gridTemplateColumns,
+        minHeight: parseFloat(getComputedStyle(button).minHeight),
+        trick: getComputedStyle(view.find('[data-spades-trick]')).gridTemplateColumns
+    };
 }
 
 function assertPhoneLayout(view, phase) {
@@ -415,6 +433,21 @@ describe('Spades phone table', () => {
         expect(compactControls).toMatch(/\.arcade-spades summary\s*\{\s*min-height:\s*44px/);
         expect(compactControls).toMatch(/\.game-night :is\(\.arcade-eights, \.arcade-rummy, \.arcade-spades, \.arcade-jack\) :is\(\.btn, select\)\s*\{[^}]*min-width:\s*44px[^}]*min-height:\s*44px/);
         expect(phone).toMatch(/\.arcade-spades \[data-spades-bid\]\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\)/);
+        // The 600px block alone is not the cascade: a later short-screen query
+        // used to replace the hand with seven columns on phones that are also
+        // <=720px tall. Resolve every matching media block in source order.
+        for (const [width, height] of [[320, 568], [360, 640], [375, 667], [390, 844], [600, 720]]) {
+            document.body.replaceChildren();
+            const hand = effectiveHand(width, height);
+            expect(hand.columns, `${width}×${height} hand`).toContain('repeat(4, minmax(0, 1fr))');
+            expect(hand.columns, `${width}×${height} hand`).not.toContain('repeat(7');
+            expect(hand.minHeight, `${width}×${height} card min-height`).toBeGreaterThanOrEqual(44);
+            expect(hand.trick, `${width}×${height} trick`).toContain('repeat(2, minmax(0, 1fr))');
+        }
+        document.body.replaceChildren();
+        const wideShort = effectiveHand(601, 720);
+        expect(wideShort.columns, '601×720 hand').toContain('repeat(7, minmax(0, 1fr))');
+        expect(parseFloat(String(wideShort.minHeight)), '601×720 card min-height').toBeGreaterThanOrEqual(44);
     });
 
     it.each(['partners', 'four'])('measures bid, play, rematch and reconnect at 390×844 in %s mode', mode => {
