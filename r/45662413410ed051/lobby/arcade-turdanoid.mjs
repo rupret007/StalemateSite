@@ -346,8 +346,19 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (room <= 0) return;
         panel.scrollTop += Math.min(room, Math.ceil(overlap));
     }
-    addEventListener('resize', clearLaunchFromTabs);
-    addEventListener('orientationchange', clearLaunchFromTabs);
+    let listeningForViewport = false;
+    function addViewportListeners() {
+        if (listeningForViewport) return;
+        addEventListener('resize', clearLaunchFromTabs);
+        addEventListener('orientationchange', clearLaunchFromTabs);
+        listeningForViewport = true;
+    }
+    function removeViewportListeners() {
+        if (!listeningForViewport) return;
+        removeEventListener('resize', clearLaunchFromTabs);
+        removeEventListener('orientationchange', clearLaunchFromTabs);
+        listeningForViewport = false;
+    }
 
     startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
@@ -470,6 +481,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     });
 
     function reset() {
+        removeViewportListeners();
         client.stop();
         backRequested = false;
         returnAfterLeave = false;
@@ -490,6 +502,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     }, true);
     panel.addEventListener('toggle', () => {
         if (!panel.open || !scope) { reset(); return; }
+        addViewportListeners();
         for (const other of container.querySelectorAll(':scope > details[open]')) if (other !== panel) other.open = false;
         container.scrollTop = 0;
         client.start(scope);
@@ -499,6 +512,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         isOpen: () => panel.open,
         open() {
             if (!scope) return;
+            addViewportListeners();
             panel.open = true;
             return panel;
         },

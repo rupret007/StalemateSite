@@ -108,6 +108,34 @@ function mountRace() {
 }
 
 describe('Turdanoid phone exit flow', () => {
+    it('keeps one viewport listener after two mount and reset cycles', () => {
+        const active = { resize: new Set(), orientationchange: new Set() };
+        const addOriginal = window.addEventListener.bind(window);
+        const removeOriginal = window.removeEventListener.bind(window);
+        const add = vi.spyOn(window, 'addEventListener').mockImplementation((type, listener, ...options) => {
+            if (type in active) active[type].add(listener);
+            return addOriginal(type, listener, ...options);
+        });
+        const remove = vi.spyOn(window, 'removeEventListener').mockImplementation((type, listener, ...options) => {
+            if (type in active) active[type].delete(listener);
+            return removeOriginal(type, listener, ...options);
+        });
+        try {
+            for (let cycle = 0; cycle < 2; cycle++) {
+                const view = mountRace();
+                view.api.panel.dispatchEvent(new Event('toggle'));
+                expect(active.resize.size).toBe(1);
+                expect(active.orientationchange.size).toBe(1);
+                view.api.setRoom({ room: `room-${cycle}`, ref: 'ref', actor: 'actor' });
+                expect(active.resize.size).toBe(0);
+                expect(active.orientationchange.size).toBe(0);
+            }
+        } finally {
+            add.mockRestore();
+            remove.mockRestore();
+        }
+    });
+
     it('Back confirms an open seat, then returns to the lobby once the seat is gone', () => {
         const view = mountRace();
         view.publish(view.waiting);
