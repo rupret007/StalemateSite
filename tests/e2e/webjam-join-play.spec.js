@@ -635,6 +635,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
             Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
                 configurable: true, value: async constraints => {
                     window.cameraChecks.push({ video: !!constraints.video, audio: !!constraints.audio });
+                    await new Promise(resolve => { window.finishCameraPrompt = resolve; });
                     throw new DOMException('Synthetic camera refusal', 'NotAllowedError');
                 },
             });
@@ -707,8 +708,19 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await expect(camera).toBeInViewport({ ratio: 1 });
         expect(issuance).toBe(2);
         expect(await page.evaluate(() => window.cameraChecks)).toEqual([]);
-        await camera.press('Enter');
+        await camera.focus();
+        await expect(camera).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(camera).toHaveAttribute('aria-disabled', 'true');
+        await expect(camera).toBeFocused();
+        await expect(stop).toBeInViewport({ ratio: 1 });
+        await page.keyboard.press('Enter');
+        expect(await page.evaluate(() => window.cameraChecks)).toEqual([{ video: true, audio: false }]);
+        await page.screenshot({ path: testInfo.outputPath(`private-camera-permission-pending-${width}x${height}.png`) });
+
+        await page.evaluate(() => window.finishCameraPrompt());
         await expect(page.locator('[data-video-status]')).toContainText('Camera access was blocked');
+        await expect(room.getByRole('button', { name: 'Try again', exact: true })).toBeFocused();
         await expect(stop).toBeInViewport({ ratio: 1 });
         expect(await page.evaluate(() => window.cameraChecks)).toEqual([{ video: true, audio: false }]);
         expect(await page.evaluate(() => window.musicConnected)).toBe(true);
