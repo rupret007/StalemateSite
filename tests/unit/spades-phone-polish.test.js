@@ -417,6 +417,24 @@ describe('Spades phone table', () => {
         }
     });
 
+    it('gives desktop Spades game-over rematch controls at least 44px at 1440×900', () => {
+        installPhoneStyles(1440, 900);
+        const view = mount();
+        view.panel.hidden = false;
+        view.panel.open = true;
+        view.find('[data-spades-table]').hidden = false;
+        view.find('[data-spades-rematch-actions]').hidden = false;
+        for (const selector of ['[data-spades-rematch-vote]', '[data-spades-start-rematch]']) {
+            const button = view.find(selector);
+            button.hidden = false;
+            button.removeAttribute('style');
+            expect(parseFloat(getComputedStyle(button).minHeight), selector).toBeGreaterThanOrEqual(44);
+        }
+        const resign = view.find('[data-spades-action="resign"]');
+        resign.hidden = false;
+        expect(parseFloat(getComputedStyle(resign).minHeight)).toBe(38);
+    });
+
     it('picks Spades hand columns from the full phone cascade and keeps trick columns', () => {
         const css = readFileSync(join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
         const phone = css.slice(css.indexOf('@media (max-width: 600px)'), css.indexOf('@media (max-width: 900px)', css.indexOf('@media (max-width: 600px)')));
