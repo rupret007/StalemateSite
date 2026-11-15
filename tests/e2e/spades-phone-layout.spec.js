@@ -258,7 +258,7 @@ test.describe('partners Spades at 390×844', () => {
             const lock = west.getByRole('button', { name: 'Lock bid', exact: true });
             await boxAtLeast44(lock);
 
-            const reconnect = west.locator('.arcade-reconnect');
+            const reconnect = west.locator('details', { has: west.locator('[data-spades-status]') }).locator('.arcade-reconnect');
             await west.context().setOffline(true);
             await expect(reconnect).toBeVisible();
             await expect(reconnect).toHaveText('Reconnecting…');
@@ -345,17 +345,17 @@ test.describe('four-player Spades at 390×844', () => {
                 await noHorizontalOverflow(page);
             }
 
-            await expect(south.locator('[data-spades-status]')).toHaveText('Round 1 · Your bid · tap Bid for me');
+            await expect(west.locator('[data-spades-status]')).toHaveText('Round 1 · Your bid · tap Bid for me');
             await expect(south.locator('[data-spades-trick-summary]')).toHaveText('Bids · no cards played yet');
-            const bid = south.getByRole('button', { name: 'Bid for me', exact: true });
+            const bid = west.getByRole('button', { name: 'Bid for me', exact: true });
             const card = south.locator('[data-spades-card]:enabled').first();
             await boxAtLeast44(bid);
             await boxAtLeast44(card);
 
-            // Every player bids in turn; South, who begins the round, can play
-            // once the bidding phase ends.
+            // Bidding begins clockwise after the dealer (South), then continues
+            // through North and East before South leads the first trick.
             await bid.click();
-            for (const page of [west, north, east]) {
+            for (const page of [north, east, south]) {
                 const bidForMe = page.getByRole('button', { name: 'Bid for me', exact: true });
                 await expect(bidForMe).toBeVisible();
                 await bidForMe.click();
