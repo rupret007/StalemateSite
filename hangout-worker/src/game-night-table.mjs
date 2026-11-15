@@ -205,7 +205,7 @@ export function createGameNightTable({
             // while the table is still closed, so the line can take it.
             this.#releaseWatchSeats(watchers);
             this.#closed = false;
-            this.#admitNext(connected);
+            this.#admitNext(connected, watchers);
             const occupied = this.#occupied();
             const match = occupied.length >= minSeats ? create(id, now, occupied) : null;
             this.#id = id;
@@ -239,7 +239,7 @@ export function createGameNightTable({
                 .filter(side => !skipping.has(this.#seats[side]));
             if (!force && (!online.length || !online.every(side => this.#votes.includes(side)))) return false;
             this.#releaseWatchSeats(watchers);
-            this.#admitNext(connected);
+            this.#admitNext(connected, watchers);
             const match = create(nextId, now, this.#occupied());
             this.#id = nextId;
             this.#match = match;
@@ -249,17 +249,37 @@ export function createGameNightTable({
 
         #online(connected, subject) { return !connected || connected.has(subject); }
 
-        // Fill only open seats from the line. A seated player keeps the same seat
-        // on a rematch, including one who lost signal (#585 same-seat recovery);
-        // anyone still waiting stays in line for the next open seat. A watch-only
-        // seat is cleared by the caller before this runs, so the line can take it.
-        #admitNext(connected) {
-            const waiting = this.#next.filter(subject => this.#online(connected, subject) && !this.seat(subject));
+        // Fill open seats from the line. A connected seated player keeps the same
+        // seat on a rematch (#585). An offline seat may be yielded so a connected
+        // guest in line can sit without displacing anyone still connected.
+        // A stored watch-only seat is not yielded here. The caller clears it first,
+        // and only between matches (#watchSeat), so the line can take that seat.
+        // A watch-only subject stays out of the line, is never seated, and so
+        // never receives a hand.
+        #admitNext(connected, watchers = []) {
+            const watch = new Set(watchers || []);
+            for (const subject of watch) this.dequeue(subject);
+            const waiting = this.#next.filter(subject => this.#online(connected, subject) && !this.seat(subject) && !watch.has(subject));
             if (!waiting.length) {
-                if (connected) this.#next = this.#next.filter(subject => connected.has(subject) && !this.seat(subject));
+                if (connected) this.#next = this.#next.filter(subject => connected.has(subject) && !this.seat(subject) && !watch.has(subject));
                 return;
             }
             const open = sides.filter(seat => seat !== first && !this.#seats[seat]);
+            const displaced = [];
+            const yieldSeat = seat => {
+                if (seat === first || open.includes(seat)) return;
+                const subject = this.#seats[seat];
+                if (!subject || watch.has(subject)) return;
+                this.#seats[seat] = null;
+                open.push(seat);
+                if (this.#online(connected, subject)) displaced.push(subject);
+            };
+            if (connected) {
+                for (const seat of [...sides].reverse()) {
+                    if (open.length >= waiting.length) break;
+                    if (this.#seats[seat] && !connected.has(this.#seats[seat])) yieldSeat(seat);
+                }
+            }
             open.sort((left, right) => sides.indexOf(left) - sides.indexOf(right));
             const leftover = [];
             for (const subject of waiting) {
@@ -267,7 +287,7 @@ export function createGameNightTable({
                 if (seat) this.#seats[seat] = subject;
                 else leftover.push(subject);
             }
-            this.#next = leftover.filter(subject => !this.seat(subject));
+            this.#next = [...leftover, ...displaced].filter(subject => !this.seat(subject) && !watch.has(subject));
         }
     };
 }
