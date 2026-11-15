@@ -62,13 +62,14 @@ export function placeArcadePanelInLobbyOrder(container, panel, game) {
         const selector = arcadeLobbyPanelSelector(GAME_NIGHT_LOBBY_ORDER[i]);
         const later = selector ? container.querySelector(`:scope > ${selector}`) : null;
         if (later && later !== panel) {
-            container.insertBefore(panel, later);
+            if (panel.nextElementSibling !== later) container.insertBefore(panel, later);
             return;
         }
     }
     const gameCall = container.querySelector(':scope > .game-call');
-    if (gameCall && gameCall !== panel) container.insertBefore(panel, gameCall);
-    else if (panel.parentElement !== container) container.append(panel);
+    if (gameCall && gameCall !== panel) {
+        if (panel.nextElementSibling !== gameCall) container.insertBefore(panel, gameCall);
+    } else if (panel.parentElement !== container) container.append(panel);
 }
 
 const matchId = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;

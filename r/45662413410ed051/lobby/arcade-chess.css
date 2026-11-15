@@ -113,7 +113,7 @@
 @media (min-width: 901px) {
     .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) {
         display: grid;
-        grid-template: "chess heading" auto "chess actions" auto "chess eights" auto "chess rummy" auto "chess spades" auto "chess jack" auto "chess tris" auto "chess mania" auto "chess rush" auto "chess brick" auto "chess call" 1fr /
+        grid-template: "chess heading" auto "chess actions" auto "chess spades" auto "chess brick" auto "chess eights" auto "chess rummy" auto "chess jack" auto "chess tris" auto "chess mania" auto "chess rush" auto "chess call" 1fr /
             minmax(0, 30rem) minmax(0, 1fr);
         gap: .6rem 1rem;
         align-items: start;
