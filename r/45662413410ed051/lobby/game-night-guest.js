@@ -182,6 +182,8 @@ join.addEventListener('click', event => {
 function offerFreshLink() {
     if (!askHost) return;
     askHost.hidden = false;
+    askHost.style.minHeight = '44px';
+    askHost.style.minWidth = '44px';
     askHost.textContent = FRESH_LINK;
 }
 
