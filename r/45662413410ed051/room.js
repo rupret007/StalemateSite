@@ -73,7 +73,15 @@
     };
     win.__hangout = app; // test hook, read-only use
 
-    function say(text) { ui.status.textContent = text; }
+    function outageStatus(text) {
+        return /Lost the room|Reconnecting|Offline|Couldn’t connect/.test(text);
+    }
+    function say(text) {
+        // The browser can be offline while a loopback socket still looks open.
+        // Keep the status line on the outage instead of a stale "you're in".
+        if (navigator.onLine === false && !outageStatus(text)) return;
+        ui.status.textContent = text;
+    }
     function setGate(text) { ui.gateStatus.textContent = text; }
 
     /* Private reports are deliberately outside chat state, encrypted snapshots,
@@ -394,6 +402,7 @@
     }
 
     let reconnectTimer;
+    let sawOffline = false;
     function syncNotice(text, retry = false) {
         ui.syncStatus.textContent = text;
         ui.syncStatus.hidden = !text;
@@ -657,6 +666,15 @@
             ui.log.replaceChildren();
             cancelRecovery();
             app.lastClose = event.code;
+            // The browser is already offline. Wait for online instead of burning
+            // the retry budget on sockets that cannot leave the machine.
+            if (app.myId && event.code !== 4429 && event.code < 4400 && navigator.onLine === false) {
+                sawOffline = true;
+                say('Lost the room for a sec. Reconnecting…');
+                app.av.peers.clear();
+                Array.from(app.av.pcs.keys()).forEach(closePc);
+                return;
+            }
             // Dropped mid-hang (Wi-Fi blip, phone switching networks): retry a few times with backoff.
             if (app.myId && event.code !== 4429 && event.code < 4400 && app.retries < 5) {
                 app.retries += 1;
@@ -1875,7 +1893,13 @@
             pc.onconnectionstatechange = () => {
                 if (!current()) return;
                 const s = pc.connectionState;
-                if (s === 'connected') { entry.restarts = 0; checkRelay(id, entry); layout(); }
+                if (s === 'connected') {
+                    entry.restarts = 0;
+                    checkRelay(id, entry);
+                    layout();
+                    if (navigator.onLine !== false && /^Reconnecting to /.test(ui.status.textContent)
+                        && [...app.av.pcs.values()].every((item) => item.pc.connectionState === 'connected')) say('Back in.');
+                }
                 if (s === 'disconnected') win.setTimeout(() => { if (pc.connectionState === 'disconnected') restartIce(id, entry); }, 3000);
                 if (s === 'failed') restartIce(id, entry);
             };
@@ -1895,6 +1919,10 @@
     /* Reconnect: ICE restart a few times, then give up on that one face politely. */
     function restartIce(id, entry) {
         if (app.av.pcs.get(id) !== entry) return;
+        if (navigator.onLine === false) {
+            say('Lost the room for a sec. Reconnecting…');
+            return;
+        }
         entry.restarts += 1;
         if (entry.restarts > 3) {
             say(`Couldn’t connect faces with ${peerName(id)}. Chat and draw still work.`);
@@ -1904,6 +1932,28 @@
         say(`Reconnecting to ${peerName(id)}…`);
         try { entry.pc.restartIce(); } catch (error) { /* old browser */ }
     }
+
+    // Offline is a real outage even when a loopback socket has not closed yet.
+    win.addEventListener('offline', () => {
+        if (app.ended || !app.myId) return;
+        sawOffline = true;
+        say('Lost the room for a sec. Reconnecting…');
+    });
+    win.addEventListener('online', () => {
+        if (!sawOffline || app.ended || !app.myId) return;
+        sawOffline = false;
+        clearTimeout(reconnectTimer);
+        if (!app.connected || !app.ws || app.ws.readyState !== 1) {
+            app.retries = 0;
+            connect();
+            return;
+        }
+        for (const [id, entry] of app.av.pcs) {
+            if (entry.pc.connectionState === 'closed') continue;
+            entry.restarts = 0;
+            restartIce(id, entry);
+        }
+    });
 
     async function checkRelay(id, entry) {
         try {

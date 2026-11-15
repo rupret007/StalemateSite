@@ -858,6 +858,124 @@ test('outbound generation: delayed camera encryption cannot publish through a re
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });
 
+test('a peer offline for 8s returns playing video and audio to every peer with no ghost tile', async ({ browser }) => {
+    test.setTimeout(120000);
+    const host = await openBrowser(browser);
+    const guest = await openBrowser(browser);
+    const dropped = await openBrowser(browser);
+    const honestOutage = (text) => /Lost the room|Reconnecting|Offline|Couldn’t connect/i.test(text)
+        && !/Back in|Video’s back|recovered/i.test(text);
+    const inboundFrom = (page, peerId) => page.evaluate(async (id) => {
+        const tile = document.querySelector(`[data-tile="${CSS.escape(id)}"]`);
+        const video = tile?.querySelector('video') || null;
+        const tiles = [...document.querySelectorAll('[data-tiles] [data-tile]')].map((node) => node.dataset.tile);
+        const tracks = video?.srcObject?.getTracks?.() || [];
+        const videoTrack = tracks.find((track) => track.kind === 'video');
+        const audioTrack = tracks.find((track) => track.kind === 'audio');
+        const entry = window.__hangout?.av?.pcs?.get(id);
+        const bytes = async () => {
+            const result = { video: 0, audio: 0 };
+            if (!entry || entry.pc.connectionState === 'closed') return result;
+            try {
+                (await entry.pc.getStats()).forEach((row) => {
+                    if (row.type !== 'inbound-rtp') return;
+                    if (row.kind === 'video') result.video = row.bytesReceived || 0;
+                    if (row.kind === 'audio') result.audio = row.bytesReceived || 0;
+                });
+            } catch (_) { /* closed while reading */ }
+            return result;
+        };
+        const started = video ? video.currentTime : 0;
+        const before = await bytes();
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const after = await bytes();
+        const live = (track) => Boolean(track && track.readyState === 'live' && track.enabled && !track.muted);
+        return {
+            tiles,
+            playing: Boolean(video && !video.paused && video.readyState >= 2 && video.videoWidth > 0 && video.currentTime > started
+                && live(videoTrack) && live(audioTrack) && after.video > before.video && after.audio > before.audio)
+        };
+    }, peerId);
+    try {
+        await join(host, roomUrl(), 'Jeff');
+        await join(guest, host.url(), 'Karen');
+        await join(dropped, host.url(), 'Pat');
+        await expect(host.locator('[data-peers]')).toContainText('3 here');
+        for (const page of [host, guest, dropped]) {
+            await camOn(page);
+            await micOn(page);
+        }
+        const ids = {
+            host: await host.evaluate(() => window.__hangout.myId),
+            guest: await guest.evaluate(() => window.__hangout.myId),
+            dropped: await dropped.evaluate(() => window.__hangout.myId)
+        };
+        await expect.poll(async () => {
+            const hostSeesGuest = await inboundFrom(host, ids.guest);
+            const hostSeesDropped = await inboundFrom(host, ids.dropped);
+            const guestSeesHost = await inboundFrom(guest, ids.host);
+            const guestSeesDropped = await inboundFrom(guest, ids.dropped);
+            const droppedSeesHost = await inboundFrom(dropped, ids.host);
+            const droppedSeesGuest = await inboundFrom(dropped, ids.guest);
+            return hostSeesGuest.playing && hostSeesDropped.playing && guestSeesHost.playing
+                && guestSeesDropped.playing && droppedSeesHost.playing && droppedSeesGuest.playing;
+        }, { timeout: 20000 }).toBe(true);
+
+        await dropped.context().setOffline(true);
+        const samples = [];
+        const until = Date.now() + 8000;
+        while (Date.now() < until) {
+            samples.push(await dropped.evaluate(() => ({
+                status: document.querySelector('[data-status]').textContent,
+                onLine: navigator.onLine,
+                connected: window.__hangout.connected,
+                ws: window.__hangout.ws?.readyState ?? null,
+                ice: [...window.__hangout.av.pcs.values()].map((entry) => entry.pc.connectionState)
+            })));
+            const pause = Math.min(1000, until - Date.now());
+            if (pause > 0) await dropped.waitForTimeout(pause);
+        }
+        const during = samples.slice(1).map((sample) => sample.status);
+        expect(during.length).toBeGreaterThan(0);
+        expect(during.every(honestOutage), `status during outage: ${JSON.stringify(samples)}`).toBe(true);
+        await dropped.context().setOffline(false);
+
+        await expect.poll(async () => {
+            const recoveredId = await dropped.evaluate(() => window.__hangout.myId);
+            if (!recoveredId) return false;
+            const views = await Promise.all([
+                inboundFrom(host, recoveredId),
+                inboundFrom(guest, recoveredId),
+                inboundFrom(dropped, ids.host),
+                inboundFrom(dropped, ids.guest)
+            ]);
+            const tiles = await Promise.all([host, guest, dropped].map((page) => page.evaluate(() => (
+                [...document.querySelectorAll('[data-tiles] [data-tile]')].map((node) => node.dataset.tile)
+            ))));
+            const live = {
+                host: [ids.guest, recoveredId],
+                guest: [ids.host, recoveredId],
+                dropped: [ids.host, ids.guest]
+            };
+            const noGhost = tiles.every((list, index) => {
+                const who = ['host', 'guest', 'dropped'][index];
+                const expected = new Set(['me', ...live[who]]);
+                return list.length === expected.size && list.every((id) => expected.has(id))
+                    && (recoveredId === ids.dropped || !list.includes(ids.dropped));
+            });
+            return views.every((view) => view.playing) && noGhost;
+        }, { timeout: 20000 }).toBe(true);
+        expect(host.errors.concat(guest.errors, dropped.errors)).toEqual([]);
+    } finally {
+        const diagnostic = {
+            host: await captureRtcDiagnostics(host),
+            guest: await captureRtcDiagnostics(guest),
+            dropped: await captureRtcDiagnostics(dropped)
+        };
+        await test.info().attach('network-drop-diagnostics', { body: JSON.stringify(diagnostic), contentType: 'application/json' });
+    }
+});
+
 test('outbound generation: reconnect drops paced camera state while preserving one queued chat', async ({ browser }) => {
     const host = await openBrowser(browser);
     await join(host, roomUrl(), 'Jeff');
