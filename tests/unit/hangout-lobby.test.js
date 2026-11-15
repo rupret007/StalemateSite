@@ -1165,6 +1165,9 @@ it('replaces a generated Jam name rejected by moderation and keeps the room priv
     expect(got(host).findLast(frame => frame.t === 'join').ch).toMatchObject({
         name: '#jam-happy-tree-1acbxef23', kind: 'jam', modes: { i: true }
     });
+    cmd(host, 'jamopen', ['#jam-happy-tree-2bcaxed34']);
+    expect(notices(host)).toContain('One new room per 10 minutes');
+    expect(got(host).filter(frame => frame.t === 'join' && frame.ch.kind === 'jam')).toHaveLength(1);
 });
 
 describe('Game Night', () => {
