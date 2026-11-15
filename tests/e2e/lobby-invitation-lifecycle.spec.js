@@ -637,7 +637,7 @@ test('Game Night keeps invitations actionable and offers a safe return after a d
     }
 });
 
-for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) test(`an Art host can invite directly from the room at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }, { width: 375, height: 812 }]) test(`an Art host can invite directly from the room at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
     const fixture = await community(browser, baseURL);
     try {
         const host = await fixture.visitor('ArtHost', viewport, false, 'rad-dad');
@@ -671,6 +671,31 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
         await invite.press('Enter');
         await recipient.press('Enter');
         await expect(join).toBeInViewport({ ratio: 1 });
+        if (viewport.width === 375) {
+            await guest.evaluate(target => {
+                const socket = window.__lobby.ws;
+                const send = socket.send;
+                socket.send = function (body) {
+                    const frame = JSON.parse(body);
+                    if (frame.t === 'cmd' && frame.name === 'join' && frame.args[0] === target) {
+                        socket.send = send;
+                        return;
+                    }
+                    return send.call(this, body);
+                };
+            }, room);
+            await join.press('Enter');
+            await expect(join).toHaveAttribute('aria-disabled', 'true');
+            await guest.clock.fastForward(8200);
+            await expect(join).toHaveAccessibleDescription(/wasn’t confirmed/);
+            await expect(join).toBeFocused();
+            const dismiss = panel.getByRole('button', { name: 'Not now', exact: true });
+            await expect(join).toBeInViewport({ ratio: 1 });
+            await expect(dismiss).toBeInViewport({ ratio: 1 });
+            await expect(guest.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+            expect(Math.abs((await join.boundingBox()).y - (await dismiss.boundingBox()).y)).toBeLessThanOrEqual(1);
+            await guest.screenshot({ path: testInfo.outputPath('art-invite-retry-actions-375.png') });
+        }
         await join.press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
         await expect(guest.locator('[data-act-canvas]')).toBeVisible();
