@@ -1,5 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
+test.use({ video: 'off' });
+
 test('the packaged website explains when browser audio is unavailable', async ({ page, baseURL }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => { window.AudioContext = undefined; });
@@ -623,3 +625,99 @@ test('capture arriving after Leave releases only its own tracks during the next 
   await expect.poll(() => page.evaluate(() => captureTracks.every(track => track.readyState === 'ended'))).toBe(true);
   await expect.poll(() => page.evaluate(() => audioContexts.every(context => context.state === 'closed'))).toBe(true);
 });
+
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`private Web Join keeps music usable when camera setup is unavailable at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        await page.addInitScript(() => {
+            window.cameraChecks = [];
+            window.musicConnected = false;
+            Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
+                configurable: true, value: async constraints => {
+                    window.cameraChecks.push({ video: !!constraints.video, audio: !!constraints.audio });
+                    throw new DOMException('Synthetic camera refusal', 'NotAllowedError');
+                },
+            });
+        });
+        let admittedRelay = false;
+        let issuance = 0;
+        let unexpectedNetwork = 0;
+        await page.route('**/*', async route => {
+            const url = new URL(route.request().url());
+            if (url.origin === baseURL) return route.continue();
+            if (url.pathname === '/turn-credentials' && route.request().method() === 'OPTIONS') {
+                return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': baseURL,
+                    'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' } });
+            }
+            if (url.pathname !== '/turn-credentials' || route.request().method() !== 'POST') {
+                unexpectedNetwork++;
+                return route.abort();
+            }
+            expect(route.request().postDataJSON().client).toBe('web-video');
+            issuance++;
+            return route.fulfill({
+                status: admittedRelay ? 200 : 503,
+                headers: { 'Access-Control-Allow-Origin': baseURL },
+                json: { client: 'web-video', quota_bytes: 64 * 1024 * 1024, ttl: 600, iceServers: [
+                    { urls: 'turn:turn.cloudflare.com:3478?transport=udp', username: 'fixture', credential: 'fixture' },
+                ] },
+            });
+        });
+        // The beta Worker response policy has its own signed-session unit
+        // coverage. This browser fixture supplies its enabled header and marker.
+        await page.route(url => url.origin === baseURL && url.pathname === '/join/', async route => {
+            const response = await route.fetch();
+            const html = (await response.text()).replace(
+                '<meta name="webjam-video" content="disabled">', '<meta name="webjam-video" content="private">');
+            await route.fulfill({ response, body: html, headers: { ...response.headers(),
+                'Permissions-Policy': 'camera=(self), geolocation=(), microphone=(self)' } });
+        });
+        // Exercise shipping UI and its real camera code with a local stand-in
+        // for the music transport and relay issuer.
+        await page.route('**/join/session.js', route => route.fulfill({ contentType: 'text/javascript', body: `
+            export class WebJoinSession {
+                constructor({ stream }) { if (stream) throw new Error('Unexpected capture stream'); }
+                async join() {
+                    this.authorized = true;
+                    this.videoBaseline = { latency: 40 };
+                    window.musicConnected = true;
+                }
+                close() { window.musicConnected = false; }
+            }
+        ` }));
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${Buffer.alloc(32, 17).toString('base64url')}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        const room = page.getByRole('region', { name: 'In-room camera', exact: true });
+        await expect(room).toBeHidden();
+        expect(issuance).toBe(0);
+        await page.getByRole('button', { name: 'Join to listen', exact: true }).press('Enter');
+        const stop = room.getByRole('button', { name: 'Leave', exact: true });
+        const retry = room.getByRole('button', { name: 'Retry', exact: true });
+        await expect(retry).toBeInViewport({ ratio: 1 });
+        await expect(stop).toBeFocused();
+        const musicStatus = page.locator('#status');
+        await expect(musicStatus).toHaveText('Listening · microphone off');
+        expect(await musicStatus.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+        expect(await page.evaluate(() => window.cameraChecks)).toEqual([]);
+        await page.screenshot({ path: testInfo.outputPath(`private-camera-unavailable-${width}x${height}.png`) });
+
+        admittedRelay = true;
+        await retry.press('Enter');
+        const camera = room.getByRole('button', { name: 'Show camera', exact: true });
+        await expect(camera).toBeInViewport({ ratio: 1 });
+        expect(issuance).toBe(2);
+        expect(await page.evaluate(() => window.cameraChecks)).toEqual([]);
+        await camera.press('Enter');
+        await expect(page.locator('[data-video-status]')).toContainText('Camera access was blocked');
+        await expect(stop).toBeInViewport({ ratio: 1 });
+        expect(await page.evaluate(() => window.cameraChecks)).toEqual([{ video: true, audio: false }]);
+        expect(await page.evaluate(() => window.musicConnected)).toBe(true);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        await page.screenshot({ path: testInfo.outputPath(`private-camera-denied-${width}x${height}.png`) });
+        await stop.press('Enter');
+        await expect(room).toBeHidden();
+        await expect(page.locator('#status')).toBeFocused();
+        expect(await page.evaluate(() => window.musicConnected)).toBe(false);
+        expect(unexpectedNetwork).toBe(0);
+    });
+}
