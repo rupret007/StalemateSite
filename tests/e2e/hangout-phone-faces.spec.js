@@ -1,4 +1,4 @@
-// Hang Out room phone faces: viewport fit for 2–4 people at 375×667 and 390×664.
+// Hang Out room phone faces: viewport fit for 2–4 people at three phone sizes.
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { test, expect } = require('@playwright/test');
@@ -15,7 +15,8 @@ const KEY = 'local-preview-key-0001';
 const SHOT_DIR = path.join('test-results', 'hangout-phone-faces');
 const VIEWPORTS = [
     { width: 390, height: 664 },
-    { width: 375, height: 667 }
+    { width: 375, height: 667 },
+    { width: 390, height: 844 }
 ];
 
 test.use({
@@ -83,8 +84,10 @@ async function auditLayout(page, tag) {
         const tiles = [...document.querySelectorAll('[data-tiles] .tile')].map((tile) => ({
             id: tile.dataset.tile,
             box: rect(tile),
+            labelBox: rect(tile.querySelector('.nm')),
             name: tile.querySelector('.nm')?.textContent || ''
         }));
+        const callbar = rect(document.querySelector('.callbar'));
         const controls = {};
         for (const key of ['mic', 'cam', 'hangup']) {
             const el = document.querySelector(`[data-${key}]`);
@@ -93,7 +96,7 @@ async function auditLayout(page, tag) {
         const videos = [...document.querySelectorAll('[data-tiles] video')].map((v) => ({
             playsinline: v.hasAttribute('playsinline') || v.playsInline === true
         }));
-        return { vw, vh, pageWide, tiles, controls, videos };
+        return { vw, vh, pageWide, tiles, callbar, controls, videos };
     });
     await fs.mkdir(SHOT_DIR, { recursive: true });
     await page.screenshot({ path: path.join(SHOT_DIR, `${tag}.png`), fullPage: true });
@@ -128,6 +131,24 @@ for (const viewport of VIEWPORTS) {
             const me = m.tiles.find((t) => t.id === 'me');
             const largest = Math.max(...m.tiles.filter((t) => t.id !== 'me').map((t) => t.box.width * t.box.height));
             expect(me.box.width * me.box.height, 'self-view stays smaller than the main tiles').toBeLessThan(largest * 0.92);
+            expect(me.box.bottom, 'self-view clears the call bar').toBeLessThanOrEqual(m.callbar.top);
+            expect(me.box.top, 'self-view stays in the viewport').toBeGreaterThanOrEqual(0);
+            expect(me.box.right, 'self-view stays in the viewport').toBeLessThanOrEqual(m.vw);
+            for (const remote of m.tiles.filter((t) => t.id !== 'me')) {
+                const label = remote.labelBox;
+                const overlaps = me.box.left < label.right && me.box.right > label.left &&
+                    me.box.top < label.bottom && me.box.bottom > label.top;
+                expect(overlaps, `self-view must clear ${remote.name}'s label`).toBe(false);
+            }
+            const rows = [];
+            for (const tile of [...m.tiles].sort((a, b) => a.box.top - b.box.top)) {
+                const row = rows.find((r) => Math.abs(r.top - tile.box.top) < 2);
+                if (row) row.bottom = Math.max(row.bottom, tile.box.bottom);
+                else rows.push({ top: tile.box.top, bottom: tile.box.bottom });
+            }
+            for (let i = 1; i < rows.length; i += 1) {
+                expect(rows[i].top - rows[i - 1].bottom, `gap before face row ${i + 1}`).toBeLessThanOrEqual(24);
+            }
 
             for (const key of ['mic', 'cam', 'hangup']) {
                 const c = m.controls[key];
