@@ -846,8 +846,9 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
 .chat:has([data-sharing-controls][open]) .lobby-welcome { display: none; }
 .chat:has([data-sharing-controls][open]) .buffer { min-height: 48px; }
 /* Phone tap floor (family demo re-grade 2026-11-15): on phones every Game Night
-   room control stays at least 44x44 CSS px, including the compact in-game states. */
-@media (max-width: 430px) {
+   room control stays at least 44x44 CSS px, including the compact in-game states.
+   Short landscape screens keep their existing compact layout. */
+@media (max-width: 430px) and (min-height: 451px) {
   .tabs button, .roombar .btn, .game-actions .btn, .connection-tools [data-fullscreen], .say .btn,
   .arcade-card-table summary, [data-game-editor] summary, .arcade-brick-race [data-brick-serve] { min-height: 44px !important; }
   .connection-tools [data-fullscreen], .slash, .roombar .btn { min-width: 44px !important; }
