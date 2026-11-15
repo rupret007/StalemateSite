@@ -5,6 +5,8 @@ const status = document.querySelector('[data-guest-status]');
 const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
 const retry = document.querySelector('[data-guest-retry]');
+const askHost = document.querySelector('[data-guest-fresh]');
+const FRESH_LINK = 'Ask the host for a fresh link.';
 const gameTitle = document.querySelector('[data-guest-game]');
 const resumeGuest = document.querySelector('[data-resume-guest]') !== null;
 const passPrefix = 'gn:pass:';
@@ -124,6 +126,7 @@ async function describe() {
         retry.hidden = error.status === 410;
         if (error.status === 410) {
             clearInvitation();
+            offerFreshLink();
             status.tabIndex = -1;
             status.focus({ preventScroll: true });
         }
@@ -151,11 +154,12 @@ async function accept() {
         const tableFull = webJam && error.status === 409 && error.tableFull;
         const closed = tableFull || error.status === 410;
         status.textContent = 'Couldn’t join just now. Try again.';
-        if (tableFull) status.textContent = returnToRoom ? 'This table is full. Return to your room for the next game.'
+        if (tableFull) status.textContent = returnToRoom ? 'This table is full. Return to your room to wait for an open seat.'
             : 'This table is full. Ask your host for a new invite when a seat opens.';
         else if (closed) status.textContent = webJam && waitUntil > 0
             ? 'Your Chess seat wasn’t confirmed. Ask your host for a new WebJam invite.' : GAME_INVITE_UNAVAILABLE;
         else if ([429, 503].includes(error.status)) status.textContent = error.message;
+        if (status.textContent === GAME_INVITE_UNAVAILABLE) offerFreshLink();
         if (closed) {
             clearInvitation();
             invite.hidden = true;
@@ -186,8 +190,29 @@ join.addEventListener('click', event => {
     void accept();
 });
 
+function offerFreshLink() {
+    if (!askHost) return;
+    askHost.hidden = false;
+    askHost.textContent = FRESH_LINK;
+}
+
+async function shareFreshLink() {
+    const payload = { title: 'Game Night', text: FRESH_LINK };
+    if (typeof navigator.share === 'function') {
+        try { await navigator.share(payload); return; }
+        catch (error) { if (error?.name === 'AbortError') return; }
+    }
+    if (typeof navigator.clipboard?.writeText === 'function') {
+        try {
+            await navigator.clipboard.writeText(FRESH_LINK);
+            if (askHost) askHost.textContent = 'Copied. Send it to your host.';
+        } catch { /* The button still shows the line to send. */ }
+    }
+}
+
 function showClosedInvitation() {
     status.textContent = GAME_INVITE_UNAVAILABLE;
+    offerFreshLink();
     status.tabIndex = -1;
     status.focus({ preventScroll: true });
 }
@@ -230,6 +255,7 @@ async function resume() {
 }
 
 retry.addEventListener('click', () => void (resumeGuest ? resume() : confirmedGame ? accept() : describe()));
+askHost?.addEventListener('click', () => { void shareFreshLink(); });
 if (resumeGuest) {
     void resume();
 } else if (hasInvitation && confirmedGame) {

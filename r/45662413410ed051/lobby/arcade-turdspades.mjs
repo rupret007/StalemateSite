@@ -16,9 +16,11 @@ const errors = {
     'invalid-bid': 'Choose a bid from 0 to 13.',
     'storage-unavailable': 'The move was not confirmed. Try again.'
 };
+export const WATCH_SYNC_INTERVAL = 5 * 60_000;
 const markup = `
 <summary>TurdSpades</summary>
 <p class="small arcade-card-status" data-spades-status role="status"></p>
+<p class="small arcade-next-game" data-next-game hidden>Table full. You’re in line for the next open seat.</p>
 <p class="small arcade-card-error" data-spades-error role="status"></p>
 <div class="arcade-card-actions">
     <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>
@@ -62,9 +64,29 @@ export function mountArcadeTurdSpades(container, onMatch) {
     const bid = $('#spades-bid'), confirm = $('[data-spades-confirm]');
     const actions = [...panel.querySelectorAll('[data-spades-action]')];
     let scope = null, model = null, canOpen = false, partnersSupported = false, savedMode, connection = 'connecting', connectionError;
-    let pending = false, timer, confirmation = '';
+    let pending = false, timer, watchTimer, confirmation = '';
     let suggestedBidKey = '', bidEdited = false, applyingBid = false;
 
+    // A watcher sends nothing else, so a sync while the page is on screen is
+    // what tells the server they are still here. A table update must not
+    // restart a pending wait. A drop or a closed panel clears the handle so
+    // the next watch-only frame can arm one timer again.
+    function clearWatch() {
+        clearTimeout(watchTimer);
+        watchTimer = null;
+    }
+    function watchSync() {
+        if (connection !== 'ready' || model?.watchOnly !== true) {
+            clearWatch();
+            return;
+        }
+        if (watchTimer != null) return;
+        watchTimer = setTimeout(() => {
+            watchTimer = null;
+            if (!document.hidden) client.send({ action: 'sync' });
+            watchSync();
+        }, WATCH_SYNC_INTERVAL);
+    }
     function clearPending() { clearTimeout(timer); pending = false; }
     function closeConfirmation() { confirmation = ''; if (confirm.open) confirm.close(); }
     const client = createGameNightMatchClient({
@@ -75,6 +97,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             connectionError = reason;
             if (reason && reason !== 'rate-limited') model = null;
             clearPending();
+            watchSync();
             closeConfirmation();
             draw();
         },
@@ -99,6 +122,11 @@ export function mountArcadeTurdSpades(container, onMatch) {
             connection = 'ready';
             connectionError = undefined;
             clearPending();
+            if (model?.watchOnly === true) {
+                if (watchTimer == null) watchSync();
+            } else {
+                clearWatch();
+            }
             draw();
             if (revealing) container.scrollTop = 0;
         },
@@ -129,6 +157,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         connectionError = undefined;
         feedback.textContent = '';
         clearPending();
+        clearWatch();
         closeConfirmation();
         draw();
     }
@@ -212,7 +241,11 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
         } else if (model?.waiting) {
             message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
-            if (model.watchOnly) message += ' · Stay here to watch when the next hand starts.';
+            if (model.watchOnly) {
+                message += occupied.length < people
+                    ? ' · A seat opened. The host can invite you in. Stay here to watch when the next hand starts.'
+                    : ' · Stay here to watch when the next hand starts.';
+            }
             if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
         } else if (match?.result) {
             message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
@@ -259,6 +292,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat || model.watchOnly === true;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
         table.hidden = !match;
+        $('[data-next-game]').hidden = !model?.upNext;
         if (!match) { showHand([]); return; }
         table.dataset.phase = match.phase;
         table.dataset.mode = paired ? 'partners' : 'four';

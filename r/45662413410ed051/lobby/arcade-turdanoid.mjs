@@ -11,6 +11,7 @@ const put = (node, text) => { if (node.textContent !== text) node.textContent = 
 const markup = `
 <summary>Turdanoid Brick Race</summary>
 <p class="small arcade-card-status brick-race-status" data-brick-status role="status"></p>
+<p class="small arcade-next-game" data-next-game hidden>Table full. You’re in line for the next open seat.</p>
 <p class="small arcade-card-error" data-brick-error role="status"></p>
 <div class="arcade-card-actions brick-race-actions">
     <button class="btn btn--small" type="button" data-brick-main hidden></button>
@@ -302,6 +303,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
             message += ` · Waiting for ${'your rival'}, link still works.`;
         }
         put(status, message);
+        $('[data-next-game]').hidden = !model?.upNext;
         startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
         startRematch.disabled = !!pending;
         main.hidden = !action;
