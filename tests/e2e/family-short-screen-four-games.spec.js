@@ -218,12 +218,87 @@ async function assertVisibleGameButtons(page, game) {
     expect(misses).toEqual([]);
 }
 
-async function assertShortPhoneLayout(page, game) {
+async function assertReachablePrincipal(page, control) {
+    await expect(control).toBeVisible();
+    if (await control.evaluate(el => el.matches('button, input, select, textarea'))) {
+        await expect(control).toBeEnabled();
+    }
+    const fullyOnScreen = await control.evaluate(el => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0
+            && rect.top >= 0 && rect.left >= 0
+            && rect.bottom <= innerHeight && rect.right <= innerWidth;
+    });
+    if (!fullyOnScreen) await control.scrollIntoViewIfNeeded();
+    await expect(control).toBeInViewport({ ratio: 1 });
+    const box = await control.boundingBox();
+    expect(box?.width, 'principal action width').toBeGreaterThanOrEqual(44);
+    expect(box?.height, 'principal action height').toBeGreaterThanOrEqual(44);
+    expect(await control.evaluate(el => {
+        const rect = el.getBoundingClientRect();
+        const navigation = document.querySelector('.phonetabs')?.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        return el.contains(hit) && (!navigation?.height || rect.bottom <= navigation.top);
+    }), 'principal action receives touch at center, not under bottom navigation').toBe(true);
+}
+
+async function tapPrincipal(page, control) {
+    const point = await control.evaluate(el => {
+        const rect = el.getBoundingClientRect();
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await page.touchscreen.tap(point.x, point.y);
+}
+
+async function assertChessFirstMove(page, game) {
+    const board = game.primary(page);
+    await assertReachablePrincipal(page, board);
+    const live = await status(page, game).textContent();
+    if (!/^You.re White · Your turn/.test(live ?? '')) return;
+    for (const square of ['e2', 'e4']) {
+        const cell = page.locator(`[data-square=${square}]`);
+        await expect(cell).toBeVisible();
+        await tapPrincipal(page, cell);
+    }
+    await expect.poll(async () => status(page, game).textContent()).toMatch(/^You.re White · Black to move/);
+}
+
+async function assertSpadesLockBid(page, game) {
+    const bid = game.primary(page);
+    await assertReachablePrincipal(page, bid);
+    const bidSelect = page.getByLabel('Your bid');
+    await expect(bidSelect).toBeEnabled();
+    const current = await bidSelect.inputValue();
+    const options = await bidSelect.locator('option').evaluateAll(opts => opts.map(option => option.value).filter(Boolean));
+    const edited = options.find(value => value !== current) ?? options[0];
+    await bidSelect.selectOption(edited);
+    await expect.poll(async () => (await bid.textContent())?.trim()).toBe('Lock bid');
+    await assertReachablePrincipal(page, bid);
+    await tapPrincipal(page, bid);
+    await expect.poll(async () => (await status(page, game).textContent()) ?? '').not.toMatch(/Your bid · tap Lock bid/);
+}
+
+async function assertTurdanoidLaunch(page, game) {
+    const launch = game.primary(page);
+    await assertReachablePrincipal(page, launch);
+    const match = page.locator('[data-brick-match]');
+    await expect(match).toHaveAttribute('data-stuck', 'true');
+    await tapPrincipal(page, launch);
+    await expect.poll(async () => match.getAttribute('data-stuck')).toBe('false');
+}
+
+async function assertShortPhoneLayout(page, game, key) {
     await assertNoHorizontalScroll(page);
     await assertVisibleGameButtons(page, game);
-    const control = game.primary(page);
-    await expect(control).toBeVisible();
-    await expect(control).toBeInViewport();
+    if (key === 'chess') {
+        await assertChessFirstMove(page, game);
+        return;
+    }
+    if (key === 'turdanoid') {
+        await assertTurdanoidLaunch(page, game);
+        return;
+    }
+    await assertSpadesLockBid(page, game);
 }
 
 async function pagesWithBidControl(pages) {
@@ -243,13 +318,13 @@ for (const [key, game] of Object.entries(GAMES)) {
         const fixture = await gameNight(browser, baseURL);
         try {
             const pages = await seated(fixture, game, nicks);
-            const targets = key === 'four'
+            const targets = key === 'four' || key === 'partners'
                 ? await pagesWithBidControl(pages)
                 : game.assertPages(pages);
             expect(targets.length).toBeGreaterThan(0);
             for (const page of pages.slice(0, game.seats)) await assertNoHorizontalScroll(page);
             for (const page of pages.slice(0, game.seats)) await assertVisibleGameButtons(page, game);
-            for (const page of targets) await assertShortPhoneLayout(page, game);
+            for (const page of targets) await assertShortPhoneLayout(page, game, key);
             expect(fixture.errors()).toEqual([]);
         } finally { await fixture.close(); }
     });
