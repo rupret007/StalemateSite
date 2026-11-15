@@ -1130,3 +1130,118 @@ test('iOS lock: ended camera and visibility restore a live peer track and playin
     await expect(guest.locator('[data-av-resume]')).toBeHidden();
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });
+
+// Same rule as the iPhone tap-to-play check: capture and play only work while a tap is dispatching.
+function armIosGestureMedia() {
+    let gesture = false;
+    const on = () => { gesture = true; };
+    const off = () => { gesture = false; };
+    for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click', 'touchend', 'keyup']) {
+        window.addEventListener(type, on, true);
+        window.addEventListener(type, off, false);
+    }
+    window.__gumLog = [];
+    const realGum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = function gum(constraints) {
+        const during = gesture;
+        window.__gumLog.push({ gesture: during, video: Boolean(constraints && constraints.video), audio: Boolean(constraints && constraints.audio) });
+        if (!during) return Promise.reject(new DOMException('getUserMedia needs a user gesture', 'NotAllowedError'));
+        return realGum(constraints);
+    };
+    const realPlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function play() {
+        if (!gesture) {
+            try { this.pause(); } catch (error) { /* not playing yet */ }
+            return Promise.reject(new DOMException('play needs a user gesture', 'NotAllowedError'));
+        }
+        return realPlay.apply(this, arguments);
+    };
+}
+const framesFrom = (page) => page.evaluate(async () => {
+    const entry = [...window.__hangout.av.pcs.values()][0];
+    let frames = 0;
+    (await entry.pc.getStats()).forEach((row) => {
+        if (row.type === 'inbound-rtp' && (row.kind === 'video' || row.mediaType === 'video')) frames = Math.max(frames, row.framesDecoded || 0);
+    });
+    return frames;
+});
+
+test('iOS lock under the gesture rule: devices stay on, one tap restores camera and mic for the peer', async ({ browser }) => {
+    const { host, guest } = await call(browser, PHONE_OPTS);
+    await micOn(guest);
+    await guest.evaluate(armIosGestureMedia);
+    const locked = await guest.evaluate(() => {
+        const av = window.__hangout.av;
+        // Record every write that would report a device off.
+        window.__offWrites = [];
+        for (const key of ['cam', 'mic']) {
+            let value = av[key];
+            Object.defineProperty(av, key, {
+                configurable: true,
+                enumerable: true,
+                get: () => value,
+                set: (next) => { if (!next) window.__offWrites.push(key); value = next; }
+            });
+        }
+        const video = av.rawCam;
+        const audio = av.stream.getAudioTracks()[0];
+        window.__stoppedVideoId = video.id;
+        window.__stoppedAudioId = audio.id;
+        window.__vis = 'hidden';
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.__vis });
+        document.querySelectorAll('.tile:not([data-tile="me"]) video').forEach((el) => el.pause());
+        document.dispatchEvent(new Event('visibilitychange'));
+        video.stop();
+        audio.stop();
+        window.__vis = 'visible';
+        document.dispatchEvent(new Event('visibilitychange'));
+        return { video: video.readyState, audio: audio.readyState };
+    });
+    expect(locked).toEqual({ video: 'ended', audio: 'ended' });
+
+    // The automatic re-acquire was refused, so the page asks for a tap and keeps both devices on.
+    await expect(guest.locator('[data-av-resume]')).toBeVisible();
+    await expect.poll(() => guest.evaluate(() => window.__gumLog.filter((entry) => !entry.gesture).length)).toBeGreaterThan(0);
+    const waiting = await guest.evaluate(() => {
+        const av = window.__hangout.av;
+        const sender = [...av.pcs.values()][0].senders.video;
+        return { cam: av.cam, mic: av.mic, off: window.__offWrites.slice(), live: Boolean(sender && sender.track && sender.track.readyState === 'live') };
+    });
+    expect(waiting).toEqual({ cam: true, mic: true, off: [], live: false });
+    await expect(guest.locator('[data-cam]')).toHaveText('Turn off my camera');
+    await expect(guest.locator('[data-mic]')).toHaveText('Mute my mic');
+    // The peer's picture is stalled until the tap.
+    const stalled = await framesFrom(host);
+    await host.waitForTimeout(700);
+    expect(await framesFrom(host) - stalled).toBeLessThanOrEqual(2);
+
+    const before = await framesFrom(host);
+    await guest.click('[data-av-resume]');
+    await expect.poll(async () => (await framesFrom(host)) - before, { timeout: 10000 }).toBeGreaterThan(5);
+    await expect.poll(() => host.evaluate(() => {
+        const entry = [...window.__hangout.av.pcs.values()][0];
+        const track = entry.pc.getReceivers().map((receiver) => receiver.track).find((item) => item && item.kind === 'video');
+        return Boolean(track && track.readyState === 'live' && track.muted === false);
+    }), { timeout: 10000 }).toBe(true);
+
+    const restored = await guest.evaluate(() => {
+        const av = window.__hangout.av;
+        const senders = [...av.pcs.values()][0].senders;
+        const audio = av.stream.getAudioTracks()[0];
+        const remote = [...document.querySelectorAll('.tile:not([data-tile="me"]) video')];
+        return {
+            cam: av.cam,
+            mic: av.mic,
+            off: window.__offWrites.slice(),
+            video: Boolean(senders.video && senders.video.track && senders.video.track.readyState === 'live' && senders.video.track.id !== window.__stoppedVideoId),
+            audio: Boolean(audio && audio.readyState === 'live' && audio.id !== window.__stoppedAudioId),
+            playing: remote.length > 0 && remote.every((el) => !el.paused),
+            tapCaptures: window.__gumLog.filter((entry) => entry.gesture).map((entry) => (entry.video ? 'video' : 'audio')).sort()
+        };
+    });
+    expect(restored).toEqual({ cam: true, mic: true, off: [], video: true, audio: true, playing: true, tapCaptures: ['audio', 'video'] });
+    await expect(guest.locator('[data-av-resume]')).toBeHidden();
+    await expect(guest.locator('[data-cam]')).toHaveText('Turn off my camera');
+    await expect(guest.locator('[data-mic]')).toHaveText('Mute my mic');
+    expect(host.errors.concat(guest.errors)).toEqual([]);
+});

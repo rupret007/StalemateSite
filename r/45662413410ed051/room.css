@@ -95,6 +95,7 @@ body.bob-mode.faces-on .call{grid-column:auto}
 .tiles .tile.is-talking{border-color:var(--lime)}
 .tiles .tile video{width:100%;height:100%;object-fit:cover;display:block;background:#090c0d}
 .faces-play{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:40;min-height:44px}
+.av-resume{bottom:calc(128px + env(safe-area-inset-bottom))}
 .tiles .tile--mirror video{transform:scaleX(-1)}
 .tiles .tile--screen video,.tiles .tile--canvas video{object-fit:contain}
 .tiles .tile--nocam video{visibility:hidden}

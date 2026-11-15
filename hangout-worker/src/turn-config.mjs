@@ -11,9 +11,12 @@ function parseTurnUrls(raw) {
     return urls;
 }
 
-/** True when the operator supplied static relay URLs at deploy/runtime. */
+/**
+ * True only when the static relay config is complete: valid URLs plus the
+ * credentials those URLs need. URLs without credentials are not advertised.
+ */
 export function runtimeTurnConfigured(env) {
-    return !!parseTurnUrls(env?.HANGOUT_TURN_URLS);
+    return !!buildRuntimeTurnEntries(env);
 }
 
 /** Hang Out may mint relay ICE when Cloudflare TURN or static URLs are configured. */

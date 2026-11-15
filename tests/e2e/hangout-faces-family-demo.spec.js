@@ -55,6 +55,33 @@ function scrub(value) {
         .slice(0, 280);
 }
 function seconds(ms) { return Math.round(ms / 100) / 10; }
+
+// The only two WebKit outcomes that are the host's fault, and the only two that may skip:
+// the browser is not installed, or its renderer process crashed. Everything else fails.
+const WEBKIT_MISSING = 'WebKit not launchable on this host';
+const WEBKIT_CRASH = 'WebKit renderer crash on this host (environment limit)';
+const errorText = (error) => `${error && error.name ? error.name : ''} ${error && error.message ? error.message : ''}`;
+const webkitExecutableMissing = (error) => /executable doesn['’]t exist|executable does not exist/i.test(errorText(error));
+const rendererCrash = (error) => /page crashed|renderer crash|target crashed/i.test(errorText(error));
+function skipForHost(description) {
+    test.info().annotations.push({ type: 'environment', description });
+    test.skip(true, description);
+}
+/** Launches WebKit. Skips only when its executable is missing; any other launch failure fails the test. */
+async function launchWebkit(report) {
+    try {
+        // The Chromium worker's fake-device flags are the default launch options.
+        // Passing an empty args list keeps those flags off this WebKit process.
+        const launched = await webkit.launch({ headless: true, args: [] });
+        extraBrowser = launched;
+        report.launched = true;
+        return launched;
+    } catch (error) {
+        report.status = `WebKit did not launch (${scrub(error.message || error.name)})`;
+        report.missing = webkitExecutableMissing(error);
+        return null;
+    }
+}
 const roomUrl = (extra = '') => `/r/${SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}${extra}`;
 
 async function openBrowser(browser, opts = {}, initScript) {
@@ -392,7 +419,7 @@ test('four people in one private Hang Out room can see each other', async ({ bro
 
 test('two people in WebKit when that browser launches', async () => {
     test.setTimeout(45000);
-    const hostLimitText = 'WebKit renderer crash on this host (environment limit)';
+    const hostLimitText = WEBKIT_CRASH;
     const report = { launched: false, pass: false, status: 'WebKit did not launch', environment: false };
     let browser;
     let host;
@@ -406,26 +433,17 @@ test('two people in WebKit when that browser launches', async () => {
         report.pass = false;
         report.status = hostLimit;
     };
-    const rendererCrash = (error) => /page crashed|renderer crash|target crashed|target closed|has been closed|browser closed|connection closed/i.test(`${error && error.name ? error.name : ''} ${error && error.message ? error.message : ''}`);
-    const pageDown = () => {
-        if (hostLimit) return true;
-        try { if (host && host.isClosed()) return true; } catch (error) { return true; }
-        try { if (guest && guest.isClosed()) return true; } catch (error) { return true; }
-        return false;
-    };
+    // Only a page 'crash' event (noted above) counts. A closed page or browser is not a crash.
+    const pageDown = () => Boolean(hostLimit);
+    browser = await launchWebkit(report);
+    if (!browser) {
+        console.log(`CHECK f fail launched=false env=${Boolean(report.missing)} seconds= status=${report.status}`);
+        await writeJson('webkit.json', report);
+        if (report.missing) skipForHost(WEBKIT_MISSING);
+        throw new Error(report.status);
+    }
     try {
-        try {
-            // The Chromium worker's fake-device flags are the default launch options.
-            // Passing an empty args list keeps those flags off this WebKit process.
-            browser = await webkit.launch({ headless: true, args: [] });
-            extraBrowser = browser;
-            report.launched = true;
-            browser.on('disconnected', () => noteLimit(hostLimitText));
-        } catch (error) {
-            report.status = `WebKit did not launch (${scrub(error.message || error.name)})`;
-            noteLimit(hostLimitText);
-        }
-        if (!hostLimit) {
+        {
             host = await openBrowser(browser, HOST_VIEW);
             guest = await openBrowser(browser, PHONE);
             host.setDefaultTimeout(8000);
@@ -470,7 +488,10 @@ test('two people in WebKit when that browser launches', async () => {
                         throw new Error(report.status);
                     }
                 }
-                if (!hostLimit && outcome !== 'frames') noteLimit(hostLimitText);
+                if (!hostLimit && outcome !== 'frames') {
+                    report.status = 'WebKit stayed up, but neither side showed a playing face.';
+                    throw new Error(report.status);
+                }
                 if (!hostLimit) {
                     report.pass = true;
                     report.seconds = seconds(Date.now() - started);
@@ -483,7 +504,7 @@ test('two people in WebKit when that browser launches', async () => {
             }
         }
     } catch (error) {
-        if (hostLimit || pageDown() || rendererCrash(error)) noteLimit(hostLimitText);
+        if (hostLimit || rendererCrash(error)) noteLimit(hostLimitText);
         else {
             report.pass = false;
             report.environment = false;
@@ -499,10 +520,7 @@ test('two people in WebKit when that browser launches', async () => {
             await Promise.race([browser.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 1500))]);
         }
     }
-    if (hostLimit) {
-        test.info().annotations.push({ type: 'environment', description: hostLimitText });
-        test.skip(true, hostLimitText);
-    }
+    if (hostLimit) skipForHost(hostLimitText);
 });
 
 const IPHONE = devices['iPhone 13'];
@@ -726,39 +744,40 @@ test('iPhone emulation plays faces after one tap and captures only from a gestur
         expect(log.length).toBeGreaterThan(0);
         expect(log.every(Boolean)).toBe(true);
     }
+});
 
-    let wk;
+// Its own test so a WebKit host limit shows as an explicit skip and never rides on the check above.
+test('WebKit iPhone emulation captures the camera from one gesture', async () => {
+    test.setTimeout(60000);
     const wkReport = { launched: false, environment: false, status: '' };
+    const wk = await launchWebkit(wkReport);
+    if (!wk) {
+        console.log(`CHECK 3d-webkit env=${Boolean(wkReport.missing)} launched=false status=${wkReport.status}`);
+        if (wkReport.missing) skipForHost(WEBKIT_MISSING);
+        throw new Error(wkReport.status);
+    }
+    let crashed = false;
     try {
-        try {
-            wk = await webkit.launch({ headless: true, args: [] });
-            extraBrowser = wk;
-            wkReport.launched = true;
-        } catch (error) {
-            wkReport.environment = true;
-            wkReport.status = `WebKit did not launch (${scrub(error.message || error.name)})`;
-            return;
-        }
         const phone = await openBrowser(wk, iphoneContext(), armIosGestureMedia);
-        phone.on('crash', () => { wkReport.environment = true; });
+        phone.on('crash', () => { crashed = true; });
         await join(phone, roomUrl(), 'Casey');
-        if (phone.isClosed() || wkReport.environment) {
-            wkReport.environment = true;
-            wkReport.status = 'WebKit renderer crashed before the gesture check.';
-            return;
-        }
         await turnCamera(phone);
+        const log = await phone.evaluate(() => window.__gumLog || []);
+        expect(log.length).toBeGreaterThan(0);
+        expect(log.every(Boolean)).toBe(true);
         wkReport.status = 'WebKit stayed up through one camera gesture.';
     } catch (error) {
-        const crashed = /crash|has been closed|Target closed/i.test(error.message || '') || (wkReport.environment);
-        wkReport.environment = crashed;
-        wkReport.status = scrub(error.message);
-        if (!crashed) throw error;
-    } finally {
-        console.log(`CHECK 3d-webkit env=${wkReport.environment} launched=${wkReport.launched} status=${wkReport.status}`);
-        if (wk) {
-            extraBrowser = null;
-            await Promise.race([wk.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 2000))]);
+        // A renderer crash is the host's limit. Any other error is a real failure.
+        if (!crashed && !rendererCrash(error)) {
+            wkReport.status = scrub(error.message);
+            throw error;
         }
+        crashed = true;
+    } finally {
+        if (crashed) { wkReport.environment = true; wkReport.status = WEBKIT_CRASH; }
+        console.log(`CHECK 3d-webkit env=${wkReport.environment} launched=${wkReport.launched} status=${wkReport.status}`);
+        extraBrowser = null;
+        await Promise.race([wk.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 2000))]);
     }
+    if (crashed) skipForHost(WEBKIT_CRASH);
 });

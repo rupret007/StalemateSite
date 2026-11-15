@@ -1469,13 +1469,23 @@
      * watching us big (speaker view, pin, spotlight); everyone else gets a thumbnail. */
     ui.avResume = doc.createElement('button');
     ui.avResume.type = 'button';
-    ui.avResume.className = 'btn tap';
+    // Fixed just above "Tap to play": on phones anything in the page flow sits under the call bar.
+    ui.avResume.className = 'btn faces-play av-resume';
     ui.avResume.hidden = true;
     ui.avResume.textContent = 'Tap to resume video';
     ui.avResume.setAttribute('data-av-resume', '');
     ui.tiles.insertAdjacentElement('afterend', ui.avResume);
-    ui.avResume.addEventListener('click', () => { resumeLocalMedia(); });
-    function showAvResume(on) { ui.avResume.hidden = !on; }
+    // Capture and play both start inside this tap: iOS refuses them anywhere else.
+    ui.avResume.addEventListener('click', () => { unblockFaces(); resumeLocalMedia(true); });
+    // The button stays up while remote playback or the local camera/mic still needs a tap.
+    const avResumeWhy = { playback: false, video: false, audio: false };
+    function paintAvResume() {
+        if (!app.av.cam || app.av.screen) avResumeWhy.video = false;
+        if (!app.av.mic) avResumeWhy.audio = false;
+        ui.avResume.hidden = !(avResumeWhy.playback || avResumeWhy.video || avResumeWhy.audio);
+    }
+    function showAvResume(on) { avResumeWhy.playback = Boolean(on); paintAvResume(); }
+    function captureNeedsTap(kind, on) { avResumeWhy[kind] = Boolean(on); paintAvResume(); }
     function avFlags() {
         return { mic: app.av.mic, cam: app.av.cam, canvas: app.av.canvas, screen: Boolean(app.av.screen), hand: app.av.hand, away: app.av.away };
     }
@@ -1797,6 +1807,7 @@
     }
 
     function paintControls() {
+        paintAvResume();
         // Phones show big icons with a one-word caption; the full words stay for screen readers and desktops.
         const ico = (el, i, short) => { el.dataset.ico = i; el.dataset.short = short; };
         ico(ui.mic, app.av.mic ? '🎤' : '🔇', app.av.mic ? 'Mute' : (app.av.jam ? 'Talk' : 'Mic'));
@@ -2494,24 +2505,42 @@
             say('Couldn’t switch to that device. Is another app using it?');
         }
     }
-    async function restartMic() {
+    // Runs synchronously so a tap can start the mic capture before any await.
+    function primeMic() {
         const version = ++captureVersion.audio;
-        const got = await navigator.mediaDevices.getUserMedia({ audio: V.micConstraints(app.av.music, prefs().mic) });
-        if (!keepCapture('audio', version, got)) return;
+        const capture = startCapture({ audio: V.micConstraints(app.av.music, prefs().mic) });
+        capture.catch(() => {});
+        return { version, capture };
+    }
+    async function restartMic(primed) {
+        const { version, capture } = primed || primeMic();
+        const got = await capture;
+        if (!keepCapture('audio', version, got)) return false;
         stopRaw('audio');
         setTrack('audio', got.getAudioTracks()[0]);
         for (const entry of app.av.pcs.values()) syncTracks(entry);
         if (app.av.ac) watchLevel('me', app.av.stream);
+        captureNeedsTap('audio', false);
+        return true;
     }
-    async function restartCam() {
+    // Refused inside a tap for one of these reasons is a real "no", not a missing gesture.
+    function captureDenied(error) {
+        return Boolean(error) && (error.name === 'NotAllowedError' || error.name === 'SecurityError' || error.name === 'NotFoundError');
+    }
+    async function restartCam(gesture) {
         if (app.ended || app.av.kicked || !app.av.cam || app.av.screen) return false;
         const canvas = app.av.canvas;
         const version = ++captureVersion.video;
         let got;
         try {
-            got = await navigator.mediaDevices.getUserMedia({ video: canvas ? CANVAS_CAM : camConstraints() });
+            // No await before this call: inside a tap it has to run in the tap itself.
+            got = await startCapture({ video: canvas ? CANVAS_CAM : camConstraints() });
         } catch (error) {
             if (version !== captureVersion.video || !app.av.cam || doc.visibilityState === 'hidden') return false;
+            // After a screen lock or app switch iOS refuses the camera outside a tap. That is not
+            // the person turning it off: keep it on and ask for one tap instead.
+            if (!gesture || !captureDenied(error)) { captureNeedsTap('video', true); return false; }
+            captureNeedsTap('video', false);
             await dropCameraKeepVoice();
             return false;
         }
@@ -2545,6 +2574,7 @@
         setTrack('video', send);
         if (old && old !== track) stopTrack(old);
         for (const entry of app.av.pcs.values()) syncTracks(entry);
+        captureNeedsTap('video', false);
         return true;
     }
     async function dropCameraKeepVoice() {
@@ -2563,13 +2593,15 @@
         return app.av.stream.getTracks().find((track) => track.kind === kind) || null;
     }
     let resumeJob = null;
-    function resumeLocalMedia() {
+    function resumeLocalMedia(gesture) {
         if (app.ended || doc.visibilityState === 'hidden') return Promise.resolve();
-        if (resumeJob) return resumeJob;
-        resumeJob = recoverLocalMedia().finally(() => { resumeJob = null; });
-        return resumeJob;
+        // A tap never waits behind an automatic attempt: its captures must start in the tap.
+        if (resumeJob && !gesture) return resumeJob;
+        const job = recoverLocalMedia(Boolean(gesture)).finally(() => { if (resumeJob === job) resumeJob = null; });
+        resumeJob = job;
+        return job;
     }
-    async function recoverLocalMedia() {
+    async function recoverLocalMedia(gesture) {
         if (app.ended || doc.visibilityState !== 'visible') return;
         const plan = V.resumeCapture({
             visible: true,
@@ -2581,19 +2613,32 @@
             audio: localCapture('audio'),
             video: app.av.rawCam || localCapture('video')
         });
-        if (plan.video) await restartCam();
-        if (plan.audio && app.av.mic) {
-            try { await restartMic(); }
-            catch (error) {
-                if (!app.ended && app.av.mic && doc.visibilityState === 'visible') {
-                    stopRaw('audio');
-                    app.av.mic = false;
-                    await refreshAv();
-                    say('Mic’s blocked. Tap the lock or “aA” icon by the address bar, allow Microphone, then try again.');
+        // Everything that needs the tap starts here, before the first await.
+        const camJob = plan.video ? restartCam(gesture) : null;
+        const micPrimed = plan.audio && app.av.mic ? primeMic() : null;
+        const playJob = gesture ? resumeRemotePlayback() : null;
+        if (camJob) await camJob;
+        if (micPrimed) {
+            try {
+                await restartMic(micPrimed);
+            } catch (error) {
+                if (!app.ended && app.av.mic && doc.visibilityState === 'visible' && micPrimed.version === captureVersion.audio) {
+                    if (!gesture || !captureDenied(error)) {
+                        // Refused outside a tap: the mic stays on as far as the person is concerned.
+                        captureNeedsTap('audio', true);
+                    } else {
+                        captureNeedsTap('audio', false);
+                        stopRaw('audio');
+                        app.av.mic = false;
+                        await refreshAv();
+                        say('Mic’s blocked. Tap the lock or “aA” icon by the address bar, allow Microphone, then try again.');
+                    }
                 }
             }
         }
-        if (doc.visibilityState === 'visible') await resumeRemotePlayback();
+        if (playJob) await playJob;
+        else if (doc.visibilityState === 'visible') await resumeRemotePlayback();
+        if (avResumeWhy.video || avResumeWhy.audio) say('Tap “Tap to resume video” to bring your camera and mic back.');
         layout();
     }
     async function resumeRemotePlayback() {
@@ -2794,7 +2839,11 @@
     }
 
     ui.canvasCam.addEventListener('click', () => toggleCanvasCam());
-    ui.facesPlay.addEventListener('click', () => unblockFaces());
+    ui.facesPlay.addEventListener('click', () => {
+        unblockFaces();
+        // Whichever button gets the tap, a camera or mic waiting on one comes back with it.
+        if (avResumeWhy.video || avResumeWhy.audio) resumeLocalMedia(true);
+    });
     ui.mic.addEventListener('click', () => toggle('mic'));
     ui.cam.addEventListener('click', () => toggle('cam'));
     ui.share.addEventListener('click', () => toggleScreen());
