@@ -1,25 +1,31 @@
 #!/usr/bin/env node
 // Capture deterministic seated Game Night states for the family-alpha visual re-grade.
-// Run at 01:00 CT with: node scripts/family-alpha-regrade-shots.mjs
-// Optional: REGRADE_OUTPUT_DIR=/path/to/regrade-20261115
+// Run with: node scripts/family-alpha-regrade-shots.mjs
+// Optional: REGRADE_OUTPUT_DIR=/path/to/regrade-20261115, REGRADE_PORT=89xx (default 8965),
+// REGRADE_STRICT=1 to fail on layout findings instead of recording them in manifest.json.
 // The default output is the requested re-grade delivery folder under Documents.
+// Shots are staged beside the output folder and swapped in only when every one
+// succeeded, so a failed run leaves the previous delivery untouched.
 // Uses the repository's installed @playwright/test (no install step) and Chromium.
+// Only seated players are created and only the host's own screen is captured.
 
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { existsSync, createReadStream } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { arcadeHello, assertPort, brickWallShown, gameSpecs, layoutFindings, matchSocket, retireMatchSocket, seatStarted, settle } from './family-alpha-regrade-shots-lib.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium, expect } = require('@playwright/test');
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.resolve(process.env.REGRADE_OUTPUT_DIR || path.join(homedir(), 'Documents', 'bob-overnight-inject', 'regrade-20261115'));
-const port = Number(process.env.REGRADE_PORT || 8765);
+const port = Number(process.env.REGRADE_PORT || 8965);
+const strict = process.env.REGRADE_STRICT === '1';
 const viewports = [{ name: '390x844', width: 390, height: 844 }, { name: '1440x900', width: 1440, height: 900 }];
 const versions = [
     { version: 'current', sha: '6a773061aa01d6966403da3960ac29f1b056ae19', games: ['chess', 'partners-spades', 'four-player-spades', 'turdanoid'] },
@@ -27,12 +33,6 @@ const versions = [
     { version: 'new', sha: '87a656c68994eedf577418a55a5622e36e2993d3', games: ['partners-spades', 'four-player-spades'] },
     { version: 'new', sha: '3bdd0e3bd7038d770cce099faa6da4b5aa49defc', game: 'turdanoid' }
 ];
-const gameSpecs = {
-    chess: { game: 'chess', seats: 2, button: 'Open Chess match', joins: ['Join as Black'], board: '.arcade-chess-board', status: '[data-chess-status]' },
-    'partners-spades': { game: 'turdspades', seats: 2, button: 'Open 2-player Spades', joins: ['Join West'], board: '[data-spades-table]', status: '[data-spades-status]' },
-    'four-player-spades': { game: 'turdspades', seats: 4, button: 'Open 4-player Spades', joins: ['Join West', 'Join North', 'Join East'], board: '[data-spades-table]', status: '[data-spades-status]' },
-    turdanoid: { game: 'turdanoid', seats: 2, button: 'Open Turdanoid race', joins: ['Join Turdanoid race'], board: '[data-brick-match]', status: '[data-brick-status]' }
-};
 const lobbyPath = '/r/45662413410ed051/lobby/';
 const preview = 'local-preview-key-0001';
 const mime = { '.css': 'text/css', '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.json': 'application/json' };
@@ -80,7 +80,8 @@ async function createFixture(browser, origin, sourceRoot, viewport) {
     const lobby = createLobby({ gameNight: true, now: () => at, limits: { defaultSlow: 0, roomPerDevice: 1 }, send: (id, frame) => {
         const person = connection(id);
         if (frame.t === 'part' && person) { const ref = lobby.arcadeRoomRef(frame.ch, false); if (ref) departures.push({ scope: { room: frame.ch, ref }, subject: person.sid }); }
-        lobbySockets.get(id)?.send(JSON.stringify(frame));
+        // lobby-do.mjs adds the arcade flags to the hello; without them the client disables every game.
+        lobbySockets.get(id)?.send(JSON.stringify(arcadeHello(frame)));
     } });
     const transports = new Map(['chess', 'turdspades', 'turdanoid'].map(name => [name, createArcadeTransport({
         name, state,
@@ -93,12 +94,7 @@ async function createFixture(browser, origin, sourceRoot, viewport) {
         for (const transport of transports.values()) transport.reconcile();
     }
     globalThis.WebSocketPair = class { constructor() { this[0] = {}; this[1] = upgrading; } };
-    const retire = async (socket, transport) => {
-        if (socket.readyState !== 1) return;
-        const scope = socket.deserializeAttachment(); socket.serializeAttachment({ ...scope, retired: true }); socket.readyState = 3;
-        try { await transport.presenceChanged(scope); }
-        finally { const index = matchSockets.indexOf(socket); if (index !== -1) matchSockets.splice(index, 1); }
-    };
+    const retire = (socket, transport) => serial(() => retireMatchSocket(socket, transport, matchSockets));
     async function phone(nick) {
         const sid = randomUUID(), session = { betaSid: sid, betaInviteVersion: '1' };
         const person = { nick, sid, identity: null, matches: new Map() }; people.set(nick, person);
@@ -125,13 +121,12 @@ async function createFixture(browser, origin, sourceRoot, viewport) {
             lobby.connect(identity);
         });
         await page.routeWebSocket(url => /-match$/.test(url.pathname) && transports.has(arcadeGame(url.pathname)), route => {
-            const game = arcadeGame(new URL(route.url()).pathname), transport = transports.get(game); let attachment = null;
-            const socket = { readyState: 1, serializeAttachment: value => { attachment = value; }, deserializeAttachment: () => attachment,
-                send: raw => { if (socket.readyState === 1) route.send(raw); },
-                close: (code = 1000, reason = '') => { if (socket.readyState === 1) { socket.readyState = 3; void route.close({ code, reason }); } } };
+            const game = arcadeGame(new URL(route.url()).pathname), transport = transports.get(game);
+            // A server close (ban, kick, replaced seat) retires the socket the same way a browser close does.
+            const socket = matchSocket(route, closed => void retire(closed, transport));
             route.onMessage(raw => void serial(() => transport.receive(socket, String(raw))));
-            route.onClose(() => void serial(() => retire(socket, transport)));
-            void serial(async () => { upgrading = socket; try { const refused = await transport.upgrade(route.protocols().join(', '), session); socket.readyState = 3; await route.close({ code: 1008, reason: `upgrade refused ${refused.status}` }); }
+            route.onClose(() => void retire(socket, transport));
+            void serial(async () => { upgrading = socket; try { const refused = await transport.upgrade(route.protocols().join(', '), session); socket.close(1008, `upgrade refused ${refused.status}`); }
                 catch (error) { if (!(error instanceof RangeError) || !matchSockets.includes(socket)) throw error; person.matches.set(game, socket); } finally { upgrading = null; } });
         });
         await page.goto(`${origin}${lobbyPath}?preview=${preview}&relay=${encodeURIComponent(origin.replace(/^http/, 'ws') + '/__hangout-relay/sessions/family-alpha-regrade')}`);
@@ -148,13 +143,65 @@ async function createFixture(browser, origin, sourceRoot, viewport) {
     return { phone, invite, people, errors: () => [...people.values()].flatMap(person => person.errors), close: async () => { await Promise.all(contexts.map(context => context.close())); } };
 }
 
-async function capture(browser, origin, sourceRoot, spec, viewport, target, sha) {
+// Retries `read` until `ok` accepts its value, so a table that is still dealing is not sampled once and misjudged.
+async function until(read, ok, describe, timeout = 15000) {
+    for (const deadline = Date.now() + timeout; ;) {
+        const value = await read();
+        if (ok(value)) return value;
+        if (Date.now() > deadline) throw new Error(describe(value));
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+}
+
+// What the Turdanoid table is showing: its phase, the wall's brick total and whether the canvas has been drawn on.
+const brickWall = board => board.evaluate(table => {
+    const totals = [...table.querySelectorAll('[data-brick-score]')].map(node => Number(/\/(\d+) bricks/.exec(node.textContent)?.[1] || 0));
+    const canvas = table.querySelector('canvas'), colors = new Set();
+    try {
+        const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+        for (let index = 0; index < pixels.length; index += 4 * 97) if (pixels[index + 3]) colors.add(pixels.slice(index, index + 3).join());
+    } catch { /* no readable canvas: not painted */ }
+    return { phase: table.dataset.phase || '', bricks: Math.max(0, ...totals), painted: colors.size >= 4 };
+});
+
+// Every enabled, visible control's box once it is scrolled to the nearest edge.
+// All of it runs inside one task and every scroll position is put back before
+// it returns, so the page is framed exactly as the player left it.
+const measureLayout = page => page.evaluate(() => {
+    const all = [...document.querySelectorAll('*')], before = new Map(), home = { top: scrollY, left: scrollX, behavior: 'instant' }, controls = [];
+    for (const element of all) if (element.scrollTop || element.scrollLeft) before.set(element, [element.scrollTop, element.scrollLeft]);
+    try {
+        for (const element of document.querySelectorAll('button, a[href], input:not([type="hidden"]), select, textarea, summary')) {
+            if (element.disabled || element.closest('[inert], [aria-disabled="true"]') || !element.checkVisibility({ visibilityProperty: true })) continue;
+            if (element.localName === 'a' && getComputedStyle(element).display === 'inline') continue;
+            // A checkbox or radio is pressed through its label.
+            const target = element.matches('input[type="checkbox"], input[type="radio"]') ? element.closest('label') || element : element;
+            target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+            const box = target.getBoundingClientRect();
+            if (!box.width && !box.height) continue;
+            const text = element.matches('select, input, textarea') ? '' : element.textContent;
+            const name = (element.getAttribute('aria-label') || text || element.getAttribute('placeholder') || element.name || element.id || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+            controls.push({ label: `${element.localName} "${name}"`, x: box.x, y: box.y, width: box.width, height: box.height });
+        }
+    } finally {
+        for (const element of all) {
+            const [top, left] = before.get(element) || [0, 0];
+            if (element.scrollTop !== top || element.scrollLeft !== left) element.scrollTo({ top, left, behavior: 'instant' });
+        }
+        scrollTo(home);
+    }
+    return { scrollWidth: document.documentElement.scrollWidth, controls };
+});
+
+async function capture(browser, origin, sourceRoot, spec, viewport, target, sha, base) {
     const fixture = await createFixture(browser, origin, sourceRoot, viewport);
     const nicks = ['HostExample', 'GuestWest', 'GuestNorth', 'GuestEast'].slice(0, spec.seats);
     try {
         const pages = await Promise.all(nicks.map(nick => fixture.phone(nick)));
         const host = pages[0];
-        await host.getByRole('button', { name: /Game Night/ }).click();
+        const start = host.getByRole('button', { name: /Game Night/ });
+        if (!await start.isVisible()) await host.locator('.phonetabs [data-show="rooms"]').click();
+        await start.click();
         await expect(host.getByRole('region', { name: /Game Night/ })).toBeVisible();
         for (let index = 1; index < pages.length; index++) await fixture.invite(host, pages[index], nicks[index]);
         for (const page of pages) {
@@ -164,46 +211,42 @@ async function capture(browser, origin, sourceRoot, spec, viewport, target, sha)
         }
         await host.getByRole('button', { name: spec.button }).click();
         for (let index = 1; index < spec.seats; index++) await pages[index].getByRole('button', { name: spec.joins[index - 1] }).click();
-        for (const page of pages.slice(0, spec.seats)) {
-            await expect(page.locator(spec.board)).toBeVisible();
-            const status = (await page.locator(spec.status).innerText()).trim();
-            if (!status || /waiting for players|waiting for opponent|waiting for .*player/i.test(status)) {
-                throw new Error(`${spec.label} did not start with all ${spec.seats} seats occupied (${status || 'empty status'}).`);
-            }
+        for (const [index, page] of pages.entries()) {
             const board = page.locator(spec.board);
-            if (spec.game === 'chess' && await board.locator('[data-square]').count() < 32) throw new Error('Chess board has no complete starting position.');
-            if (spec.game === 'turdspades' && await board.locator('[data-card]').count() < 1) throw new Error('Spades table has no dealt cards.');
-            if (spec.game === 'turdanoid' && await board.locator('canvas, [data-wall], [data-brick]').count() < 1) throw new Error('Turdanoid race has no visible wall.');
-        }
-        for (const page of pages) {
-            const layout = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: innerWidth }));
-            if (layout.width > layout.viewport + 1) throw new Error(`Horizontal overflow at ${viewport.width}x${viewport.height}.`);
-            const controls = page.locator('button:visible, a:visible, input:visible, select:visible');
-            for (let i = 0; i < await controls.count(); i++) {
-                const control = controls.nth(i);
-                if (!(await control.isEnabled().catch(() => false))) continue;
-                await control.scrollIntoViewIfNeeded();
-                const box = await control.boundingBox();
-                if (!box || box.width < 24 || box.height < 24 || box.x < 0 || box.y < 0 || box.x + box.width > viewport.width + 1 || box.y + box.height > viewport.height + 1) {
-                    throw new Error(`Unreachable or undersized control at ${viewport.width}x${viewport.height}.`);
-                }
+            await expect(board).toBeVisible();
+            await until(async () => (await page.locator(spec.status).innerText()).trim(), status => seatStarted(spec, index, status),
+                status => `${spec.label} did not start with all ${spec.seats} seats occupied (${nicks[index]}: ${status || 'empty status'}).`);
+            if (spec.proof) {
+                await until(() => board.locator(spec.proof.selector).count(), count => count >= spec.proof.min,
+                    count => `${spec.label} shows ${count} of ${spec.proof.min} ${spec.proof.selector} for ${nicks[index]}.`);
+            } else {
+                await until(() => brickWall(board), brickWallShown, wall => `Turdanoid race has no painted wall for ${nicks[index]} (${JSON.stringify(wall)}).`);
             }
         }
+        const findings = [];
+        for (const [index, page] of pages.entries()) {
+            for (const finding of layoutFindings(await measureLayout(page), viewport)) findings.push(`${nicks[index]}: ${finding}`);
+        }
+        if (strict && findings.length) throw new Error(`Layout findings at ${viewport.name}:\n${findings.join('\n')}`);
+        // The shot is the host's viewport, so the board has to be in it.
+        await host.locator(spec.board).scrollIntoViewIfNeeded();
+        await expect(host.locator(spec.board)).toBeInViewport();
         await host.waitForTimeout(250);
         if (fixture.errors().length) throw new Error(`Browser errors: ${fixture.errors().join('; ')}`);
         const buffer = await host.screenshot({ type: 'png', fullPage: false, animations: 'disabled' });
         await mkdir(path.dirname(target), { recursive: true }); await writeFile(target, buffer);
-        return { game: spec.label, version: spec.version, sha, viewport: `${viewport.width}x${viewport.height}`, path: path.relative(output, target), notes: 'Live in-process Game Night fixture; all seats joined; seated board/deal/wall visible; host screenshot.' };
+        return { game: spec.label, version: spec.version, sha, viewport: viewport.name, path: path.relative(base, target), notes: 'Live in-process Game Night fixture; all seats joined; seated board/deal/wall visible; host screenshot.', findings };
     } finally { await fixture.close(); }
 }
 
-async function main() {
-    if (!Number.isInteger(port) || port < 8700 || port > 8799) throw new Error('REGRADE_PORT must be within 8700–8799.');
-    await rm(output, { recursive: true, force: true });
-    await mkdir(output, { recursive: true });
+export async function main() {
+    assertPort(port);
+    const staging = `${output}.partial`;
+    await rm(staging, { recursive: true, force: true });
+    await mkdir(staging, { recursive: true });
     const temp = await mkdtemp(path.join(tmpdir(), 'family-alpha-regrade-'));
     const manifest = [];
-    let browser, site, complete = false;
+    let browser, site, failure = null;
     try {
         const roots = new Map();
         for (const entry of versions) {
@@ -217,25 +260,34 @@ async function main() {
             site.setRoot(root);
             for (const key of activeGames) for (const viewport of viewports) {
                 const spec = { ...gameSpecs[key], label: ({ 'partners-spades': 'partners Spades', 'four-player-spades': 'four-player Spades' })[key] || key, version: entry.version };
-                const target = path.join(output, entry.version, key, `${viewport.name}.png`);
-                manifest.push(await capture(browser, site.origin, root, spec, viewport, target, entry.sha));
-                process.stdout.write(`Captured ${entry.version} ${key} ${viewport.name}\n`);
+                const target = path.join(staging, entry.version, key, `${viewport.name}.png`);
+                const shot = await capture(browser, site.origin, root, spec, viewport, target, entry.sha, staging);
+                manifest.push(shot);
+                process.stdout.write(`Captured ${entry.version} ${key} ${viewport.name} (${shot.findings.length} layout findings)\n`);
             }
         }
-        await writeFile(path.join(output, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+        await writeFile(path.join(staging, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+        await rm(output, { recursive: true, force: true });
+        await rename(staging, output);
         process.stdout.write(`Wrote ${manifest.length} PNGs and manifest.json\n`);
-        complete = true;
-    } finally {
-        if (browser) await browser.close();
-        if (site) await site.close();
-        await rm(temp, { recursive: true, force: true });
-        if (!complete) await rm(output, { recursive: true, force: true });
-    }
+    } catch (error) { failure = error; }
+    // Each step runs even if an earlier one throws; a failed run never leaves partial shots behind.
+    const cleanup = settle([
+        async () => { if (browser) await browser.close(); },
+        async () => { if (site) await site.close(); },
+        () => rm(temp, { recursive: true, force: true }),
+        () => rm(staging, { recursive: true, force: true })
+    ]);
+    if (failure) { await cleanup.catch(() => {}); throw failure; }
+    await cleanup;
+    return manifest;
 }
 
-main().catch(error => {
-    if (error?.code === 'EPERM' && /listen|bind/i.test(error.syscall || error.message)) {
-        process.stderr.write(`Local server bind blocked (${error.code}): ${error.message}\nNo server was started; script is ready to run where localhost binds are permitted.\n`);
-    } else process.stderr.write(`${error?.stack || error}\n`);
-    process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    main().catch(error => {
+        if (['EPERM', 'EACCES', 'EADDRINUSE'].includes(error?.code) && /listen|bind/i.test(error.syscall || error.message)) {
+            process.stderr.write(`Local server bind blocked (${error.code}): ${error.message}\nNo server was started; script is ready to run where localhost binds are permitted.\n`);
+        } else process.stderr.write(`${error?.stack || error}\n`);
+        process.exitCode = 1;
+    });
+}
