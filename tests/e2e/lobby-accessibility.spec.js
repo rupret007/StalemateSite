@@ -449,7 +449,13 @@ test('native Chromium zoom keeps Jam invitations and the composer usable', async
             await page.keyboard.press('Enter');
             const cancel = page.getByRole('button', { name: 'Cancel', exact: true });
             const roster = page.getByRole('group', { name: 'Online guests' });
-            await expect(roster.getByRole('button', { name: 'Invite ZoomBandmate', exact: true })).toBeVisible();
+            const guestButton = roster.getByRole('button', { name: 'Invite ZoomBandmate', exact: true });
+            await expect(guestButton).toBeVisible();
+            await expect.poll(() => guestButton.evaluate(button => {
+                const text = document.createRange();
+                text.selectNodeContents(button);
+                return text.getClientRects().length;
+            })).toBe(1);
             await tabTo(page, cancel);
             await expect(cancel).toBeInViewport({ ratio: 1 });
             await capture(`jam-native-roster-${zoom * 100}.png`);

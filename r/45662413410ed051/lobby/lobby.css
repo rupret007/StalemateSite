@@ -923,6 +923,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
     min-height: 0;
   }
   [data-invite-quick] .invite-people {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
     min-height: 0;
     margin: 0;
   }
