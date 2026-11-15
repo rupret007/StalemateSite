@@ -95,12 +95,20 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
     // still hold the watcher in the next-game line (record.nextGame). Take them
     // out on every load, before a reopen or rematch can seat from the line.
     function dropWatchers(scope, game) {
+        for (const subject of watchers(scope)) game.dequeue(subject);
+    }
+    // The same kind of stored table can hold a watch-only subject in a seat. The
+    // table is told who they are and releases the seat between matches (rematch,
+    // start-rematch, reopen, or while it has not started), never mid-hand.
+    function watchers(scope) {
+        const found = new Set();
         for (const peer of sockets()) {
             const attachment = peer.deserializeAttachment();
             if (!attachment || attachment.ref !== scope.ref || attachment.room !== scope.room) continue;
             const peerBinding = member(attachment);
-            if (watchOnly(peerBinding)) game.dequeue(peerBinding.betaSid);
+            if (watchOnly(peerBinding)) found.add(peerBinding.betaSid);
         }
+        return found;
     }
     async function guestTableId(scope, match, host) {
         const record = await load(scope);
@@ -326,6 +334,8 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             // Lost join replies can be retried after the host closes or reopens the table.
             if (frame.action === 'join' && seatOf(game, binding)) frame = { version: 1, action: 'sync' };
             let changed = game?.expire(now()) || false;
+            // No hand is in play on a table that has not started: free a watch-only seat now.
+            if (game?.releaseWatchers(watchers(scope))) changed = true;
             if (game && !game.closed && queueArrivals(scope, game)) changed = true;
             const resume = frame.action === 'sync' && seatOf(game, binding) && !scope.synced;
             let expiresAt = record?.expiresAt;
@@ -335,7 +345,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 else if (frame.action === 'open') {
                     const SelectedTable = frame.mode === undefined ? Table : frame.mode === 'partners' ? PartnerTable : null;
                     if (!binding.canOpen || !SelectedTable) error = 'unavailable';
-                    else if (game?.closed && game.reopen(subject, uuid(), frame.mode, now(), connectedPlayers(scope))) {
+                    else if (game?.closed && game.reopen(subject, uuid(), frame.mode, now(), connectedPlayers(scope), watchers(scope))) {
                         claims = [];
                         changed = true;
                     } else if (game && !(game.closed && game.host === subject && game.subjects.length === 1)) error = 'unavailable';
@@ -365,10 +375,12 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                     const force = frame.action === 'start-rematch';
                     const candidate = uuid();
                     if (force && !binding.canOpen ||
-                        !game.requestRematch(subject, frame.id, candidate, now(), { connected: connectedPlayers(scope), force })) {
+                        !game.requestRematch(subject, frame.id, candidate, now(), { connected: connectedPlayers(scope), force, watchers: watchers(scope) })) {
                         error = 'rematch-unavailable';
                     } else {
-                        if (game.view(subject, now()).id === candidate) nextMatch = candidate;
+                        // A released watch-only seat with nobody in line leaves the table
+                        // waiting under the new id; only a started match is announced.
+                        if (game.openMatch?.id === candidate) nextMatch = candidate;
                         changed = true;
                     }
                 } else {
@@ -426,10 +438,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
         const connected = connectedPlayers(scope);
         if (connected.has(playerId)) return;
         const matchId = uuid();
-        if (record.game.startReadyRematch(matchId, now(), connected)) {
+        if (record.game.startReadyRematch(matchId, now(), connected, false, watchers(scope))) {
             const seq = record.seq + 1;
             await state.storage.put(key(scope), savedRecord(scope, record.game, record.expiresAt, record.claims, seq));
-            publish(scope, record.game, null, record.claims, seq, matchId);
+            publish(scope, record.game, null, record.claims, seq, record.game.openMatch ? matchId : undefined);
         } else publish(scope, record.game, null, record.claims, record.seq);
     }
     function reconcile() {

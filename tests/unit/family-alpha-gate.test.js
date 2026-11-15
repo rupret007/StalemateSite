@@ -212,11 +212,41 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
             expect(JSON.stringify(watcher.frames)).not.toMatch(/"playable":/);
         };
         readOnly(id);
+        // The rematch releases the stored seat; a phone in line takes it, so play goes on.
+        await f.hello(f.phone(game.seats));
         await resign(f, phones[0]);
         await f.send(phones[0], 'start-rematch', { id });
         const next = f.view(phones[0]).id;
         expect(next).not.toBe(id);
         readOnly(next);
+    });
+
+    it('5c. a watch-only invite the table lists in a seat gives it up at the rematch, and the phone up next takes it', async () => {
+        const { f, phones, id, seats } = await seated(game);
+        const index = game.seats - 1;
+        const { tableId } = f.view(phones[0]);
+        f.binding(index).gameGuest = { room, ref, host: sidFor(0), match: id, tableId, game: game.name, watch: true };
+        const watcher = f.phone(index);
+        await f.hello(watcher);
+        const extra = f.phone(game.seats);
+        await f.hello(extra);
+        expect(f.view(extra)).toMatchObject({ seat: null, upNext: true });
+        // Never mid-hand: the stored seat is untouched while the game is being played.
+        expect(f.view(phones[0])).toMatchObject({ id, waiting: false });
+        expect(f.view(phones[0]).occupied ?? seats).toHaveLength(game.seats);
+        await resign(f, phones[0]);
+        await f.send(phones[0], 'start-rematch', { id });
+        const next = f.view(phones[0]).id;
+        expect(next).not.toBe(id);
+        const players = phones.slice(0, -1);
+        expect(players.map(socket => f.view(socket).seat)).toEqual(seats.slice(0, -1));
+        expect(f.last(extra)).toMatchObject({ t: 'snapshot', phase: 'playing', currentMatchId: next, yourSeat: seats.at(-1) });
+        expect(f.view(extra).upNext).toBeUndefined();
+        if (game.privateHands) expect(f.view(extra).match.hand).toHaveLength(13);
+        expect(f.last(watcher)).toMatchObject({ t: 'snapshot', currentMatchId: next, yourSeat: null, canOpen: false });
+        expect(f.view(watcher)).toMatchObject({ watchOnly: true, seat: null });
+        if (game.privateHands) expect(f.view(watcher).match.hand).toEqual([]);
+        expect(JSON.stringify(watcher.frames)).not.toMatch(/"playable":/);
     });
 });
 

@@ -179,10 +179,28 @@ export function createGameNightTable({
             return true;
         }
 
-        reopen(subject, id, modeRequested, now, connected) {
+        // Seats a stored table still lists for a watch-only subject. The host and
+        // the first seat are never released this way.
+        #watcherSeats(watchers) {
+            if (!watchers?.size) return [];
+            return sides.filter(seat => seat !== first && this.#seats[seat] && this.#seats[seat] !== this.#host
+                && watchers.has(this.#seats[seat]));
+        }
+
+        // Privacy ruling #557/#560: a watch-only invitation never holds a seat. A
+        // table that has not started frees it at once. A match holds it until it is
+        // over; the next one frees it as it starts (see #admitNext).
+        releaseWatchers(watchers) {
+            if (this.#match) return false;
+            const seats = this.#watcherSeats(watchers);
+            for (const seat of seats) this.#seats[seat] = null;
+            return seats.length > 0;
+        }
+
+        reopen(subject, id, modeRequested, now, connected, watchers) {
             if (!this.#closed || subject !== this.#host || id === this.#id || modeRequested !== mode) return false;
             this.#closed = false;
-            this.#admitNext(connected);
+            this.#admitNext(connected, watchers);
             const occupied = this.#occupied();
             const match = occupied.length >= minSeats ? create(id, now, occupied) : null;
             this.#id = id;
@@ -197,22 +215,27 @@ export function createGameNightTable({
 
         expire(now) { return !this.#closed && (this.#match?.expire?.(now) ?? false); }
 
-        requestRematch(subject, id, nextId, now, { connected, force = false } = {}) {
+        requestRematch(subject, id, nextId, now, { connected, force = false, watchers } = {}) {
             const seat = this.seat(subject);
             if (this.#closed || id !== this.#id || !seat || !this.#match || !finished(this.#match)
                 || nextId === id || (force ? subject !== this.#host : this.#votes.includes(seat))) return false;
             if (!force) this.#votes.push(seat);
-            this.startReadyRematch(nextId, now, connected, force);
+            this.startReadyRematch(nextId, now, connected, force, watchers);
             return true;
         }
 
-        startReadyRematch(nextId, now, connected, force = false) {
+        startReadyRematch(nextId, now, connected, force = false, watchers) {
             if (this.#closed || !this.#match || !finished(this.#match) || nextId === this.#id) return false;
-            const occupied = this.#occupied();
+            // A watch-only seat cannot ask for a rematch, so it is not waited on.
+            const leaving = this.#watcherSeats(watchers);
+            const occupied = this.#occupied().filter(side => !leaving.includes(side));
             const online = connected ? occupied.filter(side => connected.has(this.#seats[side])) : occupied;
             if (!force && (!online.length || !online.every(side => this.#votes.includes(side)))) return false;
-            this.#admitNext(connected);
-            const match = create(nextId, now, this.#occupied());
+            this.#admitNext(connected, watchers);
+            // With a watch-only seat released and nobody in line to take it, the
+            // table waits with that seat open instead of dealing to an absent player.
+            const seated = this.#occupied();
+            const match = seated.length >= minSeats ? create(nextId, now, seated) : null;
             this.#id = nextId;
             this.#match = match;
             this.#votes = [];
@@ -224,7 +247,10 @@ export function createGameNightTable({
         // Fill only open seats from the line. A seated player keeps the same seat
         // on a rematch, including one who lost signal (#585 same-seat recovery);
         // anyone still waiting stays in line for the next open seat.
-        #admitNext(connected) {
+        #admitNext(connected, watchers) {
+            // Only reached between matches, never mid-hand: a watch-only subject gives
+            // up a stored seat here, so the line can fill it.
+            for (const seat of this.#watcherSeats(watchers)) this.#seats[seat] = null;
             const waiting = this.#next.filter(subject => this.#online(connected, subject) && !this.seat(subject));
             if (!waiting.length) {
                 if (connected) this.#next = this.#next.filter(subject => connected.has(subject) && !this.seat(subject));
