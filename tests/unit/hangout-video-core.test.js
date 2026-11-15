@@ -104,6 +104,24 @@ describe('hangout video core', () => {
         expect(V.backgroundVerdict(Array(30).fill(120))).toBe('stop');
     });
 
+    it('reopens a dead camera or mic only when that device is still on', () => {
+        const ended = { readyState: 'ended', muted: false };
+        const live = { readyState: 'live', muted: false };
+        const muted = { readyState: 'live', muted: true };
+        expect(V.resumeCapture({ visible: true, micOn: true, camOn: true, audio: live, video: ended })).toEqual({ audio: false, video: true });
+        expect(V.resumeCapture({ visible: true, micOn: true, camOn: true, audio: ended, video: live })).toEqual({ audio: true, video: false });
+        expect(V.resumeCapture({ visible: true, micOn: true, camOn: true, audio: muted, video: muted })).toEqual({ audio: true, video: true });
+        expect(V.resumeCapture({ visible: true, micOn: true, camOn: true, audio: live, video: live })).toEqual({ audio: false, video: false });
+        expect(V.resumeCapture({ visible: true, micOn: true, camOn: true, audio: null, video: null })).toEqual({ audio: true, video: true });
+        // Voice-only keeps the camera off. Mic-off does not open the mic.
+        expect(V.resumeCapture({ visible: true, micOn: true, camOn: false, audio: ended, video: null })).toEqual({ audio: true, video: false });
+        expect(V.resumeCapture({ visible: true, micOn: false, camOn: true, audio: null, video: ended })).toEqual({ audio: false, video: true });
+        expect(V.resumeCapture({ visible: true, micOn: true, camOn: true, screen: true, audio: live, video: ended })).toEqual({ audio: false, video: false });
+        expect(V.resumeCapture({ visible: false, micOn: true, camOn: true, audio: ended, video: ended })).toEqual({ audio: false, video: false });
+        expect(V.resumeCapture({ visible: true, kicked: true, micOn: true, camOn: true, audio: ended, video: ended })).toEqual({ audio: false, video: false });
+        expect(V.resumeCapture({ visible: true, ended: true, micOn: true, camOn: true, audio: ended, video: ended })).toEqual({ audio: false, video: false });
+    });
+
     it('builds talk vs music mic constraints and tunes Opus for music mode', () => {
         expect(V.micConstraints(false)).toMatchObject({ echoCancellation: true, noiseSuppression: true });
         expect(V.micConstraints(true, 'dev1')).toMatchObject({ echoCancellation: false, noiseSuppression: false, autoGainControl: false, deviceId: { exact: 'dev1' } });

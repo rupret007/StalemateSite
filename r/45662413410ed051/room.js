@@ -1467,6 +1467,15 @@
      * Media goes browser to browser (DTLS-SRTP), signaling rides the encrypted relay.
      * Every receiver has its own sender, so people only get our sharp feed when they're
      * watching us big (speaker view, pin, spotlight); everyone else gets a thumbnail. */
+    ui.avResume = doc.createElement('button');
+    ui.avResume.type = 'button';
+    ui.avResume.className = 'btn tap';
+    ui.avResume.hidden = true;
+    ui.avResume.textContent = 'Tap to resume video';
+    ui.avResume.setAttribute('data-av-resume', '');
+    ui.tiles.insertAdjacentElement('afterend', ui.avResume);
+    ui.avResume.addEventListener('click', () => { resumeLocalMedia(); });
+    function showAvResume(on) { ui.avResume.hidden = !on; }
     function avFlags() {
         return { mic: app.av.mic, cam: app.av.cam, canvas: app.av.canvas, screen: Boolean(app.av.screen), hand: app.av.hand, away: app.av.away };
     }
@@ -1567,24 +1576,45 @@
 
     // A permission prompt can outlive leaving the call or host moderation.
     const captureVersion = { audio: 0, video: 0 };
+    function stopTrack(track) {
+        if (!track) return;
+        track.__hangoutStopped = true;
+        if (track.readyState !== 'ended') track.stop();
+    }
     function keepCapture(kind, version, stream, restore) {
         if (!app.ended && version === captureVersion[kind] && !app.av.kicked && (restore || !(app.av.locked && !(app.av.mic || app.av.cam)))) return true;
-        stream.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach(stopTrack);
         return false;
+    }
+    function adoptLocalTrack(kind, track) {
+        if (!track || track.__hangoutWatched || (kind === 'video' && app.av.screen === track)) return;
+        track.__hangoutWatched = true;
+        track.addEventListener('ended', () => {
+            queueMicrotask(() => {
+                if (track.__hangoutStopped || app.ended) return;
+                if (kind === 'video' && (!app.av.cam || app.av.screen)) return;
+                if (kind === 'audio' && !app.av.mic) return;
+                if (doc.visibilityState === 'hidden') return;
+                resumeLocalMedia();
+            });
+        });
     }
     function setTrack(kind, track) {
         if (!app.av.stream) app.av.stream = new MediaStream();
         app.av.stream.getTracks().filter((t) => t.kind === kind).forEach((t) => app.av.stream.removeTrack(t));
-        if (track) app.av.stream.addTrack(track);
+        if (track) {
+            app.av.stream.addTrack(track);
+            adoptLocalTrack(kind, track);
+        }
     }
     function stopRaw(kind) {
         captureVersion[kind] += 1;
         if (kind === 'video') {
-            if (app.av.screen) { app.av.screen.stop(); app.av.screen = null; }
+            if (app.av.screen) { stopTrack(app.av.screen); app.av.screen = null; }
             if (app.av.bg.proc) { const p = app.av.bg.proc; app.av.bg.proc = null; p.destroy().catch(() => {}); }
-            if (app.av.rawCam) { app.av.rawCam.stop(); app.av.rawCam = null; }
+            if (app.av.rawCam) { stopTrack(app.av.rawCam); app.av.rawCam = null; }
         }
-        if (app.av.stream) app.av.stream.getTracks().filter((t) => t.kind === kind).forEach((t) => t.stop());
+        if (app.av.stream) app.av.stream.getTracks().filter((t) => t.kind === kind).forEach(stopTrack);
         setTrack(kind, null);
     }
 
@@ -1615,6 +1645,7 @@
                     stopRaw('video');
                     app.av.rawCam = got.getVideoTracks()[0];
                     app.av.canvas = false;
+                    adoptLocalTrack('video', app.av.rawCam);
                     setTrack('video', app.av.rawCam);
                     if (app.av.bg.choice && app.av.bg.choice !== 'none') setBackground(app.av.bg.choice, true);
                 } else {
@@ -1667,6 +1698,7 @@
             if (!keepCapture('video', version, got, restore)) return;
             stopRaw('video');
             app.av.rawCam = got.getVideoTracks()[0];
+            adoptLocalTrack('video', app.av.rawCam);
             setTrack('video', app.av.rawCam);
             app.av.cam = true;
             app.av.canvas = true;
@@ -1757,13 +1789,17 @@
      * share don't renegotiate. A sender is only added the first time a kind appears. */
     function syncTracks(entry) {
         const tracks = app.av.stream ? app.av.stream.getTracks() : [];
+        const replacements = [];
         for (const kind of ['audio', 'video']) {
             const t = tracks.find((x) => x.kind === kind) || null;
             const sender = entry.senders[kind];
+            // replaceTrack keeps the existing sender. addTrack is only the first
+            // time a kind appears, so a lock/resume does not renegotiate.
             if (!sender && t) entry.senders[kind] = entry.pc.addTrack(t, app.av.stream);
-            else if (sender && sender.track !== t) sender.replaceTrack(t).catch(() => {});
+            else if (sender && sender.track !== t) replacements.push(sender.replaceTrack(t));
         }
         applyEncoding();
+        if (replacements.length) Promise.all(replacements).then(() => applyEncoding()).catch(() => {});
     }
 
     /* One uplink plan for all viewers (see HangoutVideo.planUplink), then apply it. */
@@ -1868,6 +1904,7 @@
                     pruneStreamTracks(entry.stream);
                     layout();
                 };
+                e.track.addEventListener('unmute', () => { if (current()) resumeRemotePlayback(); });
                 pruneStreamTracks(entry.stream);
                 if (e.track.kind === 'audio') watchLevel(id, entry.stream);
                 layout();
@@ -2151,7 +2188,13 @@
         }
         const v = tile.querySelector('video');
         if (v.srcObject !== (stream || null)) v.srcObject = stream || null;
-        if (id !== 'me' && v.paused && stream) v.play().catch(() => {});
+        if (id !== 'me' && v.paused && stream) {
+            const pending = v.play();
+            if (pending && pending.then) pending.then(() => {
+                const stillPaused = [...ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')].some((el) => el.paused);
+                if (!stillPaused) showAvResume(false);
+            }).catch(() => showAvResume(true));
+        }
         const isCanvas = id === 'me' ? app.av.canvas : app.av.canvasPeers.has(id);
         const isScreen = id === 'me' ? Boolean(app.av.screen) : app.av.screenPeers.has(id);
         const camOn = id === 'me' ? app.av.cam : app.av.camPeers.has(id);
@@ -2349,15 +2392,16 @@
                 if (app.av.bg.proc) await app.av.bg.proc.restart({ kind: 'video', track: got.getVideoTracks()[0], element: app.av.bg.el });
                 if (!keepCapture('video', version, got)) return;
                 app.av.rawCam = got.getVideoTracks()[0];
+                adoptLocalTrack('video', app.av.rawCam);
                 setTrack('video', app.av.bg.proc ? app.av.bg.proc.processedTrack : app.av.rawCam);
                 pendingCamera = null;
-                if (old) old.stop();
+                if (old) stopTrack(old);
             }
             if (kind === 'mic' && app.av.mic) await restartMic();
             for (const entry of app.av.pcs.values()) syncTracks(entry);
             layout();
         } catch (error) {
-            if (pendingCamera) pendingCamera.getTracks().forEach((track) => track.stop());
+            if (pendingCamera) pendingCamera.getTracks().forEach(stopTrack);
             say('Couldn’t switch to that device. Is another app using it?');
         }
     }
@@ -2369,6 +2413,109 @@
         setTrack('audio', got.getAudioTracks()[0]);
         for (const entry of app.av.pcs.values()) syncTracks(entry);
         if (app.av.ac) watchLevel('me', app.av.stream);
+    }
+    async function restartCam() {
+        if (app.ended || app.av.kicked || !app.av.cam || app.av.screen) return false;
+        const canvas = app.av.canvas;
+        const version = ++captureVersion.video;
+        let got;
+        try {
+            got = await navigator.mediaDevices.getUserMedia({ video: canvas ? CANVAS_CAM : camConstraints() });
+        } catch (error) {
+            if (version !== captureVersion.video || !app.av.cam || doc.visibilityState === 'hidden') return false;
+            await dropCameraKeepVoice();
+            return false;
+        }
+        if (!keepCapture('video', version, got, true)) return false;
+        if (!app.av.cam || app.av.screen || app.av.canvas !== canvas || doc.visibilityState === 'hidden') {
+            got.getTracks().forEach(stopTrack);
+            return false;
+        }
+        const track = got.getVideoTracks()[0];
+        if (!track) { got.getTracks().forEach(stopTrack); return false; }
+        const old = app.av.rawCam;
+        let send = track;
+        if (app.av.bg.proc && !canvas) {
+            try {
+                await app.av.bg.proc.restart({ kind: 'video', track, element: app.av.bg.el });
+                if (!keepCapture('video', version, got, true) || !app.av.cam) return false;
+                send = app.av.bg.proc.processedTrack || track;
+            } catch (error) {
+                const proc = app.av.bg.proc;
+                app.av.bg.proc = null;
+                if (proc) proc.destroy().catch(() => {});
+                send = track;
+            }
+        }
+        if (version !== captureVersion.video || !app.av.cam || app.av.screen) {
+            stopTrack(track);
+            return false;
+        }
+        app.av.rawCam = track;
+        adoptLocalTrack('video', track);
+        setTrack('video', send);
+        if (old && old !== track) stopTrack(old);
+        for (const entry of app.av.pcs.values()) syncTracks(entry);
+        return true;
+    }
+    async function dropCameraKeepVoice() {
+        if (!app.av.cam || app.av.screen) return;
+        const voice = app.av.mic;
+        stopRaw('video');
+        app.av.cam = false;
+        app.av.canvas = false;
+        await refreshAv();
+        say(voice
+            ? 'You’re in with voice only. To add video, allow Camera by the address bar, then tap the camera button.'
+            : 'Camera’s blocked. Tap the lock or “aA” icon by the address bar, allow Camera, then try again.');
+    }
+    function localCapture(kind) {
+        if (!app.av.stream) return null;
+        return app.av.stream.getTracks().find((track) => track.kind === kind) || null;
+    }
+    let resumeJob = null;
+    function resumeLocalMedia() {
+        if (app.ended || doc.visibilityState === 'hidden') return Promise.resolve();
+        if (resumeJob) return resumeJob;
+        resumeJob = recoverLocalMedia().finally(() => { resumeJob = null; });
+        return resumeJob;
+    }
+    async function recoverLocalMedia() {
+        if (app.ended || doc.visibilityState !== 'visible') return;
+        const plan = V.resumeCapture({
+            visible: true,
+            ended: app.ended,
+            kicked: app.av.kicked,
+            micOn: app.av.mic,
+            camOn: app.av.cam,
+            screen: Boolean(app.av.screen),
+            audio: localCapture('audio'),
+            video: app.av.rawCam || localCapture('video')
+        });
+        if (plan.video) await restartCam();
+        if (plan.audio && app.av.mic) {
+            try { await restartMic(); }
+            catch (error) {
+                if (!app.ended && app.av.mic && doc.visibilityState === 'visible') {
+                    stopRaw('audio');
+                    app.av.mic = false;
+                    await refreshAv();
+                    say('Mic’s blocked. Tap the lock or “aA” icon by the address bar, allow Microphone, then try again.');
+                }
+            }
+        }
+        if (doc.visibilityState === 'visible') await resumeRemotePlayback();
+        layout();
+    }
+    async function resumeRemotePlayback() {
+        const videos = [...ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')];
+        let blocked = false;
+        await Promise.all(videos.map(async (video) => {
+            if (!video.paused || !video.srcObject) return;
+            try { await video.play(); }
+            catch (error) { blocked = true; }
+        }));
+        showAvResume(blocked);
     }
     async function setMusic(on) {
         app.av.music = Boolean(on);
@@ -2454,7 +2601,7 @@
         }
     }
 
-    /* ---------------- phones: keep awake, pause camera when hidden ---------------- */
+    /* ---------------- phones: keep awake; reopen a camera the OS ended ---------------- */
     async function wakeLock(on) {
         try {
             if (on && !app.av.lock && navigator.wakeLock && doc.visibilityState === 'visible') {
@@ -2472,7 +2619,10 @@
             applyEncoding();
             send({ type: 'av', av: avFlags() });
         }
-        if (!hidden && (app.av.mic || app.av.cam)) wakeLock(true);
+        if (!hidden) {
+            if (app.av.mic || app.av.cam) wakeLock(true);
+            resumeLocalMedia();
+        }
     });
 
     /* ---------------- pre-join check ---------------- */
