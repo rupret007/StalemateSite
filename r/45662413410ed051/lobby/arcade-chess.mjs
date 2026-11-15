@@ -19,8 +19,8 @@ const reasonText = {
 };
 
 export function chessTurnText(seat, turn) {
-    if (seat === turn) return 'Your turn';
     const who = seat ? `You’re ${colorName(seat)}` : 'Watching';
+    if (seat === turn) return `${who} · Your turn`;
     return `${who} · ${colorName(turn)} to move`;
 }
 
