@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RANKS, SUITS } from '../../hangout-worker/arcade/games/turdspades-engine.js';
 import { GameNightSpadesPartners, GameNightTurdSpades } from '../../hangout-worker/src/game-night-turdspades.mjs';
 
 const client = vi.hoisted(() => ({ handlers: null, sent: [] }));
@@ -37,6 +38,48 @@ function partnersTable() {
     const table = new GameNightSpadesPartners('spades-phone-fixture', 'host');
     expect(table.join('friend', 'spades-phone-fixture', 0, 'next')).toBe(true);
     return table;
+}
+
+const suitName = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs' };
+const suitSymbol = { S: '♠', H: '♥', D: '♦', C: '♣' };
+const suitByName = { Spades: 'S', Hearts: 'H', Diamonds: 'D', Clubs: 'C' };
+const deck = SUITS.flatMap(suit => RANKS.map(rank => ({ suit, rank })));
+
+function dealtCards(table) {
+    return Object.values(table.checkpoint().match.hands).flat().map(id => ({ id, ...deck[id] }));
+}
+
+function renderedCards(panel) {
+    return [...panel.querySelectorAll('[data-spades-hand] [data-spades-card]')].map(button => {
+        const label = button.getAttribute('aria-label') ?? '';
+        const parsed = label.match(/^(A|2|3|4|5|6|7|8|9|10|J|Q|K) of (Spades|Hearts|Diamonds|Clubs)/);
+        expect(parsed).not.toBeNull();
+        return {
+            id: Number(button.dataset.spadesCard),
+            rank: parsed[1],
+            suit: suitByName[parsed[2]],
+            face: button.querySelector('b')?.textContent ?? ''
+        };
+    });
+}
+
+function assertPanelHidesCards(panel, cards) {
+    expect(panel.querySelectorAll('[data-spades-card]')).toHaveLength(0);
+    const html = panel.innerHTML;
+    expect(html).not.toMatch(/[♠♥♦♣]/);
+    for (const name of Object.values(suitName)) expect(html).not.toContain(` of ${name}`);
+    for (const card of cards) {
+        const face = card.rank + suitSymbol[card.suit];
+        const label = `${card.rank} of ${suitName[card.suit]}`;
+        expect(html).not.toContain(`data-spades-card="${card.id}"`);
+        expect(html).not.toContain(face);
+        expect(html).not.toContain(label);
+        expect(html).not.toContain(`"id":${card.id}`);
+        expect(html).not.toContain(`"rank":"${card.rank}"`);
+        expect(html).not.toContain(`"suit":"${card.suit}"`);
+        expect(panel.textContent).not.toContain(face);
+        expect(panel.textContent).not.toContain(label);
+    }
 }
 
 function browserMetrics(html) {
@@ -96,13 +139,28 @@ describe('Spades phone table', () => {
         for (const [subject, position] of [['west-player', 'west'], ['north-player', 'north'], ['east-player', 'east']]) {
             expect(table.join(subject, 'spades-four-phone-fixture', 0, position)).toBe(true);
         }
-        const view = mount();
-        client.handlers.onState({ state: table.view('host'), canOpen: true, partners: true });
-        expect(view.find('[data-spades-seat]').textContent).toBe('You’re South · Partner: North');
-        expect(view.find('[data-spades-hand]').children).toHaveLength(13);
-        expect(view.find('[data-spades-trick]').children).toHaveLength(4);
-        expect(view.find('[data-spades-status]').textContent).toContain('to bid');
-        expect(view.find('[data-spades-score="0"]').textContent).toContain('South + North');
+        const players = [['host', 'south', true], ['west-player', 'west', false], ['north-player', 'north', false], ['east-player', 'east', false]];
+        const renderedIds = [];
+        for (const [subject, position, canOpen] of players) {
+            document.body.replaceChildren();
+            const state = table.view(subject);
+            expect(state.seat).toBe(position);
+            const view = mount();
+            client.handlers.onState({ state, canOpen, partners: true });
+            if (subject === 'host') {
+                expect(view.find('[data-spades-seat]').textContent).toBe('You’re South · Partner: North');
+                expect(view.find('[data-spades-hand]').children).toHaveLength(13);
+                expect(view.find('[data-spades-trick]').children).toHaveLength(4);
+                expect(view.find('[data-spades-status]').textContent).toContain('to bid');
+                expect(view.find('[data-spades-score="0"]').textContent).toContain('South + North');
+            }
+            const rendered = renderedCards(view.panel);
+            const dealt = state.match.hand.map(({ id, rank, suit }) => ({ id, rank, suit }));
+            expect(rendered.map(({ id, rank, suit }) => ({ id, rank, suit }))).toEqual(dealt);
+            expect(rendered.map(card => card.face)).toEqual(dealt.map(card => card.rank + suitSymbol[card.suit]));
+            renderedIds.push(...rendered.map(card => card.id));
+        }
+        expect(new Set(renderedIds).size).toBe(52);
     });
 
     it('hides a stale trick while bidding in both modes and shows trick cards during play', () => {
@@ -144,6 +202,9 @@ describe('Spades phone table', () => {
         expect(view.find('[data-spades-hand-label]').hidden).toBe(true);
         expect(view.find('[data-spades-bid]').hidden).toBe(true);
         expect(view.panel.querySelectorAll('[data-spades-action]:not([hidden])')).toHaveLength(0);
+        const privateCards = dealtCards(table);
+        expect(privateCards).toHaveLength(52);
+        assertPanelHidesCards(view.panel, privateCards);
     });
 
     it('keeps the full-table up-next sentence', () => {

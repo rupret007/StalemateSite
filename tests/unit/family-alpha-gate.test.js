@@ -3,6 +3,7 @@
 // driven through the real match transport, tables and invitation routes with
 // the same in-memory storage shape as arcade-transport.test.js.
 import { describe, expect, it, vi } from 'vitest';
+import { RANKS, SUITS } from '../../hangout-worker/arcade/games/turdspades-engine.js';
 import { ARCADE_TAG, createArcadeTransport } from '../../hangout-worker/src/arcade-transport.mjs';
 import { DEMO_INVITE_TTL } from '../../hangout-worker/src/beta-auth.mjs';
 import { GAME_INVITE_UNAVAILABLE, gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
@@ -12,10 +13,48 @@ const ref = '0'.repeat(32);
 const actorId = index => 'c' + String(index + 1).repeat(32);
 const sidFor = index => 'seat-' + index;
 
+const deck = SUITS.flatMap(suit => RANKS.map(rank => ({ suit, rank })));
+
+function stringHasPrivateCard(text, card) {
+    const rank = `"rank":"${card.rank}"`;
+    const suit = `"suit":"${card.suit}"`;
+    if (text.includes(rank) && text.includes(suit)) return true;
+    if (new RegExp(`"(?:id|card)":${card.id}(?!\\d)`).test(text)) return true;
+    return new RegExp(`(?:^|[^A-Z0-9])${card.rank}${card.suit}(?![A-Z0-9])`).test(text);
+}
+
+function idListLeaks(value, card) {
+    if (!Array.isArray(value) || value.length === 0 || value.length > 52) return false;
+    if (!value.every(item => Number.isInteger(item) && item >= 0 && item < 52)) return false;
+    if (new Set(value).size !== value.length) return false;
+    return value.includes(card.id);
+}
+
+// Match a card by id, by rank and suit together, by a serialized fragment, or by any
+// unique list of those ids, including a partial hand nested under another property.
 function containsPrivateCard(value, card) {
+    if (typeof value === 'string') return stringHasPrivateCard(value, card);
+    if (Array.isArray(value)) {
+        if (idListLeaks(value, card)) return true;
+        return value.some(entry => containsPrivateCard(entry, card));
+    }
     if (!value || typeof value !== 'object') return false;
-    if (!Array.isArray(value) && value.rank === card.rank && value.suit === card.suit) return true;
+    if (value.rank === card.rank && value.suit === card.suit) return true;
+    if (Number.isInteger(value.id) && value.id === card.id) return true;
+    if (Number.isInteger(value.card) && value.card === card.id) return true;
     return Object.values(value).some(entry => containsPrivateCard(entry, card));
+}
+
+function storedHands(records, gameName) {
+    for (const record of records.values()) {
+        const hands = record?.[gameName]?.match?.hands;
+        if (hands && typeof hands === 'object') return hands;
+    }
+    return null;
+}
+
+function cardsFromHands(hands) {
+    return Object.values(hands ?? {}).flat().map(id => ({ id, ...deck[id] }));
 }
 
 const games = [
@@ -56,12 +95,12 @@ function fixture(name) {
         current: scope => actors.get(scope.actor), active: async () => true, approve: async () => true,
         charge: async () => true, allowed: () => true });
     const send = (socket, action, fields = {}) => transport.receive(socket, JSON.stringify({ version: 1, action, ...fields }));
-    const hello = socket => transport.receive(socket, JSON.stringify({ version: 1, t: 'hello', lastSeq: 0 }));
+    const hello = (socket, lastSeq = 0) => transport.receive(socket, JSON.stringify({ version: 1, t: 'hello', lastSeq }));
     const last = socket => socket.frames.findLast(frame => frame.t === 'match-state' || frame.t === 'snapshot');
     const view = socket => last(socket)?.state;
     // The phone's socket ends without a leave, as when it loses signal.
     const drop = async socket => { socket.readyState = 3; await transport.presenceChanged(socket.deserializeAttachment()); };
-    return { phone, send, hello, last, view, drop, advance: ms => { now += ms; } };
+    return { phone, send, hello, last, view, drop, records, advance: ms => { now += ms; } };
 }
 
 async function seated(game) {
@@ -155,8 +194,12 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         phones.forEach((socket, index) => {
             expect(socket.frames).toContainEqual({ t: 'rematch', matchId: next });
             expect(f.last(socket)).toMatchObject({ phase: 'playing', currentMatchId: next, yourSeat: seats[index] });
+            expect(seats[index]).not.toBeNull();
+            expect(f.view(socket).seat).toBe(seats[index]);
             expect(f.view(socket).match.result ?? null).toBeNull();
         });
+        expect(f.last(phones[0])).toMatchObject({ phase: 'playing', yourSeat: f.view(phones[0]).seat });
+        expect(f.view(phones[0]).seat).not.toBeNull();
     });
 
     it('4b. a rematch also starts once every connected player has asked, even with one phone away', async () => {
@@ -168,6 +211,8 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         for (const socket of phones.slice(0, -1).filter(entry => entry.readyState === 1)) await f.send(socket, 'rematch', { id });
         const next = f.view(phones[0]).id;
         expect(next).not.toBe(id);
+        expect(f.last(phones[0])).toMatchObject({ phase: 'playing', currentMatchId: next });
+        expect(f.view(phones[0]).seat).not.toBeNull();
         expect(f.last(phones.at(-1))).toMatchObject({ phase: 'playing', currentMatchId: next, yourSeat: seats.at(-1) });
         if (game.seats > 2) {
             const returned = f.phone(1);
@@ -186,9 +231,20 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         if (game.privateHands) {
             const hands = phones.map(socket => f.view(socket).match.hand);
             for (const hand of hands) expect(hand).toHaveLength(13);
-            const privateCards = hands.flat();
+            const stored = cardsFromHands(storedHands(f.records, game.name));
+            expect(stored).toHaveLength(52);
+            const privateCards = [...hands.flat(), ...stored];
             const assertNoPrivateCards = payload => {
+                const serialized = JSON.stringify(payload);
+                expect(serialized).not.toMatch(/"playable":/);
                 for (const card of privateCards) expect(containsPrivateCard(payload, card)).toBe(false);
+                for (const hand of [...hands, ...Object.values(storedHands(f.records, game.name) ?? {}).map(ids => ids.map(id => ({ id, ...deck[id] })))]) {
+                    for (let length = 1; length <= hand.length; length += 1) {
+                        const partial = hand.slice(0, length);
+                        expect(serialized).not.toContain(JSON.stringify(partial));
+                        expect(serialized).not.toContain(JSON.stringify(partial.map(card => card.id)));
+                    }
+                }
             };
             // Check all historical frames and the current view by card identity,
             // independent of the property that carries a card or hand.
@@ -211,18 +267,42 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
             await f.hello(returnedWatcher);
             expect(f.last(returnedWatcher)).toMatchObject({ phase: 'playing', yourSeat: null });
             expect(f.view(returnedWatcher)).toMatchObject({ seat: null, match: { hand: [] } });
+            expect(f.last(phones[0])).toMatchObject({ phase: 'playing' });
+            expect(f.view(phones[0]).seat).not.toBeNull();
             expect(f.last(phones[0]).yourSeat).toBeTruthy();
-            const rematchCards = phones.map(socket => f.view(socket).match.hand).flat();
+            const rematchStored = cardsFromHands(storedHands(f.records, game.name));
+            expect(rematchStored).toHaveLength(52);
+            const rematchCards = [...phones.map(socket => f.view(socket).match.hand).flat(), ...rematchStored];
             const assertNoRematchCards = payload => {
+                const serialized = JSON.stringify(payload);
+                expect(serialized).not.toMatch(/"playable":/);
                 for (const card of rematchCards) expect(containsPrivateCard(payload, card)).toBe(false);
+                const dealt = Object.values(storedHands(f.records, game.name) ?? {}).map(ids => ids.map(cardId => ({ id: cardId, ...deck[cardId] })));
+                for (const hand of dealt) {
+                    for (let length = 1; length <= hand.length; length += 1) {
+                        const partial = hand.slice(0, length);
+                        expect(serialized).not.toContain(JSON.stringify(partial));
+                        expect(serialized).not.toContain(JSON.stringify(partial.map(card => card.id)));
+                    }
+                }
             };
             assertNoRematchCards(returnedWatcher.frames);
             assertNoRematchCards(f.view(returnedWatcher));
+            const priorSeq = f.last(returnedWatcher).seq;
+            expect(priorSeq).toBeGreaterThan(0);
             await f.drop(returnedWatcher);
             const reconnectedWatcher = f.phone(game.seats + 1);
-            await f.hello(reconnectedWatcher);
+            await f.hello(reconnectedWatcher, priorSeq);
             expect(f.last(reconnectedWatcher)).toMatchObject({ phase: 'playing', yourSeat: null });
             expect(f.view(reconnectedWatcher)).toMatchObject({ seat: null, match: { hand: [] } });
+            assertNoRematchCards(reconnectedWatcher.frames);
+            assertNoRematchCards(f.view(reconnectedWatcher));
+            const resumedSeq = f.last(reconnectedWatcher).seq;
+            expect(resumedSeq).toEqual(expect.any(Number));
+            await f.hello(reconnectedWatcher, resumedSeq);
+            expect(f.last(reconnectedWatcher)).toMatchObject({ phase: 'playing', yourSeat: null });
+            expect(f.view(reconnectedWatcher).seat).toBeNull();
+            expect(f.view(reconnectedWatcher).match.hand).toEqual([]);
             assertNoRematchCards(reconnectedWatcher.frames);
             assertNoRematchCards(f.view(reconnectedWatcher));
         }
