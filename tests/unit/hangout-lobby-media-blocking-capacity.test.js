@@ -10,6 +10,8 @@ import { accountId } from '../../hangout-worker/src/auth.mjs';
 
 const SOURCE = 'capacity-community-entry-fixture'.padEnd(32, 'x');
 const ROOMS = Array.from({ length: LOBBY_LIMITS.roomsListed }, (_, n) => `#art-capacity-${String(n).padStart(2, '0')}`);
+// Vitest 4 runs sibling beforeAll hooks in parallel; keep one serial setup phase.
+const FIXTURE_SETUP_HOOK_MS = 300_000;
 let f;
 beforeAll(async () => {
     let at = 1800000000000;
@@ -63,21 +65,19 @@ beforeAll(async () => {
         await message(person, { t: 'hello', nick: person.nick, age13: true, entrySource: SOURCE });
         expect(engine._debug.conns.get(person.id).nick).toBe(person.nick);
     }
-});
-
-// Keep setup phases within existing individual hook limits. These phases do
-// not establish a whole-fixture latency or production throughput guarantee.
-for (const [index, room] of ROOMS.entries()) beforeAll(async () => {
-    // Eight founders rotate; creation is 24 minutes apart per device, within the
-    // existing 10-minute/device and 3/hour/IP rules, with no synthetic mutation.
-    f.advance(3 * 60000);
-    const founder = f.guests[index % f.guests.length];
-    await f.cmd(founder, 'join', [room]);
-    for (const guest of f.guests) if (guest !== founder) await f.cmd(guest, 'join', [room]);
-    expect(f.engine._debug.channels.get(room).members.size).toBe(LOBBY_LIMITS.roomMax);
-    for (const person of f.staff) await f.cmd(person, 'join', [room]);
-    expect(f.engine._debug.channels.get(room).members.size).toBe(LOBBY_LIMITS.roomMax + f.staff.length);
-});
+    // Serial thirty-room setup in the same hook. Measured clean engine work is ~35s.
+    for (const [index, room] of ROOMS.entries()) {
+        // Eight founders rotate; creation is 24 minutes apart per device, within the
+        // existing 10-minute/device and 3/hour/IP rules, with no synthetic mutation.
+        f.advance(3 * 60000);
+        const founder = f.guests[index % f.guests.length];
+        await f.cmd(founder, 'join', [room]);
+        for (const guest of f.guests) if (guest !== founder) await f.cmd(guest, 'join', [room]);
+        expect(f.engine._debug.channels.get(room).members.size).toBe(LOBBY_LIMITS.roomMax);
+        for (const person of f.staff) await f.cmd(person, 'join', [room]);
+        expect(f.engine._debug.channels.get(room).members.size).toBe(LOBBY_LIMITS.roomMax + f.staff.length);
+    }
+}, FIXTURE_SETUP_HOOK_MS);
 
 describe('Block remains available at accepted shared-room membership', () => {
     it('commits one device block across 30 accepted rooms without exceeding the existing staged-output budget', async () => {

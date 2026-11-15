@@ -18,6 +18,9 @@ import { LOBBY_LIMITS } from '../../hangout-worker/src/lobby-core.mjs';
 
 const ORIGIN = 'https://capacity.fixture.invalid', ALARM = '__test_capacity_alarm__';
 const INVITE = 'synthetic-capacity-invite-'.repeat(3), PREVIEW = 'synthetic-capacity-preview-'.repeat(3);
+// Vitest 4 runs sibling beforeAll hooks in parallel; size deadlines to measured setup.
+const FIXTURE_BOOTSTRAP_HOOK_MS = 120_000;
+const FIXTURE_ADMISSIONS_HOOK_MS = 600_000;
 const bytes = value => value === undefined ? 0 : value instanceof Uint8Array ? value.byteLength : Buffer.byteLength(JSON.stringify(value));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let f;
@@ -180,21 +183,20 @@ beforeAll(async () => {
             if (index === 49) f.baseline50 = sample; else f.final150 = sample;
         }
     };
-});
-
-// One genuine admission per unchanged hook deadline, in the same order. A
-// five-person batch could exhaust a test-runner hook without any single
-// application action failing. Never retry a refused admission or extend its
-// deadline; later hooks stop after the first actual refusal.
-for (let index = 0; index < LOBBY_LIMITS.lobbyMax; index++) beforeAll(async () => {
-    if (!f.firstFailure) await f.admit(index);
-});
+}, FIXTURE_BOOTSTRAP_HOOK_MS);
 afterAll(async () => {
     if (f) { f.lobby?.presence.dispose(); await Promise.allSettled(f.background.splice(0)); await f.driver.close(); await rm(f.directory, { recursive: true, force: true }); }
     vi.unstubAllGlobals();
 });
 
 describe('actual production C3 admission capacity', () => {
+    // Nested hook runs after file-root bootstrap; serial 150 guests (~118s measured).
+    beforeAll(async () => {
+        for (let index = 0; index < LOBBY_LIMITS.lobbyMax; index++) {
+            if (!f.firstFailure) await f.admit(index);
+        }
+    }, FIXTURE_ADMISSIONS_HOOK_MS);
+
     it('admits the unchanged150 ordinary guests with eligible current grants and healthy transport', () => {
         const measurement = { scope: 'actual-SQLite-gateway-C3-capacity-only', baseline50: f.baseline50,
             final150: f.final150,
