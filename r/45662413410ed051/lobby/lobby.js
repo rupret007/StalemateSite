@@ -2124,7 +2124,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         if (state?.id !== invite.match || !state.waiting || state.hasOpenSeat === false) {
             const message = currentJam()?.keepRef === invite.ref
-                ? state?.id === invite.match ? 'The Chess table is full. You can stay in the room for the next game.'
+                ? state?.id === invite.match ? 'The Chess table is full. You can wait here for an open seat.'
                     : 'That Chess match has ended. You can still join an open match here.'
                 : 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.';
             return finishArcadeInvitation(message);
