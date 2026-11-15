@@ -384,7 +384,63 @@ test('a dropped relay connection reconnects and faces come back', async ({ brows
     await expect(host.locator('.tile:not([data-tile="me"])')).toHaveCount(1, { timeout: 20000 });
 });
 
-test('a reconnect during camera publication cannot restore a departed peer after decryption', async ({ browser }) => {
+test('faces that never connect stop rebuilding after three tries; "Try faces again" restarts them', async ({ browser }) => {
+    const { host, guest } = await call(browser);
+    // Persistent failure on the guest: every connection reports 'failed', the 2/4/8 s restart
+    // pacing runs fast, and each RTCPeerConnection the page builds is counted.
+    await guest.evaluate(() => {
+        const state = Object.getOwnPropertyDescriptor(RTCPeerConnection.prototype, 'connectionState');
+        Object.defineProperty(RTCPeerConnection.prototype, 'connectionState', {
+            configurable: true,
+            get() { return window.__failFaces ? 'failed' : state.get.call(this); }
+        });
+        const Real = window.RTCPeerConnection;
+        window.__built = 0;
+        window.RTCPeerConnection = function (config) { window.__built += 1; return new Real(config); };
+        window.RTCPeerConnection.prototype = Real.prototype;
+        const realTimeout = window.setTimeout;
+        window.setTimeout = (fn, ms, ...rest) => realTimeout(fn, window.__failFaces && [2000, 4000, 8000].includes(ms) ? 40 : ms, ...rest);
+        window.__failFaces = true;
+    });
+    // Each connection learns it failed from its own state event; fire it for whichever one is current.
+    const noticeFailure = () => guest.evaluate(() => {
+        for (const entry of window.__hangout.av.pcs.values()) entry.pc.onconnectionstatechange();
+    });
+    const stuck = guest.locator('[data-faces-stuck]');
+    await expect.poll(async () => { await noticeFailure(); return stuck.isVisible(); }, { timeout: 20000 }).toBe(true);
+    await expect(stuck).toContainText('Faces with Jeff aren’t connecting');
+    await expect(stuck).toContainText('Chat and draw still work');
+    await expect(guest.locator('[data-faces-retry]')).toHaveText('Try faces again');
+
+    // Three fresh connections, then nothing: no timer is pending and more failure events build nothing.
+    const stopped = () => guest.evaluate(() => ({
+        built: window.__built,
+        timers: [...window.__hangout.av.pcs.values()].filter((entry) => entry.restartTimer).length
+    }));
+    expect(await stopped()).toEqual({ built: 3, timers: 0 });
+    for (let i = 0; i < 5; i += 1) await noticeFailure();
+    expect(await stopped()).toEqual({ built: 3, timers: 0 });
+    await expect(stuck).toBeVisible();
+
+    // Chat is untouched by the stopped faces.
+    await guest.fill('[data-text]', 'Still chatting without faces');
+    await guest.press('[data-text]', 'Enter');
+    await expect(host.locator('[data-log]')).toContainText('Still chatting without faces');
+
+    // The failure clears; the button spends a fresh budget and the faces come back.
+    await guest.evaluate(() => { window.__failFaces = false; });
+    await guest.click('[data-faces-retry]');
+    await expect(stuck).toBeHidden();
+    await expect.poll(() => guest.evaluate(() => window.__built)).toBe(4);
+    for (const page of [host, guest]) {
+        await expect.poll(() => page.evaluate(() => [...window.__hangout.av.pcs.values()][0]?.pc.connectionState), { timeout: 20000 }).toBe('connected');
+    }
+    const before = await framesFrom(guest);
+    await expect.poll(async () => (await framesFrom(guest)) - before, { timeout: 15000 }).toBeGreaterThan(5);
+    expect(host.errors.concat(guest.errors)).toEqual([]);
+});
+
+test('a reconnect during camera publication cannot restore a departed peer after decryption',async ({ browser }) => {
     const host = await openBrowser(browser);
     await join(host, roomUrl(), 'Jeff');
     const guest = await openBrowser(browser);
@@ -1211,9 +1267,15 @@ test('iOS lock under the gesture rule: devices stay on, one tap restores camera 
     await expect(guest.locator('[data-cam]')).toHaveText('Turn off my camera');
     await expect(guest.locator('[data-mic]')).toHaveText('Mute my mic');
     // The peer's picture is stalled until the tap.
-    const stalled = await framesFrom(host);
-    await host.waitForTimeout(700);
-    expect(await framesFrom(host) - stalled).toBeLessThanOrEqual(2);
+    // Condition, not a set time: two readings in a row of the decoded-frame counter must match.
+    // A flowing 30 fps picture can never satisfy that, however the machine is loaded.
+    let lastFrames = -1;
+    await expect.poll(async () => {
+        const frames = await framesFrom(host);
+        const moved = frames - lastFrames;
+        lastFrames = frames;
+        return moved;
+    }, { timeout: 10000 }).toBe(0);
 
     const before = await framesFrom(host);
     await guest.click('[data-av-resume]');

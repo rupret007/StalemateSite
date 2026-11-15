@@ -62,7 +62,24 @@ const WEBKIT_MISSING = 'WebKit not launchable on this host';
 const WEBKIT_CRASH = 'WebKit renderer crash on this host (environment limit)';
 const errorText = (error) => `${error && error.name ? error.name : ''} ${error && error.message ? error.message : ''}`;
 const webkitExecutableMissing = (error) => /executable doesn['’]t exist|executable does not exist/i.test(errorText(error));
-const rendererCrash = (error) => /page crashed|renderer crash|target crashed/i.test(errorText(error));
+/** Records Playwright's page 'crash' event. That event is the only proof of a renderer crash:
+ * the wording of an error never is, so an error that merely mentions a crash still fails. */
+function watchCrash(pages) {
+    const watch = { seen: false };
+    watch.event = new Promise((resolve) => {
+        for (const page of pages) page.on('crash', () => { watch.seen = true; resolve(); });
+    });
+    // A call rejected by a crash can reach the test just ahead of the event itself, so wait for
+    // the event (bounded) before deciding. No event in that window means no crash was observed.
+    watch.settle = async () => {
+        if (watch.seen) return true;
+        let timer;
+        await Promise.race([watch.event, new Promise((resolve) => { timer = setTimeout(resolve, 1000); })]);
+        clearTimeout(timer);
+        return watch.seen;
+    };
+    return watch;
+}
 function skipForHost(description) {
     test.info().annotations.push({ type: 'environment', description });
     test.skip(true, description);
@@ -433,8 +450,10 @@ test('two people in WebKit when that browser launches', async () => {
         report.pass = false;
         report.status = hostLimit;
     };
-    // Only a page 'crash' event (noted above) counts. A closed page or browser is not a crash.
-    const pageDown = () => Boolean(hostLimit);
+    // Only an observed page 'crash' event counts. A closed page, a closed browser or an error
+    // whose text mentions a crash is not one.
+    let crash = { seen: false, settle: async () => false };
+    const pageDown = () => { if (crash.seen) noteLimit(hostLimitText); return Boolean(hostLimit); };
     browser = await launchWebkit(report);
     if (!browser) {
         console.log(`CHECK f fail launched=false env=${Boolean(report.missing)} seconds= status=${report.status}`);
@@ -448,8 +467,7 @@ test('two people in WebKit when that browser launches', async () => {
             guest = await openBrowser(browser, PHONE);
             host.setDefaultTimeout(8000);
             guest.setDefaultTimeout(8000);
-            host.on('crash', () => noteLimit(hostLimitText));
-            guest.on('crash', () => noteLimit(hostLimitText));
+            crash = watchCrash([host, guest]);
             const inputs = await guest.evaluate(async () => {
                 try {
                     const list = await navigator.mediaDevices.enumerateDevices();
@@ -481,8 +499,7 @@ test('two people in WebKit when that browser launches', async () => {
                         return 'waiting';
                     }, { timeout: 12000 }).not.toBe('waiting');
                 } catch (error) {
-                    if (pageDown() || rendererCrash(error)) noteLimit(hostLimitText);
-                    else {
+                    if (!(await crash.settle()) || !pageDown()) {
                         report.pass = false;
                         report.status = 'WebKit stayed up, but neither side showed a playing face.';
                         throw new Error(report.status);
@@ -504,8 +521,7 @@ test('two people in WebKit when that browser launches', async () => {
             }
         }
     } catch (error) {
-        if (hostLimit || rendererCrash(error)) noteLimit(hostLimitText);
-        else {
+        if (!(await crash.settle()) || !pageDown()) {
             report.pass = false;
             report.environment = false;
             if (!report.status || report.status === 'WebKit did not launch') report.status = scrub(error.message);
@@ -757,9 +773,10 @@ test('WebKit iPhone emulation captures the camera from one gesture', async () =>
         throw new Error(wkReport.status);
     }
     let crashed = false;
+    let crash = { seen: false, settle: async () => false };
     try {
         const phone = await openBrowser(wk, iphoneContext(), armIosGestureMedia);
-        phone.on('crash', () => { crashed = true; });
+        crash = watchCrash([phone]);
         await join(phone, roomUrl(), 'Casey');
         await turnCamera(phone);
         const log = await phone.evaluate(() => window.__gumLog || []);
@@ -767,8 +784,8 @@ test('WebKit iPhone emulation captures the camera from one gesture', async () =>
         expect(log.every(Boolean)).toBe(true);
         wkReport.status = 'WebKit stayed up through one camera gesture.';
     } catch (error) {
-        // A renderer crash is the host's limit. Any other error is a real failure.
-        if (!crashed && !rendererCrash(error)) {
+        // Only an observed page 'crash' event is the host's limit. Any other error is a real failure.
+        if (!(await crash.settle())) {
             wkReport.status = scrub(error.message);
             throw error;
         }

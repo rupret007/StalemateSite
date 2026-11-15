@@ -1477,6 +1477,37 @@
     ui.tiles.insertAdjacentElement('afterend', ui.avResume);
     // Capture and play both start inside this tap: iOS refuses them anywhere else.
     ui.avResume.addEventListener('click', () => { unblockFaces(); resumeLocalMedia(true); });
+    /* Faces that stopped reconnecting (rebuild budget spent, see rebuildPc): an honest line that
+     * stays put, with one small button to try again. Chat and drawing never depend on it. */
+    ui.facesRetry = doc.createElement('p');
+    ui.facesRetry.className = 'faces-retry';
+    ui.facesRetry.hidden = true;
+    ui.facesRetry.setAttribute('data-faces-stuck', '');
+    ui.facesRetry.setAttribute('role', 'status');
+    ui.facesRetryText = doc.createElement('span');
+    ui.facesRetryBtn = doc.createElement('button');
+    ui.facesRetryBtn.type = 'button';
+    ui.facesRetryBtn.className = 'btn';
+    ui.facesRetryBtn.textContent = 'Try faces again';
+    ui.facesRetryBtn.setAttribute('data-faces-retry', '');
+    ui.facesRetry.append(ui.facesRetryText, ui.facesRetryBtn);
+    ui.tiles.insertAdjacentElement('afterend', ui.facesRetry);
+    const stuckFaces = () => Array.from(app.av.pcs.keys()).filter((id) => relayPeers.get(id)?.facesStopped);
+    function paintFacesRetry() {
+        const ids = stuckFaces();
+        ui.facesRetry.hidden = !ids.length;
+        if (ids.length) ui.facesRetryText.textContent = `Faces with ${ids.map(peerName).join(', ')} aren’t connecting, so we stopped trying. Chat and draw still work.`;
+    }
+    ui.facesRetryBtn.addEventListener('click', () => {
+        for (const id of stuckFaces()) {
+            const peer = relayPeers.get(id);
+            peer.rebuilds = 0;
+            peer.facesStopped = false;
+            rebuildPc(id);
+        }
+        paintFacesRetry();
+    });
+
     // The button stays up while remote playback or the local camera/mic still needs a tap.
     const avResumeWhy = { playback: false, video: false, audio: false };
     function paintAvResume() {
@@ -1948,7 +1979,19 @@
             pc.onconnectionstatechange = () => {
                 if (!current()) return;
                 const s = pc.connectionState;
-                if (s === 'connected') { entry.restarts = 0; clearTimeout(entry.restartTimer); entry.restartTimer = 0; checkRelay(id, entry); layout(); }
+                clearTimeout(entry.steadyTimer);
+                entry.steadyTimer = 0;
+                if (s === 'connected') {
+                    entry.restarts = 0; clearTimeout(entry.restartTimer); entry.restartTimer = 0;
+                    peer.facesStopped = false;
+                    paintFacesRetry();
+                    // Only a link that holds earns the rebuild budget back; one that flaps does not.
+                    entry.steadyTimer = win.setTimeout(() => {
+                        entry.steadyTimer = 0;
+                        if (current() && pc.connectionState === 'connected') peer.rebuilds = 0;
+                    }, REBUILD_STEADY_MS);
+                    checkRelay(id, entry); layout();
+                }
                 if (s === 'disconnected') win.setTimeout(() => { if (pc.connectionState === 'disconnected') restartIce(id, entry); }, 3000);
                 if (s === 'failed') restartIce(id, entry);
             };
@@ -1968,9 +2011,16 @@
     /* Reconnect: paced ICE restarts (each one gets 2 s / 4 s / 8 s to finish its
      * negotiation before the next counts), then replace the connection with a fresh one. */
     const ICE_RETRY_MS = [2000, 4000, 8000];
+    /* Fresh connections we start per peer. The count lives on the peer, not the connection, so it
+     * survives each rebuild. It is earned back by a link that stays connected for REBUILD_STEADY_MS,
+     * by the browser coming back online, by "Try faces again", or by the peer rejoining (a rejoin
+     * is a new peer record). */
+    const MAX_REBUILDS = 3;
+    const REBUILD_STEADY_MS = 10000;
     const rtcMsg = (peer, to, body) => Object.assign({ type: 'rtc', to }, peer.rtcEpoch ? { e: peer.rtcEpoch } : null, body);
     function restartIce(id, entry) {
         if (app.av.pcs.get(id) !== entry || entry.restartTimer) return;
+        if (relayPeers.get(id)?.facesStopped) return;
         if (entry.restarts >= ICE_RETRY_MS.length) { rebuildPc(id); return; }
         const wait = ICE_RETRY_MS[entry.restarts];
         entry.restarts += 1;
@@ -1984,6 +2034,8 @@
 
     // The network is back: retry any face that is still down now instead of waiting out a backoff.
     win.addEventListener('online', () => {
+        for (const peer of relayPeers.values()) { peer.rebuilds = 0; peer.facesStopped = false; }
+        paintFacesRetry();
         for (const [id, entry] of app.av.pcs) {
             if (entry.pc.connectionState === 'connected') continue;
             clearTimeout(entry.restartTimer);
@@ -2001,6 +2053,12 @@
         if (!peer?.live) { closePc(id); return; }
         const mine = peer.rtcEpoch || 0;
         if (epoch !== undefined && epoch <= mine) return;
+        if (epoch === undefined) {
+            if ((peer.rebuilds || 0) >= MAX_REBUILDS) { stopFaces(id, peer); return; }
+            peer.rebuilds = (peer.rebuilds || 0) + 1;
+        }
+        // The other side starting over is a new attempt too; its own budget bounds how often.
+        peer.facesStopped = false;
         peer.rtcEpoch = epoch === undefined ? mine + 1 : epoch;
         closePc(id);
         if (epoch === undefined) {
@@ -2008,6 +2066,17 @@
             send(rtcMsg(peer, id, { reset: true }));
         }
         openPc(id);
+    }
+
+    /* Budget spent: stop restarting and rebuilding. The connection is left as it is, with no
+     * timers, so only a tap, the network returning or the other side can start it again. */
+    function stopFaces(id, peer) {
+        if (peer.facesStopped) return;
+        peer.facesStopped = true;
+        const entry = app.av.pcs.get(id);
+        if (entry) { clearTimeout(entry.restartTimer); entry.restartTimer = 0; }
+        say(`Faces with ${peerName(id)} aren’t connecting. Chat and draw still work.`);
+        paintFacesRetry();
     }
 
     async function checkRelay(id, entry) {
@@ -2117,7 +2186,8 @@
 
     function closePc(id) {
         const entry = app.av.pcs.get(id);
-        if (entry) { entry.offerNeeded = false; entry.waitingInitialOffer = false; clearTimeout(entry.restartTimer); entry.pc.close(); app.av.pcs.delete(id); }
+        if (entry) { entry.offerNeeded = false; entry.waitingInitialOffer = false; clearTimeout(entry.restartTimer); clearTimeout(entry.steadyTimer); entry.pc.close(); app.av.pcs.delete(id); }
+        paintFacesRetry();
         app.av.relayed.delete(id);
         delete app.av.levels[id];
         const meter = app.av.meters.get(id);
