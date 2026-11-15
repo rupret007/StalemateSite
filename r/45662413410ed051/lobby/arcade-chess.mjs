@@ -19,16 +19,18 @@ const reasonText = {
 };
 
 export function chessTurnText(seat, turn) {
+    if (seat === turn) return 'Your turn';
     const who = seat ? `You’re ${colorName(seat)}` : 'Watching';
     return `${who} · ${colorName(turn)} to move`;
 }
 
 export function chessResultText(result) {
     if (!result) return '';
-    if (!result.winner) return `Draw · ${result.reason}`;
-    return result.reason?.toLowerCase().includes('checkmate')
+    const reason = typeof result.reason === 'string' ? result.reason : '';
+    if (!result.winner) return reason ? `Draw · ${reason}` : 'Draw';
+    return reason.toLowerCase().includes('checkmate')
         ? `Checkmate · ${colorName(result.winner)} wins`
-        : `${colorName(result.winner)} wins · ${result.reason}`;
+        : `${colorName(result.winner)} wins${reason ? ` · ${reason}` : ''}`;
 }
 const markup = `
 <summary>Royal Flush Chess</summary>
