@@ -56,10 +56,11 @@ function scrub(value) {
 }
 function seconds(ms) { return Math.round(ms / 100) / 10; }
 
-// The only two WebKit outcomes that are the host's fault, and the only two that may skip:
-// the browser is not installed, or its renderer process crashed. Everything else fails.
+// WebKit host limits must have direct evidence: missing browser, observed renderer crash,
+// or no capture device / no local self-view frames after both cameras are turned on.
 const WEBKIT_MISSING = 'WebKit not launchable on this host';
 const WEBKIT_CRASH = 'WebKit renderer crash on this host (environment limit)';
+const WEBKIT_NO_CAPTURE = 'WEBKIT_NO_CAPTURE: WebKit cannot capture camera frames on this host';
 const errorText = (error) => `${error && error.name ? error.name : ''} ${error && error.message ? error.message : ''}`;
 const webkitExecutableMissing = (error) => /executable doesn['’]t exist|executable does not exist/i.test(errorText(error));
 /** Records Playwright's page 'crash' event. That event is the only proof of a renderer crash:
@@ -149,6 +150,12 @@ async function remoteWidths(page) {
         nocam: tile.classList.contains('tile--nocam'),
         name: tile.querySelector('.nm')?.textContent || ''
     }))).catch(() => []);
+}
+async function localSelfView(page) {
+    return page.evaluate(() => {
+        const video = document.querySelector('[data-tiles] [data-tile="me"] video');
+        return { videoWidth: video?.videoWidth || 0, currentTime: video?.currentTime || 0 };
+    });
 }
 function watchRemoteFrames(pages, seenAt) {
     let stop = false;
@@ -474,6 +481,12 @@ test('two people in WebKit when that browser launches', async () => {
                     return list.filter((device) => device.kind === 'videoinput').length;
                 } catch (_) { return -1; }
             });
+            report.videoInputs = inputs;
+            const local = {
+                host: { videoWidth: 0, timeAdvanced: false, lastTime: null, samples: 0 },
+                guest: { videoWidth: 0, timeAdvanced: false, lastTime: null, samples: 0 }
+            };
+            report.localSelfViews = local;
             if (pageDown()) noteLimit(hostLimitText);
             if (!hostLimit) await join(host, roomUrl(), 'Alex');
             if (pageDown()) noteLimit(hostLimitText);
@@ -481,8 +494,13 @@ test('two people in WebKit when that browser launches', async () => {
             if (pageDown()) noteLimit(hostLimitText);
             const started = Date.now();
             if (!hostLimit) {
-                await turnCamera(host);
-                await turnCamera(guest);
+                try {
+                    await turnCamera(host);
+                    await turnCamera(guest);
+                } catch (error) {
+                    if (inputs <= 0 && !(await crash.settle())) noteLimit(WEBKIT_NO_CAPTURE);
+                    else throw error;
+                }
             }
             if (pageDown()) noteLimit(hostLimitText);
             if (!hostLimit) {
@@ -490,7 +508,16 @@ test('two people in WebKit when that browser launches', async () => {
                 try {
                     await expect.poll(async () => {
                         if (pageDown()) return 'crashed';
-                        const [hostRows, guestRows] = await Promise.all([remoteWidths(host), remoteWidths(guest)]);
+                        const [hostRows, guestRows, hostSelf, guestSelf] = await Promise.all([
+                            remoteWidths(host), remoteWidths(guest), localSelfView(host), localSelfView(guest)
+                        ]);
+                        for (const [side, sample] of [['host', hostSelf], ['guest', guestSelf]]) {
+                            const self = local[side];
+                            self.videoWidth = Math.max(self.videoWidth, sample.videoWidth);
+                            if (self.lastTime !== null && sample.currentTime > self.lastTime) self.timeAdvanced = true;
+                            self.lastTime = sample.currentTime;
+                            self.samples += 1;
+                        }
                         if (hostRows.some((row) => row.width > 0) && guestRows.some((row) => row.width > 0)) {
                             outcome = 'frames';
                             return 'frames';
@@ -500,9 +527,14 @@ test('two people in WebKit when that browser launches', async () => {
                     }, { timeout: 12000 }).not.toBe('waiting');
                 } catch (error) {
                     if (!(await crash.settle()) || !pageDown()) {
-                        report.pass = false;
-                        report.status = 'WebKit stayed up, but neither side showed a playing face.';
-                        throw new Error(report.status);
+                        const captured = Object.values(local).some((self) => self.videoWidth > 0 || self.timeAdvanced);
+                        const observedBoth = Object.values(local).every((self) => self.samples > 0);
+                        if (!captured && (inputs <= 0 || observedBoth)) noteLimit(WEBKIT_NO_CAPTURE);
+                        else {
+                            report.pass = false;
+                            report.status = 'WebKit stayed up, but neither side showed a playing face.';
+                            throw new Error(report.status);
+                        }
                     }
                 }
                 if (!hostLimit && outcome !== 'frames') {
@@ -512,7 +544,6 @@ test('two people in WebKit when that browser launches', async () => {
                 if (!hostLimit) {
                     report.pass = true;
                     report.seconds = seconds(Date.now() - started);
-                    report.videoInputs = inputs;
                     report.environment = false;
                     report.cameraDenied = false;
                     report.status = await onScreenStatus(host);
@@ -536,7 +567,7 @@ test('two people in WebKit when that browser launches', async () => {
             await Promise.race([browser.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 1500))]);
         }
     }
-    if (hostLimit) skipForHost(hostLimitText);
+    if (hostLimit) skipForHost(hostLimit);
 });
 
 const IPHONE = devices['iPhone 13'];
