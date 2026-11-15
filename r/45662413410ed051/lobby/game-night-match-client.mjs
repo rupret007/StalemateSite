@@ -1,9 +1,11 @@
 const requestErrors = { 401: 'sign-in', 403: 'room', 404: 'disabled', 429: 'rate-limited' };
-const socketErrors = { 4403: 'room', 4409: 'replaced', 4429: 'rate-limited' };
+const socketErrors = { 4001: 'kicked', 4403: 'room', 4409: 'replaced', 4429: 'rate-limited' };
 const RECONNECT_CAP = 10_000;
 
 export const matchConnectionErrors = Object.freeze({
     'sign-in': 'Sign in to the private beta again, then return to this room.',
+    'banned': 'You can’t rejoin this Game Night room.',
+    'kicked': 'You were removed from this Game Night room.',
     'replaced': 'This match is open in another tab. Continue there, or reload to play here.',
     'room': 'Return to your Game Night room and try again.',
     'disabled': 'This game is unavailable in this room right now.',
@@ -88,7 +90,6 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     }
     function retry(attempt, reason) {
         if (attempt !== generation || !scope) return;
-        if (!reason && navigator.onLine === false) return pauseForNetwork();
         if (reason) {
             reset(false, true);
             terminalError = true;
@@ -96,6 +97,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
             onStatus('unavailable', reason);
             return;
         }
+        if (navigator.onLine === false) return pauseForNetwork();
         // An ordinary drop is never final: keep trying while the page is on screen.
         reset(true);
         onStatus('reconnecting');
@@ -127,7 +129,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
             const connection = new WebSocket(url, [grant.protocol, grant.ticket]);
             socket = connection;
             let stateFrameType;
-            connection.addEventListener('close', event => retry(attempt, socketErrors[event.code]));
+            connection.addEventListener('close', event => retry(attempt, event.reason === 'banned' ? 'banned' : socketErrors[event.code]));
             connection.addEventListener('message', event => {
                 if (attempt !== generation) return;
                 let frame;

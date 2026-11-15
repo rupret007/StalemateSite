@@ -162,6 +162,30 @@ describe('Game Night phone wake and history recovery', () => {
         expect(delays[0]).toBeLessThan(1_000);
     });
 
+    it.each([
+        ['a ban', { code: 1008, reason: 'banned' }, 'banned'],
+        ['a kick', { code: 4001 }, 'kicked']
+    ])('ends the match session after %s', async (_, close, reason) => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(sockets).toHaveLength(2);
+
+        sockets.at(-1).dispatchEvent(new CloseEvent('close', close));
+        expect(status).toHaveBeenLastCalledWith('unavailable', reason);
+        expect(status).not.toHaveBeenCalledWith('reconnecting');
+        await vi.advanceTimersByTimeAsync(30_000);
+        visibility(true);
+        visibility(false);
+        restored();
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(issue).toHaveBeenCalledTimes(2);
+        expect(sockets).toHaveLength(2);
+        expect(status).not.toHaveBeenCalledWith('reconnecting');
+    });
+
     it('waits while the page is hidden and reconnects when it is shown again', async () => {
         visibility(true);
         sockets[0].dispatchEvent(new CloseEvent('close', { code: 1006 }));
