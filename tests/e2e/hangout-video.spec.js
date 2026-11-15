@@ -143,7 +143,56 @@ async function call(browser, opts) {
 const sentVideo = (page) => page.evaluate(() => {
     const e = [...window.__hangout.av.pcs.values()][0];
     const s = e && e.senders.video;
-    return s ? s.getParameters().encodings[0] : null;
+    return s && typeof s.getParameters === 'function' ? s.getParameters().encodings[0] : null;
+});
+const PHONE_OPTS = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' };
+const phoneVideoCaps = (page) => page.evaluate(() => [...window.__hangout.av.pcs.values()]
+    .map((e) => e.senders.video)
+    .filter((s) => s && typeof s.getParameters === 'function')
+    .map((s) => s.getParameters().encodings[0]?.maxBitrate));
+
+test('phone mesh: sender maxBitrate adapts from 600 kbps at one peer to 350 kbps at three', async ({ browser }) => {
+    test.setTimeout(120000);
+    const alpha = await openBrowser(browser, PHONE_OPTS);
+    await join(alpha, roomUrl(), 'Alpha');
+    await camOn(alpha);
+    await micOn(alpha);
+    const bravo = await openBrowser(browser, PHONE_OPTS);
+    await join(bravo, alpha.url(), 'Bravo');
+    await camOn(bravo);
+    await expect(alpha.locator('[data-peers]')).toContainText('2 here');
+    await expect.poll(() => alpha.evaluate(() => {
+        const v = document.querySelector('.tile:not([data-tile="me"]) video');
+        return v ? v.videoWidth : 0;
+    }), { timeout: 15000 }).toBeGreaterThan(0);
+    await expect.poll(async () => phoneVideoCaps(alpha), { timeout: 15000 }).toEqual([180000]);
+    const alphaTile = bravo.locator('.tile:not([data-tile="me"])');
+    await alphaTile.locator('.more').click();
+    await bravo.click('[data-tile-menu] button:has-text("Pin big for me")');
+    await expect.poll(async () => phoneVideoCaps(alpha), { timeout: 15000 }).toEqual([600000]);
+
+    const charlie = await openBrowser(browser, PHONE_OPTS);
+    await join(charlie, alpha.url(), 'Charlie');
+    await camOn(charlie);
+    const delta = await openBrowser(browser, PHONE_OPTS);
+    await join(delta, alpha.url(), 'Delta');
+    await camOn(delta);
+    await expect(alpha.locator('[data-peers]')).toContainText('4 here', { timeout: 20000 });
+    await expect.poll(async () => {
+        const caps = await phoneVideoCaps(alpha);
+        return caps.length === 3 && caps.every((bps) => bps <= 350000) && caps.some((bps) => bps === 350000);
+    }, { timeout: 25000 }).toBe(true);
+    const statsShape = await alpha.evaluate(async () => {
+        const pc = [...window.__hangout.av.pcs.values()][0]?.pc;
+        if (!pc || typeof pc.getStats !== 'function') return null;
+        const rows = [];
+        (await pc.getStats()).forEach((r) => {
+            if (r.type === 'outbound-rtp' && (r.kind === 'video' || r.mediaType === 'video')) rows.push(r.type);
+        });
+        return rows.length;
+    });
+    expect(statsShape).toBeGreaterThan(0);
+    expect(alpha.errors.concat(bravo.errors, charlie.errors, delta.errors)).toEqual([]);
 });
 
 test('grid by default, speaker view and pin ask the sender for the sharp feed', async ({ browser }) => {
@@ -663,7 +712,9 @@ test('phones: portrait tiles, call bar sticks to the bottom in thumb reach, 44px
         expect(b.height, sel).toBeGreaterThanOrEqual(44);
     }
     const settings = await guest.evaluate(() => window.__hangout.av.rawCam.getSettings());
-    expect(settings.frameRate).toBeLessThanOrEqual(20); // battery-friendly default
+    expect(settings.width).toBeLessThanOrEqual(640);
+    expect(settings.height).toBeLessThanOrEqual(480);
+    expect(settings.frameRate).toBeLessThanOrEqual(24);
     if (SHOTS) {
         await guest.locator('.call').evaluate((e) => e.scrollIntoView());
         await guest.screenshot({ path: `${SHOTS}/01-phone-grid.png` });

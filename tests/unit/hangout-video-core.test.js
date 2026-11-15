@@ -122,7 +122,7 @@ describe('hangout video core', () => {
         const plan = V.planUplink({ viewers: viewers(7, true), phone: true, cams: 8 });
         const hq = Object.values(plan).filter((e) => e.scaleResolutionDownBy === 1);
         expect(hq.length).toBeLessThanOrEqual(V.MAX_HQ);
-        hq.forEach((e) => expect(e.maxBitrate).toBeLessThanOrEqual(300000));
+        hq.forEach((e) => expect(e.maxBitrate).toBeLessThanOrEqual(350000));
         expect(V.uplinkTotal(plan)).toBeLessThanOrEqual(1200000);
         expect(Object.keys(plan)).toHaveLength(7);
         Object.values(plan).forEach((e) => expect(e.active).toBe(true));
@@ -141,7 +141,7 @@ describe('hangout video core', () => {
         const small = V.planUplink({ viewers: viewers(1, true), phone: false, cams: 2 });
         expect(small.v0.maxBitrate).toBe(600000);
         const phoneSmall = V.planUplink({ viewers: viewers(1, true), phone: true, cams: 2 });
-        expect(phoneSmall.v0.maxBitrate).toBeLessThanOrEqual(300000);
+        expect(phoneSmall.v0.maxBitrate).toBeLessThanOrEqual(600000);
         // Screen share: everyone at screen rate, still within budget.
         const screen = V.planUplink({ viewers: viewers(7, false), phone: false, cams: 8, screen: true });
         expect(V.uplinkTotal(screen)).toBeLessThanOrEqual(2000000);
@@ -169,6 +169,17 @@ describe('hangout video core', () => {
         expect(V.isPhoneDevice({ ua: 'Mozilla/5.0 (X11; Linux x86_64)', coarse: true, fine: false, cores: 8 })).toBe(true); // touch-only
         expect(V.isPhoneDevice({ ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', coarse: true, fine: true, cores: 8 })).toBe(false); // touch laptop with a trackpad
         expect(V.isPhoneDevice({ ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', cores: 2 })).toBe(true); // weak machine
+    });
+
+    it('scales phone mesh sender caps with uplink count (600 kbps at one peer, 350 at three)', () => {
+        expect(V.phoneMeshBitrate(1)).toBe(600000);
+        expect(V.phoneMeshBitrate(3)).toBe(350000);
+        expect(V.phoneMeshBitrate(2)).toBe(475000);
+        expect(V.phoneMeshBitrate(9)).toBe(350000);
+        const solo = V.planUplink({ viewers: viewers(1, true), phone: true, cams: 2 });
+        expect(solo.v0.maxBitrate).toBe(600000);
+        const trio = V.planUplink({ viewers: viewers(3, true), phone: true, cams: 4 });
+        Object.values(trio).forEach((e) => expect(e.maxBitrate).toBeLessThanOrEqual(350000));
     });
 
     it('counts audio in the uplink budget, including stereo music mode', () => {
