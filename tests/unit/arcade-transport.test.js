@@ -4,6 +4,8 @@ import { ARCADE_TAG, WATCH_ACTIVITY_INTERVAL, createArcadeTransport } from '../.
 import { DEMO_INVITE_TTL } from '../../hangout-worker/src/beta-auth.mjs';
 import { readGameNightPass } from '../../hangout-worker/src/game-night-pass.mjs';
 import { GAME_NIGHT_IDLE, GAME_NIGHT_LENGTH, nextGameNightIdle, nightIdleExpired } from '../../hangout-worker/src/game-night-lifetime.mjs';
+import { TURDANOID_RACE_VERSION } from '../../hangout-worker/arcade/games/turdanoid-race.js';
+import { TURD_RUSH_RACE_VERSION } from '../../hangout-worker/arcade/games/turdrush-race.js';
 
 const room = '#game-2ca9e1x1be34a';
 const ref = '0'.repeat(32);
@@ -70,6 +72,50 @@ describe('Game Night match transport', () => {
         const moved = f.b.frames.at(-1);
         expect(moved).toMatchObject({ t: 'snapshot', currentMatchId: move.id, yourSeat: 'b', turn: 'b' });
         expect(moved.seq).toBe(initial.seq + 1);
+    });
+
+    it.each([
+        ['turdrush', TURD_RUSH_RACE_VERSION, [[1, 'jump']]],
+        ['turdanoid', TURDANOID_RACE_VERSION, [[1, 'aim', 640]]]
+    ])('keeps %s spectator broadcasts and reconnect snapshots free of seat inputs', async (game, version, inputs) => {
+        const f = fixture(game);
+        const watcherActor = 'c' + '3'.repeat(32);
+        const watcher = f.connect(watcherActor, 'unseated-watcher');
+        f.actors.get(watcherActor).canPlay = false;
+        const { id } = await f.start();
+        const { startsAt, at } = f.board(f.a).match;
+        f.advance(startsAt - at);
+        const input = { version, id, sequence: 1, inputs };
+        await f.send(f.a, 'input', input);
+        const seatedRunner = f.board(f.a).match.runner;
+        expect(seatedRunner.queue).toEqual(inputs);
+
+        const checkPublicRunner = runner => {
+            expect(runner.queue).toEqual([]);
+            for (const field of ['sequence', 'credits', 'pending', 'chargedAt', 'lastInputTick']) {
+                expect(runner).not.toHaveProperty(field);
+            }
+            expect(runner.tick).toBe(seatedRunner.tick);
+            if (game === 'turdanoid') {
+                expect(runner.run).not.toHaveProperty('aim');
+                expect(runner.run).not.toHaveProperty('axis');
+                expect(runner.run.ball).toEqual(seatedRunner.run.ball);
+            } else {
+                expect(runner.run.player).toEqual(seatedRunner.run.player);
+            }
+        };
+        const initial = watcher.frames.at(-1);
+        expect(initial).toMatchObject({ t: 'match-state', state: { seat: null } });
+        checkPublicRunner(initial.state.match.runner);
+        await f.send(watcher, undefined, { t: 'hello', lastSeq: 0 });
+        const restored = watcher.frames.at(-1);
+        expect(restored).toMatchObject({ t: 'snapshot', yourSeat: null, currentMatchId: id });
+        checkPublicRunner(restored.state.match.runner);
+
+        const writes = f.storage.put.mock.calls.length;
+        await f.send(watcher, 'input', input);
+        expect(watcher.frames.at(-1)).toEqual({ t: 'match-error', reason: 'unavailable' });
+        expect(f.storage.put.mock.calls).toHaveLength(writes);
     });
 
     it('reports a hidden match as open, never as a lobby, when a block clears a seated view', async () => {
