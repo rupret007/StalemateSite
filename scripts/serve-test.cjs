@@ -98,6 +98,9 @@ async function main() {
     const relayFor = (namespace) => {
         if (!hangoutRelays.has(namespace)) hangoutRelays.set(namespace, createHangoutRelay({
             previewKey: 'local-preview-key-0001',
+            // The whole E2E run shares this relay. Its lifetime connection count includes
+            // closed test rooms, so allow the full suite without changing production limits.
+            connectionsPerDay: 800,
             devAdminKey: process.env.HANGOUT_DEV_ADMIN_KEY || 'local-dev-admin-key-0001',
             origins: origin,
             lobbyLimits: { pmMinLobbyMs: 1500,
