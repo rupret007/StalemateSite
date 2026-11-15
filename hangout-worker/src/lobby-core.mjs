@@ -1764,7 +1764,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!/^#[a-z0-9-]{2,30}$/.test(name)) return bot(c, 'Room names look like #bobross-tuesday (letters, numbers, dashes).', 'error');
             const existing = ch(name);
             if (roomInstance !== undefined && (typeof roomInstance !== 'string' || !/^[a-f0-9]{32}$/.test(roomInstance) || !existing || existing.keepRef !== roomInstance))
-                return bot(c, 'That room changed or closed while you signed in. Choose a room to continue.', 'error');
+                return bot(c, 'That room changed or closed. Choose a room to continue.', 'error');
             if (existing) return enter(c, existing, { key });
             return create(c, name, key, titleWords.join(' '));
         },
