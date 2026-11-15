@@ -537,6 +537,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const sentRoomInvites = new Map();
     let roomInvitesSupported = false;
     let gameReturn = null, gameReturnOffered = false, joiningGameRoom = '', joiningArcadeOffer = null;
+    let creativeJoinDeadline;
     let gameOpenPending = null, gameOpenError = '';
     // Jam rooms are invite-only like Game Night, so the directory cannot lead
     // an invited guest back. They share the same offer and return controls.
@@ -682,10 +683,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 clearTimeout(gameOpenPending.timer); gameOpenPending = null;
                 gameOpenError = 'Connection interrupted. Reconnect and try opening Game Night again.';
             }
-            gameInvites.clear(); gameReturnOffered = false; joiningGameRoom = ''; drawGameOffer();
+            gameInvites.clear(); gameReturnOffered = false; clearJoiningGameRoom(); drawGameOffer();
             for (const invite of sentRoomInvites.values()) clearTimeout(invite.timer);
             sentRoomInvites.clear();
-            joiningArcadeOffer = null;
             finishArcadeInvitation();
             clearGameLinks(); clearJamInvitations();
             if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.');
@@ -1189,7 +1189,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const returningToGame = gameReturnOffered && gameReturn?.room === c.name;
             const joiningLinkedGame = gameEntry?.target?.room === c.name;
             if (joiningLinkedGame) gameEntry = null;
-            if (gameOfferAccepted) { joiningGameRoom = ''; joiningArcadeOffer = null; }
+            if (gameOfferAccepted) clearJoiningGameRoom();
             if (returningToGame) gameReturnOffered = false;
             if (gameInvites.delete(c.name) || gameOfferAccepted || returningToGame || joiningLinkedGame) drawGameOffer();
             const joinedFromChannelDialog = app.pendingChannel === m.ch.name && $('[data-channel-dialog]').open;
@@ -1299,8 +1299,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 const failedGameJoin = !!joiningGameRoom;
                 if (joiningGameRoom) {
                     const failedRoom = joiningGameRoom;
-                    joiningGameRoom = '';
-                    joiningArcadeOffer = null;
+                    clearJoiningGameRoom();
                     forgetGameRoom(failedRoom);
                     toast(jamRoomName(failedRoom) || creativeRoomName(failedRoom) ? `Couldn’t join ${failedRoom}. It may have closed. Ask the host to invite you again.`
                         : 'Couldn’t join Game Night. Ask the host for a fresh invitation.');
@@ -1369,7 +1368,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (m.status === 'expired') expireGameOffer(offer);
             else {
                 if (joiningGameRoom === offer.room) {
-                    joiningGameRoom = '';
+                    clearJoiningGameRoom();
                     if (m.status === 'unavailable') toast('The room is unavailable. Ask your host to try again.');
                 }
                 forgetGameRoom(offer.room);
@@ -1758,9 +1757,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         gameReturn = null; gameReturnOffered = false;
         removeTab(gameReturnKey);
     }
+    function clearJoiningGameRoom() {
+        clearTimeout(creativeJoinDeadline);
+        creativeJoinDeadline = undefined;
+        joiningGameRoom = '';
+        joiningArcadeOffer = null;
+    }
     function expireGameOffer(offer) {
         const wasVisible = currentGameOffer() === offer;
-        if (joiningGameRoom === offer.room) joiningGameRoom = '';
+        if (joiningGameRoom === offer.room) clearJoiningGameRoom();
         forgetGameRoom(offer.room);
         if (wasVisible) toast('That invitation expired. Ask your host to send another.', [], `room-invite-expired:${offer.room}`);
     }
@@ -1842,6 +1847,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         else if (gameReturnOffered) {
             message = jam ? `You were disconnected from ${offer.room}. Chat starts fresh.`
                 : 'Game Night disconnected. Return to the room to check your match.';
+        } else if (offer.joinUnconfirmed) {
+            message = `Joining ${roomLabel} wasn’t confirmed. Try again or ask for a fresh invitation.`;
         } else if (offer.by) message = gameLabel ? `${offer.by} invited you to play ${gameLabel}.` : `${offer.by} invited you to ${roomLabel}.`;
         else message = 'Your link points to a private Game Night. The host’s invitation is required.';
         updateOfferStatus(status, visible, message);
@@ -1864,6 +1871,15 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         if (!sent) return toast(gameNightRoomName(offer.room) ? 'Reconnect before joining Game Night.' : 'Reconnect before joining the room.');
         joiningGameRoom = offer.room;
         joiningArcadeOffer = offer.arcade ? offer : null;
+        offer.joinUnconfirmed = false;
+        if (creativeRoomName(offer.room)) {
+            creativeJoinDeadline = setTimeout(() => {
+                if (joiningGameRoom !== offer.room) return;
+                clearJoiningGameRoom();
+                if (gameInvites.get(offer.room) === offer) offer.joinUnconfirmed = true;
+                drawGameOffer();
+            }, 8000);
+        }
         drawGameOffer();
     });
     $('[data-game-offer-dismiss]').addEventListener('click', () => {

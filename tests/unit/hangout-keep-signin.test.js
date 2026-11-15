@@ -5,11 +5,13 @@ import { readFileSync } from 'node:fs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
 import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
+import * as roomFunctions from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
+const sync = readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8');
 const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) { dom.window.close(); expect(dom.clientErrors || []).toEqual([]); } });
@@ -41,8 +43,9 @@ async function visitor({ via = 'rad-dad', verified = false, stored = {}, returni
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
+    window.HangoutClientTestModules = { ...entryFunctions, ...roomFunctions, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
     window.eval(discovery);
+    window.eval(sync);
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
     window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     window.document.querySelector('[data-nick]').value = 'Viewer';
@@ -95,6 +98,51 @@ describe('verify email to keep the intended room', () => {
     });
 });
 
+
+describe('joining an invited creative room', () => {
+    it('recovers from an unanswered join without resending or losing the draft', async () => {
+        const { window, ws, join } = await visitor();
+        join('#stalemate', { kind: 'lobby' });
+        const room = '#art-sketch', roomInstance = 'b'.repeat(32);
+        const document = window.document;
+        const draft = document.querySelector('[data-text]');
+        draft.value = 'Keep this draft';
+        const button = document.querySelector('[data-game-offer-join]');
+        const dismiss = document.querySelector('[data-game-offer-dismiss]');
+        const status = document.querySelector('[data-game-offer-status]');
+        let deadline;
+        const schedule = window.setTimeout.bind(window);
+        const cancel = vi.spyOn(window, 'clearTimeout');
+        vi.spyOn(window, 'setTimeout').mockImplementation((callback, wait, ...args) => {
+            if (wait === 8000) { deadline = callback; return 8000; }
+            return schedule(callback, wait, ...args);
+        });
+
+        ws.receive({ t: 'invite', ch: room, by: 'ArtHost', roomInstance });
+        button.focus();
+        button.click();
+        expect(status.textContent).toBe('Joining #art-sketch…');
+        expect(button.getAttribute('aria-disabled')).toBe('true');
+        expect(dismiss.disabled).toBe(true);
+        expect(deadline).toBeTypeOf('function');
+        deadline();
+
+        const requests = () => ws.sent.filter(frame => frame.t === 'cmd' && frame.name === 'join');
+        expect(requests()).toHaveLength(1);
+        expect(status.textContent).toBe('Joining #art-sketch wasn’t confirmed. Try again or ask for a fresh invitation.');
+        expect(document.activeElement).toBe(button);
+        expect(button.getAttribute('aria-disabled')).toBe('false');
+        expect(dismiss.disabled).toBe(false);
+        expect(draft.value).toBe('Keep this draft');
+        cancel.mockClear();
+        button.click();
+        expect(requests()).toEqual(Array(2).fill({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate', roomInstance }));
+        join(room, { kind: 'art', keepRef: roomInstance });
+        expect(cancel).toHaveBeenCalledWith(8000);
+        expect(document.querySelector('[data-game-offer]').hidden).toBe(true);
+        expect(document.querySelector('[data-chat-context]').textContent).toBe(room);
+    });
+});
 
 describe('bounded explicit Keep return', () => {
     const room = '#keep-me', ref = 'a'.repeat(32);
