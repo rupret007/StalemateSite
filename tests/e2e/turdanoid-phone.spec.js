@@ -144,7 +144,7 @@ async function gameNight(browser, baseURL) {
         }),
         record: async game => [...(await storage.list({ prefix: game === 'chess' ? 'game-night-match:' : `game-night-${game}:` })).values()][0],
         errors: () => [...people.values()].flatMap(person => person.errors.map(error => `${person.nick}: ${error}`)),
-        frames: nick => people.get(nick).frames,
+        frames: nick => [...people.get(nick).frames],
         close: async () => {
             await serial(() => undefined);
             await Promise.all(contexts.map(context => context.close()));
@@ -245,11 +245,8 @@ async function expectPanelContained(page, selectors) {
             const ancestors = [];
             for (let parent = node; parent; parent = parent.parentElement) ancestors.push(parent);
             if (!fits(node, ancestors.slice(1))) return false;
-            const style = getComputedStyle(node);
-            if (/hidden|clip|auto|scroll/.test(style.overflowX + ' ' + style.overflowY)) {
-                const interactive = node.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-                for (const child of interactive) if (!fits(child, [node, ...ancestors.slice(1)])) return false;
-            }
+            const interactive = node.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            for (const child of interactive) if (!fits(child, [node, ...ancestors.slice(1)])) return false;
             return true;
         }, bounds);
         expect(contained, `${selector} should fit inside the race panel`).toBe(true);
@@ -258,7 +255,7 @@ async function expectPanelContained(page, selectors) {
 const phoneRaceParts = ['.brick-race-board', '.brick-race-rail', '[data-brick-score="a"]', '[data-brick-score="b"]', '[data-brick-serve]', '[data-brick-leave]'];
 async function expectWatcherHasNoPrivateRace(fixture, observer) {
     await expect(observer.locator(game.board)).toBeHidden();
-    await expect.poll(() => privateFrames(fixture.frames('RaceWatcher'))).toEqual([]);
+    await expectWatcherFramesArePublic(fixture, 'RaceWatcher');
     const privateDom = await observer.locator('body').evaluate(body => {
         const match = body.querySelector('[data-brick-match]');
         const scores = [...body.querySelectorAll('[data-brick-score]')];
@@ -276,10 +273,13 @@ async function expectWatcherHasNoPrivateRace(fixture, observer) {
     expect(privateDom.html).not.toMatch(privatePayloadPattern);
     expect(fixture.view('RaceWatcher', 'turdanoid')).toBeUndefined();
 }
-function privateFrames(frames) {
-    return frames.filter(frame => /private[-_ ]?hand|(?:"|\b)(?:hand|cards|seat)\s*"?\s*:\s*["'{[]/i.test(frame));
+async function expectWatcherFramesArePublic(fixture, nick) {
+    await expect.poll(() => privateFrames(fixture.frames(nick))).toEqual([]);
 }
-const privatePayloadPattern = /private[-_ ]?hand|private[-_ ]?seat|(?:data-)?(?:hand|cards|seat|paddle|score|players)\s*[:=]\s*["'{[]/i;
+function privateFrames(frames) {
+    return frames.filter(frame => privatePayloadPattern.test(frame));
+}
+const privatePayloadPattern = /private[-_ ]?(?:hand|seat)|(?:data-)?(?:hand|cards|seat|paddle|score|players)(?:["']\s*)?\s*[:=]/i;
 test.describe('Turdanoid phone and landscape layout', () => {
     test('390×844 private race fits, exposes controls, and supports touch', async ({ browser, baseURL }) => {
         const fixture = await gameNight(browser, baseURL);
@@ -342,14 +342,31 @@ test.describe('Turdanoid phone and landscape layout', () => {
 });
 
 test.describe('Turdanoid phone acceptance helper regressions', () => {
-    test('append-only watcher history catches a private frame removed before polling', async ({ page }) => {
+    test('watcher assertion catches a private frame removed before polling', async ({ page }) => {
         const history = [];
         let current = [];
+        const fixture = { frames: () => [...history] };
         const deliver = frame => { current.push(frame); history.push(frame); };
         deliver('{"t":"RaceWatcher","hand":["private-card"]}');
         current = [];
         await expect.poll(() => current).toEqual([]);
-        expect(privateFrames(history), 'frame history must retain a transient private watcher frame').toHaveLength(1);
+        let rejected = false;
+        try { await expectWatcherFramesArePublic(fixture, 'RaceWatcher'); } catch { rejected = true; }
+        expect(rejected, 'watcher assertion must reject the retained transient frame').toBe(true);
+    });
+
+    test('watcher frame detector catches private fields and scalar values', async () => {
+        for (const field of ['paddle', 'score', 'players']) {
+            expect(privateFrames([JSON.stringify({ [field]: { private: true } })]), `${field} payload`).toHaveLength(1);
+        }
+        for (const frame of ['{"hand":null}', '{"cards":0}', '{"seat":1}']) {
+            expect(privateFrames([frame]), frame).toHaveLength(1);
+        }
+    });
+
+    test('watcher privacy pattern catches quoted JSON keys', async ({ page }) => {
+        await page.setContent('<script type="application/json">{"hand":["private-card"]}</script>');
+        expect(await page.locator('body').innerHTML()).toMatch(privatePayloadPattern);
     });
 
     test('watcher privacy detector rejects generic hand and cards attributes', async ({ page }) => {
@@ -372,5 +389,12 @@ test.describe('Turdanoid phone acceptance helper regressions', () => {
         let rejected = false;
         try { await expectPanelContained(page, ['.brick-race-board']); } catch { rejected = true; }
         expect(rejected, 'containment helper must reject the self-clipped board').toBe(true);
+    });
+
+    test('panel containment catches clipping inside a non-clipping selected wrapper', async ({ page }) => {
+        await page.setContent('<style>.arcade-brick-race{position:relative;width:200px;height:100px}.wrapper{width:180px;height:80px;overflow:visible}.clip{position:relative;width:80px;height:50px;overflow:hidden}.clip button{position:absolute;left:60px;top:10px;width:40px;height:20px}</style><section class="arcade-brick-race"><div class="wrapper"><div class="clip"><button>Play</button></div></div></section>');
+        let rejected = false;
+        try { await expectPanelContained(page, ['.wrapper']); } catch { rejected = true; }
+        expect(rejected, 'containment helper must reject controls clipped by nested ancestors').toBe(true);
     });
 });
