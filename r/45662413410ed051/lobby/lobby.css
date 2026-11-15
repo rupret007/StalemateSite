@@ -857,4 +857,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   /* The 44px Eights summary sits above the hand. Give the transcript minimum back
      so the hand stays inside the phone panel. */
   .chat:has(.arcade-eights[open] [data-card-table]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 34px; }
+  /* The 44px Rush summary and room chrome use the slack under the track.
+     Shorten the track so the 44px race controls stay fully in view. */
+  .rush-race-track { height: clamp(132px, calc(100dvh - 521px), 275px); }
 }
