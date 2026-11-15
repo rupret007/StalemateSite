@@ -16,6 +16,7 @@ const lobbyPath = '/r/45662413410ed051/lobby/?game-guest=1';
 const gameDestination = tableId => lobbyPath + (typeof tableId === 'string' && tableIdPattern.test(tableId) ? '&table=' + tableId : '');
 const requestedTable = resumeGuest ? new URLSearchParams(location.search).get('table') : null;
 const inviter = document.querySelector('[data-guest-inviter]');
+const expiry = document.querySelector('[data-guest-expiry]');
 const returnToRoom = document.querySelector('[data-guest-return]');
 const webJam = document.querySelector('[data-webjam-guest]') !== null;
 const historyKey = webJam ? 'webJamGameNightInvite' : 'gameNightInvite';
@@ -26,6 +27,7 @@ const code = restored?.code ?? fragment.get(webJam ? 'grant' : 'invite');
 let waitUntil = webJam ? restored?.waitUntil ?? (fragment.get('wait') === '1' ? -1 : 0) : 0;
 const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
 const pass = restored?.pass ?? Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
+let watching = restored?.watch === true;
 const confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
 const hasInvitation = typeof code === 'string' && (webJam ? /^[A-Za-z0-9_-]{32,128}$/.test(code) : code.length > 0 && code.length <= 250);
 
@@ -36,7 +38,7 @@ async function sha256(value) {
 
 function retainInvitation(confirmedGame) {
     // A refresh can use this history entry, without putting the link back in the address.
-    history.replaceState({ [historyKey]: { code, attempt, pass, confirmedGame, waitUntil } }, '', location.pathname);
+    history.replaceState({ [historyKey]: { code, attempt, pass, confirmedGame, waitUntil, watch: watching } }, '', location.pathname);
 }
 
 function clearInvitation() {
@@ -66,7 +68,7 @@ async function acceptInvitation() {
         catch (error) {
             if (!retriedConnection && ['TypeError', 'SyntaxError', 'TimeoutError'].includes(error?.name)) {
                 retriedConnection = true;
-                status.textContent = 'Reconnecting to confirm your seat…';
+                status.textContent = watching ? 'Reconnecting to the table…' : 'Reconnecting to confirm your seat…';
                 continue;
             }
             const remaining = waitUntil - Date.now();
@@ -101,8 +103,17 @@ async function describe() {
     }
     status.textContent = 'Checking your invitation…';
     try {
-        const { game, host } = await request('details');
-        inviter.textContent = `${host} invited you to play.`;
+        const { game, host, watch, inviteExpiresAt } = await request('details');
+        if (expiry && Number.isSafeInteger(inviteExpiresAt) && inviteExpiresAt > 0 && inviteExpiresAt <= 8.64e15) {
+            const time = expiry.querySelector('time');
+            time.dateTime = new Date(inviteExpiresAt).toISOString();
+            time.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(inviteExpiresAt);
+            expiry.hidden = false;
+        }
+        watching = watch === true;
+        join.textContent = watching ? 'Watch game' : 'Join game';
+        if (watching) document.querySelector('#guest-agreement').textContent = 'By choosing Watch game, you confirm you’re 13+ and agree to the house rules.';
+        inviter.textContent = `${host} invited you to ${watching ? 'watch' : 'play'}.`;
         inviter.hidden = false;
         gameTitle.textContent = game;
         status.textContent = '';
@@ -122,7 +133,7 @@ async function describe() {
 async function accept() {
     retry.hidden = true;
     join.disabled = true;
-    status.textContent = 'Joining the game…';
+    status.textContent = watching ? 'Opening the table…' : 'Joining the game…';
     try {
         const { next, tableId } = await acceptInvitation();
         if (next !== lobbyPath) throw new Error('Unexpected destination');
@@ -162,14 +173,14 @@ async function accept() {
             if (document.activeElement === document.body) retry.focus({ preventScroll: true });
         } else {
             join.disabled = false;
-            join.textContent = 'Join game';
+            join.textContent = watching ? 'Watch game' : 'Join game';
             if (document.activeElement === document.body) join.focus({ preventScroll: true });
         }
     }
 }
 
 join.addEventListener('click', event => {
-    unlockGameNightAudio(event);
+    if (!watching) unlockGameNightAudio(event);
     if (waitUntil === -1) waitUntil = Date.now() + 25_000;
     retainInvitation(gameTitle.textContent);
     void accept();

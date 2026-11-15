@@ -368,6 +368,8 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
             await page.locator('[data-enter]').click();
             await expect(page.locator('[data-connection]')).toHaveText('Connected');
             if (phone) await page.locator('.phonetabs [data-show="rooms"]').tap();
+            // Give both guests the same display words to exercise private room name collisions.
+            await page.evaluate(() => { Math.random = () => 0; });
             await page.locator('[data-start="jam"]').click();
             await expect(page.locator('[data-jam]')).toBeVisible();
             originalRoom = await page.evaluate(() => window.__lobby.active);
@@ -489,8 +491,12 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
         await expect(stale.getByRole('link', { name: 'Return to room' })).toHaveCount(0);
         await capture(stale, 'expired');
 
+        const originalRooms = new Set();
         for (const [value, step] of [[standby, 'standby'], [unavailable, 'expired']]) {
             const { page: member, originalRoom } = await open(value, step === 'expired', true);
+            assert.match(originalRoom, /^#jam-happy-tree-[a-f0-9]{4}x[a-f0-9]{4}$/);
+            assert.ok(!originalRooms.has(originalRoom), 'each guest opens a distinct private room');
+            originalRooms.add(originalRoom);
             const back = member.getByRole('link', { name: 'Return to room' });
             await expect(back).toBeHidden();
             await member.getByRole('button', { name: 'Join game' }).click();

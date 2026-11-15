@@ -81,6 +81,14 @@ jobs:
           ARCADE_GUEST_TABLE_ISOLATION_ONLY: '1'
         run: node tests/runtime/arcade-transport.mjs --browser=webkit
 
+      - name: Verify watch invitations at a full Spades table
+        timeout-minutes: 3
+        env:
+          ARCADE_INVITE_EVIDENCE: ${{ github.workspace }}/test-results/arcade-multiplayer
+        run: |
+          ARCADE_SPADES_WATCH_BRAND=stalemate node tests/runtime/arcade-transport.mjs --browser=chromium
+          ARCADE_SPADES_WATCH_BRAND=rad-dad node tests/runtime/arcade-transport.mjs --browser=webkit
+
       - name: Exercise private WebJam room grants in workerd
         timeout-minutes: 6
         env:

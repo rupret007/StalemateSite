@@ -89,6 +89,14 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
     async function hasGuestSeat(scope, match, host) {
         return !!await guestTableId(scope, match, host);
     }
+    async function watchTableId(scope) {
+        const record = name === 'turdspades' && await load(scope);
+        if (!record || record.game.host !== scope.host) return null;
+        if (scope.tableId) return scope.tableId === record.game.tableId ? scope.tableId : null;
+        const view = record.game.view(scope.host, now());
+        return !record.game.closed && view.id === scope.match && !view.waiting
+            && view.occupied?.length === 4 ? record.game.tableId : null;
+    }
     async function guestNightEndsAt(scope) {
         const record = await load(scope);
         return record && record.game.tableId === scope.tableId && record.game.host === scope.host ? record.expiresAt : 0;
@@ -217,7 +225,8 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 playerId: binding.betaSid, seat, seq, ...(remembered ? { hidden: remembered } : {}) }); }
             catch { close(socket, 1011, 'match connection unavailable'); continue; }
             const invitation = binding.gameGuest;
-            if (view?.waiting) {
+            if (view && invitation?.watch) view.watchOnly = true;
+            if (view?.waiting && !view.watchOnly) {
                 const reserved = claims.some(claim => claim.sid === binding.betaSid);
                 const unreservedSeat = game.hasGuestSeat(view.id, game.host, claims.length);
                 view.hasOpenSeat = reserved || unreservedSeat;
@@ -231,9 +240,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 }
             }
             if (view && nextMatch) send(socket, { t: 'rematch', matchId: nextMatch });
+            const canOpen = !invitation?.watch && binding.canOpen;
             const reopenMode = PartnerTable && permitted && game?.closed && game.subjects.length > 1
-                && binding.canOpen && game.host === binding.betaSid ? game.mode ?? 'four' : undefined;
-            sendView(socket, recipient, view, binding.canOpen, seq, seat, reopenMode, shown);
+                && canOpen && game.host === binding.betaSid ? game.mode ?? 'four' : undefined;
+            sendView(socket, recipient, view, canOpen, seq, seat, reopenMode, shown);
         }
     }
     async function receive(socket, raw) {
@@ -284,7 +294,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             let expiresAt = record?.expiresAt;
             let error = '', nextMatch;
             if (frame.action !== 'sync') {
-                if (!binding.canPlay || !await approve(scope.actor)) error = 'unavailable';
+                if (binding.gameGuest?.watch || !binding.canPlay || !await approve(scope.actor)) error = 'unavailable';
                 else if (frame.action === 'open') {
                     const SelectedTable = frame.mode === undefined ? Table : frame.mode === 'partners' ? PartnerTable : null;
                     if (!binding.canOpen || !SelectedTable) error = 'unavailable';
@@ -437,5 +447,5 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
         const records = await state.storage.list({ prefix, limit: MATCH_CAP });
         if (records.size) await state.storage.delete([...records.keys()]);
     }
-    return { issue, upgrade, receive, reconcile, presenceChanged, revoke, maintain, retireDisabled, hasGuestSeat, guestTableId, guestNightEndsAt, reserveGuestSeat, releaseGuestClaim, roomGrants };
+    return { issue, upgrade, receive, reconcile, presenceChanged, revoke, maintain, retireDisabled, hasGuestSeat, guestTableId, watchTableId, guestNightEndsAt, reserveGuestSeat, releaseGuestClaim, roomGrants };
 }
