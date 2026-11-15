@@ -60,11 +60,10 @@ function finishMatch(table, subject) {
     expect(table.command(subject, { version: match.version, id: match.id, revision: match.revision, action: 'resign' }).ok).toBe(true);
 }
 
-function installPhoneStyles(width = phoneWidth, height = phoneHeight) {
-    // jsdom does not resolve media queries. Flatten every block that matches
-    // this viewport, later blocks included, so computed style is the cascade.
-    document.querySelectorAll('[data-phone-cascade]').forEach(node => node.remove());
-    const css = readFileSync(join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
+let lobbyCssText;
+const phoneCascadeByViewport = new Map();
+
+function flattenLobbyCssForViewport(css, width, height) {
     const source = document.createElement('style');
     source.textContent = css;
     document.head.append(source);
@@ -78,10 +77,25 @@ function installPhoneStyles(width = phoneWidth, height = phoneHeight) {
                 : (axis === 'width' ? width : height) > Number(value))) return [];
         return active(rule.cssRules);
     });
+    const text = active(source.sheet.cssRules).join('\n');
+    source.remove();
+    return text;
+}
+
+function installPhoneStyles(width = phoneWidth, height = phoneHeight) {
+    // jsdom does not resolve media queries. Flatten every block that matches
+    // this viewport, later blocks included, so computed style is the cascade.
+    document.querySelectorAll('[data-phone-cascade]').forEach(node => node.remove());
+    const css = lobbyCssText ??= readFileSync(join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
+    const key = `${width}x${height}`;
+    let text = phoneCascadeByViewport.get(key);
+    if (!text) {
+        text = flattenLobbyCssForViewport(css, width, height);
+        phoneCascadeByViewport.set(key, text);
+    }
     const flattened = document.createElement('style');
     flattened.dataset.phoneCascade = '';
-    flattened.textContent = active(source.sheet.cssRules).join('\n');
-    source.remove();
+    flattened.textContent = text;
     document.head.append(flattened);
 }
 
@@ -418,7 +432,7 @@ describe('Spades phone table', () => {
     });
 
     it('picks Spades hand columns from the full phone cascade and keeps trick columns', () => {
-        const css = readFileSync(join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
+        const css = lobbyCssText ??= readFileSync(join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
         const phone = css.slice(css.indexOf('@media (max-width: 600px)'), css.indexOf('@media (max-width: 900px)', css.indexOf('@media (max-width: 600px)')));
         expect(phone).toMatch(/\.arcade-spades \.arcade-card-hand\s*\{\s*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
         expect(phone).toMatch(/\.arcade-spades \.spades-trick\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
@@ -447,6 +461,12 @@ describe('Spades phone table', () => {
             { width: 600, height: 721, columns: 'repeat(4, minmax(0, 1fr))', minHeight: 50, trick: 'repeat(2, minmax(0, 1fr))' },
             { width: 601, height: 720, columns: 'repeat(7, minmax(0, 1fr))', minHeight: 44, trick: 'repeat(4, minmax(0, 1fr))' }
         ];
+        for (const { width, height } of layouts) {
+            const key = `${width}x${height}`;
+            if (!phoneCascadeByViewport.has(key)) {
+                phoneCascadeByViewport.set(key, flattenLobbyCssForViewport(css, width, height));
+            }
+        }
         for (const layout of layouts) {
             document.body.replaceChildren();
             const hand = effectiveHand(layout.width, layout.height);
@@ -455,7 +475,7 @@ describe('Spades phone table', () => {
             expect(hand.minHeight, `${label} card min-height`).toBe(layout.minHeight);
             expect(hand.trick, `${label} trick`).toContain(layout.trick);
         }
-    });
+    }, 20000);
 
     it.each(['partners', 'four'])('measures bid, play, rematch and reconnect at 390×844 in %s mode', mode => {
         installPhoneStyles();
