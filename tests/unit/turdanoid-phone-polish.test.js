@@ -151,6 +151,33 @@ describe('Turdanoid phone exit flow', () => {
         expect(view.api.panel.open).toBe(false);
     });
 
+    it('scrolls Launch above the section tabs when a short portrait leaves it overlapping', () => {
+        const view = mountRace();
+        view.publish(view.active);
+        const launch = view.api.panel.querySelector('[data-brick-serve]');
+        const navigation = document.createElement('nav');
+        navigation.className = 'phonetabs';
+        document.body.append(navigation);
+        let scrolled = 0;
+        Object.defineProperty(view.api.panel, 'scrollTop', {
+            configurable: true,
+            get() { return scrolled; },
+            set(value) { scrolled = value; }
+        });
+        Object.defineProperty(view.api.panel, 'scrollHeight', { configurable: true, value: 715 });
+        Object.defineProperty(view.api.panel, 'clientHeight', { configurable: true, value: 665 });
+        launch.getBoundingClientRect = () => {
+            const bottom = 659.2 - scrolled;
+            return { top: bottom - 44.2, bottom, left: 10, right: 365, width: 355, height: 44.2, x: 10, y: bottom - 44.2 };
+        };
+        navigation.getBoundingClientRect = () => ({ top: 622, bottom: 667, left: 0, right: 375, width: 375, height: 45, x: 0, y: 622 });
+        window.dispatchEvent(new Event('resize'));
+        expect(launch.getBoundingClientRect().bottom).toBeLessThanOrEqual(622);
+        expect(scrolled).toBe(38);
+        window.dispatchEvent(new Event('resize'));
+        expect(scrolled).toBe(38);
+    });
+
     it('returns from a finished race in one tap with the rematch path available', () => {
         const view = mountRace();
         view.publish({ ...view.active, match: { ...view.active.match, result: { winner: 'a', reason: 'time' } } });
