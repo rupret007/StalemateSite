@@ -71,6 +71,52 @@ describe('Turdanoid phone layout contract', () => {
         document.querySelector('[data-brick-phone-test]').remove();
     });
 
+    it('paints an open call above the live race layer and leaves a closed call underneath', () => {
+        const phoneRules = mobile.slice(mobile.indexOf('{') + 1, mobile.indexOf('\n}\n@media (max-height: 450px)'));
+        const elsewhere = css.slice(0, mobileStart) + css.slice(mobile.indexOf('@media (prefers-reduced-motion: reduce)', mobileStart));
+        expect(phoneRules).toMatch(/\.game-call:has\(#game-night-call:not\(\[hidden\]\)\)\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*30/);
+        expect(elsewhere).not.toContain('.game-call:has(#game-night-call:not([hidden]))');
+        document.head.insertAdjacentHTML('beforeend', `<style data-brick-call-test>
+            [hidden] { display: none !important; }
+            ${phoneRules}
+        </style>`);
+        document.body.innerHTML = `<section class="game-night">
+            <div class="game-actions"><button type="button">Invite players</button></div>
+            <details class="arcade-brick-race" open>
+                <div data-brick-match>
+                    <div class="brick-race-board"></div>
+                    <div class="brick-race-rail"><button data-brick-serve>Launch ball</button><p class="brick-race-help" id="brick-race-help">Drag to move.</p></div>
+                </div>
+            </details>
+            <div class="game-call">
+                <section id="game-night-call" class="game-night-call">
+                    <button type="button">Report ChessHost from this call</button>
+                </section>
+            </div>
+        </section>`;
+        const race = document.querySelector('.arcade-brick-race');
+        const call = document.querySelector('.game-call');
+        const report = document.querySelector('#game-night-call button');
+        const board = document.querySelector('.brick-race-board');
+        const launch = document.querySelector('[data-brick-serve]');
+        const style = node => window.getComputedStyle(node);
+        const raceZ = Number(style(race).zIndex);
+        expect(style(race).position).toBe('fixed');
+        expect(Number(style(call).zIndex)).toBeGreaterThan(raceZ);
+        expect(style(call).position).toBe('relative');
+        expect(style(report).pointerEvents).toBe('auto');
+        expect(style(board).display).not.toBe('none');
+        expect(style(launch).display).not.toBe('none');
+        document.querySelector('#game-night-call').hidden = true;
+        expect(style(call).zIndex).toBe('auto');
+        expect(style(call).position).toBe('static');
+        expect(style(race).position).toBe('fixed');
+        expect(style(race).zIndex).toBe(String(raceZ));
+        expect(style(board).display).not.toBe('none');
+        expect(style(launch).display).not.toBe('none');
+        document.querySelector('[data-brick-call-test]').remove();
+    });
+
     it('bounds the landscape board by viewport height and keeps a score rail beside it', () => {
         const landscape = mobile.slice(mobile.indexOf('@media (max-height: 450px)'));
         expect(landscape).toMatch(/\.brick-race-layout\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) 10rem/);

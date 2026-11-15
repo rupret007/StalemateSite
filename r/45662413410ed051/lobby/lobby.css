@@ -898,6 +898,10 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .game-night:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])) > .game-actions :is(button, a, select) {
     pointer-events: auto;
   }
+  .game-night:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])) > .game-call:has(#game-night-call:not([hidden])) {
+    position: relative;
+    z-index: 30;
+  }
   .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) {
     position: fixed;
     z-index: 20;
