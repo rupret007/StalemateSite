@@ -178,7 +178,12 @@
     .arcade-chess-clocks > div { padding: .25rem .35rem; font-size: .8rem; white-space: nowrap; }
 }
 @media (max-width: 900px) and (max-height: 720px) and (orientation: portrait) {
-    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 24px; }
+    /* The 44px tap floor uses the slack above Offer draw. Keep a transcript sliver
+       and drop the non-interactive gaps so the match actions clear the panel. */
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 8px; }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-chess { padding-top: 0; }
+    .arcade-chess-status { margin-bottom: 0; }
+    .arcade-chess-playing { gap: .15rem; }
     .arcade-chess-actions { grid-template-columns: repeat(auto-fit, minmax(4.4rem, 1fr)); }
     .arcade-chess-actions .btn { min-height: 44px; }
 }
@@ -188,4 +193,12 @@
 @media (max-height: 530px) {
     .arcade-chess #board { width: min(100%, 15rem); }
     .arcade-chess-clocks { width: min(100%, 16.5rem); }
+}
+/* Phone tap floor: trim the side padding so a 390px phone gets 44px squares. */
+@media (max-width: 430px) and (min-height: 451px) {
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-chess { padding-inline: .375rem; }
+    /* Give back the height the 44px room controls take so the match actions stay on screen. */
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .tabs { padding-top: 0; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .roombar { padding-block: 2px; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 8px; }
 }

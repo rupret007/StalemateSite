@@ -845,3 +845,22 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
 [data-sharing-confirm][hidden] { display: none; }
 .chat:has([data-sharing-controls][open]) .lobby-welcome { display: none; }
 .chat:has([data-sharing-controls][open]) .buffer { min-height: 48px; }
+/* Phone tap floor (family demo re-grade 2026-11-15): while a Game Night room is
+   open on a phone, every room control stays at least 44x44 CSS px, including the compact in-game states.
+   Short landscape screens keep their existing compact layout. */
+@media (max-width: 430px) and (min-height: 451px) {
+  body:has(.game-night:not([hidden])) :is(.tabs button, .roombar .btn, .game-actions .btn, .connection-tools [data-fullscreen], .say .btn,
+    .arcade-card-table summary, [data-game-editor] summary, .arcade-brick-race [data-brick-serve]) { min-height: 44px !important; }
+  body:has(.game-night:not([hidden])) :is(.connection-tools [data-fullscreen], .slash, .roombar .btn) { min-width: 44px !important; }
+  /* The 44px room chrome eats the card panel. Keep a short transcript and return
+     the rest so phone boards and hands clear the clip. Eights sets its own floor. */
+  .chat:has(.arcade-card-table[open] [data-card-table]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 28px; }
+  .arcade-spades .arcade-card-hand { gap: 6px 5px; }
+  .arcade-spades .arcade-card-hand button { min-height: 50px; }
+  /* The 44px Eights summary sits above the hand. Give the transcript minimum back
+     so the hand stays inside the phone panel. */
+  .chat:has(.arcade-eights[open] [data-card-table]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 34px; }
+  /* The 44px Rush summary and room chrome use the slack under the track.
+     Shorten the track so the 44px race controls stay fully in view. */
+  .rush-race-track { height: clamp(132px, calc(100dvh - 521px), 275px); }
+}
