@@ -835,6 +835,17 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
 
+/* Royal Flush Chess: sharpen state cues while preserving the square phone board. */
+.arcade-chess-status { color: var(--cream); font-weight: 700; line-height: 1.3; }
+.arcade-chess .arcade-chess-square[aria-pressed="true"] { background: #d8ef91; box-shadow: inset 0 0 0 3px #263d12, inset 0 0 0 6px #f8ffd8; }
+.arcade-chess .arcade-chess-square[data-legal]::after { width: 27%; border: 3px solid #173538; background: #f7fff0; box-shadow: 0 0 0 2px #f7fff0; }
+.arcade-chess .arcade-chess-square[data-capture]::after { inset: 5px; width: auto; border-width: 3px; box-shadow: inset 0 0 0 2px #f3ffd0, 0 0 0 1px #173538; }
+.arcade-chess .arcade-chess-square[data-last] { box-shadow: inset 0 0 0 3px #513811, inset 0 0 0 6px #ffe096; }
+.arcade-chess .arcade-chess-square[aria-pressed="true"][data-last] { box-shadow: inset 0 0 0 3px #263d12, inset 0 0 0 6px #f8ffd8, inset 0 0 0 9px #ffe096; }
+.arcade-chess .arcade-chess-square[data-check] { background-image: radial-gradient(ellipse at center, #ee5266 0%, #bd274b 58%, #8d163b 100%); box-shadow: inset 0 0 0 3px #2b0a1c, inset 0 0 0 6px #fff0dc; }
+.arcade-chess [data-chess-start-rematch] { min-height: 44px; }
+.arcade-chess [data-chess-status]:not(:empty) { overflow-wrap: anywhere; }
+
 /* Private C3 controls stay within their pane and leave the composer visible. */
 [data-sharing-controls] { min-width: 0; max-width: 100%; max-height: min(28vh, 180px); overflow-y: auto; overflow-wrap: anywhere; }
 [data-sharing-controls] summary { cursor: pointer; }
