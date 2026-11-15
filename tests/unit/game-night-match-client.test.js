@@ -234,6 +234,31 @@ describe('Game Night phone wake and history recovery', () => {
         expect(sockets).toHaveLength(before);
     });
 
+    it.each([[4001, 'kicked'], [4003, 'banned']])(
+        'ends terminal close %i, reports its reason, and clears state without calling a throwing onState handler', async (code, reason) => {
+            const status = vi.fn();
+            let privateView = { hand: ['private-card'] };
+            client.stop();
+            client = createGameNightMatchClient({
+                prefix: '/beta/arcade',
+                onStatus(next, detail) { status(next, detail); if (next === 'unavailable') privateView = null; },
+                // Mirrors the production Spades and Turdanoid destructuring shape. Passing undefined throws.
+                onState({ state }) { privateView = state?.match; },
+                onError: vi.fn()
+            });
+            client.start({ room: '#game-fixture', ref: 'fixture' });
+            await vi.advanceTimersByTimeAsync(0);
+            const current = sockets.at(-1);
+            ready(current);
+            current.dispatchEvent(new CloseEvent('close', { code }));
+            expect(status).toHaveBeenLastCalledWith('unavailable', reason);
+            expect(privateView).toBeNull();
+            const tickets = issue.mock.calls.length;
+            await vi.advanceTimersByTimeAsync(10_000);
+            expect(issue).toHaveBeenCalledTimes(tickets);
+        }
+    );
+
     it('keeps trying to reconnect with a capped wait while the page is visible', async () => {
         const status = vi.fn();
         client.stop();
@@ -255,6 +280,32 @@ describe('Game Night phone wake and history recovery', () => {
         expect(Math.max(...delays)).toBeLessThanOrEqual(10_000);
         expect(delays.at(-1)).toBeGreaterThanOrEqual(7_500);
         expect(delays[0]).toBeLessThan(1_000);
+    });
+
+    it('recovers the same seated view after an ordinary 1006 close', async () => {
+        const status = vi.fn(), states = [];
+        client.stop();
+        client = createGameNightMatchClient({
+            prefix: '/beta/arcade', onStatus: status, onState: frame => states.push(frame.state), onError: vi.fn()
+        });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        let current = sockets.at(-1);
+        ready(current);
+        const state = { id: 'match-1', seat: 'b', match: { hand: ['private-card'] } };
+        current.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state })
+        }));
+        current.dispatchEvent(new CloseEvent('close', { code: 1006 }));
+        expect(status).toHaveBeenLastCalledWith('reconnecting');
+        await vi.advanceTimersByTimeAsync(500);
+        current = sockets.at(-1);
+        ready(current);
+        current.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state })
+        }));
+        expect(states.map(view => view.seat)).toEqual(['b', 'b']);
+        expect(states.at(-1).match.hand).toEqual(['private-card']);
     });
 
     it('waits while the page is hidden and reconnects when it is shown again', async () => {
