@@ -63,8 +63,9 @@ test('390×844 Chess result survives deterministic reconnect and a complete rema
         await expect(guest.locator('.arcade-chess-board')).toBeVisible();
         expect((await fixture.record('chess')).chess.match.result).toMatchObject({ reason: 'Resignation', winner: 'w' });
 
-        // Keep the lobby reconnect banner visible long enough to measure its layout.
-        await fixture.dropLobby('PhoneGuest');
+        // Keep the match reconnect banner visible long enough to measure its layout.
+        // A lobby disconnect ends the room membership and revokes the match seat.
+        await fixture.dropMatch('PhoneGuest', 'chess');
         const reconnect = panel(guest).locator('.arcade-reconnect');
         await expect(reconnect).toHaveText('Reconnecting…');
         const layout = await guest.evaluate(() => {
@@ -101,6 +102,10 @@ test('390×844 Chess result survives deterministic reconnect and a complete rema
         const accept = panel(guest).getByRole('button', { name: 'Accept rematch', exact: true });
         await expect(accept).toBeVisible();
         await expect(accept).toBeEnabled();
+        const rematchHostSocket = fixture.view('PhoneHost', 'chess');
+        const rematchGuestSocket = fixture.view('PhoneGuest', 'chess');
+        const hostFrameOffset = fixture.frames('PhoneHost').length;
+        const guestFrameOffset = fixture.frames('PhoneGuest').length;
         await accept.click();
 
         await expect.poll(async () => (await fixture.record('chess')).chess.id).not.toBe(firstId);
@@ -111,8 +116,14 @@ test('390×844 Chess result survives deterministic reconnect and a complete rema
             await expect(page.locator(CHESS.status)).not.toContainText(/wins ·|Draw ·|Checkmate/);
             await expect(page.locator(CHESS.status)).toContainText(index === 0 ? /You’re White/ : /You’re Black/);
         }
-        expect(fixture.view('PhoneHost', 'chess')).not.toBe(firstHostSocket);
-        expect(fixture.view('PhoneGuest', 'chess')).not.toBe(firstGuestSocket);
+        expect(fixture.view('PhoneHost', 'chess')).toBe(rematchHostSocket);
+        expect(fixture.view('PhoneGuest', 'chess')).toBe(rematchGuestSocket);
+        const rematchFrames = ['PhoneHost', 'PhoneGuest'].map(nick => fixture.frames(nick)
+            .slice(nick === 'PhoneHost' ? hostFrameOffset : guestFrameOffset).map(frame => JSON.parse(frame)));
+        for (const frames of rematchFrames) {
+            expect(frames).toContainEqual(expect.objectContaining({ t: 'rematch', matchId: next.chess.id }));
+            expect(frames.some(frame => ['match-state', 'snapshot'].includes(frame.t) && frame.state?.id === next.chess.id)).toBe(true);
+        }
         expect(fixture.view('PhoneHost', 'chess').deserializeAttachment().seat).toBe('w');
         expect(fixture.view('PhoneGuest', 'chess').deserializeAttachment().seat).toBe('b');
         expect(fixture.errors()).toEqual([]);
