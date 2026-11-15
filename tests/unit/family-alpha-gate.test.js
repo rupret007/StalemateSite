@@ -55,7 +55,7 @@ function fixture(name) {
     const view = socket => last(socket)?.state;
     // The phone's socket ends without a leave, as when it loses signal.
     const drop = async socket => { socket.readyState = 3; await transport.presenceChanged(socket.deserializeAttachment()); };
-    return { phone, send, hello, last, view, drop, advance: ms => { now += ms; } };
+    return { phone, send, hello, last, view, drop, binding: index => actors.get(actorId(index)), advance: ms => { now += ms; } };
 }
 
 async function seated(game) {
@@ -116,17 +116,14 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         expect(extra.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
     });
 
-    // BUG (server half of check 2): nothing queues the extra phone for the next
-    // game. hangout-worker/src/game-night-table.mjs:164-176 (requestRematch /
-    // startReadyRematch) always re-seats the current roster, so "you're up next
-    // game" has nothing behind it unless a seated guest leaves first.
-    it.fails('2b. the extra phone is seated when the next game starts', async () => {
-        const { f, phones, id } = await seated(game);
+    it('2b. the extra phone is up next and a rematch keeps every player in the same seat', async () => {
+        const { f, phones, id, seats } = await seated(game);
         const extra = f.phone(game.seats);
         await f.hello(extra);
         await resign(f, phones.at(-1));
         await f.send(phones[0], 'start-rematch', { id });
-        expect(f.view(extra).seat).toBeTruthy();
+        expect(phones.map(socket => f.view(socket).seat)).toEqual(seats);
+        expect(f.view(extra)).toMatchObject({ seat: null, upNext: true });
     });
 
     it('2c. after the game ends, a guest who steps away frees the seat for the waiting phone', async () => {
@@ -199,6 +196,27 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         await resign(f, phones.at(-1));
         expect(f.last(watcher)).toMatchObject({ phase: 'finished', yourSeat: null });
         if (game.privateHands) expect(f.view(watcher).match.hand).toEqual([]);
+    });
+
+    it('5b. a watch-only invite is shown no seat and no hand, even if the table lists it in a seat, through reconnect and rematch', async () => {
+        const { f, phones, id } = await seated(game);
+        const index = game.seats - 1;
+        const { tableId } = f.view(phones[0]);
+        f.binding(index).gameGuest = { room, ref, host: sidFor(0), match: id, tableId, game: game.name, watch: true };
+        const watcher = f.phone(index);
+        await f.hello(watcher);
+        const readOnly = next => {
+            expect(f.last(watcher)).toMatchObject({ t: 'snapshot', currentMatchId: next, yourSeat: null, canOpen: false });
+            expect(f.view(watcher)).toMatchObject({ watchOnly: true, seat: null });
+            if (game.privateHands) expect(f.view(watcher).match.hand).toEqual([]);
+            expect(JSON.stringify(watcher.frames)).not.toMatch(/"playable":/);
+        };
+        readOnly(id);
+        await resign(f, phones[0]);
+        await f.send(phones[0], 'start-rematch', { id });
+        const next = f.view(phones[0]).id;
+        expect(next).not.toBe(id);
+        readOnly(next);
     });
 });
 

@@ -376,6 +376,93 @@ describe('Game Night match transport', () => {
         return { f, id, tableId, watcher, binding, watchActor };
     }
 
+    it('keeps a watch-only guest read-only and every player in the same seat after a full-table rematch', async () => {
+        const f = fixture('turdspades');
+        const north = f.connect('c' + '3'.repeat(32), 'seat-north');
+        const east = f.connect('c' + '4'.repeat(32), 'seat-east');
+        const watchActor = 'c' + '5'.repeat(32);
+        const watcher = f.connect(watchActor, 'seat-watch');
+        await f.send(f.a, 'open');
+        const { id, tableId } = f.board(f.a);
+        await f.send(f.b, 'join', { id, seat: 'west' });
+        await f.send(north, 'join', { id, seat: 'north' });
+        f.actors.get(watchActor).gameGuest = { room, ref, host: sid, match: id, tableId, game: 'turdspades', watch: true };
+        await f.send(east, 'join', { id, seat: 'east' });
+        await f.send(watcher, undefined, { t: 'hello', lastSeq: 0 });
+        const players = [f.a, f.b, north, east];
+        const seats = players.map(socket => f.board(socket).seat);
+        expect(f.board(watcher)).toMatchObject({ watchOnly: true, seat: null, match: { hand: [] } });
+
+        await f.send(f.a, 'resign', { id, revision: f.board(f.a).match.revision ?? 0 });
+        for (const socket of players) await f.send(socket, 'rematch', { id });
+        const next = f.board(f.a).id;
+        expect(next).not.toBe(id);
+        expect(players.map(socket => f.board(socket).seat)).toEqual(seats);
+        // Privacy ruling #557/#560: an explicit watch invite never becomes a seat or receives a hand.
+        await f.send(watcher, 'sync');
+        expect(f.board(watcher)).toMatchObject({ id: next, watchOnly: true, seat: null, match: { hand: [] } });
+        expect(f.board(watcher).upNext).toBeUndefined();
+    });
+
+    it('projects a watch-only invitation with no seat and no hand even when the table has it seated', async () => {
+        const f = fixture('turdspades');
+        const north = f.connect('c' + '3'.repeat(32), 'seat-north');
+        const eastActor = 'c' + '4'.repeat(32);
+        const east = f.connect(eastActor, 'seat-east');
+        await f.send(f.a, 'open');
+        const { id, tableId } = f.board(f.a);
+        await f.send(f.b, 'join', { id, seat: 'west' });
+        await f.send(north, 'join', { id, seat: 'north' });
+        await f.send(east, 'join', { id, seat: 'east' });
+        expect(f.board(east).match.hand).toHaveLength(13);
+        // The table still lists this person in a seat, but the invitation is watch-only.
+        const returned = f.connect(eastActor, 'seat-east');
+        f.actors.get(eastActor).gameGuest = { room, ref, host: sid, match: id, tableId, game: 'turdspades', watch: true };
+        await f.send(returned, undefined, { t: 'hello', lastSeq: 0 });
+        expect(returned.frames.at(-1)).toMatchObject({ t: 'snapshot', yourSeat: null, canOpen: false });
+        expect(f.board(returned)).toMatchObject({ watchOnly: true, seat: null, match: { hand: [] } });
+        expect(returned.deserializeAttachment().seat).toBeNull();
+        expect(JSON.stringify(returned.frames)).not.toMatch(/"playable":/);
+
+        await f.send(f.a, 'resign', { id, revision: f.board(f.a).match.revision ?? 0 });
+        await f.send(f.a, 'start-rematch', { id });
+        const next = f.board(f.a).id;
+        expect(next).not.toBe(id);
+        expect(returned.frames.at(-1)).toMatchObject({ t: 'snapshot', currentMatchId: next, yourSeat: null });
+        expect(f.board(returned)).toMatchObject({ id: next, watchOnly: true, seat: null, match: { hand: [] } });
+        expect(JSON.stringify(returned.frames)).not.toMatch(/"playable":/);
+    });
+
+    it('never seats a watch-only guest from a stale next-game line when the host reopens', async () => {
+        const f = fixture('turdspades');
+        const north = f.connect('c' + '3'.repeat(32), 'seat-north');
+        const east = f.connect('c' + '4'.repeat(32), 'seat-east');
+        const watchActor = 'c' + '5'.repeat(32);
+        const watcher = f.connect(watchActor, 'seat-watch');
+        await f.send(f.a, 'open');
+        const { id, tableId } = f.board(f.a);
+        await f.send(f.b, 'join', { id, seat: 'west' });
+        await f.send(north, 'join', { id, seat: 'north' });
+        await f.send(east, 'join', { id, seat: 'east' });
+        // Lined up before the invitation was known to be watch-only; the checkpoint keeps the line.
+        await f.send(watcher, undefined, { t: 'hello', lastSeq: 0 });
+        const saved = () => f.storage.put.mock.calls.at(-1)[1].turdspades;
+        expect(saved().nextGame).toEqual(['seat-watch']);
+        f.actors.get(watchActor).gameGuest = { room, ref, host: sid, match: id, tableId, game: 'turdspades', watch: true };
+
+        await f.send(f.a, 'resign', { id, revision: f.board(f.a).match.revision ?? 0 });
+        await f.send(east, 'leave', { id });
+        await f.send(f.a, 'leave', { id: f.board(f.a).id });
+        await f.send(f.a, 'open');
+        expect(saved().seats).toMatchObject({ east: null });
+        expect(saved().nextGame).toBeUndefined();
+        expect(f.board(f.a)).toMatchObject({ waiting: true, match: null });
+        await f.send(watcher, 'sync');
+        expect(f.board(watcher)).toMatchObject({ watchOnly: true, seat: null, match: null });
+        expect(f.board(watcher).upNext).toBeUndefined();
+        expect(JSON.stringify(watcher.frames)).not.toMatch(/"playable":/);
+    });
+
     it('keeps the watcher redacted while a blocked player is offline and resumes when visibility returns', async () => {
         const { f, id, watcher, binding } = await watchedSpades();
         const canSee = binding.canSee;
