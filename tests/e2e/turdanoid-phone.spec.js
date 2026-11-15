@@ -261,13 +261,44 @@ test.describe('Turdanoid phone and landscape layout', () => {
             const { host: page } = await openRace(fixture, { width: 844, height: 390 });
             await expect(page.locator('[data-brick-match]')).toBeVisible();
             const board = page.locator('.brick-race-board'), rail = page.locator('.brick-race-rail');
-            await expectContained(page, ['.brick-race-board', '.brick-race-rail', '[data-brick-serve]', '[data-brick-score="a"]', '[data-brick-score="b"]']);
+            await expectContained(page, ['.brick-race-board', '.brick-race-rail', '[data-brick-back]', '[data-brick-serve]', '[data-brick-score="a"]', '[data-brick-score="b"]']);
             const boardRight = await board.evaluate(node => { const r = node.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r.right : NaN; });
             const railLeft = await rail.evaluate(node => { const r = node.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r.left : NaN; });
             expect(boardRight).toBeLessThanOrEqual(railLeft);
             const metrics = await page.locator('.arcade-brick-race').evaluate(node => ({ scrollHeight: node.scrollHeight, clientHeight: node.clientHeight }));
             expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.clientHeight);
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        } finally { await fixture.close(); }
+    });
+
+    test('Back during and after a race returns to a usable table and frees the seat', async ({ browser, baseURL }) => {
+        const fixture = await gameNight(browser, baseURL);
+        try {
+            const { host, guest } = await openRace(fixture, PHONE);
+            // Back during play follows the confirmed forfeit path and returns to
+            // the table; the rival gets a rematch action instead of a dead end.
+            await host.locator('[data-brick-back]').tap();
+            const confirm = host.getByRole('dialog', { name: 'Leave this race?' });
+            await expect(confirm).toBeVisible();
+            await confirm.getByRole('button', { name: 'Leave race' }).tap();
+            await expect(host.locator(game.board)).toBeHidden();
+            await expect(host.getByRole('button', { name: 'Open Turdanoid race' })).toBeVisible();
+            await expect(guest.locator(game.status)).toContainText('forfeit');
+            await expect(guest.getByRole('button', { name: 'Request Turdanoid rematch' })).toBeVisible();
+
+            // Back after the finish closes the panel cleanly. The finished
+            // race remains usable, and a fresh open race exposes its seat.
+            const guestBack = guest.locator('[data-brick-back]');
+            await expect(guestBack).toBeVisible();
+            await guestBack.tap();
+            await expect(guest.locator(game.board)).toBeHidden();
+            await expect(host.getByRole('button', { name: 'Open Turdanoid race' })).toBeVisible();
+            await host.getByRole('button', { name: 'Open Turdanoid race' }).tap();
+            await expect(guest.getByRole('button', { name: 'Join Turdanoid race' })).toBeVisible();
+            await guest.getByRole('button', { name: 'Join Turdanoid race' }).tap();
+            await expect(host.locator(game.board)).toBeVisible();
+            await expect(guest.locator(game.board)).toBeVisible();
+            expect(fixture.errors()).toEqual([]);
         } finally { await fixture.close(); }
     });
 });
