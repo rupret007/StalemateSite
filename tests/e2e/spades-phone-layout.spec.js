@@ -358,8 +358,21 @@ test.describe('four-player Spades at 390×844', () => {
             }
             await expect(west.locator('[data-spades-status]')).toHaveText('Round 1 · Your turn · tap a card');
             await expect(west.locator('[data-spades-trick-summary]')).not.toHaveText('Bids · no cards played yet');
-            for (const page of pages.slice(1)) await expect(page.locator('[data-spades-card]:enabled')).toHaveCount(0);
-            await expect(west.locator('[data-spades-card]:enabled')).toHaveCount(13);
+            // West leads before spades are broken. legalCards enables every
+            // non-spade, or the whole hand when West holds only spades.
+            // South, North, and East are not on lead.
+            for (const page of [south, north, east]) await expect(page.locator('[data-spades-card]:enabled')).toHaveCount(0);
+            const lead = await west.locator('[data-spades-card]').evaluateAll(nodes => nodes.map(node => ({
+                id: node.dataset.spadesCard,
+                enabled: !node.disabled,
+                spade: (node.getAttribute('aria-label') || '').includes(' of Spades')
+            })));
+            const onlySpades = lead.length > 0 && lead.every(card => card.spade);
+            const legal = (onlySpades ? lead : lead.filter(card => !card.spade)).map(card => card.id);
+            const enabled = lead.filter(card => card.enabled).map(card => card.id);
+            expect(legal.length, 'West has a legal opening lead').toBeGreaterThan(0);
+            expect(enabled, 'West can play exactly its legal opening lead').toEqual(legal);
+            expect(lead.filter(card => card.enabled && card.spade).map(card => card.id), 'a spade is enabled only when West holds only spades').toEqual(onlySpades ? legal : []);
             const card = west.locator('[data-spades-card]:enabled').first();
             await boxAtLeast44(card);
             await card.click();

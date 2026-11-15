@@ -351,7 +351,12 @@ test.describe('four-player Spades watch-only guest', () => {
       await expect(watcher.locator('[data-spades-card]')).toHaveCount(0);
       await expect(watcher.locator('[data-spades-hand] button')).toHaveCount(0);
       expect(fixture.view('WatchGuest', game.game).deserializeAttachment().seat).toBeNull();
-      const frames = fixture.people.get('WatchGuest').matchFrames;
+      // chess-phone-fixture stores person.frames and exposes frames(nick).
+      // The inline harness below is still reachable when that file is absent
+      // and keeps the same bytes on person.matchFrames.
+      const frames = typeof fixture.frames === 'function'
+        ? fixture.frames('WatchGuest')
+        : fixture.people.get('WatchGuest').matchFrames;
       const views = frames.map(raw => JSON.parse(raw)).filter(frame => frame.state?.match);
       expect(views.length).toBeGreaterThan(0);
       for (const view of views) {
