@@ -108,7 +108,7 @@ async function gameNight(browser, baseURL) {
             let attachment = null;
             const socket = { readyState: 1, serializeAttachment: value => { attachment = value; }, deserializeAttachment: () => attachment,
                 // Routed sockets do not emit page websocket events. These are the bytes the browser receives.
-                send: raw => { if (socket.readyState !== 1) return; person.frames.push(String(raw)); route.send(raw); },
+                send: raw => { if (socket.readyState !== 1) return; route.send(raw); person.frames.push(String(raw)); },
                 close: (code = 1000, reason = '') => { if (socket.readyState !== 1) return; socket.readyState = 3; void route.close({ code, reason }); } };
             route.onMessage(raw => void serial(() => transport.receive(socket, String(raw))));
             route.onClose(() => void serial(() => retire(socket, transport)));
