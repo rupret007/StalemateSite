@@ -157,6 +157,19 @@ function partnersTable() {
     return table;
 }
 
+function fourSeatTable() {
+    const table = new GameNightTurdSpades('spades-four-upnext-fixture', 'host');
+    for (const [subject, position] of [['west-player', 'west'], ['north-player', 'north'], ['east-player', 'east']]) {
+        expect(table.join(subject, 'spades-four-upnext-fixture', 0, position)).toBe(true);
+    }
+    return table;
+}
+
+const spadesUpNextFixtures = () => [
+    ['partners', partnersTable(), false, true],
+    ['four-seat', fourSeatTable(), true, false],
+];
+
 beforeEach(() => { document.body.replaceChildren(); client.handlers = null; client.sent = []; });
 
 describe('Spades phone table', () => {
@@ -379,12 +392,11 @@ describe('Spades phone table', () => {
         expect(view.find('[data-spades-bid]').hidden).toBe(true);
     });
 
-    it('shows the full-table up-next sentence only to a guest queued for the next game', () => {
-        const table = partnersTable();
+    it.each(spadesUpNextFixtures())('shows the full-table up-next sentence only to a guest queued for the next game (%s)', (_label, table, canOpen, partners) => {
         const view = mount();
         const queued = { ...table.view('watcher'), seat: null, upNext: true };
         delete queued.watchOnly;
-        client.handlers.onState({ state: queued, canOpen: false, partners: true });
+        client.handlers.onState({ state: queued, canOpen, partners });
         const banner = view.find('[data-next-game]');
         expect(banner.textContent).toBe("Table full, you're up next game");
         expect(banner.hidden).toBe(false);
@@ -392,15 +404,14 @@ describe('Spades phone table', () => {
         expect(view.find('[data-spades-seat]').textContent).toBe('Watching · hands are private');
     });
 
-    it('hides the up-next banner from a watch-only invite viewer', () => {
-        const table = partnersTable();
+    it.each(spadesUpNextFixtures())('hides the up-next queue line from a watch-only invite viewer (%s)', (_label, table, canOpen, partners) => {
         const view = mount();
         const watching = { ...table.view('watcher'), seat: null, watchOnly: true, upNext: true };
-        client.handlers.onState({ state: watching, canOpen: false, partners: true });
+        client.handlers.onState({ state: watching, canOpen, partners });
         const banner = view.find('[data-next-game]');
         expect(watching.seat).toBeNull();
-        expect(banner.textContent).toBe("Table full, you're up next game");
         expect(banner.hidden).toBe(true);
+        expect(banner.textContent).toBe('');
         expect(view.find('[data-spades-table]').hasAttribute('data-watching')).toBe(true);
         expect(view.find('[data-spades-seat]').textContent).toBe('Watching · hands are private');
         expect(view.find('[data-spades-hand-label]').textContent).toBe('Watching · hands are private');
