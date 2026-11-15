@@ -394,7 +394,7 @@ for (const game of Object.values(GAMES)) {
                 await expect(status(late, game)).not.toHaveText(WAIT_FOR_HOST);
                 expect(fixture.view('LateWatcher', game.game).deserializeAttachment().seat).toBeNull();
                 if (game.game === 'turdspades') {
-                    await expect(late.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
+                    await expect(late.locator('[data-spades-seat]')).toHaveText('Watching · hands are private');
                     await expect(late.locator('[data-spades-hand] button')).toHaveCount(0);
                     const frames = fixture.frames('LateWatcher');
                     const views = frames.map(raw => JSON.parse(raw)).filter(frame => frame.state?.match);

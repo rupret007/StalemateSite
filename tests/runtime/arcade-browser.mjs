@@ -897,7 +897,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await captureArcadeInvite(friend, phone, 'spades-01-guest-accept');
             await friend.getByRole('button', { name: 'Join game', exact: true }).tap();
             await expect(table(friend)).toHaveAttribute('data-mode', 'partners');
-            await expect(status(friend)).toHaveText('You and a computer partner vs the host and a computer · tap Bid for me');
+            await expect(status(friend)).toHaveText('Round 1 · Your bid · tap Bid for me');
             const initialTable = new URL(friend.url()).searchParams.get('table');
             await host.locator('[data-spades-action="leave"]').click();
             await host.getByRole('dialog', { name: 'Leave this table?' }).getByRole('button', { name: 'Leave table', exact: true }).click();
@@ -908,7 +908,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(table(friend)).toHaveAttribute('data-mode', 'partners');
             await expect(status(friend)).toContainText('tap Bid for me');
             assert.equal(new URL(friend.url()).searchParams.get('table'), initialTable);
-            await expect(friend.locator('.arcade-card-score')).toBeHidden();
+            await expect(friend.locator('.arcade-card-score')).toBeVisible();
             for (const player of [host, friend]) await expect(cards(player)).toHaveCount(13);
             const suitOf = { Spades: 'S', Hearts: 'H', Diamonds: 'D', Clubs: 'C' };
             const guestHand = (await friend.locator('[data-spades-card]').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label'))))
@@ -922,7 +922,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await expect(table(host)).toHaveAttribute('data-phase', 'play');
             await expect(friend.locator('[data-spades-trick]')).toContainText('North (CPU)');
             await expect(friend.locator('[data-spades-trick]')).toContainText('East (CPU)');
-            await expect(status(friend)).toHaveText(/Your play · tap a card/);
+            await expect(status(friend)).toHaveText('Your turn · tap a card');
             await captureArcadeInvite(host, desktop, 'spades-02-playing');
             await captureArcadeInvite(friend, phone, 'spades-02-playing');
 
@@ -934,7 +934,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 let turn;
                 await expect.poll(async () => {
                     const messages = await Promise.all(players.map(page => status(page).textContent()));
-                    turn = messages.flatMap((message, index) => message.startsWith('Round 1 · Your play') ? [index] : []);
+                    turn = messages.flatMap((message, index) => message.startsWith('Your turn · tap a card') ? [index] : []);
                     return turn.length;
                 }).toBe(1);
                 const index = turn[0], page = players[index], card = page.locator('[data-spades-card]:enabled').first();
@@ -2167,7 +2167,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             let turn;
             await expect.poll(async () => {
                 const messages = await Promise.all(players.map(page => status(page).textContent()));
-                turn = messages.flatMap((message, index) => message.startsWith('Round 1 · Your play') ? [index] : []);
+                turn = messages.flatMap((message, index) => message.startsWith('Your turn · tap a card') ? [index] : []);
                 return turn.length;
             }).toBe(1);
             const index = turn[0], page = players[index];
