@@ -360,6 +360,36 @@ for (const game of Object.values(GAMES)) {
             } finally { await fixture.close(); }
         });
 
+        // Both sockets die while the page stays up. dropLobby(4403) is the lobby
+        // close; reconcile then closes the match with 4403 because membership
+        // cannot be confirmed. The phone must show Reconnecting… and sit down
+        // again on its own. A ban still uses this code with reason "banned".
+        test('1d. total signal loss, including a 4403 close, shows Reconnecting… then its own seat', async ({ browser, baseURL }) => {
+            const fixture = await gameNight(browser, baseURL);
+            try {
+                const pages = await seated(fixture, game, nicks);
+                const guest = pages.at(-1);
+                const before = fixture.view(last, game.game).deserializeAttachment().seat;
+                expect(before).toBeTruthy();
+                const seen = await watchStatus(guest, game);
+                const pill = panel(guest, game).locator('.arcade-reconnect');
+                await fixture.dropLobby(last, 4403);
+                await expect(pill).toBeVisible();
+                await expect(pill).toHaveText('Reconnecting…');
+                await expect(pill).toBeHidden();
+                await expect(status(guest, game)).toHaveText(game.live.at(-1));
+                await expect(guest.locator(game.board)).toBeVisible();
+                await expect(guest.locator('[data-connection]')).toHaveText('Connected');
+                await expect(guest.locator('[data-game-offer]')).toBeHidden();
+                await expect.poll(() => fixture.view(last, game.game)?.deserializeAttachment()?.seat).toBe(before);
+                const lines = await seen();
+                expect(lines.filter(text => WAIT_FOR_HOST.test(text) && !/to bid/.test(text))).toEqual([]);
+                expect(lines.filter(text => /Return to your Game Night room|couldn.t reconnect|Ask your host/i.test(text))).toEqual([]);
+                expect(await guest.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(PHONE.width);
+                expect(fixture.errors()).toEqual([]);
+            } finally { await fixture.close(); }
+        });
+
         test('4. a finished game offers the host a one-tap rematch that seats everyone again', async ({ browser, baseURL }) => {
             const fixture = await gameNight(browser, baseURL);
             try {

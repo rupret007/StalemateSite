@@ -24,6 +24,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         ? '?game-guest=1' + (tableId ? '&table=' + tableId : '') : '';
     let scope, socket, controller, reconnectTimer, joinTimer, claimTimer, generation = 0, failures = 0, ready = false;
     let pausedForNetwork = false, terminalError = false, lastSeq = 0, matchOpen = false, matchUnavailable = false;
+    // Set once a view has arrived. A later 4403/403 is the lobby socket dropping
+    // out from under a seat, not a refusal of someone who never reached the table.
+    let tableSeen = false;
     let hiddenAt, pongTimer, pingNonce = 0, supportsPing = false, waitingForPage = false;
     let playing = false, wakeLock, pendingWakeLock = false, retryWakeLock = false;
     async function updateWakeLock() {
@@ -79,6 +82,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         scope = null;
         pausedForNetwork = false;
         hiddenAt = undefined;
+        tableSeen = false;
         setPlaying(false);
     }
     function send(frame) {
@@ -88,6 +92,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
     }
     function retry(attempt, reason) {
         if (attempt !== generation || !scope) return;
+        if (tableSeen && reason === 'room') reason = undefined;
         if (!reason && navigator.onLine === false) return pauseForNetwork();
         if (reason) {
             reset(false, true);
@@ -155,6 +160,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     // playing/finished: a game is open but hidden. unavailable: wrong-table invite.
                     matchUnavailable = !frame.state && frame.phase === 'unavailable';
                     matchOpen = !frame.state && (frame.phase === 'playing' || frame.phase === 'finished');
+                    tableSeen = true;
                     setPlaying(!!match && !!frame.state.seat && frame.phase !== 'finished' && !match.result);
                     onState(frame);
                     if (attempt === generation) onMatch?.(scope, frame.state, send, false,
