@@ -389,7 +389,8 @@ test('four people in one private Hang Out room can see each other', async ({ bro
 });
 
 test('two people in WebKit when that browser launches', async () => {
-    test.skip(true, 'Linux headless WebKit 27.2 crashes on 2-peer getUserMedia+WebRTC receive (plain P2P A:crash); family Safari needs real iOS/macOS, not this harness.');
+    // Linux headless WPE only — playwright #43926, WebKit bug 328052 (2-peer getUserMedia+WebRTC receive crash).
+    test.skip(process.platform === 'linux', 'Linux headless WebKit crashes on 2-peer getUserMedia+WebRTC receive (plain P2P A:crash); family Safari needs real iOS/macOS, not this harness.');
     test.setTimeout(120000);
     const report = { launched: false, pass: false, status: 'WebKit did not launch' };
     let browser;
