@@ -411,7 +411,8 @@ describe('Spades phone table', () => {
         const banner = view.find('[data-next-game]');
         expect(watching.seat).toBeNull();
         expect(banner.hidden).toBe(true);
-        expect(banner.textContent).toBe('');
+        expect(getComputedStyle(banner).display).toBe('none');
+        expect(banner.getClientRects()).toHaveLength(0);
         expect(view.find('[data-spades-table]').hasAttribute('data-watching')).toBe(true);
         expect(view.find('[data-spades-seat]').textContent).toBe('Watching · hands are private');
         expect(view.find('[data-spades-hand-label]').textContent).toBe('Watching · hands are private');
