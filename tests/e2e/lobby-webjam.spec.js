@@ -114,19 +114,23 @@ async function browserRoom(browser, baseURL, configured, viewport, directMusic =
     return { join, external, close: () => Promise.all(contexts.map(context => context.close())) };
 }
 
-test('two hosts given the same Jam label start separate rooms', async ({ browser, baseURL }) => {
+test('two hosts given the same rejected Jam name start separate rooms', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
     try {
         const first = await f.join('FirstHost', false, 'stalemate');
         const second = await f.join('SecondHost', false, 'rad-dad');
         const names = [];
         for (const host of [first, second]) {
-            // Force the same readable words while leaving the browser's UUIDs intact.
-            await host.evaluate(() => { Math.random = () => 0; });
+            // The first generated candidate is known to fail the name filter.
+            await host.evaluate(() => {
+                Math.random = () => 0;
+                crypto.randomUUID = () => 'fa6ccc66-0000-4000-8000-000000000000';
+            });
             await host.locator('.phonetabs [data-show="rooms"]').click();
             await host.locator('[data-start="jam"]').click();
             const context = host.locator('[data-chat-context]');
-            await expect(context).toHaveText(/^#jam-happy-tree(?:-|$)/);
+            await expect(context).toHaveText(/^#jam-happy-tree-[a-f0-9]{4}x[a-f0-9]{4}$/);
+            await expect(context).not.toHaveText('#jam-happy-tree-fa6cxcc66');
             names.push(await context.textContent());
         }
         expect(names[0]).not.toBe(names[1]);

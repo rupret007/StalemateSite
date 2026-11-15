@@ -514,6 +514,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     const musicInviteFailed = 'Music invitation couldn’t be sent. Try again, or copy a fresh browser invite from WebJam and share it with the room.';
     const jamWaitingCopy = $('[data-jam-wait]').textContent;
     let gameNightSupported = false, gameOpenSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
+    let jamOpenSupported = false;
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
     const arcadeTables = new Map([
         ['chess', { label: 'Royal Flush Chess', load: () => import('./arcade-chess.mjs').then(module => module.mountArcadeChess) }],
@@ -1073,6 +1074,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             gameNightSupported = m.features?.gameNight === 1;
             gameOpenSupported = m.features?.gameOpen === 1;
+            jamOpenSupported = m.features?.jamOpen === 1;
             gameGuestInvitesSupported = m.features?.gameGuestInvites === 1;
             arcadeTables.get('chess').supported = m.features?.arcadeChess === 1;
             arcadeTables.get('crapeights').supported = m.features?.arcadeCrapeights === 1;
@@ -2833,7 +2835,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         // words match. Break up digits so the code won't look like a phone number.
         const code = kind === 'jam' ? crypto.randomUUID().replaceAll('-', '') : '';
         const suffix = kind === 'jam' ? `${slug()}-${code.slice(0, 4)}x${code.slice(4, 8)}` : slug();
-        count(`room-start-${kind}`); cmd('join', [`#${kind}-${suffix}`]);
+        count(`room-start-${kind}`);
+        cmd(kind === 'jam' && jamOpenSupported ? 'jamopen' : 'join', [`#${kind}-${suffix}`]);
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
     $('[data-channel-dialog]').addEventListener('close', () => {
