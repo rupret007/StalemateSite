@@ -7,7 +7,7 @@
     "index.html": "Preserve private listening and playback controls and add a disabled-by-default camera marker.",
     "join-entry.js": "Keep the host camera closed unless the protected document enables it.",
     "session.js": "Preserve listen-only music and admitted-session error guidance during camera teardown.",
-    "style.css": "Preserve the private join spacing and keep playback recovery visible in the camera layout."
+    "style.css": "Preserve the private join spacing and keep playback recovery visible beside a single Leave control in the camera layout."
   },
   "files": {
     "LICENSE": {
@@ -71,7 +71,7 @@
     },
     "style.css": {
       "upstreamSha256": "ecf8e9649e957936c7ecf91e146dea22be1385a97fc59c21456559624a505259",
-      "shippedSha256": "ca95afbf47d8cad8c1d112a12af3abd806ae7fde243d796f4752404b59cc4f67"
+      "shippedSha256": "0d576870cae2bfc36126b9e2e808073ea2c42a522019761148d13ffc61cb91e3"
     },
     "video-guard.js": {
       "upstreamSha256": "e0aac82a0eee7db1faaeb41a4ab60b38a718756c7ff6a7f9c72fa63ce7764e5c",
