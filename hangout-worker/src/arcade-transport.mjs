@@ -15,6 +15,8 @@ export { arcadeRoomRequest } from './game-night-sockets.mjs';
 export const ARCADE_TAG = 'game-night-match';
 export const ARCADE_PROTOCOL = 'game-night.v1';
 const CONNECTED_CLAIM_TTL = 60_000;
+// A connected watcher's sync counts as guest activity at most this often.
+export const WATCH_ACTIVITY_INTERVAL = 60_000;
 const MATCH_CAP = 60;
 const adapters = new Map([
     ['chess', { flag: 'HANGOUT_ARCADE_CHESS', Table: GameNightChess }],
@@ -195,11 +197,14 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 ? [attachment.betaSid] : [];
         }));
     }
+    // A seated player and an invited watcher keep the board while a seated
+    // player is offline. The watcher's view never carries a hand.
+    const keepsAbsent = (binding, seated) => !!seated || binding.gameGuest?.watch === true;
     function canView(game, binding, scope) {
-        const seated = !!game?.seat(binding.betaSid);
         if (game && otherTable(game, binding.gameGuest, scope)) return false;
+        const lenient = !!game && keepsAbsent(binding, game.seat(binding.betaSid));
         return !game || game.subjects.every(subject =>
-            binding.canSee(subject) || seated && binding.isPresent?.(subject) === false);
+            binding.canSee(subject) || lenient && binding.isPresent?.(subject) === false);
     }
     function publish(scope, game, requester, claims, seq, nextMatch) {
         const online = connectedPlayers(scope);
@@ -361,10 +366,18 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                     try { await guestActivity(binding); } catch { /* Keep the existing idle deadline. */ }
                 }
             } else if (!record?.expired) publish(scope, game, resume ? null : socket, claims, seq);
-            if (frame.action === 'sync' && !scope.synced) {
-                socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });
-                if (binding.gameGuest?.watch && game?.openMatch) {
-                    try { await guestActivity(binding); } catch { /* Keep the existing idle deadline. */ }
+            if (frame.action === 'sync') {
+                if (!scope.synced) socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });
+                // Watching is the watcher's only activity. A sync that shows the open
+                // table renews the idle deadline; the registry still caps it at the
+                // night deadline and the invite's expiry.
+                const time = now();
+                if (binding.gameGuest?.watch && game && !game.closed
+                    && !(time - scope.watchActiveAt < WATCH_ACTIVITY_INTERVAL)) {
+                    try {
+                        await guestActivity(binding);
+                        socket.serializeAttachment({ ...socket.deserializeAttachment(), watchActiveAt: time });
+                    } catch { /* Keep the existing idle deadline. */ }
                 }
             }
             if (error) send(socket, { t: 'match-error', reason: error });
@@ -391,7 +404,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             const scope = ws.deserializeAttachment(), binding = member(scope);
             if (!binding) close(ws, 4403, 'room membership ended');
             else if (scope.subjects?.some(subject => !binding.canSee(subject) &&
-                !(scope.seat && binding.isPresent?.(subject) === false))) {
+                !(keepsAbsent(binding, scope.seat) && binding.isPresent?.(subject) === false))) {
                 const hidden = scope.hidden;
                 try { ws.serializeAttachment({ ...scope, subjects: [], seat: null, ...(hidden ? { hidden } : {}) }); }
                 catch { close(ws, 1011, 'match connection unavailable'); continue; }
