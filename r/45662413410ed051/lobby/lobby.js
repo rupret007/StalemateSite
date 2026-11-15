@@ -872,7 +872,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         clearTimeout(retryTimer); cancelTransportAck();
         // Keep the unsent text under its original channel/PM key. Never move a
         // private draft into #stalemate or persist it during re-authentication.
-        saveDraft(app.active, $('[data-text]').value);
+        const composer = $('[data-text]');
+        saveDraft(app.active, composer.value);
         clearGameReturn();
         app.chans.clear(); app.pms.clear(); app.rooms = []; app.pendingChannel = '';
         app.band = false; app.verified = false; app.role = 'fan'; app.capabilities = {};
@@ -890,7 +891,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         document.body.classList.remove('is-band', 'am-op');
         announcements.replace(() => $('[data-chat-lines]').replaceChildren());
         setConnection('ended'); drawTabs(); drawChan();
-        $('[data-text]').readOnly = true;
+        composer.readOnly = true;
+        $('[data-session-draft]').hidden = !composer.value.trim();
         const ended = reason === 'private-access' ? 'Your private community access needs renewal.'
             : reason === 'left' ? 'You left this chat. Your sign-in and any recorded sharing withdrawal have not been changed.' : reason === 'admission'
             ? 'Couldn’t reconnect. The service may be unavailable or your sign-in may have expired.'
@@ -2781,7 +2783,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         else delete prompt.dataset.prompt;
         const paused = !app.band && (app.netLock === 'readonly' || app.budget === 'readonly');
         const note = $('[data-network-note]');
-        note.hidden = !paused && connected;
+        note.hidden = sessionEnded ? !$('[data-text]').value.trim() : !paused && connected;
         note.textContent = sessionEnded ? 'This session is closed. Your unsent message is available to copy.'
             : !connected ? 'You’re offline. Your draft stays here until you reconnect.' : 'Chat is read-only for now. Your unsent draft stays here.';
     }

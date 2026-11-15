@@ -146,9 +146,20 @@ describe('private entry recovery after a rejected socket admission', () => {
         expect(window.document.querySelector('[data-session-ended]').hidden).toBe(false);
         expect(window.document.querySelector('[data-session-reason]').textContent).toContain('private community access needs renewal');
         expect(window.document.querySelector('[data-session-reentry]').hidden).toBe(false);
+        expect(window.document.querySelector('[data-session-ended] .small').hidden).toBe(false);
+        expect(window.document.querySelector('[data-network-note]').hidden).toBe(false);
         expect(window.document.querySelector('[data-text]').value).toBe('Keep this unsent rehearsal note');
         expect(window.document.querySelector('[data-text]').readOnly).toBe(true);
         expect(fetch).toHaveBeenCalledTimes(1);
+    });
+    it('does not advertise an unsent message when an empty session ends', async () => {
+        const { window, ws, welcome, join } = await visitor('', undefined, { beta: true });
+        welcome(); join();
+        expect(window.document.querySelector('[data-text]').value).toBe('');
+        await ws.close(4401);
+        expect(window.document.querySelector('[data-session-ended]').hidden).toBe(false);
+        expect(window.document.querySelector('[data-session-ended] .small').hidden).toBe(true);
+        expect(window.document.querySelector('[data-network-note]').hidden).toBe(true);
     });
 });
 
