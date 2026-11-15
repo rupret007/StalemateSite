@@ -185,7 +185,13 @@ export function mountArcadeTurdSpades(container, onMatch) {
         bid.append(option);
     }
     bid.value = '3';
-    bid.addEventListener('change', () => { if (!applyingBid) bidEdited = true; });
+    bid.addEventListener('change', () => {
+        if (applyingBid) return;
+        bidEdited = true;
+        // The amount is no longer the suggestion. Show the lock control immediately;
+        // draw() is what puts the label back to Bid for me on the next deal.
+        draw();
+    });
 
     function showHand(cards, choosingCard = false) {
         const old = new Map([...hand.children].map(button => [button.dataset.spadesCard, button]));
@@ -332,6 +338,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
         }
         bid.disabled = connection !== 'ready' || pending;
+        $('[data-spades-action="bid"]').textContent = bidEdited ? 'Lock bid' : 'Bid for me';
         $('[data-spades-hand-label]').textContent = seat
             ? `Your hand · ${match.hand.length} cards${match.phase === 'play' && match.spadesBroken ? ' · Spades broken' : ''}`
             : 'Watching · hands are private';
