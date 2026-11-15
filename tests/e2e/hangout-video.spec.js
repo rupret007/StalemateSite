@@ -697,17 +697,21 @@ test('a pending remote offer prevents an obsolete local offer from entering the 
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });
 
-test('phones: portrait tiles, call bar sticks to the bottom in thumb reach, 44px targets', async ({ browser }) => {
+test('phones: square face tiles, call bar sticks to the bottom in thumb reach, 44px targets', async ({ browser }) => {
     const opts = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' };
     const { host, guest } = await call(browser, opts);
     const tile = await guest.locator('.tile:not([data-tile="me"])').boundingBox();
-    expect(tile.height).toBeGreaterThan(tile.width); // portrait
+    const me = await guest.locator('.tile[data-tile="me"]').boundingBox();
+    // Faces-on phone layout uses square tiles so 2–4 people fit; self-view stays smaller.
+    expect(Math.abs(tile.height - tile.width)).toBeLessThan(2);
+    expect(me.width * me.height).toBeLessThan(tile.width * tile.height * 0.92);
     await expect(guest.locator('[data-share]')).toBeHidden(); // no screen share on phones
+    await expect(guest.locator('[data-hand]')).toBeHidden(); // compact phone bar keeps Leave, mic, camera
     const bar = guest.locator('.callbar');
     await expect(bar).toHaveCSS('position', 'fixed');
     const vb = await bar.boundingBox();
     expect(vb.y + vb.height).toBeGreaterThan(844 - 4); // pinned to the bottom edge, in thumb reach
-    for (const sel of ['[data-mic]', '[data-cam]', '[data-hand]']) {
+    for (const sel of ['[data-mic]', '[data-cam]', '[data-hangup]']) {
         const b = await guest.locator(sel).boundingBox();
         expect(b.height, sel).toBeGreaterThanOrEqual(44);
     }
