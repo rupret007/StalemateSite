@@ -106,7 +106,12 @@ async function gameNight(browser, baseURL) {
             const game = arcadeGame(new URL(route.url()).pathname), transport = transports.get(game);
             let attachment = null;
             const socket = { readyState: 1, serializeAttachment: value => { attachment = value; }, deserializeAttachment: () => attachment,
-                send: raw => { if (socket.readyState === 1) { person.matchFrames.push(String(raw)); route.send(raw); } },
+                send: raw => {
+                    if (socket.readyState !== 1) return;
+                    route.send(raw);
+                    // This buffer observes only frames forwarded by the routed socket fixture.
+                    person.matchFrames.push(String(raw));
+                },
                 close: (code = 1000, reason = '') => { if (socket.readyState !== 1) return; socket.readyState = 3; void route.close({ code, reason }); } };
             route.onMessage(raw => void serial(() => transport.receive(socket, String(raw))));
             route.onClose(() => void serial(() => retire(socket, transport)));
