@@ -45,15 +45,15 @@ describe('demo chess draw, rematch, watcher and reconnect behavior', () => {
         expect(game.view(white, startedAt).match.revision).toBe(finished.revision);
     });
 
-    it('records resignation and starts a mutually approved rematch with colors swapped', () => {
+    it('records resignation and starts a mutually approved rematch with the same colors', () => {
         const game = seatedGame();
         expect(command(game, white, 'resign')).toEqual({ ok: true });
         expect(game.view(black, startedAt).match.result).toMatchObject({ winner: 'b', reason: 'Resignation' });
 
         expect(game.requestRematch(white, 'chess-demo', 'chess-rematch', startedAt)).toBe(true);
         expect(game.requestRematch(black, 'chess-demo', 'chess-rematch', startedAt)).toBe(true);
-        expect(game.view(white, startedAt)).toMatchObject({ id: 'chess-rematch', seat: 'b', match: { result: null, moves: [] } });
-        expect(game.view(black, startedAt)).toMatchObject({ id: 'chess-rematch', seat: 'w', match: { result: null, moves: [] } });
+        expect(game.view(white, startedAt)).toMatchObject({ id: 'chess-rematch', seat: 'w', match: { result: null, moves: [] } });
+        expect(game.view(black, startedAt)).toMatchObject({ id: 'chess-rematch', seat: 'b', match: { result: null, moves: [] } });
     });
 
     it('rejects watcher draw offers, resignations and moves', () => {
