@@ -64,7 +64,7 @@ async function gameNight(browser, baseURL) {
 
     async function phone(nick, { viewport = PHONE } = {}) {
         const sid = randomUUID(), session = { betaSid: sid, betaInviteVersion: '1' };
-        const person = { nick, sid, identity: null, matches: new Map() };
+        const person = { nick, sid, identity: null, matches: new Map(), tickets: Promise.resolve() };
         people.set(nick, person);
         const context = await browser.newContext({ viewport, hasTouch: true });
         contexts.push(context);
@@ -77,6 +77,7 @@ async function gameNight(browser, baseURL) {
         await context.route(url => /-ticket$/.test(url.pathname) && !!arcadeGame(url.pathname), async route => {
             const game = arcadeGame(new URL(route.request().url()).pathname), scope = arcadeRoomRequest(route.request().postDataJSON());
             if (!transports.has(game) || !scope) return route.fulfill({ status: 404, json: { error: 'not found' } });
+            await person.tickets;
             const response = await serial(() => transports.get(game).issue(scope, session));
             await route.fulfill({ status: response.status, contentType: 'application/json', body: await response.text() });
         });
@@ -99,7 +100,8 @@ async function gameNight(browser, baseURL) {
             const socket = { readyState: 1, serializeAttachment: value => { attachment = value; }, deserializeAttachment: () => attachment,
                 // Routed sockets do not emit page websocket events. These are the bytes the browser receives.
                 send: raw => { if (socket.readyState !== 1) return; person.frames.push(String(raw)); route.send(raw); },
-                close: (code = 1000, reason = '') => { if (socket.readyState !== 1) return; socket.readyState = 3; void route.close({ code, reason }); } };
+                // closed keeps the code the server ended this socket with.
+                close: (code = 1000, reason = '') => { if (socket.readyState !== 1) return; socket.readyState = 3; socket.closed = { code, reason }; void route.close({ code, reason }); } };
             route.onMessage(raw => void serial(() => transport.receive(socket, String(raw))));
             route.onClose(() => void serial(() => retire(socket, transport)));
             void serial(async () => {
@@ -124,7 +126,21 @@ async function gameNight(browser, baseURL) {
         // The live table as the server sees it for one phone.
         view: (nick, game) => people.get(nick).matches.get(game),
         // Send one match command as this phone's seat, exactly as its socket would.
-        act: (nick, game, frame) => serial(() => table(game).receive(people.get(nick).matches.get(game), JSON.stringify({ version: 1, ...frame }))),
+        // receive() returns nothing. A refused command is answered with a match-error frame,
+        // or the socket is closed, so report those.
+        act: (nick, game, frame) => serial(async () => {
+            const person = people.get(nick), socket = person.matches.get(game), from = person.frames.length;
+            const open = socket?.readyState === 1;
+            if (open) await table(game).receive(socket, JSON.stringify({ version: 1, ...frame }));
+            const error = person.frames.slice(from).map(raw => JSON.parse(raw)).find(sent => sent.t === 'match-error')?.reason ?? null;
+            return { ok: open && socket.readyState === 1 && !error, error };
+        }),
+        // Hold this phone's next match tickets so a reconnect stays on screen. Returns the release.
+        holdTickets: nick => {
+            let release;
+            people.get(nick).tickets = new Promise(resolve => { release = resolve; });
+            return release;
+        },
         // The network takes the match socket without a goodbye.
         dropMatch: (nick, game) => serial(async () => {
             const socket = people.get(nick).matches.get(game);
