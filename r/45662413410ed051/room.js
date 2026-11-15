@@ -43,7 +43,7 @@
         reportRetry: $('[data-report-retry]'), reportNew: $('[data-report-new]'), reportClose: $('[data-report-close]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
-        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), videoStatus: $('[data-video-status]'),
+        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), facesPlay: $('[data-faces-play]'), videoStatus: $('[data-video-status]'),
         bobToggle: $('[data-bob-toggle]'), bob: $('[data-bob]'), bobNow: $('[data-bob-now]'), bobHold: $('[data-bob-hold]'),
         bobRewind: $('[data-bob-rewind]'), bobCatchup: $('[data-bob-catchup]'), bobNudge: $('[data-bob-nudge]'),
         bobEpisodes: $('[data-bob-episodes]'), bobPalette: $('[data-bob-palette]'), bobBrushes: $('[data-bob-brushes]'),
@@ -1516,7 +1516,7 @@
         layout();
     }
 
-    function ask(title, copy, { adult18 = false } = {}) {
+    function ask(title, copy, { adult18 = false, onYes = null } = {}) {
         if (ui.ask.open) return Promise.resolve(false);
         return new Promise((resolve) => {
             ui.askTitle.textContent = title;
@@ -1529,10 +1529,13 @@
                 if (v && confirmAge) app.av.adult18 = true;
                 resolve(v);
             };
-            ui.askYes.onclick = () => done(true);
+            // iOS only allows getUserMedia inside the tap that confirms, not after the dialog's promise.
+            ui.askYes.onclick = () => { try { if (onYes) onYes(); } catch (error) { /* toggle reads the failed capture */ } done(true); };
             ui.askNo.onclick = () => done(false);
             ui.ask.addEventListener('cancel', cancel);
-            if (ui.ask.showModal) ui.ask.showModal(); else done(win.confirm(`${title}\n\n${ui.askCopy.textContent}`));
+            if (ui.ask.showModal) ui.ask.showModal();
+            else if (win.confirm(`${title}\n\n${ui.askCopy.textContent}`)) { try { if (onYes) onYes(); } catch (error) { /* toggle reads the failed capture */ } done(true); }
+            else done(false);
         });
     }
 
@@ -1618,29 +1621,47 @@
         setTrack(kind, null);
     }
 
+    let primedCapture = null;
+    function startCapture(constraints) {
+        try { return navigator.mediaDevices.getUserMedia(constraints); }
+        catch (error) { return Promise.reject(error); }
+    }
+    function dropPrimed() {
+        const pending = primedCapture;
+        primedCapture = null;
+        if (pending && pending.then) pending.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
+    }
     async function toggle(kind, restore) {
         if (app.ended) return;
         const turningOn = !app.av[kind] || (kind === 'cam' && Boolean(app.av.screen));
         const mediaKind = kind === 'cam' ? 'video' : 'audio';
         if (kind === 'cam' && app.av.canvas) { await toggleCanvasCam(); return; }
         if (turningOn) {
-            if (app.av.kicked) { say('The host took you off faces in this room. Chat and draw still work.'); return; }
-            if (!restore && app.av.locked && !(app.av.mic || app.av.cam)) { say('The host locked faces for now. Chat and draw still work.'); return; }
-            if (!restore && !(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
+            if (app.av.kicked) { dropPrimed(); say('The host took you off faces in this room. Chat and draw still work.'); return; }
+            if (!restore && app.av.locked && !(app.av.mic || app.av.cam)) { dropPrimed(); say('The host locked faces for now. Chat and draw still work.'); return; }
+            if (!restore && !(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { dropPrimed(); say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
             const version = ++captureVersion[mediaKind];
+            const constraints = kind === 'cam'
+                ? { video: camConstraints() }
+                : { audio: V.micConstraints(app.av.music, prefs().mic) };
             if (!app.av.asked[kind]) {
                 const ok = await ask(kind === 'cam' ? 'Turn on your camera?' : 'Turn on your mic?',
                     kind === 'cam'
                         ? 'Tap Allow on the next pop-up. Only this room sees you.'
                         : app.av.jam
                             ? 'This is for talking between songs. Your playing goes through WebJam, so keep this off while you play or people hear you twice. Your browser will ask: tap Allow.'
-                            : 'Tap Allow on the next pop-up. Only this room hears you.', { adult18: kind === 'cam' });
+                            : 'Tap Allow on the next pop-up. Only this room hears you.', {
+                        adult18: kind === 'cam',
+                        onYes: () => { primedCapture = startCapture(constraints); }
+                    });
                 if (!ok) return;
             }
-            if (version !== captureVersion[mediaKind]) return;
+            if (version !== captureVersion[mediaKind]) { dropPrimed(); return; }
+            const pending = primedCapture;
+            primedCapture = null;
             try {
                 if (kind === 'cam') {
-                    const got = await navigator.mediaDevices.getUserMedia({ video: camConstraints() });
+                    const got = await (pending || startCapture(constraints));
                     if (!keepCapture('video', version, got, restore)) return;
                     stopRaw('video');
                     app.av.rawCam = got.getVideoTracks()[0];
@@ -1649,7 +1670,7 @@
                     setTrack('video', app.av.rawCam);
                     if (app.av.bg.choice && app.av.bg.choice !== 'none') setBackground(app.av.bg.choice, true);
                 } else {
-                    const got = await navigator.mediaDevices.getUserMedia({ audio: V.micConstraints(app.av.music, prefs().mic) });
+                    const got = await (pending || startCapture(constraints));
                     if (!keepCapture('audio', version, got)) return;
                     stopRaw('audio');
                     setTrack('audio', got.getAudioTracks()[0]);
@@ -1661,8 +1682,11 @@
                 if (version !== captureVersion[mediaKind]) return;
                 if (kind === 'cam' && !app.av.mic && !app.av.jam) {
                     // No camera (blocked, missing or busy)? Don't strand them: offer voice only.
-                    const voice = await ask('Camera’s not available', 'Join with just your voice? You can add the camera later.');
-                    if (version !== captureVersion[mediaKind]) return;
+                    const voiceConstraints = { audio: V.micConstraints(app.av.music, prefs().mic) };
+                    const voice = await ask('Camera’s not available', 'Join with just your voice? You can add the camera later.', {
+                        onYes: () => { primedCapture = startCapture(voiceConstraints); }
+                    });
+                    if (version !== captureVersion[mediaKind]) { dropPrimed(); return; }
                     if (voice) { app.av.asked.mic = true; await toggle('mic'); }
                     if (app.av.mic) { say('You’re in with voice only. To add video, allow Camera by the address bar, then tap the camera button.'); return; }
                 }
@@ -2182,6 +2206,38 @@
         renderHands();
     }
 
+    function remoteFacesWaiting() {
+        return [...ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')].some((video) => video.srcObject && video.paused);
+    }
+    // Remote autoplay is blocked on iOS until a tap. One tap plays and unmutes every face.
+    function playRemoteFace(video) {
+        if (!video) return;
+        let attempt;
+        try { attempt = video.play(); } catch (error) {
+            ui.facesPlay.hidden = false;
+            showAvResume(true);
+            return;
+        }
+        if (!attempt || typeof attempt.then !== 'function') return;
+        attempt.then(() => {
+            if (!remoteFacesWaiting()) ui.facesPlay.hidden = true;
+            const stillPaused = [...ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')].some((el) => el.paused);
+            if (!stillPaused) showAvResume(false);
+        }).catch((error) => {
+            if (!error || error.name === 'NotAllowedError') ui.facesPlay.hidden = false;
+            showAvResume(true);
+        });
+    }
+    function unblockFaces() {
+        ensureAudioCtx();
+        if (app.av.ac && app.av.ac.state === 'suspended') app.av.ac.resume().catch(() => {});
+        for (const video of ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')) {
+            video.muted = false;
+            playRemoteFace(video);
+        }
+        if (!remoteFacesWaiting()) ui.facesPlay.hidden = true;
+    }
+
     function bars(tier) {
         const n = { good: 4, ok: 3, weak: 2, bad: 1 }[tier] || 0;
         return `${'▮'.repeat(n)}${'▯'.repeat(4 - n)}`;
@@ -2198,6 +2254,8 @@
             const v = doc.createElement('video');
             v.autoplay = true;
             v.playsInline = true;
+            v.setAttribute('playsinline', '');
+            v.setAttribute('webkit-playsinline', '');
             v.muted = id === 'me';
             const cap = doc.createElement('figcaption');
             const nm = doc.createElement('span');
@@ -2225,13 +2283,7 @@
         }
         const v = tile.querySelector('video');
         if (v.srcObject !== (stream || null)) v.srcObject = stream || null;
-        if (id !== 'me' && v.paused && stream) {
-            const pending = v.play();
-            if (pending && pending.then) pending.then(() => {
-                const stillPaused = [...ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')].some((el) => el.paused);
-                if (!stillPaused) showAvResume(false);
-            }).catch(() => showAvResume(true));
-        }
+        if (id !== 'me' && v.paused && stream) playRemoteFace(v);
         const isCanvas = id === 'me' ? app.av.canvas : app.av.canvasPeers.has(id);
         const isScreen = id === 'me' ? Boolean(app.av.screen) : app.av.screenPeers.has(id);
         const camOn = id === 'me' ? app.av.cam : app.av.camPeers.has(id);
@@ -2742,6 +2794,7 @@
     }
 
     ui.canvasCam.addEventListener('click', () => toggleCanvasCam());
+    ui.facesPlay.addEventListener('click', () => unblockFaces());
     ui.mic.addEventListener('click', () => toggle('mic'));
     ui.cam.addEventListener('click', () => toggle('cam'));
     ui.share.addEventListener('click', () => toggleScreen());
