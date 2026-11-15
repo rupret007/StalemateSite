@@ -155,5 +155,14 @@ describe('Spades phone table', () => {
         expect(phone).toMatch(/\.arcade-spades \.spades-trick\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
         expect(phone).toMatch(/\.arcade-spades \.arcade-card-hand button\s*\{[^}]*min-height:\s*50px/);
         expect(css).toMatch(/\.game-night :is\(\.arcade-eights, \.arcade-rummy, \.arcade-spades, \.arcade-jack\) :is\(\.btn, select\)\s*\{[^}]*min-height:\s*44px/);
+        // At the 390px viewport, the page and the Spades panel must be able
+        // to shrink to the viewport instead of forcing horizontal scrolling.
+        expect(css).toMatch(/html, body\s*\{[^}]*overflow-x:\s*hidden/);
+        expect(phone).toMatch(/\.arcade-spades, \.arcade-spades \[data-spades-table\]\s*\{[^}]*min-width:\s*0[^}]*max-width:\s*100%/);
+        expect(phone).toMatch(/\.arcade-spades \.arcade-card-hand button\s*\{[^}]*min-width:\s*0[^}]*min-height:\s*50px/);
+        const compactControls = css.slice(css.indexOf('@media (max-width: 900px)'), css.indexOf('@media (max-width: 720px)', css.indexOf('@media (max-width: 900px)')));
+        expect(compactControls).toMatch(/\.arcade-spades summary\s*\{\s*min-height:\s*44px/);
+        expect(compactControls).toMatch(/\.game-night :is\(\.arcade-eights, \.arcade-rummy, \.arcade-spades, \.arcade-jack\) :is\(\.btn, select\)\s*\{[^}]*min-width:\s*44px[^}]*min-height:\s*44px/);
+        expect(phone).toMatch(/\.arcade-spades \[data-spades-bid\]\s*\{[^}]*minmax\(64px, 1fr\)[^}]*minmax\(110px, 1\.4fr\)/);
     });
 });
