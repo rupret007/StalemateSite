@@ -379,13 +379,34 @@ describe('Spades phone table', () => {
         expect(view.find('[data-spades-bid]').hidden).toBe(true);
     });
 
-    it('keeps the full-table up-next sentence', () => {
+    it('shows the full-table up-next sentence only to a guest queued for the next game', () => {
         const table = partnersTable();
-        const state = { ...table.view('watcher'), upNext: true };
-        mount();
-        client.handlers.onState({ state, canOpen: false, partners: true });
-        expect(document.querySelector('[data-next-game]').textContent).toBe("Table full, you're up next game");
-        expect(document.querySelector('[data-next-game]').hidden).toBe(false);
+        const view = mount();
+        const queued = { ...table.view('watcher'), seat: null, upNext: true };
+        delete queued.watchOnly;
+        client.handlers.onState({ state: queued, canOpen: false, partners: true });
+        const banner = view.find('[data-next-game]');
+        expect(banner.textContent).toBe("Table full, you're up next game");
+        expect(banner.hidden).toBe(false);
+        expect(view.find('[data-spades-table]').hasAttribute('data-watching')).toBe(true);
+        expect(view.find('[data-spades-seat]').textContent).toBe('Watching · hands are private');
+    });
+
+    it('hides the up-next banner from a watch-only invite viewer', () => {
+        const table = partnersTable();
+        const view = mount();
+        const watching = { ...table.view('watcher'), seat: null, watchOnly: true, upNext: true };
+        client.handlers.onState({ state: watching, canOpen: false, partners: true });
+        const banner = view.find('[data-next-game]');
+        expect(watching.seat).toBeNull();
+        expect(banner.textContent).toBe("Table full, you're up next game");
+        expect(banner.hidden).toBe(true);
+        expect(view.find('[data-spades-table]').hasAttribute('data-watching')).toBe(true);
+        expect(view.find('[data-spades-seat]').textContent).toBe('Watching · hands are private');
+        expect(view.find('[data-spades-hand-label]').textContent).toBe('Watching · hands are private');
+        expect(view.find('[data-spades-hand]').children).toHaveLength(0);
+        expect(view.find('[data-spades-bid]').hidden).toBe(true);
+        expect(view.panel.querySelectorAll('[data-spades-action]:not([hidden])')).toHaveLength(0);
     });
 
     it('shows Game over after a result in any phase and keeps the last trick winner', () => {

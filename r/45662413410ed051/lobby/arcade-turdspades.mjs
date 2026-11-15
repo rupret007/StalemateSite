@@ -318,7 +318,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat || model.watchOnly === true;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
         table.hidden = !match;
-        $('[data-next-game]').hidden = !model?.upNext;
+        // A queued guest (no seat, up next, not a watch invite) is the only viewer of this line.
+        $('[data-next-game]').hidden = !(model?.upNext && !seat && model.watchOnly !== true);
         if (!match) { showHand([]); return; }
         table.dataset.phase = match.phase;
         table.dataset.mode = paired ? 'partners' : 'four';
