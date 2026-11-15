@@ -258,9 +258,14 @@ export function mountArcadeTurdSpades(container, onMatch) {
         partnerButton.disabled = pending;
         seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
-        table.hidden = !match;
+        table.hidden = connection !== 'ready' || !match;
         $('[data-next-game]').hidden = !model?.upNext;
-        if (!match) { showHand([]); return; }
+        if (!match || connection !== 'ready') {
+            $('[data-spades-seat]').textContent = '';
+            $('[data-spades-hand-label]').textContent = '';
+            showHand([]);
+            return;
+        }
         table.dataset.phase = match.phase;
         table.dataset.mode = paired ? 'partners' : 'four';
         const partner = seat && seats[(seats.indexOf(seat) + 2) % seats.length];
@@ -315,7 +320,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
                     : action === 'resign' && !!match.result);
             control.disabled = connection !== 'ready' || pending;
         }
-        showHand(match.hand, connection === 'ready' && match.phase === 'play' && match.turn === seat && !match.result);
+        showHand(seat ? match.hand : [], match.phase === 'play' && match.turn === seat && !match.result);
     }
 
     hand.addEventListener('click', event => {
