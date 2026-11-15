@@ -61,7 +61,7 @@ async function gameNight(browser, baseURL) {
         const sid = randomUUID(), session = { betaSid: sid, betaInviteVersion: '1' };
         const person = { nick, sid, identity: null, matches: new Map(), matchFrames: [] };
         people.set(nick, person);
-        const context = await browser.newContext({ viewport, hasTouch: true });
+        const context = await browser.newContext({ viewport, hasTouch: true, isMobile: true });
         contexts.push(context);
         await context.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
         await context.route(url => url.pathname === LOBBY, async route => {
@@ -133,9 +133,12 @@ async function openGameNight(page) {
 async function invite(host, guest, nick) {
     await host.getByRole('button', { name: 'Invite players' }).click();
     await host.getByRole('button', { name: `Invite ${nick}`, exact: true }).click();
-    await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night' }).click();
+    const offer = guest.locator('[data-game-offer]').getByRole('button', { name: /^(?:Join Game Night|Play .+)$/ });
+    const arcadeOffer = (await offer.textContent()).startsWith('Play ');
+    await offer.click();
     await expect(guest.getByRole('region', { name: /Game Night/ })).toBeVisible();
     if (await host.locator('[data-invite-dialog][open]').count()) await host.keyboard.press('Escape');
+    return arcadeOffer;
 }
 
 async function pickGame(page, game) {
@@ -180,9 +183,12 @@ async function dealSpades(fixture, host, { mode, seats }) {
     for (const seat of seats) {
         const nick = `Phone${seat}`;
         const guest = await fixture.phone(nick);
-        await invite(host, guest, nick);
+        const arcadeOffer = await invite(host, guest, nick);
         await pickGame(guest, 'turdspades');
-        await guest.getByRole('button', { name: `Join ${seat}`, exact: true }).tap();
+        // Accepting an arcade offer already joins the invited match.
+        if (!arcadeOffer) await guest.getByRole('button', { name: `Join ${seat}`, exact: true }).tap();
+        const seatStatus = guest.locator('[data-spades-status], [data-spades-seat]').filter({ hasText: `You’re ${seat}` });
+        await expect(seatStatus).toBeVisible();
         players.push({ guest, seat });
     }
     const table = host.locator('[data-spades-table]');
