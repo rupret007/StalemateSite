@@ -854,4 +854,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   body:has(.game-night:not([hidden])) :is(.connection-tools [data-fullscreen], .slash, .roombar .btn) { min-width: 44px !important; }
   .arcade-spades .arcade-card-hand { gap: 6px 5px; }
   .arcade-spades .arcade-card-hand button { min-height: 50px; }
+  /* The 44px Eights summary sits above the hand. Give the transcript minimum back
+     so the hand stays inside the phone panel. */
+  .chat:has(.arcade-eights[open] [data-card-table]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 34px; }
 }
