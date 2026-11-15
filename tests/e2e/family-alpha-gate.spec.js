@@ -454,8 +454,19 @@ for (const game of Object.values(GAMES)) {
                 await expect(status(late, game)).not.toHaveText(WAIT_FOR_HOST);
                 expect(fixture.view('LateWatcher', game.game).deserializeAttachment().seat).toBeNull();
                 if (game.game === 'turdspades') {
+                    await expect(late.locator('[data-spades-seat]')).toHaveText('Watching · hands are private');
                     await expect(late.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
-                    await expect(late.locator('[data-spades-hand] button')).toHaveCount(0);
+                    await expect(late.locator('[data-spades-card]')).toHaveCount(0);
+                    const hiddenCards = [];
+                    for (const page of pages) {
+                        hiddenCards.push(...await page.locator('[data-spades-card]').evaluateAll(cards =>
+                            cards.map(card => card.getAttribute('aria-label')).filter(Boolean)));
+                    }
+                    const watcherDom = await late.locator('body').evaluate(body => {
+                        const attrs = [...body.querySelectorAll('*')].flatMap(node => [...node.attributes].map(attr => attr.value));
+                        return `${body.innerText}\n${attrs.join('\n')}`;
+                    });
+                    for (const label of hiddenCards) expect(watcherDom).not.toContain(label);
                     const frames = fixture.people.get('LateWatcher').matchFrames;
                     const views = frames.map(raw => JSON.parse(raw)).filter(frame => frame.state?.match);
                     expect(views.length).toBeGreaterThan(0);
