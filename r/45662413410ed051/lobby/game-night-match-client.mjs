@@ -1,5 +1,5 @@
 const requestErrors = { 401: 'sign-in', 403: 'room', 404: 'disabled', 429: 'rate-limited' };
-const socketErrors = { 4001: 'kicked', 4403: 'room', 4409: 'replaced', 4429: 'rate-limited' };
+const socketErrors = { 4001: 'kicked', 4003: 'banned', 4403: 'room', 4409: 'replaced', 4429: 'rate-limited' };
 const RECONNECT_CAP = 10_000;
 
 export const matchConnectionErrors = Object.freeze({
@@ -131,7 +131,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
             let stateFrameType;
             connection.addEventListener('close', event => {
                 const reason = event.reason === 'banned' || event.reason === 'kicked' ? event.reason
-                    : event.code === 1008 ? 'banned' : socketErrors[event.code];
+                    : socketErrors[event.code] || (event.code === 1008 && !event.reason ? 'banned' : undefined);
                 retry(attempt, reason);
             });
             connection.addEventListener('message', event => {

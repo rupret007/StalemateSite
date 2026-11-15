@@ -165,6 +165,7 @@ describe('Game Night phone wake and history recovery', () => {
     it.each([
         ['a ban', { code: 1008, reason: 'banned' }, 'banned'],
         ['a ban without a reason', { code: 1008, reason: '' }, 'banned'],
+        ['a ban with its own close code', { code: 4003 }, 'banned'],
         ['a kick', { code: 4001 }, 'kicked'],
         ['a kick with a policy close code', { code: 1008, reason: 'kicked' }, 'kicked']
     ])('ends the match session after %s', async (_, close, reason) => {
@@ -188,7 +189,10 @@ describe('Game Night phone wake and history recovery', () => {
         expect(status).not.toHaveBeenCalledWith('reconnecting');
     });
 
-    it('ends an offline kick and ignores late private state after coming online', async () => {
+    it.each([
+        ['kick', { code: 1008, reason: 'kicked' }, 'kicked'],
+        ['ban', { code: 1008, reason: 'banned' }, 'banned']
+    ])('ends an offline %s and ignores late private state after coming online', async (_, close, reason) => {
         const status = vi.fn();
         const onState = vi.fn();
         client.stop();
@@ -200,20 +204,66 @@ describe('Game Night phone wake and history recovery', () => {
 
         let online = false;
         vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online);
-        kickedSocket.dispatchEvent(new CloseEvent('close', { code: 1008, reason: 'kicked' }));
-        expect(status).toHaveBeenLastCalledWith('unavailable', 'kicked');
+        const priorRequests = issue.mock.calls.length;
+        const priorSockets = sockets.length;
+        kickedSocket.dispatchEvent(new CloseEvent('close', close));
+        expect(status).toHaveBeenLastCalledWith('unavailable', reason);
         expect(status).not.toHaveBeenCalledWith('reconnecting');
-        kickedSocket.dispatchEvent(new MessageEvent('message', {
-            data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state: { seat: 'w', hand: ['private-card'] } })
-        }));
-        expect(onState).not.toHaveBeenCalled();
 
         online = true;
         window.dispatchEvent(new Event('online'));
         await vi.advanceTimersByTimeAsync(30_000);
-        expect(issue).toHaveBeenCalledTimes(2);
-        expect(sockets).toHaveLength(2);
+        kickedSocket.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state: { seat: 'w', hand: ['private-card'] } })
+        }));
+        expect(onState).not.toHaveBeenCalled();
+        expect(issue).toHaveBeenCalledTimes(priorRequests);
+        expect(sockets).toHaveLength(priorSockets);
+        expect(status).toHaveBeenLastCalledWith('unavailable', reason);
         expect(status).not.toHaveBeenCalledWith('reconnecting');
+    });
+
+    it('retries a generic policy close without reporting a ban', async () => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const priorRequests = issue.mock.calls.length;
+        const priorSockets = sockets.length;
+
+        sockets.at(-1).dispatchEvent(new CloseEvent('close', { code: 1008, reason: 'policy violation' }));
+        expect(status).toHaveBeenLastCalledWith('reconnecting');
+        expect(status).not.toHaveBeenCalledWith('unavailable', 'banned');
+        await vi.advanceTimersByTimeAsync(600);
+        expect(issue).toHaveBeenCalledTimes(priorRequests + 1);
+        expect(sockets).toHaveLength(priorSockets + 1);
+    });
+
+    it('ignores a stale close after its replacement connects', async () => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const oldSocket = sockets.at(-1);
+        oldSocket.dispatchEvent(new CloseEvent('close', { code: 1006 }));
+        await vi.advanceTimersByTimeAsync(600);
+        const replacement = sockets.at(-1);
+        ready(replacement);
+        replacement.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'match-state', version: 1, room: '#game-fixture', state: null })
+        }));
+        const priorRequests = issue.mock.calls.length;
+        const priorSockets = sockets.length;
+        status.mockClear();
+
+        oldSocket.dispatchEvent(new CloseEvent('close', { code: 4001 }));
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(issue).toHaveBeenCalledTimes(priorRequests);
+        expect(sockets).toHaveLength(priorSockets);
+        expect(replacement.close).not.toHaveBeenCalled();
+        expect(status).not.toHaveBeenCalledWith('unavailable', 'kicked');
     });
 
     it('reconnects once after an ordinary online 1006 close', async () => {
