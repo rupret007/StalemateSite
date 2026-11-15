@@ -11,6 +11,7 @@ import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
+const sync = readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8');
 const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) { dom.window.close(); expect(dom.clientErrors || []).toEqual([]); } });
@@ -44,6 +45,7 @@ async function visitor({ via = 'rad-dad', verified = false, stored = {}, returni
     };
     window.HangoutClientTestModules = { ...entryFunctions, ...roomFunctions, createEntrySharing, createIdleHeartbeat, createChatAnnouncements };
     window.eval(discovery);
+    window.eval(sync);
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
     window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     window.document.querySelector('[data-nick]').value = 'Viewer';
