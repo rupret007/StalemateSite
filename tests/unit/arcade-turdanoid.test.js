@@ -161,6 +161,34 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.panel.open).toBe(false);
     });
 
+    it('confirms Back for an active seat and forfeits before leaving the race', () => {
+        const view = mount();
+        view.publish(54_000);
+        view.pump();
+        expect(view.back.hidden).toBe(false);
+        view.back.click();
+        const confirmation = view.panel.querySelector('[data-brick-confirm]');
+        expect(confirmation.open).toBe(true);
+        expect(view.panel.open).toBe(true);
+        expect(client.sent.filter(frame => frame.action !== 'sync')).toEqual([]);
+        view.panel.querySelector('[data-brick-confirm-yes]').click();
+        expect(confirmation.open).toBe(false);
+        expect(client.sent.filter(frame => frame.action !== 'sync')).toEqual([{ action: 'resign', id: 'race-12345' }]);
+        expect(view.panel.open).toBe(true);
+        view.publish(54_100, 'b', { winner: 'a', reason: 'resign' });
+        expect(view.panel.open).toBe(false);
+    });
+
+    it('keeps the race open when Back is canceled', () => {
+        const view = mount();
+        view.publish(54_000);
+        view.back.click();
+        view.panel.querySelector('[data-brick-confirm-no]').click();
+        expect(client.sent.filter(frame => frame.action === 'resign')).toEqual([]);
+        view.publish(54_100, 'b', { winner: 'b', reason: 'time' });
+        expect(view.panel.open).toBe(true);
+    });
+
     it('gives a spectator a way back without exposing a paddle control', () => {
         const view = mount();
         view.publish(54_000, null);
@@ -197,6 +225,9 @@ function mount({ coarse = true } = {}) {
     const container = document.createElement('div');
     document.body.append(container);
     const api = mountArcadeTurdanoid(container, () => {});
+    const confirmation = container.querySelector('[data-brick-confirm]');
+    confirmation.showModal = () => { confirmation.open = true; };
+    confirmation.close = () => { confirmation.open = false; };
     const board = container.querySelector('[data-brick-board]');
     board.getBoundingClientRect = () => ({
         x: 0, y: 0, left: 0, top: 0, right: 240, bottom: 200, width: 240, height: 200, toJSON() { return {}; }

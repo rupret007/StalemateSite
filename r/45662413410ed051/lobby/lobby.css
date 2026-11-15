@@ -841,7 +841,8 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
     height: 100dvh;
     margin: 0;
     padding: max(6px, env(safe-area-inset-top)) 10px max(6px, env(safe-area-inset-bottom));
-    overflow: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background: var(--ink);
   }
   .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) summary { min-height: 44px; }
@@ -861,7 +862,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
     grid-template-columns: minmax(0, 1fr);
   }
   .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-board {
-    width: min(100%, calc((100dvh - 320px) * 1.2));
+    width: min(100%, calc(clamp(170px, 100dvh - 560px, 320px) * 1.2));
     max-width: none;
     justify-self: center;
   }
