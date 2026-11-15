@@ -70,8 +70,8 @@
       "shippedSha256": "bffc8f690212583dff2d9ad7cac98fe4ef35d44b0de13acfe6e700ab454f9c3b"
     },
     "style.css": {
-      "upstreamSha256": "9a62cac877ba36cfd03539fe3dd23e1366f80ad9a680fcec584966eaae856285",
-      "shippedSha256": "7582e38496ab764c4fa0ac0925b55960f103af3a6b6e1af213a944c18fdd6c8f"
+      "upstreamSha256": "ecf8e9649e957936c7ecf91e146dea22be1385a97fc59c21456559624a505259",
+      "shippedSha256": "ca95afbf47d8cad8c1d112a12af3abd806ae7fde243d796f4752404b59cc4f67"
     },
     "video-guard.js": {
       "upstreamSha256": "e0aac82a0eee7db1faaeb41a4ab60b38a718756c7ff6a7f9c72fa63ce7764e5c",
@@ -90,8 +90,8 @@
       "shippedSha256": "61f873de784b320d1a5921cf1bdb9078a29912b26e939b7e1b1438eb6b5c3bbe"
     },
     "video-room.js": {
-      "upstreamSha256": "fff0eb6389bad68c6adf629bbcefbb1f5dfc78e8c6152894417d96cebed61639",
-      "shippedSha256": "fff0eb6389bad68c6adf629bbcefbb1f5dfc78e8c6152894417d96cebed61639"
+      "upstreamSha256": "939d820de9f95ef2953d59872c62eba095443828f303f72b564d2137a2a4bde0",
+      "shippedSha256": "939d820de9f95ef2953d59872c62eba095443828f303f72b564d2137a2a4bde0"
     }
   },
   "composedWith": [
@@ -128,7 +128,7 @@
     }
   ],
   "phase1Composition": {
-    "sourceCommit": "778ac4173fab0ee0660b3e94fe3c5694dfae7618",
+    "sourceCommit": "8fb02d00904fc673257b7a5365c73169461dac7b",
     "existingJoinCommit": "07b1b28c5b3dc381f4edc448f4eef6647e357610",
     "previousSiteSource": "eda19e803992db41a634ed66382bd383aa3e77ec",
     "stagedModuleSources": [
