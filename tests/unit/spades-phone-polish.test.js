@@ -65,7 +65,7 @@ describe('Spades phone table', () => {
             expect(table.join(subject, 'spades-four-phone-fixture', 0, position)).toBe(true);
         }
         const view = mount();
-        client.handlers.onState({ state: table.view('host'), canOpen: true, partners: true });
+        client.handlers.onState({ state: table.view('host'), canOpen: true, partners: false });
         expect(view.find('[data-spades-seat]').textContent).toBe('You’re South · Partner: North');
         expect(view.find('[data-spades-hand]').children).toHaveLength(13);
         expect(view.find('[data-spades-trick]').children).toHaveLength(4);
@@ -85,22 +85,45 @@ describe('Spades phone table', () => {
         for (const table of [partnersTable(), four]) {
             const state = table.view('host');
             const bidding = { ...state, match: { ...state.match, phase: 'bid', canBid: true, trick: [], lastTrick: [previousCard] } };
-            client.handlers.onState({ state: bidding, canOpen: true, partners: true });
+            client.handlers.onState({ state: bidding, canOpen: true, partners: state.mode === 'partners' });
             expect(trick.hidden).toBe(true);
             expect(view.find('[data-spades-score="0"]').hidden).toBe(false);
             expect(view.find('[data-spades-bid]').hidden).toBe(false);
             expect(view.find('[data-spades-trick-summary]').textContent).toBe('Bids · no cards played yet');
 
             const showingLast = { ...bidding, match: { ...bidding.match, phase: 'play' } };
-            client.handlers.onState({ state: showingLast, canOpen: true, partners: true });
+            client.handlers.onState({ state: showingLast, canOpen: true, partners: state.mode === 'partners' });
             expect(trick.hidden).toBe(false);
             expect(trick.children[2].querySelector('b').textContent).toBe('A♠');
 
             const showingCurrent = { ...showingLast, match: { ...showingLast.match, trick: [currentCard] } };
-            client.handlers.onState({ state: showingCurrent, canOpen: true, partners: true });
+            client.handlers.onState({ state: showingCurrent, canOpen: true, partners: state.mode === 'partners' });
             expect(trick.hidden).toBe(false);
             expect(trick.children[0].querySelector('b').textContent).toBe('K♥');
+            expect([...trick.querySelectorAll('b')].map(card => card.textContent)).not.toContain('A♠');
+
+            const nextBid = { ...showingCurrent, match: { ...showingCurrent.match, phase: 'bid', trick: [], lastTrick: [currentCard] } };
+            client.handlers.onState({ state: nextBid, canOpen: true, partners: state.mode === 'partners' });
+            expect(trick.hidden).toBe(true);
         }
+    });
+
+    it('hides a stale trick for four-player bidders and watchers', () => {
+        const four = new GameNightTurdSpades('spades-four-stale-bid', 'host');
+        for (const [subject, position] of [['west-player', 'west'], ['north-player', 'north'], ['east-player', 'east']]) {
+            expect(four.join(subject, 'spades-four-stale-bid', 0, position)).toBe(true);
+        }
+        const view = mount();
+        const staleTrick = { seat: 'north', rank: 'A', suit: 'S' };
+        const bidderState = four.view('host');
+        const bidding = { ...bidderState, match: { ...bidderState.match, phase: 'bid', canBid: true, trick: [], lastTrick: [staleTrick] } };
+        client.handlers.onState({ state: bidding, canOpen: true, partners: false });
+        expect(view.find('[data-spades-trick]').hidden).toBe(true);
+
+        const watcherState = four.view('watcher');
+        const watcherBidding = { ...watcherState, match: { ...watcherState.match, phase: 'bid', canBid: false, trick: [], lastTrick: [staleTrick] } };
+        client.handlers.onState({ state: watcherBidding, canOpen: false, partners: false });
+        expect(view.find('[data-spades-trick]').hidden).toBe(true);
     });
 
     it('gives watchers the exact privacy sentence and no private card controls', () => {
@@ -135,15 +158,15 @@ describe('Spades phone table', () => {
                 ...state.match, phase: 'round-end', lastWinner: 'north',
                 tricks: { south: 0, west: 0, north: 0, east: 0 }, result: null
             } };
-            client.handlers.onState({ state: roundEnd, canOpen: true, partners: true });
+            client.handlers.onState({ state: roundEnd, canOpen: true, partners: state.mode === 'partners' });
             expect(view.find('[data-spades-trick-summary]').textContent).toBe('Hand over · Last won by North' + (state.mode === 'partners' ? ' (CPU)' : ''));
 
             const completed = { ...roundEnd, match: { ...roundEnd.match, tricks: { south: 13, west: 0, north: 0, east: 0 } } };
-            client.handlers.onState({ state: completed, canOpen: true, partners: true });
+            client.handlers.onState({ state: completed, canOpen: true, partners: state.mode === 'partners' });
             expect(view.find('[data-spades-trick-summary]').textContent).toBe('13 tricks complete · Last won by North' + (state.mode === 'partners' ? ' (CPU)' : ''));
 
             const finished = { ...completed, match: { ...completed.match, result: { winner: 0, reason: 'score' } } };
-            client.handlers.onState({ state: finished, canOpen: true, partners: true });
+            client.handlers.onState({ state: finished, canOpen: true, partners: state.mode === 'partners' });
             expect(view.find('[data-spades-trick-summary]').textContent).toBe('Game over · Last won by North' + (state.mode === 'partners' ? ' (CPU)' : ''));
         }
     });
