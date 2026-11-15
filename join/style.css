@@ -61,6 +61,7 @@ details p { margin: 6px 0; }
 .camera-layout .join-card { max-width: 560px; width: 100%; margin-inline: auto; border: 0; padding: 0; background: transparent; }
 .camera-layout .join-card > :not(#status):not(.actions) { display: none; }
 .camera-layout .actions { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
+.camera-layout:has(.video-room:not([hidden])) .actions > #leave { display: none; }
 .camera-layout .actions:focus-within, .camera-layout .actions:has(#play-audio:not([hidden])) { position: static; width: auto; height: auto; clip-path: none; overflow: visible; }
 .camera-layout #status { min-height: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .9rem; }
 .camera-host .join-card { display: none; }
