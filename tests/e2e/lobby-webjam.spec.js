@@ -952,6 +952,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         expect(await guest.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain(WEB_INVITE);
         for (const [role, page] of [['host', host], ['guest', guest]]) {
             await expect(page.locator('[data-jam-help]')).not.toHaveAttribute('open');
+            await expect(page.locator('[data-cam]')).toHaveAccessibleName('📷 Room camera (18+)');
             // Platform limits must remain visible without expanding setup help.
             await expect(page.locator('[data-jam-platform]')).toBeVisible();
             await expect(page.locator('[data-jam-platform]')).toContainText('A Mac hosts music');
@@ -974,6 +975,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(help).toHaveAttribute('open'); await expect(summary).toBeFocused();
         await expect(help).toContainText('Open WebJam in browser');
         await expect(help).toContainText('WebJam opens in a new tab. Come back to this tab to chat.');
+        await expect(help).toContainText('Room camera is for the Hang Out room. When WebJam video is available, use the camera control in the WebJam tab.');
         await expect(help).toContainText('Invite bandmate to Music');
         await expect(help).toContainText('click Copy browser invite in WebJam. Wait for Link copied, then paste the link in Hang Out and choose Share with room.');
         await expect(help).toContainText('Sharing an invite does not turn on your microphone');
