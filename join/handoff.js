@@ -9,7 +9,7 @@ if (!request || location.protocol !== 'https:' || typeof BroadcastChannel !== 'f
     const channel = new BroadcastChannel(`webjam-music-${request[1]}`);
     const timer = setTimeout(() => {
         channel.close();
-        status.textContent = retry;
+        status.textContent = 'Hang Out couldn’t confirm delivery. Check with your bandmate before sending another invite. If they didn’t get it, end the browser invite in WebJam and retry from your Jam room in this browser profile.';
     }, 8000);
     channel.onmessage = ({ data }) => {
         if (typeof data?.returned !== 'boolean') return;
