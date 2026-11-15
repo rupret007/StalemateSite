@@ -259,6 +259,7 @@ test.describe('partners Spades at 390×844', () => {
             await boxAtLeast44(lock);
 
             const reconnect = west.locator('.arcade-spades .arcade-reconnect');
+            await expect(reconnect).toHaveCount(1);
             await west.context().setOffline(true);
             await expect(reconnect).toBeVisible();
             await expect(reconnect).toHaveText('Reconnecting…');
@@ -303,6 +304,72 @@ test.describe('partners Spades at 390×844', () => {
             await expect(watcher.locator('[data-spades-table]')).toBeVisible();
             await expect(watcher.locator('[data-spades-seat]')).toHaveText('Watching · hands are private');
             await expect(watcher.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
+            await expect(watcher.locator('[data-spades-hand] button')).toHaveCount(0);
+            await expect(watcher.locator('[data-spades-card]')).toHaveCount(0);
+            const watcherFrames = fixture.frames('LateWatcher').map(raw => JSON.parse(raw));
+            const handsIn = value => Array.isArray(value) ? value.flatMap(handsIn) : value && typeof value === 'object'
+                ? Object.entries(value).flatMap(([key, child]) => key.toLowerCase() === 'hand' ? [child] : handsIn(child)) : [];
+            expect(watcherFrames.length).toBeGreaterThan(0);
+            const watcherHands = watcherFrames.flatMap(handsIn);
+            expect(watcherHands.length).toBeGreaterThan(0);
+            for (const hand of watcherHands) expect(hand).toEqual([]);
+            await noHorizontalOverflow(watcher);
+            expect(fixture.errors()).toEqual([]);
+        } finally { await fixture.close(); }
+    });
+});
+
+test.describe('four-player Spades at 390×844', () => {
+    test.beforeEach(() => test.slow());
+    test('bidding and play fit the phone and a watcher never sees cards', async ({ browser, baseURL }) => {
+        const fixture = await gameNight(browser, baseURL);
+        try {
+            const nicks = ['HostExample', 'GuestWest', 'GuestNorth', 'GuestEast'];
+            const pages = await room(fixture, nicks);
+            const [south, west, north, east] = pages;
+            for (const page of pages) {
+                await page.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
+                await expect(page.locator('[data-spades-status]')).toBeVisible();
+            }
+            await south.getByRole('button', { name: 'Open 4-player Spades', exact: true }).click();
+            for (const [index, [page, seat]] of [[west, 'West'], [north, 'North'], [east, 'East']].entries()) {
+                await page.getByRole('button', { name: `Join ${seat}`, exact: true }).click();
+                if (index < 2) await expect(south.locator('[data-spades-status]')).toContainText(`${index + 2}/4 seated`);
+            }
+            for (const page of pages) {
+                await expect(page.locator('[data-spades-table]')).toBeVisible();
+                await expect(page.locator('[data-spades-card]')).toHaveCount(13);
+                await noHorizontalOverflow(page);
+            }
+
+            await expect(west.locator('[data-spades-status]')).toHaveText('Round 1 · Your bid · tap Bid for me');
+            await expect(south.locator('[data-spades-trick-summary]')).toHaveText('Bids · no cards played yet');
+            const bid = west.getByRole('button', { name: 'Bid for me', exact: true });
+            await boxAtLeast44(bid);
+            for (const page of pages) await expect(page.locator('[data-spades-card]:enabled')).toHaveCount(0);
+
+            // South deals. Bidding starts with West, then North, East, and
+            // South; West leads the first trick.
+            await bid.click();
+            for (const page of [north, east, south]) {
+                const bidForMe = page.getByRole('button', { name: 'Bid for me', exact: true });
+                await expect(bidForMe).toBeVisible();
+                await bidForMe.click();
+            }
+            await expect(west.locator('[data-spades-status]')).toHaveText('Round 1 · Your turn · tap a card');
+            await expect(west.locator('[data-spades-trick-summary]')).not.toHaveText('Bids · no cards played yet');
+            for (const page of pages.slice(1)) await expect(page.locator('[data-spades-card]:enabled')).toHaveCount(0);
+            await expect(west.locator('[data-spades-card]:enabled')).toHaveCount(13);
+            const card = west.locator('[data-spades-card]:enabled').first();
+            await boxAtLeast44(card);
+            await card.click();
+            await expect(west.locator('[data-spades-card]')).toHaveCount(12);
+
+            const watcher = await fixture.phone('LateWatcher');
+            await invite(south, watcher, 'LateWatcher');
+            await watcher.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
+            await expect(watcher.locator('[data-spades-table]')).toBeVisible();
+            await expect(watcher.locator('[data-spades-seat]')).toHaveText('Watching · hands are private');
             await expect(watcher.locator('[data-spades-hand] button')).toHaveCount(0);
             await expect(watcher.locator('[data-spades-card]')).toHaveCount(0);
             const watcherFrames = fixture.frames('LateWatcher').map(raw => JSON.parse(raw));
