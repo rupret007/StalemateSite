@@ -442,6 +442,28 @@ for (const game of Object.values(GAMES)) {
             } finally { await fixture.close(); }
         });
 
+        test('6. every room control on the host phone is at least a 44x44 tap target', async ({ browser, baseURL }) => {
+            const fixture = await gameNight(browser, baseURL);
+            try {
+                const [host] = await seated(fixture, game, nicks);
+                const controls = ['.tabs button', '[data-roomtools]', '[data-arcade-game]', '[data-leave]', '[data-game-sound]',
+                    '[data-game-invite]', '[data-game-share]', '[data-game-arcade]', '[data-palette-open]', '[data-send]'];
+                if (game.game === 'chess') controls.push('.arcade-chess-square');
+                for (const selector of controls) {
+                    const found = host.locator(selector).filter({ visible: true });
+                    expect(await found.count(), `${selector} is on the host phone`).toBeGreaterThan(0);
+                    for (const box of await Promise.all((await found.all()).map(control => control.boundingBox()))) {
+                        expect(Math.min(box.width, box.height), `${selector} is ${box.width}x${box.height}`).toBeGreaterThanOrEqual(44);
+                    }
+                }
+                // Launch ball only shows while a ball waits, so check its phone floor directly.
+                if (game.game === 'turdanoid') expect(await host.locator('[data-brick-serve]').evaluate(serve =>
+                    parseFloat(getComputedStyle(serve).minHeight))).toBeGreaterThanOrEqual(44);
+                expect(await host.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(PHONE.width);
+                await expect(host.locator('[data-send]')).toBeInViewport();
+            } finally { await fixture.close(); }
+        });
+
         test('5. a late joiner can watch the game', async ({ browser, baseURL }) => {
             const fixture = await gameNight(browser, baseURL);
             try {

@@ -189,3 +189,11 @@
     .arcade-chess #board { width: min(100%, 15rem); }
     .arcade-chess-clocks { width: min(100%, 16.5rem); }
 }
+/* Phone tap floor: trim the side padding so a 390px phone gets 44px squares. */
+@media (max-width: 430px) {
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-chess { padding-inline: .375rem; }
+    /* Give back the height the 44px room controls take so the match actions stay on screen. */
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .tabs { padding-top: 0; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .roombar { padding-block: 2px; }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 24px; }
+}
