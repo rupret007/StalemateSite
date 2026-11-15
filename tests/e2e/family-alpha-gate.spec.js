@@ -18,6 +18,45 @@ const PREVIEW = 'local-preview-key-0001';
 const WAIT_FOR_HOST = /wait(ing)? for (the )?host/i;
 const arcadeFeatures = { arcadeChess: 1, arcadeTurdSpades: 1, arcadeTurdanoid: 1 };
 
+// route.send() is asynchronous. A frame counts as browser-received only after
+// delivery completes; transport senders may ignore its returned promise.
+function sendAndRecord(route, frames, raw) {
+    const delivery = route.send(raw);
+    return Promise.resolve(delivery).then(() => { frames.push(String(raw)); }, () => {});
+}
+
+function hasPrivateSpadesHand(frame) {
+    return frame.state?.match?.hands !== undefined ||
+        (Array.isArray(frame.state?.match?.hand) && frame.state.match.hand.length > 0) ||
+        JSON.stringify(frame).includes('PRIVATE_CARD_HAND_MARKER');
+}
+
+test('match socket delivery records only successful sends and watcher frames stay private', async () => {
+    const frames = [], sent = [];
+    let resolveDelivery;
+    const pending = new Promise(resolve => { resolveDelivery = resolve; });
+    const route = { send(raw) { expect(frames).toEqual([]); sent.push(String(raw)); return pending; } };
+    const first = sendAndRecord(route, frames, '{"n":1}');
+    expect(frames).toEqual([]);
+    resolveDelivery();
+    await first;
+    expect(frames).toEqual(['{"n":1}']);
+    expect(await sendAndRecord({ send: () => Promise.reject(new Error('delivery failed')) }, frames, '{"n":2}')).toBeUndefined();
+    expect(frames).toEqual(['{"n":1}']);
+    expect(() => sendAndRecord({ send: () => { throw new Error('send threw'); } }, frames, '{"n":3}')).toThrow('send threw');
+    expect(frames).toEqual(['{"n":1}']);
+
+    await sendAndRecord({ send: raw => { sent.push(String(raw)); return Promise.resolve(); } }, frames, '{"n":4}');
+    await sendAndRecord({ send: raw => { sent.push(String(raw)); return Promise.resolve(); } }, frames, '{"n":5}');
+    expect(sent).toEqual(['{"n":1}', '{"n":4}', '{"n":5}']);
+    expect(frames).toEqual(['{"n":1}', '{"n":4}', '{"n":5}']);
+
+    const publicState = { state: { match: { hand: [] } } };
+    const privateMarker = { state: { match: { hand: ['PRIVATE_CARD_HAND_MARKER'] } } };
+    expect(hasPrivateSpadesHand(publicState)).toBe(false);
+    expect(hasPrivateSpadesHand(privateMarker)).toBe(true);
+});
+
 async function gameNight(browser, baseURL) {
     const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
     const { arcadeGame, arcadeRoomRequest, createArcadeTransport } = await import('../../hangout-worker/src/arcade-transport.mjs');
@@ -108,7 +147,7 @@ async function gameNight(browser, baseURL) {
             let attachment = null;
             const socket = { readyState: 1, serializeAttachment: value => { attachment = value; }, deserializeAttachment: () => attachment,
                 // Routed sockets do not emit page websocket events. These are the bytes the browser receives.
-                send: raw => { if (socket.readyState !== 1) return; route.send(raw); person.frames.push(String(raw)); },
+                send: raw => { if (socket.readyState !== 1) return; return sendAndRecord(route, person.frames, raw); },
                 close: (code = 1000, reason = '') => { if (socket.readyState !== 1) return; socket.readyState = 3; void route.close({ code, reason }); } };
             route.onMessage(raw => void serial(() => transport.receive(socket, String(raw))));
             route.onClose(() => void serial(() => retire(socket, transport)));
@@ -399,7 +438,7 @@ for (const game of Object.values(GAMES)) {
                     const frames = fixture.frames('LateWatcher');
                     const views = frames.map(raw => JSON.parse(raw)).filter(frame => frame.state?.match);
                     expect(views.length).toBeGreaterThan(0);
-                    for (const view of views) { expect(view.state.match.hand).toEqual([]); expect(view.state.match.hands).toBeUndefined(); }
+                    for (const view of views) expect(hasPrivateSpadesHand(view)).toBe(false);
                     expect(frames.join('\n')).not.toMatch(/"playable"/);
                 }
                 expect(await late.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(PHONE.width);
