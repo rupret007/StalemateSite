@@ -163,7 +163,7 @@ async function flush() {
     for (let i = 0; i < 6; i += 1) await Promise.resolve();
 }
 
-describe('hangout song mute stays independent of voice and camera', () => {
+describe('component-isolation evidence only: a standalone suite-music fixture, not the family-route song control', () => {
     let nativePlay;
     let view;
     let realAddEventListener;
