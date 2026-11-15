@@ -20,6 +20,7 @@ const reasonText = {
 
 export function chessTurnText(seat, turn) {
     const who = seat ? `You’re ${colorName(seat)}` : 'Watching';
+    if (seat && seat === turn) return `${who} · Your turn`;
     return `${who} · ${colorName(turn)} to move`;
 }
 
