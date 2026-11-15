@@ -248,9 +248,10 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .jam-paste { margin-top: 10px; }
 .game-note { margin: 4px 0 8px; }
 .game-night summary { cursor: pointer; width: fit-content; }
-/* The reconnect indicator is part of the summary's tap target. Keep that
-   target in the layout, with room for the race's separate Leave control. */
-.game-night > :is(.arcade-chess, .arcade-spades, .arcade-brick-race) > summary {
+/* Both Spades seat counts share a panel; all card tables and Chess need the
+   same full-width reconnect target. Leave room for the race's Leave control. */
+.game-night > :is(.arcade-chess, .arcade-card-table) > summary {
+  box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   min-height: 44px;
@@ -261,11 +262,12 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .arcade-reconnect {
     display: inline-block;
     margin-inline-start: .45rem;
+    box-sizing: border-box;
     padding: .15rem .45rem;
     border: 1px solid var(--amber);
     border-radius: 1rem;
     color: var(--amber);
-    max-width: 100%;
+    max-width: calc(100% - .45rem);
     overflow-wrap: anywhere;
     font: 600 .75rem/1.4 var(--mono);
     vertical-align: middle;
