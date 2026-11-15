@@ -125,11 +125,18 @@ export function createGameNightTable({
         }
 
         // Take someone out of the line, e.g. a watch-only invitation that an older
-        // checkpoint had lined up. They are never seated from it.
+        // checkpoint had lined up. Also release any legacy seat held by a watcher.
+        // They are never seated from it.
         dequeue(subject) {
-            if (!this.#next.includes(subject)) return false;
+            const queued = this.#next.includes(subject);
             this.#next = this.#next.filter(entry => entry !== subject);
-            return true;
+            const seat = this.seat(subject);
+            // Do not dismantle an active match's roster. The finished match is
+            // still projected until its next lifecycle transition; a closed or
+            // waiting table can release the legacy seat immediately.
+            const released = !!(seat && seat !== first && (!this.#match || finished(this.#match) || this.#closed));
+            if (released) this.#seats[seat] = null;
+            return queued || released;
         }
 
         join(subject, id, now, requested, reserved = 0, heldSeats = []) {
