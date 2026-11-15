@@ -229,26 +229,59 @@ async function expectPanelContained(page, selectors) {
         await expect(locator).toBeVisible();
         const contained = await locator.evaluate((node, panelBounds) => {
             const r = node.getBoundingClientRect();
-            return r.width > 0 && r.height > 0 && r.left >= panelBounds.left && r.right <= panelBounds.right && r.top >= panelBounds.top && r.bottom <= panelBounds.bottom;
+            if (!(r.width > 0 && r.height > 0 && r.left >= panelBounds.left && r.right <= panelBounds.right && r.top >= panelBounds.top && r.bottom <= panelBounds.bottom)) return false;
+            // Check each clipping ancestor, including the game panel itself.
+            for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+                const style = getComputedStyle(parent);
+                const clipX = /hidden|clip|auto|scroll/.test(style.overflowX);
+                const clipY = /hidden|clip|auto|scroll/.test(style.overflowY);
+                if (!clipX && !clipY) continue;
+                const p = parent.getBoundingClientRect();
+                if (clipX && (r.left < p.left || r.right > p.right)) return false;
+                if (clipY && (r.top < p.top || r.bottom > p.bottom)) return false;
+                if (parent.matches('.arcade-brick-race')) break;
+            }
+            return true;
         }, bounds);
         expect(contained, `${selector} should fit inside the race panel`).toBe(true);
     }
+}
+const phoneRaceParts = ['.brick-race-board', '.brick-race-rail', '[data-brick-score="a"]', '[data-brick-score="b"]', '[data-brick-serve]', '[data-brick-leave]'];
+async function expectWatcherHasNoPrivateRace(fixture, observer) {
+    await expect(observer.locator(game.board)).toBeHidden();
+    await expect.poll(() => fixture.frames('RaceWatcher'), { timeout: 1500, intervals: [100, 250, 500] }).toEqual([]);
+    await observer.waitForTimeout(400);
+    expect(fixture.frames('RaceWatcher'), 'watcher must not receive race frames after the room settles').toEqual([]);
+    const privateDom = await observer.locator('body').evaluate(body => {
+        const match = body.querySelector('[data-brick-match]');
+        const scores = [...body.querySelectorAll('[data-brick-score]')];
+        const payloadNodes = [...body.querySelectorAll('[data-brick-hand], [data-brick-seat], [data-private-hand], [data-private-seat], [data-paddle], [data-stuck]')];
+        return {
+            boardHidden: !match || match.hidden,
+            scoreText: scores.map(row => row.textContent.trim()),
+            payloadNodes: payloadNodes.length,
+            html: body.innerHTML
+        };
+    });
+    expect(privateDom.boardHidden, 'watcher board must stay unavailable').toBe(true);
+    expect(privateDom.scoreText.every(text => text === ''), 'watcher DOM must not contain private scores').toBe(true);
+    expect(privateDom.payloadNodes, 'watcher DOM must not contain private hand, seat, or board state').toBe(0);
+    expect(privateDom.html).not.toMatch(/private[-_ ]?hand|private[-_ ]?seat|"(?:hand|seat|paddle|score|players)"\s*:/i);
+    expect(fixture.view('RaceWatcher', 'turdanoid')).toBeUndefined();
 }
 test.describe('Turdanoid phone and landscape layout', () => {
     test('390×844 private race fits, exposes controls, and supports touch', async ({ browser, baseURL }) => {
         const fixture = await gameNight(browser, baseURL);
         try {
             const { host: page, guest, observer } = await openRace(fixture, { width: 390, height: 844 }, { watcher: true });
-            await expectContained(page, ['[data-brick-match]', '[data-brick-status]', '[data-brick-back]', '[data-brick-leave]', '[data-brick-serve]', '.brick-race-rail']);
+            await expectContained(page, ['[data-brick-match]', ...phoneRaceParts, '[data-brick-status]', '[data-brick-back]']);
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-            await expectPanelContained(page, ['[data-brick-match]', '[data-brick-status]', '[data-brick-back]', '[data-brick-leave]', '[data-brick-serve]']);
-            await expectContained(guest, ['[data-brick-match]', '[data-brick-status]', '[data-brick-back]', '[data-brick-leave]', '[data-brick-serve]']);
-            await expectPanelContained(guest, ['[data-brick-match]', '[data-brick-status]', '[data-brick-back]', '[data-brick-leave]', '[data-brick-serve]']);
+            await expectPanelContained(page, ['[data-brick-match]', ...phoneRaceParts, '[data-brick-status]', '[data-brick-back]']);
+            await expectContained(guest, ['[data-brick-match]', ...phoneRaceParts, '[data-brick-status]', '[data-brick-back]']);
+            await expectPanelContained(guest, ['[data-brick-match]', ...phoneRaceParts, '[data-brick-status]', '[data-brick-back]']);
             expect(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
             await expect(observer.locator(game.status)).toBeVisible();
-            await expect(observer.locator(game.board)).toBeHidden();
-            expect(fixture.view('RaceWatcher', 'turdanoid')).toBeUndefined();
-            expect(fixture.frames('RaceWatcher')).toEqual([]);
+            await expectWatcherHasNoPrivateRace(fixture, observer);
             expect(await page.evaluate(() => navigator.maxTouchPoints)).toBeGreaterThan(0);
             const serve = page.locator('[data-brick-serve]');
             await expect(serve).toBeVisible();
@@ -256,9 +289,14 @@ test.describe('Turdanoid phone and landscape layout', () => {
             await page.locator('[data-brick-serve]').tap();
             await expect(page.locator('[data-brick-match]')).toBeVisible();
             await expect(page.locator('[data-brick-match]')).toHaveAttribute('data-stuck', 'false');
-            await expect(observer.locator(game.board)).toBeHidden();
-            expect(fixture.view('RaceWatcher', 'turdanoid')).toBeUndefined();
-            expect(fixture.frames('RaceWatcher')).toEqual([]);
+            await expectContained(page, ['[data-brick-match]', ...phoneRaceParts, '[data-brick-status]', '[data-brick-back]']);
+            await expectPanelContained(page, ['[data-brick-match]', ...phoneRaceParts, '[data-brick-status]', '[data-brick-back]']);
+            await expectContained(guest, ['[data-brick-match]', ...phoneRaceParts, '[data-brick-status]', '[data-brick-back]']);
+            await expectPanelContained(guest, ['[data-brick-match]', ...phoneRaceParts, '[data-brick-status]', '[data-brick-back]']);
+            await page.locator('.brick-race-board').focus();
+            await page.keyboard.press('ArrowLeft');
+            await page.waitForTimeout(150);
+            await expectWatcherHasNoPrivateRace(fixture, observer);
             expect(new URL(page.url()).pathname).toBe(LOBBY);
         } finally { await fixture.close(); }
     });
