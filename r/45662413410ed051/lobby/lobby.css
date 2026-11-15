@@ -874,4 +874,10 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   /* The 44px Rush summary and room chrome use the slack under the track.
      Shorten the track so the 44px race controls stay fully in view. */
   .rush-race-track { height: clamp(132px, calc(100dvh - 521px), 275px); }
+  /* Tabs are only as wide as their label, room actions use min-width: 0, and
+     Launch ball is a .btn--small (38px). Keep each at least 44×44. */
+  body:has(.game-night:not([hidden])) :is(.tabs button, .game-actions .btn, button.btn.btn--small[data-brick-serve]) {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
 }
