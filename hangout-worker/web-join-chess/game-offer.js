@@ -5,7 +5,7 @@ export const GAME_OFFER_LABEL = "webjoin-game-offer";
 export const OFFER_TTL_MS = 120000;
 export const AGE_LINE = "By joining, you confirm you're 13+ and agree to the house rules.";
 const HANGOUT_GUEST_PAGE = "https://stalemate-hangout-beta.jeffstory007.workers.dev/beta/game-night/webjam-guest";
-const FULL_COPY = "Table full, you're up next game";
+const FULL_COPY = "Table full. You’re in line for the next open seat.";
 const EXPIRED_COPY = "This game offer expired";
 
 let generation = 0;

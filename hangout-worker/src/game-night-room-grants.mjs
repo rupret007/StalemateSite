@@ -23,7 +23,7 @@ const LIST_PAGE = 400;
 
 // Same copy and status as game-night-invitations.mjs `unavailable()`.
 export const EXPIRED_COPY = GAME_INVITE_UNAVAILABLE;
-export const TABLE_FULL_COPY = "Table full, you're up next game";
+export const TABLE_FULL_COPY = 'Table full. You’re in line for the next open seat.';
 const REGISTER_COPY = 'Open a game table with an available seat before seating your room.';
 const HOST_COPY = 'You are hosting this table and already have a seat.';
 const LIMIT_COPY = 'Game invitation allowance reached. Try again in a few minutes.';
