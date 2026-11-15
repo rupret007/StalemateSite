@@ -2601,7 +2601,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             const cam = $('[data-cam]');
             cam.hidden = app.localMediaPaused || ['chat', 'game'].includes(c.kind);
             cam.setAttribute('aria-pressed', String(!!c.myCam));
-            cam.textContent = c.myCam ? '📷 Camera on' : m.C ? '📷 Camera (18+)' : '📷 Cameras off here';
+            const cameraLabel = c.kind === 'jam' ? 'Room camera' : 'Camera';
+            cam.textContent = c.myCam ? `📷 ${cameraLabel} on` : m.C ? `📷 ${cameraLabel} (18+)` : `📷 ${cameraLabel}s off here`;
             cam.disabled = !m.C && !c.myCam;
         }
         const peopleHeading = $('[data-people-title]');
