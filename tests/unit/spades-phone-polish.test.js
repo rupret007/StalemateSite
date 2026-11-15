@@ -235,7 +235,7 @@ describe('Spades phone table', () => {
         expect(document.querySelector('[data-next-game]').hidden).toBe(false);
     });
 
-    it('reserves Game over for a match result and keeps the last trick winner', () => {
+    it('shows Game over after a result in any phase and keeps the last trick winner', () => {
         const four = new GameNightTurdSpades('spades-four-summary', 'host');
         for (const [subject, position] of [['west-player', 'west'], ['north-player', 'north'], ['east-player', 'east']]) {
             expect(four.join(subject, 'spades-four-summary', 0, position)).toBe(true);
@@ -245,7 +245,7 @@ describe('Spades phone table', () => {
             const state = table.view('host');
             const roundEnd = { ...state, match: {
                 ...state.match, phase: 'round-end', lastWinner: 'north',
-                tricks: { south: 0, west: 0, north: 0, east: 0 }, result: null
+                tricks: { south: 2, west: 1, north: 1, east: 0 }, result: null
             } };
             client.handlers.onState({ state: roundEnd, canOpen: true, partners: state.mode === 'partners' });
             expect(view.find('[data-spades-trick-summary]').textContent).toBe('Hand over · Last won by North' + (state.mode === 'partners' ? ' (CPU)' : ''));
@@ -256,6 +256,14 @@ describe('Spades phone table', () => {
 
             const finished = { ...completed, match: { ...completed.match, result: { winner: 0, reason: 'score' } } };
             client.handlers.onState({ state: finished, canOpen: true, partners: state.mode === 'partners' });
+            expect(view.find('[data-spades-trick-summary]').textContent).toBe('Game over · Last won by North' + (state.mode === 'partners' ? ' (CPU)' : ''));
+
+            const bidResign = { ...state, match: { ...state.match, phase: 'bid', result: { winner: 1, reason: 'resign' } } };
+            client.handlers.onState({ state: bidResign, canOpen: true, partners: state.mode === 'partners' });
+            expect(view.find('[data-spades-trick-summary]').textContent).toBe('Game over');
+
+            const midHandResign = { ...roundEnd, match: { ...roundEnd.match, phase: 'play', result: { winner: 1, reason: 'resign' } } };
+            client.handlers.onState({ state: midHandResign, canOpen: true, partners: state.mode === 'partners' });
             expect(view.find('[data-spades-trick-summary]').textContent).toBe('Game over · Last won by North' + (state.mode === 'partners' ? ' (CPU)' : ''));
         }
     });
