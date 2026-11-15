@@ -40,9 +40,11 @@ describe('pinned WebJam browser assets', () => {
 
     it('distinguishes an unconfirmed return from an explicit invite refusal', () => {
         const status = { textContent: '' };
-        let expire, channel;
+        const timers = new Map();
+        let channel;
         const createPage = () => {
             status.textContent = '';
+            timers.clear();
             runInNewContext(read('handoff.js'), {
                 location: {
                     hash: '#' + 'a'.repeat(32) + '&k=' + 'A'.repeat(43) + '&s=' + '0'.repeat(64) + '&g=1&e=1',
@@ -53,23 +55,32 @@ describe('pinned WebJam browser assets', () => {
                 BroadcastChannel: class {
                     constructor() { channel = this; }
                     postMessage() {}
-                    close() {}
+                    close() { this.closed = true; }
                 },
-                setTimeout(callback) { expire = callback; return 1; },
-                clearTimeout() { expire = null; },
+                setTimeout(callback, delay) { timers.set(delay, callback); return delay; },
+                clearTimeout(delay) { timers.delete(delay); },
             });
         };
         createPage();
-        expire();
+        timers.get(8000)();
+        expect(status.textContent).toContain('Still waiting');
+        expect(channel.closed).toBeUndefined();
+        channel.onmessage({ data: { returned: true } });
+        expect(status.textContent).toBe('Return to your Jam room. You can close this tab.');
+        expect(channel.closed).toBe(true);
+        expect(timers.size).toBe(0);
+        createPage();
+        timers.get(8000)();
+        timers.get(90000)();
         expect(status.textContent).toContain('Check with your bandmate before sending another invite.');
+        expect(channel.closed).toBe(true);
+        expect(channel.onmessage).toBeNull();
+        expect(timers.size).toBe(0);
         createPage();
         channel.onmessage({ data: { returned: false } });
         expect(status.textContent).toBe('End the browser invite in WebJam, then retry from your Jam room in this browser profile.');
-        expect(expire).toBeNull();
-        createPage();
-        channel.onmessage({ data: { returned: true } });
-        expect(status.textContent).toBe('Return to your Jam room. You can close this tab.');
-        expect(expire).toBeNull();
+        expect(channel.closed).toBe(true);
+        expect(timers.size).toBe(0);
     });
 
     it('resolves the entire static module and stylesheet graph within the packaged client', () => {
