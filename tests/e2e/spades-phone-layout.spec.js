@@ -213,7 +213,31 @@ async function boxAtLeast44(locator) {
     const box = await locator.boundingBox();
     expect(box?.width).toBeGreaterThanOrEqual(44);
     expect(box?.height).toBeGreaterThanOrEqual(44);
+    expect(box?.x).toBeGreaterThanOrEqual(0);
+    expect(box?.y).toBeGreaterThanOrEqual(0);
+    expect(box && box.x + box.width).toBeLessThanOrEqual(PHONE.width);
+    expect(box && box.y + box.height).toBeLessThanOrEqual(PHONE.height);
 }
+
+test('Chess and Turdanoid reach their playable boards on phones', async ({ browser, baseURL }) => {
+    for (const entry of [
+        { game: 'chess', status: '[data-chess-status]', board: '.arcade-chess-board', open: 'Open Chess match', join: 'Join as Black' },
+        { game: 'turdanoid', status: '[data-brick-status]', board: '[data-brick-match]', open: 'Open Turdanoid race', join: 'Join Turdanoid race' }
+    ]) {
+        const fixture = await gameNight(browser, baseURL);
+        try {
+            const [host, guest] = await room(fixture, ['HostExample', 'GuestWest']);
+            for (const page of [host, guest]) {
+                await page.getByRole('combobox', { name: 'Switch game' }).selectOption(entry.game);
+                await expect(page.locator(entry.status)).toBeVisible();
+            }
+            await host.getByRole('button', { name: entry.open, exact: true }).click();
+            await guest.getByRole('button', { name: entry.join, exact: true }).click();
+            for (const page of [host, guest]) await expect(page.locator(entry.board)).toBeVisible();
+            expect(fixture.errors()).toEqual([]);
+        } finally { await fixture.close(); }
+    }
+});
 async function noHorizontalOverflow(page) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     expect(await page.evaluate(() => window.innerWidth)).toBe(390);
@@ -229,6 +253,8 @@ test.describe('partners Spades at 390×844', () => {
             const bid = west.getByRole('button', { name: 'Bid for me', exact: true });
             await boxAtLeast44(bid);
             await west.getByLabel('Your bid').selectOption('0');
+            const bidBeforeReconnect = await west.getByLabel('Your bid').inputValue();
+            const handBeforeReconnect = await west.locator('[data-spades-card]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-spades-card')));
             const lock = west.getByRole('button', { name: 'Lock bid', exact: true });
             await boxAtLeast44(lock);
 
@@ -242,6 +268,9 @@ test.describe('partners Spades at 390×844', () => {
             await noHorizontalOverflow(west);
             await west.context().setOffline(false);
             await expect(reconnect).toBeHidden();
+            await expect(west.locator('[data-spades-card]')).toHaveCount(13);
+            await expect(west.getByLabel('Your bid')).toHaveValue(bidBeforeReconnect);
+            await expect.poll(() => west.locator('[data-spades-card]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-spades-card')))).toEqual(handBeforeReconnect);
             await west.getByRole('button', { name: 'Lock bid', exact: true }).click();
             await host.getByRole('button', { name: 'Bid for me', exact: true }).click();
             await expect(west.locator('[data-spades-status]')).toContainText('Your turn');
@@ -259,8 +288,19 @@ test.describe('partners Spades at 390×844', () => {
             await expect(watcher.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
             await expect(watcher.locator('[data-spades-hand] button')).toHaveCount(0);
             await expect(watcher.locator('[data-spades-card]')).toHaveCount(0);
-            const watcherAttributes = await watcher.locator('body *').evaluateAll(nodes => nodes.flatMap(node => [...node.attributes].map(attribute => attribute.value)));
-            for (const id of privateIds) expect(watcherAttributes).not.toContain(id);
+            const watcherDom = await watcher.locator('body').evaluate(node => ({
+                text: node.innerText,
+                attributes: [...node.querySelectorAll('*')].flatMap(element => [...element.attributes].map(attribute => attribute.value))
+            }));
+            const watcherFrames = fixture.frames('LateWatcher').map(raw => JSON.parse(raw));
+            const handsIn = value => Array.isArray(value) ? value.flatMap(handsIn) : value && typeof value === 'object'
+                ? Object.entries(value).flatMap(([key, child]) => key.toLowerCase() === 'hand' ? [child] : handsIn(child)) : [];
+            expect(watcherFrames.length).toBeGreaterThan(0);
+            for (const frame of watcherFrames) for (const hand of handsIn(frame)) expect(hand).toEqual([]);
+            for (const id of privateIds) {
+                expect(watcherDom.attributes).not.toContain(id);
+                expect(watcherDom.text).not.toContain(id);
+            }
             await noHorizontalOverflow(watcher);
 
             await west.locator('[data-spades-action="resign"]').click();
@@ -269,6 +309,15 @@ test.describe('partners Spades at 390×844', () => {
             const rematch = west.getByRole('button', { name: 'Request Spades rematch' });
             await boxAtLeast44(rematch);
             await noHorizontalOverflow(west);
+            await rematch.click();
+            const acceptRematch = host.getByRole('button', { name: 'Accept Spades rematch' });
+            await expect(acceptRematch).toBeVisible();
+            await acceptRematch.click();
+            await expect(west.locator('[data-spades-status]')).not.toContainText('win by resignation');
+            await expect(west.locator('[data-spades-card]')).toHaveCount(13);
+            await expect(west.getByLabel('Your bid')).toBeEnabled();
+            await expect(west.getByRole('button', { name: 'Bid for me', exact: true })).toBeEnabled();
+            expect(fixture.errors()).toEqual([]);
         } finally { await fixture.close(); }
     });
 });
