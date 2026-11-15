@@ -855,6 +855,11 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
     min-height: 44px;
     padding: 6px 9px;
   }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) [data-brick-back] {
+    width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
   .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) [data-brick-leave] { position: static; }
   .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) [data-brick-match] { max-width: none; }
   .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-layout {

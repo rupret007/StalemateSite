@@ -166,8 +166,12 @@ describe('Turdanoid brick race phone friction', () => {
         view.publish(54_000, null);
         view.pump();
         expect(view.back.hidden).toBe(false);
+        expect(view.main.hidden).toBe(true);
         expect(view.launch.hidden).toBe(true);
         expect(view.scores[0].textContent).toContain('Player 1');
+        view.back.click();
+        expect(view.panel.open).toBe(false);
+        expect(view.panel.querySelector('summary').hidden).toBe(false);
     });
 
     it('tells a touch player to drag and tap instead of using arrow keys and Space', () => {
