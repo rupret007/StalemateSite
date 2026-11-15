@@ -178,7 +178,7 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     // playing/finished: a game is open but hidden. unavailable: wrong-table invite.
                     matchUnavailable = !frame.state && frame.phase === 'unavailable';
                     matchOpen = !frame.state && (frame.phase === 'playing' || frame.phase === 'finished');
-                    tableSeen = true;
+                    if (frame.state || frame.phase === 'lobby' || frame.canOpen) tableSeen = true;
                     setPlaying(!!match && !!frame.state.seat && frame.phase !== 'finished' && !match.result);
                     onState(frame);
                     if (attempt === generation) onMatch?.(scope, frame.state, send, false,

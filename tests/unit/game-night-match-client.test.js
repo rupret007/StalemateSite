@@ -185,6 +185,41 @@ describe('Game Night phone wake and history recovery', () => {
         expect(sockets).toHaveLength(1);
     });
 
+    it.each(['playing', 'finished', 'unavailable'])(
+        'ends a room refusal when the only snapshot was %s with no board access', async phase => {
+            const status = vi.fn();
+            client.stop();
+            client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+            client.start({ room: '#game-fixture', ref: 'fixture' });
+            await vi.advanceTimersByTimeAsync(0);
+            const current = sockets.at(-1);
+            ready(current, { snapshots: true });
+            snapshot({ phase, currentMatchId: phase === 'unavailable' ? null : 'match-fixture' });
+            const tickets = issue.mock.calls.length;
+            current.dispatchEvent(new CloseEvent('close', { code: 4403, reason: 'room membership ended' }));
+            expect(status).toHaveBeenLastCalledWith('unavailable', 'room');
+            await vi.advanceTimersByTimeAsync(10_000);
+            expect(issue).toHaveBeenCalledTimes(tickets);
+        }
+    );
+
+    it('still retries a room refusal after a confirmed lobby followed by a hidden board', async () => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const current = sockets.at(-1);
+        ready(current, { snapshots: true });
+        snapshot({ phase: 'lobby', currentMatchId: null });
+        snapshot({ phase: 'playing', currentMatchId: 'match-fixture' });
+        const tickets = issue.mock.calls.length;
+        current.dispatchEvent(new CloseEvent('close', { code: 4403, reason: 'room membership ended' }));
+        expect(status).toHaveBeenLastCalledWith('reconnecting');
+        await vi.advanceTimersByTimeAsync(600);
+        expect(issue).toHaveBeenCalledTimes(tickets + 1);
+    });
+
     it('still ends a 4403 that arrives before any table view', async () => {
         const status = vi.fn();
         client.stop();

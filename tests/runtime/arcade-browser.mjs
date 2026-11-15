@@ -3019,7 +3019,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const field = await board(b).boundingBox(), launch = await serve(b).boundingBox();
         assert.ok(field && launch);
         assert.ok(launch.width >= 44 && launch.height >= 44, 'phone-sized Turdanoid Launch button');
-        assert.ok(launch.x >= field.x + field.width, 'Launch button does not cover the playfield or paddle');
+        const coversPlayfield = launch.x < field.x + field.width && launch.x + launch.width > field.x
+            && launch.y < field.y + field.height && launch.y + launch.height > field.y;
+        assert.equal(coversPlayfield, false, 'Launch button does not cover the playfield or paddle');
         assert.equal(await b.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         await expect(serve(b)).toBeEnabled();
         await expect(serve(a)).toBeEnabled();

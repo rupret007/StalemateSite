@@ -743,7 +743,7 @@ async function verifyWebJamChess() {
         assert.ok(firstPlayMs < 30_000, 'first confirmed move is within 30 seconds in the fixture');
         await standbyPlay.tap();
         await expect.poll(() => standby.evaluate(room => window.__lobby.active === room, hostRoom.room)).toBe(true);
-        await expect(standby.locator('[data-toast]')).toHaveText('The Chess table is full. You can stay in the room for the next game.');
+        await expect(standby.locator('[data-toast]')).toHaveText('The Chess table is full. You can wait here for an open seat.');
         await expect(standby.locator('[data-jam-chess]').getByRole('button', { name: 'Join Chess' })).toHaveCount(0);
         await capture(standby, 'table-full');
         assert.ok(await friend.evaluate(room => window.__lobby.active === room && ![...window.__lobby.chans.values()].some(c => c.kind === 'game'),

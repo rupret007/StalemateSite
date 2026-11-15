@@ -11,7 +11,7 @@ const put = (node, text) => { if (node.textContent !== text) node.textContent = 
 const markup = `
 <summary>Turdanoid Brick Race</summary>
 <p class="small arcade-card-status brick-race-status" data-brick-status role="status"></p>
-<p class="small arcade-next-game" data-next-game hidden>Table full, you're up next game</p>
+<p class="small arcade-next-game" data-next-game hidden>Table full. You’re in line for the next open seat.</p>
 <p class="small arcade-card-error" data-brick-error role="status"></p>
 <div class="arcade-card-actions brick-race-actions">
     <button class="btn btn--small" type="button" data-brick-main hidden></button>
@@ -329,7 +329,25 @@ export function mountArcadeTurdanoid(container, onMatch) {
         launch.hidden = !seat || !match || !!result;
         if (connection !== 'ready') launch.disabled = true;
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
+        clearLaunchFromTabs();
     }
+
+    // Portrait phone layout stacks Launch under the board. On a short screen that
+    // puts the button through the section tabs. Scroll the race panel until the
+    // whole control sits above them. Landscape already clears the tabs.
+    function clearLaunchFromTabs() {
+        if (!panel.isConnected || launch.hidden) return;
+        const navigation = document.querySelector('.phonetabs');
+        const nav = navigation?.getBoundingClientRect();
+        if (!nav?.height) return;
+        const overlap = launch.getBoundingClientRect().bottom - nav.top;
+        if (overlap <= 0) return;
+        const room = panel.scrollHeight - panel.clientHeight - panel.scrollTop;
+        if (room <= 0) return;
+        panel.scrollTop += Math.min(room, Math.ceil(overlap));
+    }
+    addEventListener('resize', clearLaunchFromTabs);
+    addEventListener('orientationchange', clearLaunchFromTabs);
 
     startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
