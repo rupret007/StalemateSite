@@ -465,7 +465,8 @@ test('native Chromium zoom keeps Jam invitations and the composer usable', async
             await capture(`jam-native-composer-${zoom * 100}.png`);
             contained(geometry);
             await page.keyboard.press('Space');
-            const sent = page.getByRole('log', { name: 'Conversation' }).getByText(message, { exact: true });
+            const sent = page.getByRole('log', { name: 'Conversation' })
+                .getByRole('listitem').filter({ hasText: message });
             await expect(sent).toBeInViewport();
             await capture(`jam-native-message-${zoom * 100}.png`);
         }
