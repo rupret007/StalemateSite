@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
+import { BETA_COOKIE, signBeta } from '../../hangout-worker/src/beta-auth.mjs';
 import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
 import { BetaSessions } from '../../hangout-worker/src/beta-sessions.mjs';
 import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
@@ -68,6 +69,38 @@ describe('entry context through the private beta shell', () => {
             expect(JSON.parse(calls[1][1].body)).toEqual({ key: code.value });
             expect(window.sessionStorage.length).toBe(0);
         } finally { dom.window.close(); }
+    });
+
+    it('enables camera access only for the admitted Web Join document when private video is enabled', async () => {
+        const config = env();
+        const html = readFileSync(new URL('../../join/index.html', import.meta.url), 'utf8');
+        config.ASSETS.fetch.mockImplementation(async () => new Response(html, {
+            headers: { 'Content-Type': 'text/html; charset=utf-8', ETag: '"fixture"' },
+        }));
+        config.BETA_SESSIONS = { idFromName: name => name, get: () => ({ fetch: async () => new Response('ok') }) };
+        const cookie = await signBeta('access', { v: 1, sid: 'synthetic-active-guest', scope: 'guest', version: '1',
+            exp: Date.now() + 60000 }, config.HANGOUT_HMAC_KEY);
+        const fetch = (path, extra = {}, admitted = true) => betaFetch(new Request('https://beta.example' + path,
+            { headers: admitted ? { Cookie: `${BETA_COOKIE}=${cookie}` } : {} }), { ...config, ...extra });
+        const off = await fetch('/join/');
+        expect(off.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=(self)');
+        expect(await off.text()).toContain('name="webjam-video" content="disabled"');
+
+        const enabled = { HANGOUT_WEBJAM_VIDEO_ADMISSION: 'on' };
+        const guest = await fetch('/join/', enabled);
+        expect(guest.headers.get('Permissions-Policy')).toBe('camera=(self), geolocation=(), microphone=(self)');
+        expect(guest.headers.has('ETag')).toBe(false);
+        expect(await guest.text()).toContain('name="webjam-video" content="private"');
+        const host = await fetch('/join/?cameras=1', enabled);
+        expect(host.headers.get('Permissions-Policy')).toBe('camera=(self), geolocation=(), microphone=()');
+        for (const path of ['/join/handoff.html', '/join/join-entry.js']) {
+            const other = await fetch(path, enabled);
+            expect(other.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=(self)');
+            expect(await other.text()).not.toContain('name="webjam-video" content="private"');
+        }
+        const unadmitted = await fetch('/join/?cameras=1', enabled, false);
+        expect(unadmitted.status).toBe(401);
+        expect(unadmitted.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=()');
     });
 
     it('explains how to resubmit a retained code after an invitation outage', async () => {

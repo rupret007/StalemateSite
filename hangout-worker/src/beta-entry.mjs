@@ -14,6 +14,7 @@ import { publicBetaHelp } from './beta-public-help.mjs';
 import { arcadeEnabled, arcadeGame, arcadePath, arcadeRoomRequest } from './arcade-transport.mjs';
 import { mediaEnabled, mediaPath } from './game-night-media.mjs';
 import { GAME_GUEST_PATH, GAME_INVITATION_PATH, gameGuestEnabled, gameGuestScope, gameGuestSessionRef } from './game-night-invitations.mjs';
+import { videoAdmissionEnabled } from './webjam-video-admission.mjs';
 export { BetaSessions } from './beta-sessions.mjs';
 export { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget };
 
@@ -571,10 +572,25 @@ async function betaRequest(request, env, deps = {}) {
     if (assetPath === '/join' || assetPath.startsWith('/join/')) {
         // Web Join is a separate opt-in audio client. Keep its stricter policy
         // and omit the chat bootstrap; invitation admission above still applies.
-        const result = new Response(asset.body, asset);
+        const cameraMarker = '<meta name="webjam-video" content="disabled">';
+        let body = asset.body, camera = false;
+        if (webJoinPage && request.method === 'GET' && videoAdmissionEnabled(env) && asset.ok
+            && asset.headers.get('Content-Type')?.startsWith('text/html')) {
+            const page = await asset.text();
+            const active = page.replace(cameraMarker, '<meta name="webjam-video" content="private">');
+            camera = active !== page;
+            body = active;
+        }
+        const result = new Response(body, asset);
         for (const [key, value] of Object.entries(headers)) result.headers.set(key, value);
         result.headers.set('Content-Security-Policy', WEB_JOIN_CSP);
-        result.headers.set('Permissions-Policy', 'camera=(), geolocation=(), microphone=(self)');
+        const microphone = camera && url.searchParams.get('cameras') === '1' ? '()' : '(self)';
+        result.headers.set('Permissions-Policy', `camera=${camera ? '(self)' : '()'}, geolocation=(), microphone=${microphone}`);
+        if (camera) {
+            result.headers.delete('Content-Length');
+            result.headers.delete('Content-Encoding');
+            result.headers.delete('ETag');
+        }
         return result;
     }
     if (!asset.headers.get('Content-Type')?.includes('text/html')) {
