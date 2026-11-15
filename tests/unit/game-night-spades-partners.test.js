@@ -64,16 +64,25 @@ describe('TurdSpades with computer partners', () => {
         expect(scored.bids.east).not.toBeNull();
         expect(table.view(human.west).match.scores).toEqual(scored.scores);
         expect(table.command(human.south, request(scored, { action: 'resign' })).ok).toBe(true);
-        expect(table.requestRematch(human.west, matchId, 'spades-next-fixture', 1)).toBe(true);
-        expect(table.requestRematch(human.south, matchId, 'spades-next-fixture', 1)).toBe(true);
-        const next = table.view(human.south);
-        expect(next).toMatchObject({ id: 'spades-next-fixture', seat: 'south', match: { round: 1, phase: 'bid', scores: [0, 0] } });
-        expect(next.match.hand).toHaveLength(13);
-        expect(table.view(human.west)).toMatchObject({ id: 'spades-next-fixture', seat: 'west', match: { phase: 'bid' } });
-        expect(table.view(human.west).match.hand).toHaveLength(13);
-        const lateWatcher = table.view('late-watcher');
-        expect(lateWatcher.seat).toBeNull();
-        expect(lateWatcher.match.hand).toEqual([]);
+        const finished = table.checkpoint();
+        for (const order of [[human.south, human.west], [human.west, human.south]]) {
+            const rematch = GameNightSpadesPartners.restore(finished);
+            expect(rematch.requestRematch(order[0], matchId, 'spades-next-fixture', 1)).toBe(true);
+            expect(rematch.view(human.south).id).toBe(matchId);
+            expect(rematch.view(human.south).match.result).toBeTruthy();
+            expect(rematch.requestRematch(order[1], matchId, 'spades-next-fixture', 1)).toBe(true);
+            const next = rematch.view(human.south);
+            expect(next).toMatchObject({ id: 'spades-next-fixture', seat: 'south', match: { round: 1, phase: 'bid', scores: [0, 0] } });
+            const west = rematch.view(human.west);
+            expect(west).toMatchObject({ id: 'spades-next-fixture', seat: 'west', match: { round: 1, phase: 'bid', scores: [0, 0] } });
+            const dealt = rematch.checkpoint().match.hands;
+            expect(next.match.hand.map(card => card.id).sort((a, b) => a - b)).toEqual([...dealt.south].sort((a, b) => a - b));
+            expect(west.match.hand.map(card => card.id).sort((a, b) => a - b)).toEqual([...dealt.west].sort((a, b) => a - b));
+            expect(new Set([...next.match.hand, ...west.match.hand].map(card => card.id)).size).toBe(26);
+            const lateWatcher = rematch.view('late-watcher');
+            expect(lateWatcher.seat).toBeNull();
+            expect(lateWatcher.match.hand).toEqual([]);
+        }
     });
 
     it('suggests Nil for a blank hand and a stable 1–9 bid for aces', () => {

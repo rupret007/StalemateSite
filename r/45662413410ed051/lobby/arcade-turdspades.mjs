@@ -105,7 +105,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             connectionError = undefined;
             clearPending();
             draw();
-            if (revealing || (!prior?.result && state?.match?.result)) container.scrollTop = 0;
+            if (revealing || (!prior?.result && next?.result)) container.scrollTop = 0;
         },
         onError(reason) {
             clearPending();

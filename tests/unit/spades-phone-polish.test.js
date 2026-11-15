@@ -110,11 +110,16 @@ describe('Spades phone table', () => {
         const finished = { ...table.view('host'), canStartRematch: true };
         client.handlers.onState({ state: finished, canOpen: true, partners: true });
         expect(view.container.scrollTop).toBe(0);
+        view.container.scrollTop = 300;
+        client.handlers.onState({ state: finished, canOpen: true, partners: true });
+        expect(view.container.scrollTop).toBe(300);
         expect(view.find('[data-spades-status]').textContent).toContain('Game over');
         expect(view.find('[data-spades-rematch-actions]').hidden).toBe(false);
         expect(view.find('[data-spades-rematch-vote]').hidden).toBe(false);
         expect(view.find('[data-spades-start-rematch]').hidden).toBe(false);
-        expect(view.find('[data-spades-rematch-vote]').closest('[data-spades-table]')).toBe(view.find('[data-spades-table]'));
+        // The result scrolls to the top; keep both controls before the score and trick content.
+        expect(view.find('[data-spades-rematch-actions]').previousElementSibling).toBe(view.find('[data-spades-seat]'));
+        expect(view.find('[data-spades-rematch-actions]').nextElementSibling).toBe(view.find('[data-spades-score="0"]').parentElement);
         expect(view.find('[data-spades-hand]').hidden).toBe(true);
         expect(view.find('[data-spades-hand]').children).toHaveLength(0);
         for (const selector of ['[data-spades-rematch-vote]', '[data-spades-start-rematch]']) {
@@ -122,6 +127,9 @@ describe('Spades phone table', () => {
             expect(button.style.minWidth).toBe('44px');
             expect(button.style.minHeight).toBe('44px');
             expect(button.style.maxWidth).toBe('100%');
+            expect(button.disabled).toBe(false);
+            button.focus();
+            expect(document.activeElement).toBe(button);
         }
         view.find('[data-spades-rematch-vote]').click();
         expect(client.sent.at(-1)).toMatchObject({ action: 'rematch', id: finished.id });
@@ -129,7 +137,26 @@ describe('Spades phone table', () => {
         view.find('[data-spades-start-rematch]').click();
         expect(client.sent.at(-1)).toMatchObject({ action: 'start-rematch', id: finished.id });
 
-        expect(table.requestRematch('host', finished.id, 'spades-next-phone', 1, { force: true })).toBe(true);
+        const watcherAtGameOver = table.view('late-watcher');
+        expect(watcherAtGameOver.seat).toBeNull();
+        expect(watcherAtGameOver.match.hand).toEqual([]);
+        client.handlers.onState({ state: watcherAtGameOver, canOpen: false, partners: true });
+        expect(view.find('[data-spades-seat]').textContent).toBe('Watching · hands are private');
+        expect(view.find('[data-spades-hand]').children).toHaveLength(0);
+        expect(view.find('[data-spades-rematch-actions]').hidden).toBe(true);
+
+        const voters = mode === 'partners' ? ['host', 'friend'] : ['host', 'west-player', 'north-player', 'east-player'];
+        for (const subject of voters.slice(0, -1)) {
+            expect(table.requestRematch(subject, finished.id, 'spades-next-phone', 1)).toBe(true);
+            expect(table.view('host').id).toBe(finished.id);
+            expect(table.view('host').match.result).toBeTruthy();
+        }
+        expect(table.requestRematch(voters.at(-1), finished.id, 'spades-next-phone', 1)).toBe(true);
+        for (const subject of voters) {
+            const player = table.view(subject);
+            expect(player).toMatchObject({ id: 'spades-next-phone', match: { round: 1, phase: 'bid', scores: [0, 0] } });
+            expect(player.match.hand).toHaveLength(13);
+        }
         client.handlers.onState({ state: table.view('host'), canOpen: true, partners: true });
         expect(view.find('[data-spades-seat]').textContent).toContain('You’re South');
         expect(view.find('[data-spades-hand]').children).toHaveLength(13);
