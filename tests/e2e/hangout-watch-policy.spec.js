@@ -117,14 +117,18 @@ for (const surface of ['private', 'channel']) {
             policy.blocked = false; policy.deferPlaying = true;
             return policy.playCalls;
         });
-        await room.guest.page.click(room.tap);
+        const tap = room.guest.page.locator(room.tap);
+        if (surface === 'channel') await tap.press('Enter');
+        else await tap.click();
         await expect.poll(() => room.guest.page.evaluate(() => window.__ytAutoplayControl.playCalls)).toBeGreaterThan(playCalls);
         expect(await room.guest.page.evaluate(() => window.__autoplayTrustedTap)).toBe(true);
         expect(await room.guest.page.evaluate(() => window.__ytLog[0].getPlayerState())).not.toBe(1);
-        await expect(room.guest.page.locator(room.tap)).toBeVisible();
+        await expect(tap).toBeVisible();
+        if (surface === 'channel') await expect(tap).toBeFocused();
         await room.guest.page.evaluate(() => window.__ytAutoplayControl.players[0].finishPlayback());
         await expect(room.guest.page.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
-        await expect(room.guest.page.locator(room.tap)).toBeHidden();
+        await expect(tap).toBeHidden();
+        if (surface === 'channel') await expect(room.guest.page.locator('[data-activity] > summary')).toBeFocused();
         // A delayed denial from the earlier attempt must not re-latch the
         // prompt or suspend synchronization after playback has recovered.
         await deliverStaleBlocked(room.guest.page);
