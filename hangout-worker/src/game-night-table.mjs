@@ -53,6 +53,7 @@ export function createGameNightTable({
             if (record.match) {
                 game.#match = Match.restore(record.match);
                 const done = !!finished(game.#match);
+                if (manualStart && !done && occupied.length < minSeats) throw new TypeError('Invalid active seats');
                 if (manualStart && !done && JSON.stringify(game.#match.players) !== JSON.stringify(occupied)) throw new TypeError('Invalid active seats');
                 const votes = twoSeats ? (record.rematch ? [record.rematch] : []) : record.rematchVotes;
                 if (done && Array.isArray(votes) && votes.length <= occupied.length &&

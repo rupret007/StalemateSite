@@ -2,6 +2,7 @@
 // Transport-level kick/ban before rematch for Chess, Spades, and partner Spades.
 import { describe, expect, it } from 'vitest';
 import { ARCADE_TAG, createArcadeTransport } from '../../hangout-worker/src/arcade-transport.mjs';
+import { GameNightTurdJack } from '../../hangout-worker/src/game-night-turdjack.mjs';
 
 const room = '#game-2ca9e1x1be34a';
 const ref = '0'.repeat(32);
@@ -203,5 +204,17 @@ describe.each(cases)('Game Night kick/ban before rematch ($label)', game => {
             expect(f.view(watcher).match?.hand ?? []).toEqual([]);
             expect(reportHandLeak(watcher, 0)).toBe(false);
         }
+    });
+});
+
+describe('Game Night checkpoint restore', () => {
+    it('rejects an active TurdJack checkpoint below minSeats', () => {
+        const table = new GameNightTurdJack('turdjack-restore-fixture', 'host');
+        expect(table.join('guest', table.view('host').id, 0, 'next')).toBe(true);
+        expect(table.start('host', table.view('host').id, 0)).toBe(true);
+
+        const checkpoint = structuredClone(table.checkpoint());
+        checkpoint.seats.two = null;
+        expect(() => GameNightTurdJack.restore(checkpoint)).toThrow(/Invalid active seats/);
     });
 });
