@@ -646,7 +646,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             gameInvites.clear(); gameReturnOffered = false; joiningGameRoom = ''; drawGameOffer();
             joiningArcadeOffer = null;
             finishArcadeInvitation();
-            clearGameLinks(); clearJamInvitations();
+            // Reconnecting still has a seat to return to. Tearing the table down
+            // here is what leaves the phone on "Try again" with no board.
+            if (state !== 'reconnecting') clearGameLinks();
+            clearJamInvitations();
             if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.');
         }
         const label = { offline: 'Offline', connecting: 'Connecting…', reconnecting: 'Reconnecting…', connected: 'Connected', ended: 'Session ended' }[state];
@@ -775,7 +778,15 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             personPreferencePending = null;
             resetPendingReports();
             uncertainMessages();
-            setConnection('offline');
+            // Ordinary 4403 can follow a temporary loss of room membership.
+            const removed = e.code === 4001 || (e.code === 4403 && e.reason === 'banned');
+            if (removed && app.me) {
+                if (gameGuest) return leaveGameGuest('removed');
+                return endSession('removed');
+            }
+            const networkDrop = opened && !timedOut && !savedMessages.size
+                && !removed && !app.kicked && ![1009, 4400, 4413, 4429, 4003, 4503, 4401, 1000].includes(e.code);
+            setConnection(networkDrop ? 'reconnecting' : 'offline');
             if (roomApi) roomApi.onLeave();
             if (timedOut) {
                 const message = 'Hang Out took too long to respond. Try again.';
@@ -813,7 +824,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 line(app.active, { event: true, text: `* ${message}` });
                 return;
             }
-            if ([4001, 4003, 4503, 4403].includes(e.code) || app.kicked || e.code === 1000) return;
+            if (removed || [4003, 4503].includes(e.code) || app.kicked || e.code === 1000) return;
             line(app.active, { event: true, text: '* Disconnected. Reconnecting…' });
             setConnection('reconnecting');
             retryTimer = setTimeout(() => connect(app.me || nick), Math.min(10000, 1000 * (2 ** Math.min(retry++, 4))) * (0.75 + Math.random() * 0.25));
@@ -845,6 +856,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         // private draft into #stalemate or persist it during re-authentication.
         drafts.set(app.active, $('[data-text]').value);
         clearGameReturn();
+        arcadeReturning = null;
         app.chans.clear(); app.pms.clear(); app.rooms = []; app.pendingChannel = '';
         app.band = false; app.verified = false; app.role = 'fan'; app.capabilities = {};
         ownerSession = false; removeTab('hangout-owner');
@@ -863,6 +875,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         setConnection('ended'); drawTabs(); drawChan();
         $('[data-text]').readOnly = true;
         const ended = reason === 'private-access' ? 'Your private community access needs renewal.'
+            : reason === 'removed' ? 'You were removed from this session.'
             : reason === 'left' ? 'You left this chat. Your sign-in and any recorded sharing withdrawal have not been changed.' : reason === 'admission'
             ? 'Couldn’t reconnect. The service may be unavailable or your sign-in may have expired.'
             : wasVerified ? 'Your verified sign-in expired or was revoked.' : 'Your guest session expired or was revoked.';
@@ -1115,6 +1128,18 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                     cmd('join', [arcadeResume.room], '#stalemate', arcadeResume.ref)) arcadeReturning = arcadeResume;
                 arcadeResume = null;
             }
+            // A live socket drop is not a reload. The seat is still held; join it
+            // again instead of stopping on "Back to my seat".
+            let returningToSeat = false;
+            if (wasIn && app.resetSession && !arcadeReturning && !gameGuest && !app.sharingStopped && !pendingKeep) {
+                const hint = readGameReturn();
+                if (hint?.game && arcadeTables.get(hint.game)?.supported
+                    && cmd('join', [hint.room], '#stalemate', hint.ref)) {
+                    arcadeReturning = { ...hint, seat: true };
+                    gameReturn = hint;
+                    returningToSeat = true;
+                }
+            }
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
             $('[data-gate]').hidden = true;
@@ -1124,12 +1149,14 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 $('[data-game-guest-connecting]').hidden = true;
             }
             if (!gameGuest && (!wasIn || app.resetSession)) {
-                gameReturn = readGameReturn();
-                gameReturnOffered = !!gameReturn;
+                if (!returningToSeat) {
+                    gameReturn = readGameReturn();
+                    gameReturnOffered = !!gameReturn;
+                }
                 drawGameOffer();
             }
             if (wasIn && app.resetSession) {
-                if (!gameGuest && !gameReturnOffered) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
+                if (!gameGuest && !gameReturnOffered && !returningToSeat) toast('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.');
             }
             else if (wasIn) line(app.active, { event: true, text: `* You are now ${m.nick}` });
             app.resetSession = false;
