@@ -12,6 +12,12 @@ const ref = '0'.repeat(32);
 const actorId = index => 'c' + String(index + 1).repeat(32);
 const sidFor = index => 'seat-' + index;
 
+function containsPrivateCard(value, card) {
+    if (!value || typeof value !== 'object') return false;
+    if (!Array.isArray(value) && value.rank === card.rank && value.suit === card.suit) return true;
+    return Object.values(value).some(entry => containsPrivateCard(entry, card));
+}
+
 const games = [
     { label: 'Chess', name: 'chess', seats: 2, open: {}, privateHands: false },
     { label: 'partners Spades', name: 'turdspades', seats: 2, open: { mode: 'partners' }, privateHands: true },
@@ -180,14 +186,14 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         if (game.privateHands) {
             const hands = phones.map(socket => f.view(socket).match.hand);
             for (const hand of hands) expect(hand).toHaveLength(13);
-            expect(watched.hand).toEqual([]);
-            expect(Object.keys(watched)).not.toContain('hands');
-            // Card ids are 0-51. No list of thirteen ids or card objects may reach a watcher.
-            const sent = JSON.stringify(watcher.frames);
-            for (const hand of hands) expect(sent).not.toContain(JSON.stringify(hand));
-            expect(sent).not.toMatch(/"playable":/);
-            expect(sent).not.toMatch(/"hands":\s*\[/);
-            expect(sent).not.toMatch(/"hand":\s*\[\s*\{/);
+            const privateCards = hands.flat();
+            const assertNoPrivateCards = payload => {
+                for (const card of privateCards) expect(containsPrivateCard(payload, card)).toBe(false);
+            };
+            // Check all historical frames and the current view by card identity,
+            // independent of the property that carries a card or hand.
+            assertNoPrivateCards(watcher.frames);
+            assertNoPrivateCards(f.view(watcher));
         }
         // Watching keeps up with play, and a watcher cannot act on the table.
         const before = watcher.frames.length;
@@ -205,9 +211,20 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
             await f.hello(returnedWatcher);
             expect(f.last(returnedWatcher)).toMatchObject({ phase: 'playing', yourSeat: null });
             expect(f.view(returnedWatcher)).toMatchObject({ seat: null, match: { hand: [] } });
-            const returnedFrames = JSON.stringify(returnedWatcher.frames);
-            expect(returnedFrames).not.toMatch(/"playable":|"hands":\s*\[|"hand":\s*\[\s*\{/);
-            expect(returnedFrames).not.toContain(JSON.stringify(f.view(phones[0]).match.hand));
+            expect(f.last(phones[0]).yourSeat).toBeTruthy();
+            const rematchCards = phones.map(socket => f.view(socket).match.hand).flat();
+            const assertNoRematchCards = payload => {
+                for (const card of rematchCards) expect(containsPrivateCard(payload, card)).toBe(false);
+            };
+            assertNoRematchCards(returnedWatcher.frames);
+            assertNoRematchCards(f.view(returnedWatcher));
+            await f.drop(returnedWatcher);
+            const reconnectedWatcher = f.phone(game.seats + 1);
+            await f.hello(reconnectedWatcher);
+            expect(f.last(reconnectedWatcher)).toMatchObject({ phase: 'playing', yourSeat: null });
+            expect(f.view(reconnectedWatcher)).toMatchObject({ seat: null, match: { hand: [] } });
+            assertNoRematchCards(reconnectedWatcher.frames);
+            assertNoRematchCards(f.view(reconnectedWatcher));
         }
     });
 });

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,6 +37,36 @@ function partnersTable() {
     const table = new GameNightSpadesPartners('spades-phone-fixture', 'host');
     expect(table.join('friend', 'spades-phone-fixture', 0, 'next')).toBe(true);
     return table;
+}
+
+function browserMetrics(html) {
+    const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    const temp = mkdtempSync(join(tmpdir(), 'spades-phone-'));
+    const page = join(temp, 'phone.html');
+    const css = readFileSync(join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
+    const script = `<script>
+      addEventListener('load', () => {
+        const rect = element => { const r = element.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}; };
+        const hit = element => { const r=element.getBoundingClientRect(); const x=r.left+r.width/2,y=r.top+r.height/2; return !!r.width && !!r.height && document.elementFromPoint(x,y)?.closest('button,select,summary')===element; };
+        const panel=document.querySelector('.arcade-spades'), table=panel.querySelector('[data-spades-table]');
+        const cards=[...panel.querySelectorAll('[data-spades-card]')], summary=panel.querySelector('summary');
+        const controls=[...panel.querySelectorAll('[data-spades-action]:not([hidden]), [data-spades-bid] select')];
+        document.body.dataset.metrics=JSON.stringify({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,panel:rect(panel),table:rect(table),
+          controls:controls.map(e=>({rect:rect(e),hit:hit(e),minWidth:getComputedStyle(e).minWidth,minHeight:getComputedStyle(e).minHeight})),
+          cardCount:cards.length,cards:cards.map(e=>({rect:rect(e),hit:hit(e),minWidth:getComputedStyle(e).minWidth,minHeight:getComputedStyle(e).minHeight})),
+          panelStyle:{minWidth:getComputedStyle(panel).minWidth,maxWidth:getComputedStyle(panel).maxWidth},
+          summary:{minHeight:getComputedStyle(summary).minHeight,rect:rect(summary),hit:hit(summary)},
+          bidGrid:getComputedStyle(panel.querySelector('[data-spades-bid]')).gridTemplateColumns,
+          bidRect:rect(panel.querySelector('[data-spades-bid]'))});
+      });
+    </script>`;
+    writeFileSync(page, `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><main class="game-night">${html}</main>${script}</body></html>`);
+    try {
+        const output = execFileSync(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--no-first-run', '--no-default-browser-check', '--window-size=390,844', '--force-device-scale-factor=1', '--dump-dom', `file://${page}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 20000 });
+        const match = output.match(/<body[^>]*data-metrics="([^"]+)"/);
+        if (!match) throw new Error('Chrome did not produce Spades layout metrics');
+        return JSON.parse(match[1].replaceAll('&quot;', '"').replaceAll('&amp;', '&'));
+    } finally { rmSync(temp, { recursive: true, force: true }); }
 }
 
 beforeEach(() => { document.body.replaceChildren(); client.handlers = null; client.sent = []; });
@@ -164,5 +196,38 @@ describe('Spades phone table', () => {
         expect(compactControls).toMatch(/\.arcade-spades summary\s*\{\s*min-height:\s*44px/);
         expect(compactControls).toMatch(/\.game-night :is\(\.arcade-eights, \.arcade-rummy, \.arcade-spades, \.arcade-jack\) :is\(\.btn, select\)\s*\{[^}]*min-width:\s*44px[^}]*min-height:\s*44px/);
         expect(phone).toMatch(/\.arcade-spades \[data-spades-bid\]\s*\{[^}]*minmax\(64px, 1fr\)[^}]*minmax\(110px, 1\.4fr\)/);
+    });
+
+    it('renders the live Spades table inside a 390×844 phone viewport', context => {
+        const table = partnersTable();
+        const state = table.view('host');
+        const view = mount();
+        client.handlers.onState({ state: { ...state, match: { ...state.match, phase: 'bid', turn: 'south', canBid: true } }, canOpen: true, partners: true });
+        view.panel.hidden = false;
+        view.panel.open = true;
+        let metrics;
+        try { metrics = browserMetrics(view.container.innerHTML); }
+        catch (error) {
+            if (error.signal === 'SIGABRT') context.skip();
+            throw error;
+        }
+
+        expect(metrics.width).toBe(390);
+        expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.width);
+        expect(metrics.panel.right).toBeLessThanOrEqual(metrics.width);
+        expect(metrics.table.right).toBeLessThanOrEqual(metrics.width);
+        expect(metrics.panelStyle.minWidth).toBe('0px');
+        expect(metrics.panelStyle.maxWidth).toBe('100%');
+        expect(metrics.cardCount).toBe(13);
+        expect(metrics.cards.every(card => card.rect.right <= metrics.width && card.minWidth === '0px' && parseFloat(card.minHeight) >= 50 && card.hit)).toBe(true);
+        expect(parseFloat(metrics.summary.minHeight)).toBeGreaterThanOrEqual(44);
+        expect(metrics.summary.hit).toBe(true);
+        expect(metrics.controls.length).toBeGreaterThanOrEqual(2);
+        expect(metrics.controls.every(control => control.rect.right <= metrics.width && parseFloat(control.minWidth) >= 44 && parseFloat(control.minHeight) >= 44 && control.hit)).toBe(true);
+        const tracks = metrics.bidGrid.split(/\s+/).map(parseFloat);
+        expect(tracks).toHaveLength(3); // label, 64px-minimum select, 110px-minimum button
+        expect(tracks[1]).toBeGreaterThanOrEqual(64);
+        expect(tracks[2]).toBeGreaterThanOrEqual(110);
+        expect(tracks.reduce((sum, width) => sum + width, 0)).toBeLessThanOrEqual(metrics.bidRect.width + 1);
     });
 });
