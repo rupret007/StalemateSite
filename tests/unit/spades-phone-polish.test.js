@@ -179,6 +179,32 @@ describe('Spades phone table', () => {
         expect(view.find('[data-spades-status]').textContent).toContain('Your bid · tap Lock bid');
     });
 
+    it('locks the bid label refresh so an edited amount shows Lock bid before the next deal', () => {
+        const source = readFileSync(join(root, 'r/45662413410ed051/lobby/arcade-turdspades.mjs'), 'utf8');
+        expect(source).toContain("bid.addEventListener('change', () => { if (!applyingBid) { bidEdited = true; draw(); } });");
+        expect(source).toContain("$('[data-spades-action=\"bid\"]').textContent = bidEdited ? 'Lock bid' : 'Bid for me';");
+        const table = partnersTable();
+        const view = mount();
+        const state = table.view('friend');
+        client.handlers.onState({ state, canOpen: false, partners: true });
+        const button = view.find('[data-spades-action="bid"]');
+        const select = view.find('#spades-bid');
+        expect(button.textContent).toBe('Bid for me');
+        expect(view.find('[data-spades-status]').textContent).toContain('tap Bid for me');
+        const edited = select.value === '0' ? '1' : '0';
+        select.value = edited;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        expect(select.value).toBe(edited);
+        expect(button.textContent).toBe('Lock bid');
+        expect(view.find('[data-spades-status]').textContent).toContain('tap Lock bid');
+        client.handlers.onState({
+            state: { ...state, match: { ...state.match, revision: state.match.revision + 1 } },
+            canOpen: false, partners: true
+        });
+        expect(button.textContent).toBe('Bid for me');
+        expect(view.find('[data-spades-status]').textContent).toContain('tap Bid for me');
+    });
+
     it('shows a distinct partner and private 13-card hand at a four-player seat', () => {
         const table = new GameNightTurdSpades('spades-four-phone-fixture', 'host');
         for (const [subject, position] of [['west-player', 'west'], ['north-player', 'north'], ['east-player', 'east']]) {
