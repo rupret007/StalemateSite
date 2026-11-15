@@ -114,28 +114,40 @@ describe('committed Turdanoid synchronization', () => {
         expect(snapshot(play)).toEqual(firstSnapshot);
     });
 
-    it('resolves a tag to the same imported snapshot as its exact SHA', () => {
+    it('imports a divergent release tag instead of the newer main commit', () => {
         const f = fixture();
-        const first = sync(f, f.first);
-        expect(first.status, first.stderr).toBe(0);
-        const firstSnapshot = snapshot(join(f.root, 'play'));
+        writeFileSync(join(f.upstream, 'game.js'), '/* newer main revision */');
+        f.git('add', '.');
+        f.git('-c', 'user.name=Arcade test', '-c', 'user.email=arcade-test@example.invalid', 'commit', '--quiet', '-m', 'New main revision');
+        const mainSha = f.git('rev-parse', 'main');
+        expect(mainSha).not.toBe(f.first);
+
         const tagged = sync(f, 'release-test');
         expect(tagged.status, tagged.stderr).toBe(0);
-        expect(snapshot(join(f.root, 'play'))).toEqual(firstSnapshot);
+        const play = join(f.root, 'play');
+        expect(readFileSync(join(play, 'game.js'), 'utf8')).toBe('/* upstream game */');
+        expect(readFileSync(join(play, 'VENDORED.txt'), 'utf8')).toContain(`Turdanoid@${f.first}`);
+        expect(readFileSync(join(play, 'VENDORED.txt'), 'utf8')).not.toContain(`Turdanoid@${mainSha}`);
     });
 
-    it('imports the committed branch revision after an earlier exact SHA import', () => {
+    it('imports the branch tree and resolved SHA after the branch moves', () => {
         const f = fixture();
         writeFileSync(join(f.upstream, 'game.js'), '/* second committed revision */');
         f.git('add', '.');
         f.git('-c', 'user.name=Arcade test', '-c', 'user.email=arcade-test@example.invalid', 'commit', '--quiet', '-m', 'Second revision');
+        const movedSha = f.git('rev-parse', 'main');
         writeFileSync(join(f.upstream, 'game.js'), '/* uncommitted source edit */');
         const first = sync(f, f.first);
         expect(first.status, first.stderr).toBe(0);
         expect(readFileSync(join(f.root, 'play/game.js'), 'utf8')).toBe('/* upstream game */');
         const latest = sync(f, 'main');
         expect(latest.status, latest.stderr).toBe(0);
-        expect(readFileSync(join(f.root, 'play/game.js'), 'utf8')).toBe('/* second committed revision */');
+        const play = join(f.root, 'play');
+        expect(readFileSync(join(play, 'game.js'), 'utf8')).toBe('/* second committed revision */');
+        expect(readFileSync(join(play, 'VENDORED.txt'), 'utf8')).toContain(`Turdanoid@${movedSha}`);
+        const movedTree = snapshot(play);
+        expect(sync(f, movedSha).status).toBe(0);
+        expect(snapshot(play)).toEqual(movedTree);
     });
 
     it('preserves the previous import when ref resolution or transformation fails', () => {
