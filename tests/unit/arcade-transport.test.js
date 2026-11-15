@@ -433,6 +433,92 @@ describe('Game Night match transport', () => {
         expect(JSON.stringify(returned.frames)).not.toMatch(/"playable":/);
     });
 
+    it('keeps a stored watch-only seat through the live hand, then gives it to the next player on rematch', async () => {
+        const f = fixture('turdspades');
+        const north = f.connect('c' + '3'.repeat(32), 'seat-north');
+        const eastActor = 'c' + '4'.repeat(32);
+        const east = f.connect(eastActor, 'seat-east');
+        const waiting = f.connect('c' + '6'.repeat(32), 'seat-next');
+        await f.send(f.a, 'open');
+        const { id, tableId } = f.board(f.a);
+        await f.send(f.b, 'join', { id, seat: 'west' });
+        await f.send(north, 'join', { id, seat: 'north' });
+        await f.send(east, 'join', { id, seat: 'east' });
+        await f.send(waiting, undefined, { t: 'hello', lastSeq: 0 });
+        expect(f.board(waiting)).toMatchObject({ seat: null, upNext: true });
+        // An older table still has this person in a seat. The invitation is watch-only.
+        f.actors.get(eastActor).gameGuest = { room, ref, host: sid, match: id, tableId, game: 'turdspades', watch: true };
+        const saved = () => f.storage.put.mock.calls.at(-1)[1].turdspades;
+        const held = { south: sid, west: 'seat-black', north: 'seat-north', east: 'seat-east' };
+        await f.send(east, 'sync');
+        const hidden = east.frames.length;
+        const turn = f.board(f.a).match.turn;
+        await f.send(east, 'bid', { id, revision: f.board(f.a).match.revision ?? 0, bid: 1 });
+        expect(east.frames.at(-1)).toMatchObject({ t: 'match-error', reason: 'unavailable' });
+        // The live hand is unchanged: the seat stays, so a real player cannot take it yet.
+        expect(f.board(f.a).match.turn).toBe(turn);
+        expect(saved().seats).toMatchObject(held);
+        expect(f.board(waiting)).toMatchObject({ seat: null, upNext: true });
+        expect(f.board(east)).toMatchObject({ watchOnly: true, seat: null, match: { hand: [] } });
+
+        await f.send(f.a, 'resign', { id, revision: f.board(f.a).match.revision ?? 0 });
+        await f.send(f.a, 'rematch', { id });
+        expect(f.board(f.a).id).toBe(id);
+        expect(saved().seats).toMatchObject(held);
+        await f.send(f.b, 'rematch', { id });
+        await f.send(north, 'rematch', { id });
+        const next = f.board(f.a).id;
+        expect(next).not.toBe(id);
+        expect(saved().seats).toMatchObject({ south: sid, west: 'seat-black', north: 'seat-north', east: 'seat-next' });
+        expect(saved().nextGame).toBeUndefined();
+        expect(f.board(f.a).seat).toBe('south');
+        expect(f.board(f.b).seat).toBe('west');
+        expect(f.board(north).seat).toBe('north');
+        expect(f.board(waiting)).toMatchObject({ id: next, seat: 'east' });
+        expect(f.board(waiting).upNext).toBeUndefined();
+        expect(f.board(waiting).match.hand).toHaveLength(13);
+        const dealt = JSON.stringify(f.board(waiting).match.hand);
+        expect(f.board(east)).toMatchObject({ id: next, watchOnly: true, seat: null, match: { hand: [] } });
+        expect(f.board(east).upNext).toBeUndefined();
+        expect(JSON.stringify(east.frames.slice(hidden))).not.toContain(dealt);
+        expect(JSON.stringify(east.frames.slice(hidden))).not.toMatch(/"playable":/);
+    });
+
+    it('releases a stored watch-only seat when the host reopens so the next player can take it', async () => {
+        const f = fixture('turdspades');
+        const north = f.connect('c' + '3'.repeat(32), 'seat-north');
+        const eastActor = 'c' + '4'.repeat(32);
+        const east = f.connect(eastActor, 'seat-east');
+        const waiting = f.connect('c' + '6'.repeat(32), 'seat-next');
+        await f.send(f.a, 'open');
+        const { id, tableId } = f.board(f.a);
+        await f.send(f.b, 'join', { id, seat: 'west' });
+        await f.send(north, 'join', { id, seat: 'north' });
+        await f.send(east, 'join', { id, seat: 'east' });
+        await f.send(waiting, undefined, { t: 'hello', lastSeq: 0 });
+        f.actors.get(eastActor).gameGuest = { room, ref, host: sid, match: id, tableId, game: 'turdspades', watch: true };
+        const saved = () => f.storage.put.mock.calls.at(-1)[1].turdspades;
+        await f.send(east, 'sync');
+        const hidden = east.frames.length;
+        north.readyState = 3;
+        await f.send(f.a, 'leave', { id });
+        expect(saved().closed).toBe(true);
+        expect(saved().seats).toMatchObject({ south: sid, west: 'seat-black', north: 'seat-north', east: 'seat-east' });
+        await f.send(f.a, 'open');
+        const next = f.board(f.a).id;
+        expect(next).not.toBe(id);
+        expect(saved().closed).toBeUndefined();
+        expect(saved().seats).toMatchObject({ south: sid, west: 'seat-black', north: 'seat-north', east: 'seat-next' });
+        expect(f.board(f.a).seat).toBe('south');
+        expect(f.board(f.b).seat).toBe('west');
+        expect(f.board(waiting)).toMatchObject({ id: next, seat: 'east' });
+        expect(f.board(waiting).upNext).toBeUndefined();
+        expect(f.board(waiting).match.hand).toHaveLength(13);
+        expect(f.board(east)).toMatchObject({ id: next, watchOnly: true, seat: null, match: { hand: [] } });
+        expect(JSON.stringify(east.frames.slice(hidden))).not.toContain(JSON.stringify(f.board(waiting).match.hand));
+        expect(JSON.stringify(east.frames.slice(hidden))).not.toMatch(/"playable":/);
+    });
+
     it('never seats a watch-only guest from a stale next-game line when the host reopens', async () => {
         const f = fixture('turdspades');
         const north = f.connect('c' + '3'.repeat(32), 'seat-north');

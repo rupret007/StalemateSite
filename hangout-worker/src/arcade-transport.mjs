@@ -91,16 +91,23 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
     // whatever the stored table says.
     const watchOnly = binding => !!binding?.gameGuest?.watch;
     const seatOf = (game, binding) => watchOnly(binding) ? null : game?.seat(binding.betaSid) ?? null;
-    // A checkpoint written before the invitation was known to be watch-only may
-    // still hold the watcher in the next-game line (record.nextGame). Take them
-    // out on every load, before a reopen or rematch can seat from the line.
-    function dropWatchers(scope, game) {
+    function watchOnlySubjects(scope) {
+        const subjects = [];
         for (const peer of sockets()) {
             const attachment = peer.deserializeAttachment();
             if (!attachment || attachment.ref !== scope.ref || attachment.room !== scope.room) continue;
             const peerBinding = member(attachment);
-            if (watchOnly(peerBinding)) game.dequeue(peerBinding.betaSid);
+            if (watchOnly(peerBinding) && !subjects.includes(peerBinding.betaSid)) subjects.push(peerBinding.betaSid);
         }
+        return subjects;
+    }
+    // A checkpoint written before the invitation was known to be watch-only may
+    // still hold the watcher in the next-game line (record.nextGame). Take them
+    // out on every load, before a reopen or rematch can seat from the line.
+    // A seat they already hold stays until the next deal: freeing it mid-hand
+    // would change who must play. Rematch, start-rematch and reopen free it.
+    function dropWatchers(scope, game) {
+        for (const subject of watchOnlySubjects(scope)) game.dequeue(subject);
     }
     async function guestTableId(scope, match, host) {
         const record = await load(scope);
@@ -335,7 +342,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 else if (frame.action === 'open') {
                     const SelectedTable = frame.mode === undefined ? Table : frame.mode === 'partners' ? PartnerTable : null;
                     if (!binding.canOpen || !SelectedTable) error = 'unavailable';
-                    else if (game?.closed && game.reopen(subject, uuid(), frame.mode, now(), connectedPlayers(scope))) {
+                    else if (game?.closed && game.reopen(subject, uuid(), frame.mode, now(), connectedPlayers(scope), watchOnlySubjects(scope))) {
                         claims = [];
                         changed = true;
                     } else if (game && !(game.closed && game.host === subject && game.subjects.length === 1)) error = 'unavailable';
@@ -365,7 +372,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                     const force = frame.action === 'start-rematch';
                     const candidate = uuid();
                     if (force && !binding.canOpen ||
-                        !game.requestRematch(subject, frame.id, candidate, now(), { connected: connectedPlayers(scope), force })) {
+                        !game.requestRematch(subject, frame.id, candidate, now(), { connected: connectedPlayers(scope), force, watchers: watchOnlySubjects(scope) })) {
                         error = 'rematch-unavailable';
                     } else {
                         if (game.view(subject, now()).id === candidate) nextMatch = candidate;
@@ -426,7 +433,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
         const connected = connectedPlayers(scope);
         if (connected.has(playerId)) return;
         const matchId = uuid();
-        if (record.game.startReadyRematch(matchId, now(), connected)) {
+        if (record.game.startReadyRematch(matchId, now(), connected, false, watchOnlySubjects(scope))) {
             const seq = record.seq + 1;
             await state.storage.put(key(scope), savedRecord(scope, record.game, record.expiresAt, record.claims, seq));
             publish(scope, record.game, null, record.claims, seq, matchId);

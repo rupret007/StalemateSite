@@ -156,6 +156,26 @@ export function createGameNightTable({
             return true;
         }
 
+        // A checkpoint or older build may still list a watch-only subject in a seat.
+        // A live hand keeps that seat: this person cannot play, so the deal stalls,
+        // and freeing the seat mid-hand would change who must act. Between matches
+        // the seat can be given to someone waiting. The host seat stays.
+        #watchSeat(subject) {
+            const seat = this.seat(subject);
+            if (!seat || seat === first || subject === this.#host) return null;
+            if (!this.#closed && this.#match && !finished(this.#match)) return null;
+            return seat;
+        }
+
+        #releaseWatchSeats(watchers) {
+            for (const subject of watchers || []) {
+                const seat = this.#watchSeat(subject);
+                if (!seat) continue;
+                this.#seats[seat] = null;
+                this.dequeue(subject);
+            }
+        }
+
         // A guest gives up a seat once play is over. The table, its host and the
         // other seats stay; a finished match is cleared so the seat can be filled.
         // During play the seat is held, so this returns false.
@@ -179,8 +199,11 @@ export function createGameNightTable({
             return true;
         }
 
-        reopen(subject, id, modeRequested, now, connected) {
+        reopen(subject, id, modeRequested, now, connected, watchers = []) {
             if (!this.#closed || subject !== this.#host || id === this.#id || modeRequested !== mode) return false;
+            // The closed hand is not resumed. Free a stored watch-only seat first,
+            // while the table is still closed, so the line can take it.
+            this.#releaseWatchSeats(watchers);
             this.#closed = false;
             this.#admitNext(connected);
             const occupied = this.#occupied();
@@ -197,20 +220,25 @@ export function createGameNightTable({
 
         expire(now) { return !this.#closed && (this.#match?.expire?.(now) ?? false); }
 
-        requestRematch(subject, id, nextId, now, { connected, force = false } = {}) {
+        requestRematch(subject, id, nextId, now, { connected, force = false, watchers = [] } = {}) {
             const seat = this.seat(subject);
             if (this.#closed || id !== this.#id || !seat || !this.#match || !finished(this.#match)
                 || nextId === id || (force ? subject !== this.#host : this.#votes.includes(seat))) return false;
             if (!force) this.#votes.push(seat);
-            this.startReadyRematch(nextId, now, connected, force);
+            this.startReadyRematch(nextId, now, connected, force, watchers);
             return true;
         }
 
-        startReadyRematch(nextId, now, connected, force = false) {
+        startReadyRematch(nextId, now, connected, force = false, watchers = []) {
             if (this.#closed || !this.#match || !finished(this.#match) || nextId === this.#id) return false;
+            // A connected watch-only seat cannot vote or play. It must not block
+            // the next deal, and it is freed only once that deal is actually starting.
+            const skipping = new Set((watchers || []).filter(subject => this.#watchSeat(subject)));
             const occupied = this.#occupied();
-            const online = connected ? occupied.filter(side => connected.has(this.#seats[side])) : occupied;
+            const online = (connected ? occupied.filter(side => connected.has(this.#seats[side])) : occupied)
+                .filter(side => !skipping.has(this.#seats[side]));
             if (!force && (!online.length || !online.every(side => this.#votes.includes(side)))) return false;
+            this.#releaseWatchSeats(watchers);
             this.#admitNext(connected);
             const match = create(nextId, now, this.#occupied());
             this.#id = nextId;
@@ -223,7 +251,8 @@ export function createGameNightTable({
 
         // Fill only open seats from the line. A seated player keeps the same seat
         // on a rematch, including one who lost signal (#585 same-seat recovery);
-        // anyone still waiting stays in line for the next open seat.
+        // anyone still waiting stays in line for the next open seat. A watch-only
+        // seat is cleared by the caller before this runs, so the line can take it.
         #admitNext(connected) {
             const waiting = this.#next.filter(subject => this.#online(connected, subject) && !this.seat(subject));
             if (!waiting.length) {
