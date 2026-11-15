@@ -98,9 +98,11 @@ export function mountArcadeTurdSpades(container, onMatch) {
         onMatch,
         prefix: '/beta/arcade-turdspades',
         onStatus(next, reason) {
-            connection = next;
             connectionError = reason;
             if (reason && reason !== 'rate-limited') model = null;
+            // "connected" means the link is back. With a snapshot already applied,
+            // that is the current match, so the turn line can replace the reconnect copy.
+            connection = next === 'connected' && model ? 'ready' : next;
             clearPending();
             watchSync();
             closeConfirmation();
@@ -244,8 +246,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (connection === 'unavailable') {
             message = matchConnectionErrors[connectionError] || 'The table couldn’t reconnect. Try again from this room.';
             if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Reconnect table'; }
-        } else if (connection !== 'ready') {
+        } else if (connection !== 'ready' && connection !== 'connected') {
             if (match) message = seat ? 'Reconnecting to the table… Your hand is paused.' : 'Reconnecting to the table…';
+        } else if (connection === 'connected' && !model) {
+            message = 'Connecting to the table…';
         } else if (!model && client.matchUnavailable()) {
             message = matchUnavailableText;
         } else if (!model && client.matchOpen()) {

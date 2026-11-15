@@ -91,9 +91,9 @@ export function mountArcadeChess(container, onMatch) {
         onMatch,
         prefix: '/beta/arcade',
         onStatus(next, reason) {
-            connection = next;
             connectionError = reason;
             if (reason && reason !== 'rate-limited') { model = null; chess = null; }
+            connection = next === 'connected' && model ? 'ready' : next;
             clearPending();
             closeChoice();
             selected = null;
@@ -301,13 +301,15 @@ export function mountArcadeChess(container, onMatch) {
         if (connection === 'unavailable') {
             status.textContent = matchConnectionErrors[connectionError] || 'Chess couldn’t reconnect. Try again from this room.';
             if (!connectionError || connectionError === 'rate-limited') button('Reconnect to Chess', 'retry');
-        } else if (connection !== 'ready') {
+        } else if (connection !== 'ready' && connection !== 'connected') {
             status.textContent = match ? 'Reconnecting to Chess… The clocks keep running.'
                 : connection === 'reconnecting' ? 'Reconnecting to Chess…' : 'Connecting to Chess…';
             if (seated && match?.result && model.rematch !== model.seat) {
                 button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');
                 primary.disabled = true;
             }
+        } else if (connection === 'connected' && !model) {
+            status.textContent = 'Connecting to Chess…';
         } else if (!model && client.matchUnavailable()) {
             status.textContent = matchUnavailableText;
         } else if (!model && client.matchOpen()) {

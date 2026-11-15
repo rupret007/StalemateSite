@@ -86,9 +86,9 @@ export function mountArcadeCrapeights(container, onMatch) {
         onMatch,
         prefix: '/beta/arcade-crapeights',
         onStatus(next, reason) {
-            phase = next;
             connectionError = reason;
             if (reason && reason !== 'rate-limited') model = null;
+            phase = next === 'connected' && model ? 'ready' : next;
             clearPending();
             closeChoices();
             draw();
@@ -180,9 +180,11 @@ export function mountArcadeCrapeights(container, onMatch) {
         if (phase === 'unavailable') {
             status.textContent = matchConnectionErrors[connectionError] || 'The table couldn’t reconnect. Try again from this room.';
             if (!connectionError || connectionError === 'rate-limited') { command = 'retry'; label = 'Reconnect table'; }
-        } else if (phase !== 'ready') {
+        } else if (phase !== 'ready' && phase !== 'connected') {
             status.textContent = match && seated ? 'Reconnecting to the table… Your hand is paused.'
                 : phase === 'reconnecting' ? 'Reconnecting to the table…' : 'Connecting to the table…';
+        } else if (phase === 'connected' && !model) {
+            status.textContent = 'Connecting to the table…';
         } else if (!model && client.matchUnavailable()) {
             status.textContent = matchUnavailableText;
         } else if (!model && client.matchOpen()) {

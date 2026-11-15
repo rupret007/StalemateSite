@@ -117,9 +117,9 @@ export function mountArcadeTurdRush(container, onMatch) {
         onMatch,
         prefix: '/beta/arcade-turdrush',
         onStatus(next, reason) {
-            connection = next;
             connectionError = reason;
             if (reason && reason !== 'rate-limited') model = visual = null;
+            connection = next === 'connected' && model ? 'ready' : next;
             clearPending();
             clearInputs();
             if (confirm.open) confirm.close();
@@ -261,8 +261,10 @@ export function mountArcadeTurdRush(container, onMatch) {
         if (connection === 'unavailable') {
             message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
             if (!connectionError || connectionError === 'rate-limited') { action = 'retry'; label = 'Reconnect race'; }
-        } else if (connection !== 'ready') {
+        } else if (connection !== 'ready' && connection !== 'connected') {
             if (match) message = match.result ? 'Reconnecting to the race…' : 'Reconnecting · the course keeps moving';
+        } else if (connection === 'connected' && !model) {
+            message = 'Connecting to the race…';
         } else if (!model) {
             message = 'Same 480 m course. Go farther, then collect more picks to break a tie.';
             if (canOpen) { action = 'open'; label = 'Open Turd Rush race'; }
