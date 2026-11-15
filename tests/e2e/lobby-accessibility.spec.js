@@ -849,6 +849,10 @@ for (const width of [375, 390]) {
         try {
             await send(host.page, '/join #directory-room');
             await expect(host.page.locator('[data-chat-context]')).toHaveText('#directory-room');
+            const actions = visitor.page.locator('[data-quick]');
+            const startRoom = actions.getByRole('button', { name: /start a room/i });
+            await tabTo(visitor.page, actions.getByRole('button', { name: 'Help with chat commands' }));
+            await expect.poll(() => actions.evaluate(row => row.scrollLeft)).toBeGreaterThan(0);
             await section(visitor.page, 'rooms');
             const button = visitor.page.locator('[data-roomlist] button[data-room="#directory-room"]');
             const publicRoom = visitor.page.locator('[data-room="#directory-room"]');
@@ -872,6 +876,7 @@ for (const width of [375, 390]) {
             const activeTab = visitor.page.getByRole('tab', { name: '#directory-room', exact: true });
             await expect(activeTab).toBeFocused();
             await expect(activeTab).toBeInViewport({ ratio: 1 });
+            await expect(startRoom).toBeInViewport({ ratio: 1 });
             if (width === 390) await visitor.page.screenshot({ path: testInfo.outputPath('joined-chat-room-390x844.png') });
             await section(visitor.page, 'rooms');
             await tabTo(visitor.page, button);
@@ -889,6 +894,7 @@ for (const width of [375, 390]) {
             await visitor.page.keyboard.press('Enter');
             await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#stalemate');
             await expect(visitor.page.getByRole('tab', { name: '#stalemate', exact: true })).toBeFocused();
+            await expect(startRoom).toBeInViewport({ ratio: 1 });
             if (width === 390) await visitor.page.screenshot({ path: testInfo.outputPath('left-chat-room-390x844.png') });
             expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]); expect(arrival.errors).toEqual([]);
         } finally { await arrival?.close(); await visitor.close(); await host.close(); }
