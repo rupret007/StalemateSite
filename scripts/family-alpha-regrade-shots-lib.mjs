@@ -87,6 +87,6 @@ export async function settle(steps) {
 }
 
 export function assertPort(port) {
-    if (!Number.isInteger(port) || port < 8900 || port > 8999) throw new Error('REGRADE_PORT must be within 8900–8999.');
+    if (!Number.isInteger(port) || port < 4800 || port > 4849) throw new Error('REGRADE_PORT must be within 4800–4849.');
     return port;
 }

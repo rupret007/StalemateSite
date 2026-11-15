@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Capture deterministic seated Game Night states for the family-alpha visual re-grade.
 // Run with: node scripts/family-alpha-regrade-shots.mjs
-// Optional: REGRADE_OUTPUT_DIR=/path/to/regrade-20261115, REGRADE_PORT=89xx (default 8965),
+// Optional: REGRADE_OUTPUT_DIR=/path/to/regrade-20261115, REGRADE_PORT=48xx (default 4825),
 // REGRADE_STRICT=1 to fail on layout findings instead of recording them in manifest.json.
 // The default output is the requested re-grade delivery folder under Documents.
 // Shots are staged beside the output folder and swapped in only when every one
@@ -13,7 +13,7 @@ import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdtemp, mkdir, rename, rm, writeFile } from 'node:fs/promises';
-import { existsSync, createReadStream } from 'node:fs';
+import { existsSync, createReadStream, symlinkSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -24,14 +24,14 @@ const require = createRequire(import.meta.url);
 const { chromium, expect } = require('@playwright/test');
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.resolve(process.env.REGRADE_OUTPUT_DIR || path.join(homedir(), 'Documents', 'bob-overnight-inject', 'regrade-20261115'));
-const port = Number(process.env.REGRADE_PORT || 8965);
+const port = Number(process.env.REGRADE_PORT || 4825);
 const strict = process.env.REGRADE_STRICT === '1';
 const viewports = [{ name: '390x844', width: 390, height: 844 }, { name: '1440x900', width: 1440, height: 900 }];
 const versions = [
-    { version: 'current', sha: '6a773061aa01d6966403da3960ac29f1b056ae19', games: ['chess', 'partners-spades', 'four-player-spades', 'turdanoid'] },
-    { version: 'new', sha: '74280151ceb88d7beb614359a276d06dd156c9a9', game: 'chess' },
-    { version: 'new', sha: '87a656c68994eedf577418a55a5622e36e2993d3', games: ['partners-spades', 'four-player-spades'] },
-    { version: 'new', sha: '3bdd0e3bd7038d770cce099faa6da4b5aa49defc', game: 'turdanoid' }
+    // Main 990a18c has no Game Night bundle; archive the seated baseline it compares against.
+    { version: 'current', sha: '990a18c73de7b9b6710626167f2f368368132467', treeSha: '6a773061aa01d6966403da3960ac29f1b056ae19',
+        games: ['chess', 'partners-spades', 'four-player-spades', 'turdanoid'] },
+    { version: 'new', sha: 'da871f3ac9fcc632df84da6629b2e130af881d6a', games: ['chess', 'partners-spades', 'four-player-spades', 'turdanoid'] }
 ];
 const lobbyPath = '/r/45662413410ed051/lobby/';
 const preview = 'local-preview-key-0001';
@@ -40,6 +40,13 @@ const mime = { '.css': 'text/css', '.html': 'text/html', '.js': 'text/javascript
 function archive(sha, directory) {
     const bytes = execFileSync('git', ['archive', sha], { cwd: repo, maxBuffer: 512 * 1024 * 1024 });
     execFileSync('tar', ['-x', '-C', directory], { input: bytes, maxBuffer: 512 * 1024 * 1024 });
+    // Archived trees are served statically; worker imports still resolve through this checkout.
+    const link = path.join(directory, 'node_modules');
+    if (!existsSync(link)) symlinkSync(path.join(repo, 'node_modules'), link, 'dir');
+}
+
+function workerRoot(sourceRoot) {
+    return existsSync(path.join(sourceRoot, 'hangout-worker/src/arcade-transport.mjs')) ? sourceRoot : repo;
 }
 
 async function staticServer(initialRoot) {
@@ -63,8 +70,9 @@ async function staticServer(initialRoot) {
 }
 
 async function createFixture(browser, origin, sourceRoot, viewport) {
-    const { createLobby } = await import(pathToFileURL(path.join(sourceRoot, 'hangout-worker/src/lobby-core.mjs')));
-    const { arcadeGame, arcadeRoomRequest, createArcadeTransport } = await import(pathToFileURL(path.join(sourceRoot, 'hangout-worker/src/arcade-transport.mjs')));
+    const worker = workerRoot(sourceRoot);
+    const { createLobby } = await import(pathToFileURL(path.join(worker, 'hangout-worker/src/lobby-core.mjs')));
+    const { arcadeGame, arcadeRoomRequest, createArcadeTransport } = await import(pathToFileURL(path.join(worker, 'hangout-worker/src/arcade-transport.mjs')));
     const contexts = [], lobbySockets = new Map(), people = new Map(), matchSockets = [], departures = [], records = new Map();
     let at = 1800000000000, alarm = null, upgrading = null, queue = Promise.resolve();
     const serial = task => { const run = queue.then(task); queue = run.catch(() => {}); return run; };
@@ -98,7 +106,8 @@ async function createFixture(browser, origin, sourceRoot, viewport) {
     async function phone(nick) {
         const sid = randomUUID(), session = { betaSid: sid, betaInviteVersion: '1' };
         const person = { nick, sid, identity: null, matches: new Map() }; people.set(nick, person);
-        const context = await browser.newContext({ viewport, hasTouch: viewport.width < 600 }); contexts.push(context);
+        const phone = viewport.width < 600;
+        const context = await browser.newContext({ viewport, hasTouch: phone }); contexts.push(context);
         await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
         await context.route(url => url.pathname === lobbyPath, async route => {
             const response = await route.fetch();
@@ -111,7 +120,9 @@ async function createFixture(browser, origin, sourceRoot, viewport) {
             const response = await serial(() => transports.get(game).issue(scope, session));
             await route.fulfill({ status: response.status, contentType: 'application/json', body: await response.text() });
         });
-        const page = await context.newPage(); person.page = page; person.errors = [];
+        const page = await context.newPage();
+        if (phone) await page.emulateMedia({ media: 'screen', features: [{ name: 'pointer', value: 'coarse' }] });
+        person.page = page; person.errors = [];
         page.on('pageerror', error => person.errors.push(error.message));
         await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
             const identity = { id: 'c' + randomBytes(16).toString('hex'), dev: `device-${nick}`, iph: `ip-${nick}`, role: 'fan', account: '', admin: false, ...session };
@@ -206,7 +217,8 @@ async function capture(browser, origin, sourceRoot, spec, viewport, target, sha,
         for (let index = 1; index < pages.length; index++) await fixture.invite(host, pages[index], nicks[index]);
         for (const page of pages) {
             const picker = page.getByRole('combobox', { name: 'Switch game' });
-            await expect(picker.locator(`option[value="${spec.game}"]`)).toBeEnabled();
+            await until(() => picker.locator(`option[value="${spec.game}"]`).isEnabled(), ok => ok,
+                () => `${spec.label} stays disabled on the game picker (arcade module still loading?).`);
             await picker.selectOption(spec.game);
         }
         await host.getByRole('button', { name: spec.button }).click();
@@ -248,10 +260,12 @@ export async function main() {
     const manifest = [];
     let browser, site, failure = null;
     try {
-        const roots = new Map();
+        const roots = new Map(), prepared = new Set();
         for (const entry of versions) {
-            if (roots.has(entry.sha)) continue;
-            const root = path.join(temp, entry.sha); await mkdir(root, { recursive: true }); archive(entry.sha, root); roots.set(entry.sha, root);
+            const treeSha = entry.treeSha || entry.sha;
+            const root = path.join(temp, treeSha);
+            if (!prepared.has(treeSha)) { await mkdir(root, { recursive: true }); archive(treeSha, root); prepared.add(treeSha); }
+            roots.set(entry.sha, root);
         }
         site = await staticServer(roots.get(versions[0].sha));
         browser = await chromium.launch({ headless: true });

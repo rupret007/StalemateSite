@@ -128,9 +128,9 @@ test('every cleanup step runs even when an earlier one throws', async () => {
     assert.deepEqual(ran, ['browser', 'site', 'temp', 'partial output']);
 });
 
-test('the local server only binds 89xx ports', () => {
-    assert.equal(assertPort(8965), 8965);
-    for (const port of [8765, 8899, 9000, 80, NaN]) assert.throws(() => assertPort(port), /8900–8999/);
+test('the local server only binds 4800–4849 ports', () => {
+    assert.equal(assertPort(4825), 4825);
+    for (const port of [4765, 4850, 9000, 80, NaN]) assert.throws(() => assertPort(port), /4800–4849/);
 });
 
 if (!process.env.VITEST) {
