@@ -1149,6 +1149,24 @@ describe('open-room paint + synced video (act frames)', () => {
     });
 });
 
+it('replaces a generated Jam name rejected by moderation and keeps the room private', () => {
+    boot({ roomsPerIpHour: 1 });
+    const host = join('JamHost');
+    const request = '#jam-happy-tree-fa6cxcc66';
+    expect(checkText('jam happy tree fa6cxcc66', undefined, { handles: false }).verdict).toBe('block');
+    cmd(host, 'join', [request]);
+    expect(notices(host)).toContain('Pick another room name');
+    const random = vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce('1acbef23-acbe-4c49-bc32-550b4e03de23');
+    try {
+        cmd(host, 'jamopen', [request]);
+    } finally {
+        random.mockRestore();
+    }
+    expect(got(host).findLast(frame => frame.t === 'join').ch).toMatchObject({
+        name: '#jam-happy-tree-1acbxef23', kind: 'jam', modes: { i: true }
+    });
+});
+
 describe('Game Night', () => {
     it('replaces a generated room name rejected by moderation and acknowledges the original request', () => {
         boot({}, true);
