@@ -4,6 +4,16 @@
   "license": "MIT",
   "modifications": {},
   "files": {
+    "LICENSE": {
+      "source": "LICENSE",
+      "upstreamSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1",
+      "shippedSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1"
+    },
+    "_headers": {
+      "source": "web/join/_headers",
+      "upstreamSha256": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43",
+      "shippedSha256": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43"
+    },
     "app.js": {
       "source": "web/join/app.js",
       "upstreamSha256": "2c083d702e65a9269c2743a6b843c9ec3a8cbe4a14a253a6d64f4d5ff3a94fd3",
@@ -20,9 +30,8 @@
       "shippedSha256": "f0e6dabeff031994670126b6c2008d645aeda58cd3a1fb87513a2f0418b0ccfd"
     },
     "crypto.js": {
-      "source": "web/join/crypto.js",
-      "upstreamSha256": "9f4cdfb4a34606df5cf7181523a16d8317071c5c1d283d20b2fdf95c432c4fc8",
-      "shippedSha256": "9f4cdfb4a34606df5cf7181523a16d8317071c5c1d283d20b2fdf95c432c4fc8"
+      "upstreamSha256": "95c8127af06f61a24074df1c540026703a7faa42733b3a19611c19e2e0b884ba",
+      "shippedSha256": "95c8127af06f61a24074df1c540026703a7faa42733b3a19611c19e2e0b884ba"
     },
     "errors.js": {
       "source": "web/join/errors.js",
@@ -40,9 +49,8 @@
       "shippedSha256": "b419f8d69c2f57a6668a9c05b638780a0d3c4e68fff03f3fbc3f48709c387cb2"
     },
     "policy.js": {
-      "source": "web/join/policy.js",
-      "upstreamSha256": "3e89bf3cee36d7dccf5c8bb4716093661a3f35f8ddace58dbcef14a12c196658",
-      "shippedSha256": "3e89bf3cee36d7dccf5c8bb4716093661a3f35f8ddace58dbcef14a12c196658"
+      "upstreamSha256": "37d5ab9d52d14ec360c70337d7f51bd840482098ea866d77645286651c794eec",
+      "shippedSha256": "37d5ab9d52d14ec360c70337d7f51bd840482098ea866d77645286651c794eec"
     },
     "prejoin.js": {
       "source": "web/join/prejoin.js",
@@ -59,15 +67,25 @@
       "upstreamSha256": "2f6b92c8ef946928b517ad1f3aec6c4b9d3591d1be3742f59be518cb4c83d726",
       "shippedSha256": "2f6b92c8ef946928b517ad1f3aec6c4b9d3591d1be3742f59be518cb4c83d726"
     },
-    "_headers": {
-      "source": "web/join/_headers",
-      "upstreamSha256": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43",
-      "shippedSha256": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43"
+    "video-guard.js": {
+      "upstreamSha256": "e0aac82a0eee7db1faaeb41a4ab60b38a718756c7ff6a7f9c72fa63ce7764e5c",
+      "shippedSha256": "e0aac82a0eee7db1faaeb41a4ab60b38a718756c7ff6a7f9c72fa63ce7764e5c"
     },
-    "LICENSE": {
-      "source": "LICENSE",
-      "upstreamSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1",
-      "shippedSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1"
+    "video-mailbox.js": {
+      "upstreamSha256": "22c806d187f7990f1cb525bbfa22b291de9eb952838b2b7b20ee950c2b42b76a",
+      "shippedSha256": "22c806d187f7990f1cb525bbfa22b291de9eb952838b2b7b20ee950c2b42b76a"
+    },
+    "video-peer.js": {
+      "upstreamSha256": "53435d2b06892d7e08ee28cec6f6dacc37012dc51a228a5af2c56d8adfd848a7",
+      "shippedSha256": "53435d2b06892d7e08ee28cec6f6dacc37012dc51a228a5af2c56d8adfd848a7"
+    },
+    "video-refresh.js": {
+      "upstreamSha256": "28a0d6fd92adfbaa702203be1df4de279f1553220954868e1eed5141b924b4b7",
+      "shippedSha256": "28a0d6fd92adfbaa702203be1df4de279f1553220954868e1eed5141b924b4b7"
+    },
+    "video-room.js": {
+      "upstreamSha256": "fff0eb6389bad68c6adf629bbcefbb1f5dfc78e8c6152894417d96cebed61639",
+      "shippedSha256": "fff0eb6389bad68c6adf629bbcefbb1f5dfc78e8c6152894417d96cebed61639"
     }
   },
   "composedWith": [
@@ -102,5 +120,19 @@
       "commit": "07b1b28c5b3dc381f4edc448f4eef6647e357610",
       "pullRequest": "https://github.com/rupret007/webjam/pull/510"
     }
-  ]
+  ],
+  "phase1Composition": {
+    "sourceCommit": "a6a4f1514fd363a7718d25e4eea86c021e432a54",
+    "existingJoinCommit": "07b1b28c5b3dc381f4edc448f4eef6647e357610",
+    "previousSiteSource": "eda19e803992db41a634ed66382bd383aa3e77ec",
+    "stagedModuleSources": [
+      "crypto.js",
+      "policy.js",
+      "video-guard.js",
+      "video-mailbox.js",
+      "video-peer.js",
+      "video-refresh.js",
+      "video-room.js"
+    ]
+  }
 }
