@@ -137,6 +137,45 @@
     .arcade-chess #board { width: min(100%, 25rem, max(15rem, calc(100dvh - 568px))); }
     .arcade-chess-clocks { width: min(100%, 25rem, max(17rem, calc(100dvh - 568px))); }
 }
+/* Wide desktops can hold a larger board. 640px is the cap; the dvh term keeps
+   the match controls on screen at 1440x900, and from 1280px the controls sit
+   beside the board so the cap is actually reachable on a tall window. */
+@media (min-width: 1024px) {
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) {
+        grid-template-columns: minmax(0, 640px) minmax(12rem, 1fr);
+        padding: 8px 12px;
+    }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-chess {
+        min-width: 0;
+        max-width: min(100%, 640px);
+    }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer { min-height: 32px; }
+    .arcade-chess #board { width: min(100%, 640px, max(15rem, calc(100dvh - 500px))); }
+    .arcade-chess-clocks { width: min(100%, 640px, max(17rem, calc(100dvh - 500px))); }
+}
+@media (min-width: 1280px) {
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) {
+        grid-template-columns: minmax(0, 860px) minmax(12rem, 1fr);
+        padding: 6px 10px;
+    }
+    .game-night:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-chess {
+        max-width: min(100%, 860px);
+        padding: .4rem .5rem .45rem;
+    }
+    .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer { min-height: 24px; }
+    .arcade-chess-playing {
+        grid-template-columns: minmax(0, 1fr) minmax(9rem, 10.5rem);
+        align-items: start;
+        justify-items: stretch;
+    }
+    .arcade-chess-clocks, .arcade-chess-actions { grid-column: 2; width: 100%; }
+    .arcade-chess-actions { display: grid; grid-template-columns: 1fr; }
+    .arcade-chess #board {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        width: min(100%, 640px, max(15rem, calc(100dvh - 400px)));
+    }
+}
 @media (max-width: 900px) {
     body:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .titlebar {
         min-height: 48px;
@@ -196,4 +235,9 @@
     .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .tabs { padding-top: 0; }
     .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .roombar { padding-block: 2px; }
     .chat:has(.arcade-chess[open] [data-chess-playing]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 24px; }
+}
+/* Tall phones already have the height. Floor the board at 352px (44px squares)
+   without exceeding the panel, and leave the short-phone height cap alone. */
+@media (max-width: 430px) and (min-height: 800px) {
+    .arcade-chess #board { width: min(100%, 25rem, max(352px, calc(100dvh - 465px))); }
 }
