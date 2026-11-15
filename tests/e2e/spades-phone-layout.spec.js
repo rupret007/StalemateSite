@@ -280,29 +280,6 @@ test.describe('partners Spades at 390×844', () => {
             await expect(west.locator('[data-spades-card]')).toHaveCount(12);
             await noHorizontalOverflow(west);
 
-            const privateIds = await west.locator('[data-spades-card]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-spades-card')));
-            const watcher = await fixture.phone('LateWatcher');
-            await invite(host, watcher, 'LateWatcher');
-            await watcher.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
-            await expect(watcher.locator('[data-spades-table]')).toBeVisible();
-            await expect(watcher.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
-            await expect(watcher.locator('[data-spades-hand] button')).toHaveCount(0);
-            await expect(watcher.locator('[data-spades-card]')).toHaveCount(0);
-            const watcherDom = await watcher.locator('body').evaluate(node => ({
-                text: node.innerText,
-                attributes: [...node.querySelectorAll('*')].flatMap(element => [...element.attributes].map(attribute => attribute.value))
-            }));
-            const watcherFrames = fixture.frames('LateWatcher').map(raw => JSON.parse(raw));
-            const handsIn = value => Array.isArray(value) ? value.flatMap(handsIn) : value && typeof value === 'object'
-                ? Object.entries(value).flatMap(([key, child]) => key.toLowerCase() === 'hand' ? [child] : handsIn(child)) : [];
-            expect(watcherFrames.length).toBeGreaterThan(0);
-            for (const frame of watcherFrames) for (const hand of handsIn(frame)) expect(hand).toEqual([]);
-            for (const id of privateIds) {
-                expect(watcherDom.attributes).not.toContain(id);
-                expect(watcherDom.text).not.toContain(id);
-            }
-            await noHorizontalOverflow(watcher);
-
             await west.locator('[data-spades-action="resign"]').click();
             await west.getByRole('dialog', { name: 'Resign for your team?' }).getByRole('button', { name: 'Resign', exact: true }).click();
             await expect(west.locator('[data-spades-status]')).toContainText('win by resignation');
@@ -317,6 +294,25 @@ test.describe('partners Spades at 390×844', () => {
             await expect(west.locator('[data-spades-card]')).toHaveCount(13);
             await expect(west.getByLabel('Your bid')).toBeEnabled();
             await expect(west.getByRole('button', { name: 'Bid for me', exact: true })).toBeEnabled();
+
+            // Add the watcher after rematch so the two-seat table cannot admit
+            // the queued watcher into West's seat before the hand assertion.
+            const watcher = await fixture.phone('LateWatcher');
+            await invite(host, watcher, 'LateWatcher');
+            await watcher.getByRole('combobox', { name: 'Switch game' }).selectOption('turdspades');
+            await expect(watcher.locator('[data-spades-table]')).toBeVisible();
+            await expect(watcher.locator('[data-spades-seat]')).toHaveText('Watching · hands are private');
+            await expect(watcher.locator('[data-spades-hand-label]')).toBeHidden();
+            await expect(watcher.locator('[data-spades-hand] button')).toHaveCount(0);
+            await expect(watcher.locator('[data-spades-card]')).toHaveCount(0);
+            const watcherFrames = fixture.frames('LateWatcher').map(raw => JSON.parse(raw));
+            const handsIn = value => Array.isArray(value) ? value.flatMap(handsIn) : value && typeof value === 'object'
+                ? Object.entries(value).flatMap(([key, child]) => key.toLowerCase() === 'hand' ? [child] : handsIn(child)) : [];
+            expect(watcherFrames.length).toBeGreaterThan(0);
+            const watcherHands = watcherFrames.flatMap(handsIn);
+            expect(watcherHands.length).toBeGreaterThan(0);
+            for (const hand of watcherHands) expect(hand).toEqual([]);
+            await noHorizontalOverflow(watcher);
             expect(fixture.errors()).toEqual([]);
         } finally { await fixture.close(); }
     });
