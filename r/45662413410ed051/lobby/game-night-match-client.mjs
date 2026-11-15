@@ -98,6 +98,11 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         if (terminal || reason) {
             reset(false, true);
             terminalError = true;
+            lastSeq = 0;
+            shownMatch = null;
+            matchOpen = false;
+            matchUnavailable = false;
+            onState(undefined);
             setPlaying(false);
             onStatus('unavailable', reason);
             return;
@@ -144,8 +149,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     } catch { /* Ignore the rejected pass in memory if storage is unavailable. */ }
                     return retry(attempt);
                 }
-                retry(attempt, socketErrors[event.code],
-                    event.code === 4001 || event.code === 4003 || event.reason === 'banned');
+                const terminal = event.code === 4001 || event.code === 4003 || event.reason === 'banned';
+                const terminalReason = event.reason || (event.code === 4001 ? 'kicked' : event.code === 4003 ? 'banned' : undefined);
+                retry(attempt, terminal ? terminalReason : socketErrors[event.code], terminal);
             });
             connection.addEventListener('message', event => {
                 if (attempt !== generation) return;
@@ -173,17 +179,23 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     if (Number.isInteger(wait) && wait > 0 && wait <= 60000) {
                         claimTimer = setTimeout(() => send({ action: 'sync' }), wait);
                     }
-                    const match = frame.state?.match;
-                    shownMatch = frame.state?.id ?? frame.currentMatchId ?? null;
+                    let publishedFrame = frame;
+                    if (frame.state?.seat == null && frame.state?.match && Object.hasOwn(frame.state.match, 'hands')) {
+                        const safeMatch = { ...frame.state.match };
+                        delete safeMatch.hands;
+                        publishedFrame = { ...frame, state: { ...frame.state, match: safeMatch } };
+                    }
+                    const match = publishedFrame.state?.match;
+                    shownMatch = publishedFrame.state?.id ?? publishedFrame.currentMatchId ?? null;
                     clearTimeout(rematchTimer);
                     // playing/finished: a game is open but hidden. unavailable: wrong-table invite.
-                    matchUnavailable = !frame.state && frame.phase === 'unavailable';
-                    matchOpen = !frame.state && (frame.phase === 'playing' || frame.phase === 'finished');
+                    matchUnavailable = !publishedFrame.state && publishedFrame.phase === 'unavailable';
+                    matchOpen = !publishedFrame.state && (publishedFrame.phase === 'playing' || publishedFrame.phase === 'finished');
                     tableSeen = true;
-                    setPlaying(!!match && !!frame.state.seat && frame.phase !== 'finished' && !match.result);
-                    onState(frame);
-                    if (attempt === generation) onMatch?.(scope, frame.state, send, false,
-                        stateFrameType === 'snapshot' ? frame : undefined);
+                    setPlaying(!!match && !!publishedFrame.state.seat && publishedFrame.phase !== 'finished' && !match.result);
+                    onState(publishedFrame);
+                    if (attempt === generation) onMatch?.(scope, publishedFrame.state, send, false,
+                        stateFrameType === 'snapshot' ? publishedFrame : undefined);
                 } else if (stateFrameType && frame?.t === 'rematch' && typeof frame.matchId === 'string'
                     && /^[a-zA-Z0-9-]{5,80}$/.test(frame.matchId) && frame.matchId !== shownMatch) {
                     // The new board normally follows at once. If it does not, ask for it.
