@@ -315,6 +315,10 @@ $("skip-check").addEventListener("click", (event) => {
   if (continueCheck) focusNextAudioCheckControl();
 });
 
+function sessionLeaveButton() {
+  return videoRoom?.root.querySelector("[data-video-leave]") ?? $("leave");
+}
+
 function setPlaybackRecovery(blocked) {
   $("play-audio").hidden = !blocked;
   $("leave").classList.toggle("secondary", blocked);
@@ -336,13 +340,13 @@ async function playSessionAudio(attempt) {
       return;
     }
     setPlaybackRecovery(true);
-    if (document.activeElement === $("leave")) $("play-audio").focus();
+    if (document.activeElement === sessionLeaveButton()) $("play-audio").focus();
     return;
   }
   if (!isCurrent()) return;
   const restoreFocus = document.activeElement === $("play-audio");
   setPlaybackRecovery(false);
-  if (restoreFocus) $("leave").focus();
+  if (restoreFocus) sessionLeaveButton().focus();
 }
 
 async function leave(message = "You left the session.", error, joined = session?.authorized === true, unloading = false) {
@@ -493,7 +497,7 @@ async function startJoin(listenOnly = false) {
     clearJoinFailure(failureElements(), $("status").textContent);
     $("join").hidden = true;
     const resumeAudio = $("play-audio");
-    (resumeAudio.hidden ? (videoRoom?.root.querySelector("[data-video-leave]") ?? $("leave")) : resumeAudio).focus({ preventScroll: resumeAudio.hidden });
+    (resumeAudio.hidden ? sessionLeaveButton() : resumeAudio).focus({ preventScroll: resumeAudio.hidden });
     starting = false;
     refresh();
   } catch (error) {
