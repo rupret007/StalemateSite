@@ -23,7 +23,10 @@ describe('pinned WebJam browser assets', () => {
         for (const [name, record] of Object.entries(provenance.files)) {
             const hash = createHash('sha256').update(readFileSync(resolve(root, name))).digest('hex');
             expect(hash, name).toBe(record.shippedSha256);
-            if (name !== 'index.html') expect(hash, name).toBe(record.upstreamSha256);
+            if (Object.hasOwn(provenance.modifications, name)) {
+                expect(provenance.modifications[name], name).toBeTruthy();
+                expect(hash, name).not.toBe(record.upstreamSha256);
+            } else expect(hash, name).toBe(record.upstreamSha256);
         }
     });
 
@@ -85,8 +88,9 @@ describe('pinned WebJam browser assets', () => {
 
     it('resolves the entire static module and stylesheet graph within the packaged client', () => {
         const html = read('index.html');
+        expect(html).toContain('<meta name="webjam-video" content="disabled">');
         const assets = [...html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+)"/g)].map(match => match[1]);
-        expect(assets.sort()).toEqual(['app.js', 'style.css']);
+        expect(assets.sort()).toEqual(['join-entry.js', 'style.css']);
         for (const name of Object.keys(provenance.files).filter(name => name.endsWith('.js'))) {
             for (const match of read(name).matchAll(/\bimport\s[^;]*?\bfrom\s+["']([^"']+)["']/g)) {
                 expect(match[1], name).toMatch(/^\.\/[a-z-]+\.js$/);

@@ -2,7 +2,13 @@
   "repository": "https://github.com/rupret007/webjam",
   "commit": "07b1b28c5b3dc381f4edc448f4eef6647e357610",
   "license": "MIT",
-  "modifications": {},
+  "modifications": {
+    "app.js": "Preserve private listen-only joining, playback recovery and focus when adding the optional camera stage.",
+    "index.html": "Preserve private listening and playback controls and add a disabled-by-default camera marker.",
+    "join-entry.js": "Keep the host camera closed unless the protected document enables it.",
+    "session.js": "Preserve listen-only music and admitted-session error guidance during camera teardown.",
+    "style.css": "Preserve the private join spacing and keep playback recovery visible in the camera layout."
+  },
   "files": {
     "LICENSE": {
       "source": "LICENSE",
@@ -15,9 +21,8 @@
       "shippedSha256": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43"
     },
     "app.js": {
-      "source": "web/join/app.js",
-      "upstreamSha256": "2c083d702e65a9269c2743a6b843c9ec3a8cbe4a14a253a6d64f4d5ff3a94fd3",
-      "shippedSha256": "2c083d702e65a9269c2743a6b843c9ec3a8cbe4a14a253a6d64f4d5ff3a94fd3"
+      "upstreamSha256": "39648f3ee6d145e4f60a93439f148fa298e15942c2e01572c8a639c9c085ba37",
+      "shippedSha256": "937432c2e504f8257dabcf3c24c7ef09f71b126101f053fb352ebce2d9428080"
     },
     "audio.js": {
       "source": "web/join/audio.js",
@@ -39,9 +44,12 @@
       "shippedSha256": "14b3af6f25a2c386c77f9188bc8fb724e28aa3b80ad52614e2b8ead3270b9e04"
     },
     "index.html": {
-      "source": "web/join/index.html",
-      "upstreamSha256": "5c4fe8e1d00536250929000dacbce9a06cdb9a9da9f9621ee3fcf06c78a35a62",
-      "shippedSha256": "5c4fe8e1d00536250929000dacbce9a06cdb9a9da9f9621ee3fcf06c78a35a62"
+      "upstreamSha256": "a4525d8c5f8ea143beba11b5a692ded9e87566bbc631e8c385089d0187e22f25",
+      "shippedSha256": "86d4152e1f9b7edc5686287bf285b8335c66db2fb4dfb35ad02474602a3267bf"
+    },
+    "join-entry.js": {
+      "upstreamSha256": "6e27e25f1110f8c44a9347d695f4e746d39bb94a94ffcffff5414532b30de581",
+      "shippedSha256": "012c13073063f55a3d9d36e72d8d149994e70e55424379564ef53311673edf41"
     },
     "mailbox.js": {
       "source": "web/join/mailbox.js",
@@ -58,14 +66,12 @@
       "shippedSha256": "edbf0ce755df49046600a3fe8f2e9a3aab94a27ff9e7f1927db8761fd83df2d8"
     },
     "session.js": {
-      "source": "web/join/session.js",
-      "upstreamSha256": "fc7bc336760ab7cd54b80b6f97b7da44f0da06be77d97128811c86212f7a14b3",
-      "shippedSha256": "fc7bc336760ab7cd54b80b6f97b7da44f0da06be77d97128811c86212f7a14b3"
+      "upstreamSha256": "30dd90d190c77395a66f9879445be6017c2b316c6449da30b65d9316aea1e7b3",
+      "shippedSha256": "bffc8f690212583dff2d9ad7cac98fe4ef35d44b0de13acfe6e700ab454f9c3b"
     },
     "style.css": {
-      "source": "web/join/style.css",
-      "upstreamSha256": "2f6b92c8ef946928b517ad1f3aec6c4b9d3591d1be3742f59be518cb4c83d726",
-      "shippedSha256": "2f6b92c8ef946928b517ad1f3aec6c4b9d3591d1be3742f59be518cb4c83d726"
+      "upstreamSha256": "9a62cac877ba36cfd03539fe3dd23e1366f80ad9a680fcec584966eaae856285",
+      "shippedSha256": "7582e38496ab764c4fa0ac0925b55960f103af3a6b6e1af213a944c18fdd6c8f"
     },
     "video-guard.js": {
       "upstreamSha256": "e0aac82a0eee7db1faaeb41a4ab60b38a718756c7ff6a7f9c72fa63ce7764e5c",

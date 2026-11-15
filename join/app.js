@@ -1,6 +1,7 @@
 import { readInvite } from "./crypto.js";
 import { acquireMusicStream, closeAudioContext } from "./audio.js";
 import { WebJoinSession } from "./session.js";
+import { VideoRoom } from "./video-room.js";
 import { RELAY_ORIGIN } from "./config.js";
 import {
   micCheckFailure,
@@ -21,6 +22,8 @@ const failureElements = () => ({
 
 let invite;
 let session;
+let videoRoom;
+const cameraEnabled = document.querySelector('meta[name="webjam-video"]')?.content === "private";
 let context;
 let starting = false;
 let retryListening = false;
@@ -342,9 +345,19 @@ async function playSessionAudio(attempt) {
   if (restoreFocus) $("leave").focus();
 }
 
-function leave(message = "You left the session.", error, joined = session?.authorized === true) {
+async function leave(message = "You left the session.", error, joined = session?.authorized === true, unloading = false) {
+  const restoreCameraFocus = document.activeElement === document.querySelector("[data-video-leave]");
+  const closing = videoRoom;
+  if (closing) {
+    if (unloading) closing.close();
+    else await closing.closed();
+    if (videoRoom !== closing) return;
+    videoRoom = null;
+    closing.root.hidden = true;
+    document.body.classList.remove("camera-layout");
+  }
   const elements = failureElements();
-  const restoreFocus = [elements.leave, $("play-audio")].includes(document.activeElement);
+  const restoreFocus = restoreCameraFocus || [elements.leave, $("play-audio")].includes(document.activeElement);
   clearAccessTime();
   activeAttempt?.abort();
   activeAttempt = null;
@@ -456,6 +469,9 @@ async function startJoin(listenOnly = false) {
         $("host-audio").srcObject = remote;
         void playSessionAudio(attempt);
       },
+      videoPeer: () => videoRoom?.peer,
+      onVideoTrip: () => videoRoom?.pause("Video paused to protect music timing. Music stays connected."),
+      beforeMusicClose: cameraEnabled ? () => videoRoom?.closed() : null,
       onError: (error, wasAuthorized) => {
         if (isCurrent()) leave(undefined, error, wasAuthorized);
       },
@@ -465,11 +481,18 @@ async function startJoin(listenOnly = false) {
     await joinedSession.join();
     if (!isCurrent()) return;
     showAccessTime(joinedSession.accessExpiresAt, isCurrent);
+    if (cameraEnabled && joinedSession.authorized && $("video-room")) {
+      document.body.classList.add("camera-layout");
+      videoRoom = new VideoRoom({
+        root: $("video-room"), origin: RELAY_ORIGIN, invite, host: false,
+        timingReady: () => joinedSession.authorized && !!joinedSession.videoBaseline,
+      });
+    }
     if (listenOnly) $("status").textContent = "Connected. You’re listening with your microphone off.";
     clearJoinFailure(failureElements(), $("status").textContent);
     $("join").hidden = true;
     const resumeAudio = $("play-audio");
-    (resumeAudio.hidden ? $("leave") : resumeAudio).focus({ preventScroll: resumeAudio.hidden });
+    (resumeAudio.hidden ? (videoRoom?.root.querySelector("[data-video-leave]") ?? $("leave")) : resumeAudio).focus({ preventScroll: resumeAudio.hidden });
     starting = false;
     refresh();
   } catch (error) {
@@ -495,7 +518,7 @@ $("retry").addEventListener("click", () => {
 $("play-audio").addEventListener("click", () => { void playSessionAudio(activeAttempt); });
 $("leave").addEventListener("click", () => leave());
 window.addEventListener("hashchange", () => window.location.reload());
-window.addEventListener("pagehide", () => leave());
+window.addEventListener("pagehide", () => leave(undefined, undefined, undefined, true));
 document.addEventListener("visibilitychange", () => {
   if (document.hidden || expireUnusedInvite()) return;
   if (context?.state === "suspended") {
