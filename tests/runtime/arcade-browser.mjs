@@ -2310,20 +2310,22 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             audioBeforeTrick = await Promise.all(players.map(page => packetCounts(page, 'audio')));
         }
         await b.getByLabel('Your bid').selectOption('0');
-        await verifyCardLandscape(b, 'TurdSpades bid', b.getByLabel('Your bid'), b.getByRole('button', { name: 'Bid for me' }));
+        const lockBid = b.getByRole('button', { name: 'Lock bid' });
+        await verifyCardLandscape(b, 'TurdSpades bid', b.getByLabel('Your bid'), lockBid);
         if (pauseReconnect) {
             const cards = b.locator('[data-spades-card]');
             const hand = await cards.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard));
             const returnHand = await pauseReconnect();
             await expect(b.locator('[data-spades-status]')).toHaveText('Reconnecting to the table… Your hand is paused.');
             await expect(b.getByLabel('Your bid')).toBeDisabled();
-            await expect(b.getByRole('button', { name: 'Bid for me' })).toBeDisabled();
+            await expect(lockBid).toBeDisabled();
             assert.deepEqual(await cards.evaluateAll(buttons => buttons.map(button => button.dataset.spadesCard)), hand);
             returnHand();
             await expect(b.getByLabel('Your bid')).toBeEnabled();
             await expect(b.getByLabel('Your bid')).toHaveValue('0');
         }
-        for (const page of [b, north, east, a]) await page.getByRole('button', { name: 'Bid for me' }).click();
+        await lockBid.click();
+        for (const page of [north, east, a]) await page.getByRole('button', { name: 'Bid for me' }).click();
         await expect(a.locator('[data-spades-trick]')).toContainText('West · Bid Nil · 0 tricks');
         const lead = b.locator('[data-spades-card]:enabled').first();
         await verifyCardLandscape(b, 'TurdSpades', lead, b.locator('[data-spades-action="resign"]'));
@@ -3250,7 +3252,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect(page.locator('[data-spades-hand-label]')).toBeVisible();
         await expect(page.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
         await expect(page.getByText('Discord calls are unavailable in this session. You can still watch and chat.')).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Bid for me' })).toBeHidden();
+        await expect(page.locator('[data-spades-action="bid"]')).toBeHidden();
         await expect(page.locator('[data-spades-card]')).toHaveCount(0);
         await expect.poll(() => read()?.watchOnly).toBe(true);
         assert.ok(!read().seat);
@@ -3262,7 +3264,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await expect.poll(() => rejections).toEqual(['unavailable', 'unavailable']);
         assert.equal(read().match.revision, before.revision);
         await players[1].getByLabel('Your bid').selectOption('1');
-        await players[1].getByRole('button', { name: 'Bid for me' }).tap();
+        await players[1].getByRole('button', { name: 'Lock bid' }).tap();
         await expect(page.locator('[data-spades-trick]')).toContainText('West · Bid 1 · 0 tricks');
         await captureArcadeInvite(page, phone, brand + '-watch-live');
         // A room disconnect redacts the table for an observer until everyone
