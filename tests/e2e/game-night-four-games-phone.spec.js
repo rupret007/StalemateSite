@@ -161,6 +161,7 @@ async function primaryInView(page, name) {
     const action = await primaryVisible(page, name);
     const box = await action.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
+    expect(box?.width).toBeGreaterThanOrEqual(44);
     return action;
 }
 
@@ -172,6 +173,7 @@ async function tapClose(page, gameCase) {
         await expect(confirm).toBeVisible();
         const confirmBox = await confirm.boundingBox();
         expect(confirmBox?.height).toBeGreaterThanOrEqual(44);
+        expect(confirmBox?.width).toBeGreaterThanOrEqual(44);
         await confirm.tap();
     }
     await expect(page.getByRole('button', { name: gameCase.close, exact: true })).toBeHidden();
@@ -186,9 +188,10 @@ async function backToRoomChat(page) {
 }
 
 async function assertWatcherSpades(watcher) {
+    await expect(watcher.locator('[data-spades-status]')).toHaveText(/^Round 1 ·/);
     await expect(watcher.locator('[data-spades-hand] button')).toHaveCount(0);
     const label = watcher.locator('[data-spades-hand-label]');
-    if (await label.isVisible()) await expect(label).toHaveText('Watching · hands are private');
+    await expect(label).toHaveText('Watching · hands are private');
     await fitsWidth(watcher);
 }
 
@@ -197,7 +200,7 @@ const CASES = [
         close: 'Close waiting match' },
     { label: 'partners Spades', game: 'turdspades', open: 'Open 2-player Spades', status: '[data-spades-status]', table: '[data-spades-table]', card: true,
         close: 'Close table' },
-    { label: 'four-player Spades', game: 'turdspades', open: 'Open 4-player Spades', status: '[data-spades-status]', table: '[data-spades-table]', card: true,
+    { label: 'four-player Spades', game: 'turdspades', open: 'Open 4-player Spades', status: '[data-spades-status]', table: '[data-spades-table]', card: true, seats: 4,
         close: 'Close table' },
     { label: 'Turdanoid', game: 'turdanoid', open: 'Open Turdanoid race', status: '[data-brick-status]', table: null, card: false,
         close: 'Leave race' }
@@ -206,7 +209,7 @@ const CASES = [
 test.describe.configure({ mode: 'serial' });
 test.describe('Game Night four graded games at 390×844', () => {
     test.use({ viewport: PHONE, hasTouch: true });
-    let fixture, host, watcher;
+    let fixture, host, watcher, spadesGuests;
 
     test.beforeAll(async ({ browser, baseURL }) => {
         test.setTimeout(120_000);
@@ -215,6 +218,8 @@ test.describe('Game Night four graded games at 390×844', () => {
         await openGameNight(host);
         watcher = await fixture.phone('PhoneWatcher');
         await invite(host, watcher, 'PhoneWatcher');
+        spadesGuests = await Promise.all(['PhoneWest', 'PhoneNorth', 'PhoneEast'].map(nick => fixture.phone(nick)));
+        for (const [index, guest] of spadesGuests.entries()) await invite(host, guest, ['PhoneWest', 'PhoneNorth', 'PhoneEast'][index]);
     });
 
     test.afterAll(async () => { await fixture?.close(); });
@@ -229,8 +234,18 @@ test.describe('Game Night four graded games at 390×844', () => {
             const open = await primaryVisible(host, gameCase.open);
             await open.tap();
             await expect(host.locator(gameCase.status)).toBeVisible();
+            if (gameCase.seats === 4) {
+                for (const [index, guest] of spadesGuests.entries()) {
+                    await pickGame(guest, gameCase.game);
+                    const join = guest.getByRole('button', { name: `Join ${['West', 'North', 'East'][index]}`, exact: true });
+                    await join.click();
+                    await expect(join).toBeHidden();
+                }
+                await expect(host.locator('[data-spades-table]')).toBeVisible();
+                await expect(host.locator(gameCase.status)).toHaveText(/^Round 1 ·/);
+            }
             if (gameCase.close) await primaryInView(host, gameCase.close);
-            else if (gameCase.table) await expect(host.locator(gameCase.table)).toBeVisible();
+            if (gameCase.table) await expect(host.locator(gameCase.table)).toBeVisible();
             await fitsWidth(host);
 
             if (gameCase.card) {
