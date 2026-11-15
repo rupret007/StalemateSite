@@ -542,6 +542,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
     // an invited guest back. They share the same offer and return controls.
     const jamRoomName = name => typeof name === 'string' && /^#jam(?:-[a-z0-9-]{1,26})?$/.test(name);
     const offerRoomName = name => jamRoomName(name) || gameNightSupported && gameNightRoomName(name);
+    const creativeRoomName = name => typeof name === 'string' && /^#(?:art|bobross|watch)(?:-[a-z0-9-]+)?$/.test(name);
     function stopLocalCamera(channel) {
         const c = app.chans.get(channel);
         if (!c) return false;
@@ -1301,7 +1302,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                     joiningGameRoom = '';
                     joiningArcadeOffer = null;
                     forgetGameRoom(failedRoom);
-                    toast(jamRoomName(failedRoom) ? `Couldn’t join ${failedRoom}. It may have closed. Ask the host to invite you again.`
+                    toast(jamRoomName(failedRoom) || creativeRoomName(failedRoom) ? `Couldn’t join ${failedRoom}. It may have closed. Ask the host to invite you again.`
                         : 'Couldn’t join Game Night. Ask the host for a fresh invitation.');
                 }
                 if (fourActionPending) { fourActionPending = false; drawGameNight(); }
@@ -1375,8 +1376,9 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             }
             break;
         }
-        case 'invite':
-            if (jamRoomName(m.ch) || gameNightSupported && gameNightRoomName(m.ch) && roomNonce(m.roomInstance)) {
+        case 'invite': {
+            const ref = roomNonce(m.roomInstance) ? m.roomInstance : undefined;
+            if (jamRoomName(m.ch) || ref && (offerRoomName(m.ch) || creativeRoomName(m.ch))) {
                 if (!app.chans.has(m.ch)) {
                     if (!gameInvites.has(m.ch) && gameInvites.size === 5 && !joiningGameRoom)
                         gameInvites.delete(gameInvites.keys().next().value);
@@ -1384,7 +1386,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                         const arcade = gameNightRoomName(m.ch) && arcadeTables.get(m.arcade?.game)?.supported
                             ? gameNightInvite(m.arcade.game, m.arcade.match) : null;
                         const request = roomNonce(m.request) && Number.isFinite(m.until) ? m.request : '';
-                        const offer = { room: m.ch, ref: roomNonce(m.roomInstance) ? m.roomInstance : undefined, by: m.by, request, arcade };
+                        const offer = { room: m.ch, ref, by: m.by, request, arcade };
                         if (request) setTimeout(() => {
                             if (gameInvites.get(m.ch) === offer) expireGameOffer(offer);
                         }, Math.max(0, Math.min(120000, m.until - Date.now())));
@@ -1394,6 +1396,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
                 }
             } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]);
             break;
+        }
         case 'kicked': {
             if (gameGuest && m.ch === gameGuest.room) { gameGuestExit = 'removed'; break; }
             forgetGameRoom(m.ch);
@@ -1828,7 +1831,8 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             dismissToast();
         }
         const jam = jamRoomName(offer?.room);
-        const roomLabel = jam ? offer.room : 'Game Night';
+        const namedRoom = jam || creativeRoomName(offer?.room);
+        const roomLabel = namedRoom ? offer.room : 'Game Night';
         const gameLabel = arcadeTables.get(offer?.arcade?.game)?.label;
         const selectedGame = arcadeTables.get(gameEntry?.table)?.label;
         let message;
@@ -1842,7 +1846,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         else message = 'Your link points to a private Game Night. The host’s invitation is required.';
         updateOfferStatus(status, visible, message);
         button.textContent = start ? 'Start Game Night' : gameReturnOffered ? 'Return to room'
-            : gameLabel ? `Play ${gameLabel}` : jam ? 'Join room' : 'Join Game Night';
+            : gameLabel ? `Play ${gameLabel}` : namedRoom ? 'Join room' : 'Join Game Night';
         const busy = !!joiningGameRoom || start && !!gameOpenPending;
         button.setAttribute('aria-disabled', String(busy));
         $('[data-game-offer-dismiss]').disabled = busy;
@@ -1857,7 +1861,7 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
         const sent = offer.request
             ? send({ t: 'room-invite-answer', request: offer.request, accept: true })
             : cmd('join', [offer.room], app.active, offer.ref);
-        if (!sent) return toast(jamRoomName(offer.room) ? 'Reconnect before joining the room.' : 'Reconnect before joining Game Night.');
+        if (!sent) return toast(gameNightRoomName(offer.room) ? 'Reconnect before joining Game Night.' : 'Reconnect before joining the room.');
         joiningGameRoom = offer.room;
         joiningArcadeOffer = offer.arcade ? offer : null;
         drawGameOffer();
