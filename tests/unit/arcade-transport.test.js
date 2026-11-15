@@ -376,38 +376,26 @@ describe('Game Night match transport', () => {
         return { f, id, tableId, watcher, binding, watchActor };
     }
 
-    it('keeps the public board for a watcher while a seated player is offline, never a hand', async () => {
+    it('keeps the watcher redacted while a blocked player is offline and resumes when visibility returns', async () => {
         const { f, id, watcher, binding } = await watchedSpades();
-        const bystanderActor = 'c' + '6'.repeat(32);
-        const bystander = f.connect(bystanderActor, 'seat-bystander');
-        await f.send(bystander, undefined, { t: 'hello', lastSeq: 0 });
-        expect(f.board(bystander)).toMatchObject({ seat: null, match: { hand: [] } });
-
-        // East drops: the room can no longer vouch for them to anyone.
-        const eastGone = { canSee: subject => subject !== 'seat-east', isPresent: subject => subject !== 'seat-east' };
-        Object.assign(binding, eastGone);
-        Object.assign(f.actors.get(bystanderActor), eastGone);
-        const before = watcher.frames.length;
-        f.transport.reconcile();
-        expect(watcher.frames).toHaveLength(before);
-        expect(bystander.frames.at(-1)).toMatchObject({ t: 'snapshot', phase: 'playing', currentMatchId: id, state: null });
-
-        await f.send(watcher, 'sync');
-        const shown = watcher.frames.at(-1);
-        expect(shown).toMatchObject({ t: 'snapshot', phase: 'playing', currentMatchId: id, yourSeat: null });
-        expect(shown.state).toMatchObject({ watchOnly: true, seat: null,
-            match: { hand: [], bids: expect.any(Object), tricks: expect.any(Object), scores: expect.any(Array) } });
-        expect(watcher.deserializeAttachment().subjects).toContain('seat-east');
-        // A change at the table still reaches the watcher while East is away.
-        await f.send(f.a, 'resign', { id, revision: shown.state.match.revision });
-        expect(f.board(watcher)).toMatchObject({ watchOnly: true, seat: null, match: { hand: [], result: expect.any(Object) } });
-        await f.send(bystander, 'sync');
-        expect(f.board(bystander)).toBeNull();
-
-        // A block against a player who is present still hides the board.
+        const canSee = binding.canSee;
+        binding.canSee = subject => subject !== 'seat-east';
         binding.isPresent = () => true;
         f.transport.reconcile();
-        expect(watcher.frames.at(-1)).toMatchObject({ t: 'snapshot', currentMatchId: id, yourSeat: null, state: null });
+        expect(watcher.frames.at(-1)).toMatchObject({ t: 'snapshot', phase: 'playing',
+            currentMatchId: id, yourSeat: null, state: null });
+
+        binding.isPresent = subject => subject !== 'seat-east';
+        f.advance(WATCH_ACTIVITY_INTERVAL);
+        await f.send(watcher, 'sync');
+        expect(f.board(watcher)).toBeNull();
+        expect(f.guestActivity).toHaveBeenCalledTimes(1);
+
+        binding.isPresent = () => true;
+        binding.canSee = canSee;
+        await f.send(watcher, 'sync');
+        expect(f.board(watcher)).toMatchObject({ watchOnly: true, seat: null, match: { hand: [] } });
+        expect(f.guestActivity).toHaveBeenCalledTimes(2);
     });
 
     it('lets a connected watcher renew idle by syncing, at most once per interval and never past the deadlines', async () => {

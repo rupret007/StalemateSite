@@ -197,14 +197,11 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 ? [attachment.betaSid] : [];
         }));
     }
-    // A seated player and an invited watcher keep the board while a seated
-    // player is offline. The watcher's view never carries a hand.
-    const keepsAbsent = (binding, seated) => !!seated || binding.gameGuest?.watch === true;
     function canView(game, binding, scope) {
+        const seated = !!game?.seat(binding.betaSid);
         if (game && otherTable(game, binding.gameGuest, scope)) return false;
-        const lenient = !!game && keepsAbsent(binding, game.seat(binding.betaSid));
         return !game || game.subjects.every(subject =>
-            binding.canSee(subject) || lenient && binding.isPresent?.(subject) === false);
+            binding.canSee(subject) || seated && binding.isPresent?.(subject) === false);
     }
     function publish(scope, game, requester, claims, seq, nextMatch) {
         const online = connectedPlayers(scope);
@@ -404,7 +401,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             const scope = ws.deserializeAttachment(), binding = member(scope);
             if (!binding) close(ws, 4403, 'room membership ended');
             else if (scope.subjects?.some(subject => !binding.canSee(subject) &&
-                !(keepsAbsent(binding, scope.seat) && binding.isPresent?.(subject) === false))) {
+                !(scope.seat && binding.isPresent?.(subject) === false))) {
                 const hidden = scope.hidden;
                 try { ws.serializeAttachment({ ...scope, subjects: [], seat: null, ...(hidden ? { hidden } : {}) }); }
                 catch { close(ws, 1011, 'match connection unavailable'); continue; }
