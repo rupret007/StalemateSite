@@ -74,7 +74,7 @@ async function gameNight(browser, baseURL) {
 
     async function phone(nick, { viewport = PHONE } = {}) {
         const sid = randomUUID(), session = { betaSid: sid, betaInviteVersion: '1' };
-        const person = { nick, sid, identity: null, matches: new Map() };
+        const person = { nick, sid, identity: null, matches: new Map(), matchFrames: [] };
         people.set(nick, person);
         const context = await browser.newContext({ viewport, hasTouch: true });
         contexts.push(context);
@@ -106,7 +106,7 @@ async function gameNight(browser, baseURL) {
             const game = arcadeGame(new URL(route.url()).pathname), transport = transports.get(game);
             let attachment = null;
             const socket = { readyState: 1, serializeAttachment: value => { attachment = value; }, deserializeAttachment: () => attachment,
-                send: raw => { if (socket.readyState === 1) route.send(raw); },
+                send: raw => { if (socket.readyState === 1) { person.matchFrames.push(String(raw)); route.send(raw); } },
                 close: (code = 1000, reason = '') => { if (socket.readyState !== 1) return; socket.readyState = 3; void route.close({ code, reason }); } };
             route.onMessage(raw => void serial(() => transport.receive(socket, String(raw))));
             route.onClose(() => void serial(() => retire(socket, transport)));
@@ -391,9 +391,7 @@ for (const game of Object.values(GAMES)) {
             const fixture = await gameNight(browser, baseURL);
             try {
                 const pages = await seated(fixture, game, nicks);
-                const frames = [];
                 const late = await fixture.phone('LateWatcher');
-                late.on('websocket', socket => { if (/-match$/.test(new URL(socket.url()).pathname)) socket.on('framereceived', ({ payload }) => frames.push(String(payload))); });
                 await invite(pages[0], late, 'LateWatcher');
                 await showTable(late, game);
                 await expect(late.locator(game.board)).toBeVisible();
@@ -403,6 +401,7 @@ for (const game of Object.values(GAMES)) {
                 if (game.game === 'turdspades') {
                     await expect(late.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
                     await expect(late.locator('[data-spades-hand] button')).toHaveCount(0);
+                    const frames = fixture.people.get('LateWatcher').matchFrames;
                     const views = frames.map(raw => JSON.parse(raw)).filter(frame => frame.state?.match);
                     expect(views.length).toBeGreaterThan(0);
                     for (const view of views) { expect(view.state.match.hand).toEqual([]); expect(view.state.match.hands).toBeUndefined(); }
