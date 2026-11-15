@@ -120,7 +120,7 @@ async function describe() {
         gameTitle.textContent = game;
         status.textContent = '';
         invite.hidden = false;
-        if (document.activeElement === document.body) join.focus({ preventScroll: true });
+        if (document.activeElement === document.body || document.activeElement === retry) join.focus({ preventScroll: true });
     } catch (error) {
         status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE : 'Couldn’t check the invitation. Try again.';
         retry.hidden = error.status === 410;
