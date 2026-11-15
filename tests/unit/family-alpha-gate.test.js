@@ -187,6 +187,8 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
             const sent = JSON.stringify(watcher.frames);
             for (const hand of hands) expect(sent).not.toContain(JSON.stringify(hand));
             expect(sent).not.toMatch(/"playable":/);
+            expect(sent).not.toMatch(/"hands":\s*\[/);
+            expect(sent).not.toMatch(/"hand":\s*\[\s*\{/);
         }
         // Watching keeps up with play, and a watcher cannot act on the table.
         const before = watcher.frames.length;
@@ -196,6 +198,18 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         await resign(f, phones.at(-1));
         expect(f.last(watcher)).toMatchObject({ phase: 'finished', yourSeat: null });
         if (game.privateHands) expect(f.view(watcher).match.hand).toEqual([]);
+        if (game.privateHands) {
+            // A phone waiting for the next table can be seated by rematch.
+            // A distinct late watcher and its reconnect remain unseated.
+            await f.send(phones[0], 'start-rematch', { id });
+            const returnedWatcher = f.phone(game.seats + 1);
+            await f.hello(returnedWatcher);
+            expect(f.last(returnedWatcher)).toMatchObject({ phase: 'playing', yourSeat: null });
+            expect(f.view(returnedWatcher)).toMatchObject({ seat: null, match: { hand: [] } });
+            const returnedFrames = JSON.stringify(returnedWatcher.frames);
+            expect(returnedFrames).not.toMatch(/"playable":|"hands":\s*\[|"hand":\s*\[\s*\{/);
+            expect(returnedFrames).not.toContain(JSON.stringify(f.view(phones[0]).match.hand));
+        }
     });
 
     it('5b. a watch-only invite is shown no seat and no hand, even if the table lists it in a seat, through reconnect and rematch', async () => {
