@@ -86,8 +86,8 @@
       "shippedSha256": "53435d2b06892d7e08ee28cec6f6dacc37012dc51a228a5af2c56d8adfd848a7"
     },
     "video-refresh.js": {
-      "upstreamSha256": "28a0d6fd92adfbaa702203be1df4de279f1553220954868e1eed5141b924b4b7",
-      "shippedSha256": "28a0d6fd92adfbaa702203be1df4de279f1553220954868e1eed5141b924b4b7"
+      "upstreamSha256": "61f873de784b320d1a5921cf1bdb9078a29912b26e939b7e1b1438eb6b5c3bbe",
+      "shippedSha256": "61f873de784b320d1a5921cf1bdb9078a29912b26e939b7e1b1438eb6b5c3bbe"
     },
     "video-room.js": {
       "upstreamSha256": "fff0eb6389bad68c6adf629bbcefbb1f5dfc78e8c6152894417d96cebed61639",
@@ -128,7 +128,7 @@
     }
   ],
   "phase1Composition": {
-    "sourceCommit": "a6a4f1514fd363a7718d25e4eea86c021e432a54",
+    "sourceCommit": "778ac4173fab0ee0660b3e94fe3c5694dfae7618",
     "existingJoinCommit": "07b1b28c5b3dc381f4edc448f4eef6647e357610",
     "previousSiteSource": "eda19e803992db41a634ed66382bd383aa3e77ec",
     "stagedModuleSources": [
