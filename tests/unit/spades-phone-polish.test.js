@@ -37,6 +37,11 @@ function partnersTable() {
     return table;
 }
 
+function finishMatch(table, subject) {
+    const match = table.view(subject).match;
+    expect(table.command(subject, { version: match.version, id: match.id, revision: match.revision, action: 'resign' }).ok).toBe(true);
+}
+
 beforeEach(() => { document.body.replaceChildren(); client.handlers = null; client.sent = []; });
 
 describe('Spades phone table', () => {
@@ -91,6 +96,66 @@ describe('Spades phone table', () => {
         client.handlers.onState({ state, canOpen: false, partners: true });
         expect(document.querySelector('[data-next-game]').textContent).toBe("Table full, you're up next game");
         expect(document.querySelector('[data-next-game]').hidden).toBe(false);
+    });
+
+    it.each(['partners', 'four'])('keeps %s rematch on the finished phone table and preserves watcher privacy', mode => {
+        const table = mode === 'partners' ? partnersTable() : new GameNightTurdSpades('spades-four-rematch', 'host');
+        if (mode === 'four') for (const [subject, seat] of [['west-player', 'west'], ['north-player', 'north'], ['east-player', 'east']]) {
+            expect(table.join(subject, 'spades-four-rematch', 0, seat)).toBe(true);
+        }
+        const view = mount();
+        client.handlers.onState({ state: table.view('host'), canOpen: true, partners: true });
+        view.container.scrollTop = 300;
+        finishMatch(table, 'host');
+        const finished = { ...table.view('host'), canStartRematch: true };
+        client.handlers.onState({ state: finished, canOpen: true, partners: true });
+        expect(view.container.scrollTop).toBe(0);
+        expect(view.find('[data-spades-status]').textContent).toContain('Game over');
+        expect(view.find('[data-spades-rematch-actions]').hidden).toBe(false);
+        expect(view.find('[data-spades-rematch-vote]').hidden).toBe(false);
+        expect(view.find('[data-spades-start-rematch]').hidden).toBe(false);
+        expect(view.find('[data-spades-rematch-vote]').closest('[data-spades-table]')).toBe(view.find('[data-spades-table]'));
+        expect(view.find('[data-spades-hand]').hidden).toBe(true);
+        expect(view.find('[data-spades-hand]').children).toHaveLength(0);
+        for (const selector of ['[data-spades-rematch-vote]', '[data-spades-start-rematch]']) {
+            const button = view.find(selector);
+            expect(button.style.minWidth).toBe('44px');
+            expect(button.style.minHeight).toBe('44px');
+            expect(button.style.maxWidth).toBe('100%');
+        }
+        view.find('[data-spades-rematch-vote]').click();
+        expect(client.sent.at(-1)).toMatchObject({ action: 'rematch', id: finished.id });
+        client.handlers.onState({ state: finished, canOpen: true, partners: true });
+        view.find('[data-spades-start-rematch]').click();
+        expect(client.sent.at(-1)).toMatchObject({ action: 'start-rematch', id: finished.id });
+
+        expect(table.requestRematch('host', finished.id, 'spades-next-phone', 1, { force: true })).toBe(true);
+        client.handlers.onState({ state: table.view('host'), canOpen: true, partners: true });
+        expect(view.find('[data-spades-seat]').textContent).toContain('You’re South');
+        expect(view.find('[data-spades-hand]').children).toHaveLength(13);
+        expect(view.find('[data-spades-rematch-actions]').hidden).toBe(true);
+
+        client.handlers.onState({ state: table.view('late-watcher'), canOpen: false, partners: true });
+        expect(table.view('late-watcher').seat).toBeNull();
+        expect(table.view('late-watcher').match.hand).toEqual([]);
+        expect(view.find('[data-spades-seat]').textContent).toBe('Watching · hands are private');
+        expect(view.find('[data-spades-hand]').children).toHaveLength(0);
+        expect(view.find('[data-spades-rematch-actions]').hidden).toBe(true);
+    });
+
+    it('distinguishes a completed hand from a finished game', () => {
+        const table = partnersTable();
+        const view = mount();
+        const state = table.view('host');
+        const roundResult = [{ delta: 30, nil: [], bagPenalties: 0 }, { delta: 20, nil: [], bagPenalties: 0 }];
+        state.match = { ...state.match, phase: 'round-end', roundResult, tricks: { south: 4, west: 3, north: 3, east: 3 }, hand: [] };
+        client.handlers.onState({ state, canOpen: true, partners: true });
+        expect(view.find('[data-spades-status]').textContent).toContain('Hand over');
+        expect(view.find('[data-spades-trick-summary]').textContent).toContain('13 tricks complete');
+        expect(view.find('[data-spades-rematch-actions]').hidden).toBe(true);
+        finishMatch(table, 'host');
+        client.handlers.onState({ state: table.view('host'), canOpen: true, partners: true });
+        expect(view.find('[data-spades-status]').textContent).toContain('Game over');
     });
 
     it('uses four phone hand columns and two trick columns with full-width controls', () => {

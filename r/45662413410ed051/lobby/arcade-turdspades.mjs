@@ -23,11 +23,14 @@ const markup = `
 <div class="arcade-card-actions">
     <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>
     <button class="btn btn--small" type="button" data-spades-main hidden></button>
-    <button class="btn btn--small btn--ghost" type="button" data-spades-start-rematch hidden>Start now</button>
 </div>
 <div class="arcade-card-actions" data-spades-seats hidden></div>
 <div data-card-table data-spades-table hidden>
     <p class="small spades-seat" data-spades-seat></p>
+    <div class="arcade-card-actions" data-spades-rematch-actions hidden>
+        <button class="btn btn--small" style="min-width:44px;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere" type="button" data-spades-rematch-vote hidden></button>
+        <button class="btn btn--small btn--ghost" style="min-width:44px;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere" type="button" data-spades-start-rematch hidden>Start now</button>
+    </div>
     <div class="arcade-card-score" aria-label="Partnership scores"><span data-spades-score="0"></span><span data-spades-score="1"></span></div>
     <p class="small spades-trick-summary" data-spades-trick-summary></p>
     <ul class="spades-trick" aria-label="Bids and trick cards" data-spades-trick></ul>
@@ -102,7 +105,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             connectionError = undefined;
             clearPending();
             draw();
-            if (revealing) container.scrollTop = 0;
+            if (revealing || (!prior?.result && state?.match?.result)) container.scrollTop = 0;
         },
         onError(reason) {
             clearPending();
@@ -182,7 +185,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (next.length !== old.size || next.some((button, index) => hand.children[index] !== button)) hand.replaceChildren(...next);
     }
 
-    const startRematch = $('[data-spades-start-rematch]');
+    const rematchActions = $('[data-spades-rematch-actions]');
+    const rematchVote = $('[data-spades-rematch-vote]'), startRematch = $('[data-spades-start-rematch]');
 
     function draw() {
         const match = model?.match, seat = model?.seat, occupied = model?.occupied || [];
@@ -220,7 +224,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
             if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
         } else if (match?.result) {
-            message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
+            message = `Game over · ${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
             if (seat) {
                 const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
                 const ready = votes.filter(vote => !away.includes(vote)).length;
@@ -230,7 +234,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
                     : command ? ` Tap ${label}.` : ' Waiting for the other players to accept.';
             }
         } else if (match?.roundResult) {
-            message = match.roundResult.map((result, team) => {
+            message = 'Hand over · ' + match.roundResult.map((result, team) => {
                 const signed = result.delta > 0 ? '+' + result.delta : result.delta;
                 const nil = result.nil.map(entry => `${nameFor(entry.seat)} ${entry.succeeded ? 'made' : 'missed'} Nil`);
                 if (result.bagPenalties) nil.push('bag penalty');
@@ -247,10 +251,14 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (connection === 'ready' && seat && match && away.length) {
             message += ` · Waiting for ${away.map(nameFor).join(', ')}, link still works.`;
         }
-        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        rematchActions.hidden = !(connection === 'ready' && seat && match?.result);
+        rematchVote.hidden = command !== 'rematch';
+        rematchVote.textContent = label;
+        rematchVote.disabled = pending;
+        startRematch.hidden = rematchActions.hidden || !model.canStartRematch;
         startRematch.disabled = pending;
         if (status.textContent !== message) status.textContent = message;
-        main.hidden = !command;
+        main.hidden = !command || command === 'rematch';
         main.textContent = label;
         main.dataset.command = command;
         main.disabled = pending;
@@ -277,7 +285,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         $('[data-spades-trick-summary]').textContent = match.phase === 'bid'
             ? 'Bids · no cards played yet'
             : match.phase === 'round-end' || match.result
-                ? `${completed >= 13 ? '13 tricks complete' : 'Game over'}${match.lastWinner ? ` · Last won by ${nameFor(match.lastWinner)}` : ''}`
+                ? `${completed >= 13 ? '13 tricks complete' : match.result ? 'Game over' : 'Hand over'}${match.lastWinner ? ` · Last won by ${nameFor(match.lastWinner)}` : ''}`
                 : `Trick ${Math.min(completed + 1, 13)} of 13${!match.trick.length && match.lastTrick.length ? ' · showing last trick' : ''}`;
         const shown = match.trick.length ? match.trick : match.lastTrick;
         trickSlots.forEach(({ row, label, card }, index) => {
@@ -307,7 +315,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
         $('[data-spades-hand-label]').textContent = seat
             ? `Your hand · ${match.hand.length} cards${match.phase === 'play' && match.spadesBroken ? ' · Spades broken' : ''}`
             : '';
-        $('[data-spades-hand-label]').hidden = !seat;
+        $('[data-spades-hand-label]').hidden = !seat || !!match.result;
+        hand.hidden = !seat || !!match.result;
         for (const control of actions) {
             const action = control.dataset.spadesAction;
             control.hidden = !seat || (action === 'bid' ? !match.canBid
@@ -315,7 +324,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
                     : action === 'resign' && !!match.result);
             control.disabled = connection !== 'ready' || pending;
         }
-        showHand(match.hand, connection === 'ready' && match.phase === 'play' && match.turn === seat && !match.result);
+        showHand(seat && !match.result ? match.hand : [], connection === 'ready' && match.phase === 'play' && match.turn === seat && !match.result);
     }
 
     hand.addEventListener('click', event => {
@@ -323,6 +332,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (button && !button.disabled) send('play', { card: Number(button.dataset.spadesCard) });
     });
     startRematch.addEventListener('click', () => send('start-rematch'));
+    rematchVote.addEventListener('click', () => send('rematch'));
     main.addEventListener('click', () => {
         const action = main.dataset.command;
         if (action === 'retry') client.start(scope);
