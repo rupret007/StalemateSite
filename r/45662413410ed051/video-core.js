@@ -217,6 +217,25 @@
         return { good: 'Great connection', ok: 'Good connection', weak: 'Shaky connection', bad: 'Very weak: video paused, audio kept' }[tier] || 'Checking…';
     }
 
+    /* A lock or app switch can end or mute a live capture. Missing, ended, or
+     * muted means it has to be opened again. A healthy live track does not. */
+    function trackNeedsResume(track) {
+        if (!track) return true;
+        if (track.readyState === 'ended' || track.muted) return true;
+        return track.readyState !== 'live';
+    }
+
+    /* Which devices to reopen after the page is visible again or a local track
+     * ends. Camera-off and voice-only stay that way. Screen share is separate. */
+    function resumeCapture(state) {
+        const s = state || {};
+        if (!s.visible || s.ended || s.kicked) return { audio: false, video: false };
+        return {
+            audio: Boolean(s.micOn) && trackNeedsResume(s.audio),
+            video: Boolean(s.camOn) && !s.screen && trackNeedsResume(s.video)
+        };
+    }
+
     /* Bounded send queue: when full, shed ICE candidates first (oldest first); offers,
      * answers and everything else only go once no candidates are left to drop. */
     function enqueue(queue, item, max) {
@@ -236,7 +255,7 @@
         return q;
     }
 
-    const api = { enqueue, isPhoneDevice, BUDGET, PHONE_HQ_BPS, PHONE_MESH_HI_BPS, PHONE_MESH_LO_BPS, phoneMeshBitrate, MAX_HQ, planUplink, uplinkTotal, MAX_CAMS, REACTIONS, TIERS, HOST_KINDS, encodingFor, gradeLink, nextTier, pickSpeaker, mainTile, gridColumns, cleanReaction, rateLimit, handQueue, cleanHostAction, backgroundSupport, backgroundVerdict, micConstraints, musicSdp, qualityLabel };
+    const api = { enqueue, isPhoneDevice, BUDGET, PHONE_HQ_BPS, PHONE_MESH_HI_BPS, PHONE_MESH_LO_BPS, phoneMeshBitrate, MAX_HQ, planUplink, uplinkTotal, MAX_CAMS, REACTIONS, TIERS, HOST_KINDS, encodingFor, gradeLink, nextTier, pickSpeaker, mainTile, gridColumns, cleanReaction, rateLimit, handQueue, cleanHostAction, backgroundSupport, backgroundVerdict, micConstraints, musicSdp, qualityLabel, resumeCapture };
     if (typeof module === 'object' && module.exports) module.exports = api;
     global.HangoutVideo = api;
 }(typeof window !== 'undefined' ? window : globalThis));

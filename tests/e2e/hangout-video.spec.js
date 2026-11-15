@@ -1054,3 +1054,75 @@ test('a face that drops off the network past every ICE restart comes back for al
     for (const page of pages) await expect(page.locator('[data-tiles] .tile')).toHaveCount(3);
     expect(pages.flatMap((page) => page.errors)).toEqual([]);
 });
+
+test('iOS lock: ended camera and visibility restore a live peer track and playing tiles', async ({ browser }) => {
+    const { host, guest } = await call(browser);
+    const stopped = await guest.evaluate(() => {
+        const track = window.__hangout.av.rawCam;
+        const pc = [...window.__hangout.av.pcs.values()][0].pc;
+        window.__offers = 0;
+        const createOffer = pc.createOffer.bind(pc);
+        pc.createOffer = (...args) => { window.__offers += 1; return createOffer(...args); };
+        window.__stoppedVideoId = track.id;
+        try {
+            const descriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+            if (descriptor && descriptor.configurable) {
+                window.__vis = 'visible';
+                Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.__vis });
+            }
+        } catch (error) { window.__vis = ''; }
+        document.querySelectorAll('.tile:not([data-tile="me"]) video').forEach((video) => video.pause());
+        if (window.__vis) {
+            window.__vis = 'hidden';
+            document.dispatchEvent(new Event('visibilitychange'));
+        }
+        track.stop();
+        if (window.__vis) window.__vis = 'visible';
+        document.dispatchEvent(new Event('visibilitychange'));
+        const videos = [...document.querySelectorAll('.tile:not([data-tile="me"]) video')];
+        return { stopped: track.readyState, paused: videos.length > 0 && videos.every((video) => video.paused) };
+    });
+    expect(stopped.stopped).toBe('ended');
+    expect(stopped.paused).toBe(true);
+
+    await expect.poll(() => host.evaluate(() => {
+        const entry = [...window.__hangout.av.pcs.values()][0];
+        const track = entry.pc.getReceivers().map((receiver) => receiver.track).find((item) => item && item.kind === 'video');
+        return Boolean(track && track.readyState === 'live' && track.muted === false);
+    }), { timeout: 10000 }).toBe(true);
+
+    await expect.poll(() => guest.evaluate(() => {
+        const videos = [...document.querySelectorAll('.tile:not([data-tile="me"]) video')];
+        return videos.length > 0 && videos.every((video) => !video.paused);
+    }), { timeout: 10000 }).toBe(true);
+
+    const restored = await guest.evaluate(() => {
+        const sender = [...window.__hangout.av.pcs.values()][0].senders.video;
+        return {
+            offers: window.__offers,
+            live: Boolean(sender && sender.track && sender.track.readyState === 'live' && sender.track.id !== window.__stoppedVideoId),
+            cam: window.__hangout.av.cam
+        };
+    });
+    expect(restored.live).toBe(true);
+    expect(restored.offers).toBe(0);
+    expect(restored.cam).toBe(true);
+
+    await guest.evaluate(() => {
+        const video = document.querySelector('.tile:not([data-tile="me"]) video');
+        video.play = () => Promise.reject(new DOMException('play blocked', 'NotAllowedError'));
+        video.pause();
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(guest.locator('[data-av-resume]')).toBeVisible();
+    await guest.evaluate(() => {
+        delete document.querySelector('.tile:not([data-tile="me"]) video').play;
+    });
+    await guest.click('[data-av-resume]');
+    await expect.poll(() => guest.evaluate(() => {
+        const video = document.querySelector('.tile:not([data-tile="me"]) video');
+        return Boolean(video && !video.paused);
+    })).toBe(true);
+    await expect(guest.locator('[data-av-resume]')).toBeHidden();
+    expect(host.errors.concat(guest.errors)).toEqual([]);
+});
