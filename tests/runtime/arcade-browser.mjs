@@ -3140,6 +3140,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} Turdanoid same wall, keyboard launch, ${media ? 'native phone drag with 220 ms delay and active call' : 'native phone tap and full reload'}, visible paddle and Launch, both scores, spectator and rematch.`);
     }
+    async function verifyGuestEntrances() {
+        await verifyGameNightEntry();
+        await verifyPrivateSiteEntry();
+    }
     try {
         if (process.env.ARCADE_GUEST_TABLE_ISOLATION_ONLY === '1') {
             await verifyGuestTableIsolation();
@@ -3147,7 +3151,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             return;
         }
         if (process.env.ARCADE_GUEST_RECOVERY_ONLY === '1') {
-            await verifyGameNightEntry();
+            await verifyGuestEntrances();
             assert.deepEqual(errors, []);
             return;
         }
@@ -3328,8 +3332,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         await b.locator('[data-enter]').click();
         await expect(b.locator('[data-connection]')).toHaveText('Connected');
         await expect(b.locator('[data-game-night]')).toBeHidden();
-        await verifyGameNightEntry();
-        await verifyPrivateSiteEntry();
+        if (process.env.ARCADE_SEPARATE_GUEST_RECOVERY !== '1') await verifyGuestEntrances();
         assert.deepEqual(errors, []);
         console.log(`Passed ${engine} ${entrances ? 'both generated arcade entry links' : 'protected entry with both brand contexts'}, invitation, keyboard/touch Chess, room chat, draw and rematch.`);
     } finally { await browser.close(); }
