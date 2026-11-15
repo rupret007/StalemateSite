@@ -221,9 +221,9 @@ export function createGameNightTable({
 
         #online(connected, subject) { return !connected || connected.has(subject); }
 
-        // Fill only open seats from the line. A seated player keeps the same seat
-        // on a rematch, including one who lost signal (#585 same-seat recovery);
-        // anyone still waiting stays in line for the next open seat.
+        // Fill open seats from the line. A connected seated player keeps the same
+        // seat on a rematch (#585); an offline seat may be yielded so a connected
+        // guest in line can sit without displacing anyone still connected.
         #admitNext(connected) {
             const waiting = this.#next.filter(subject => this.#online(connected, subject) && !this.seat(subject));
             if (!waiting.length) {
@@ -231,6 +231,21 @@ export function createGameNightTable({
                 return;
             }
             const open = sides.filter(seat => seat !== first && !this.#seats[seat]);
+            const displaced = [];
+            const yieldSeat = seat => {
+                if (seat === first || open.includes(seat)) return;
+                const subject = this.#seats[seat];
+                if (!subject) return;
+                this.#seats[seat] = null;
+                open.push(seat);
+                if (this.#online(connected, subject)) displaced.push(subject);
+            };
+            if (connected) {
+                for (const seat of [...sides].reverse()) {
+                    if (open.length >= waiting.length) break;
+                    if (this.#seats[seat] && !connected.has(this.#seats[seat])) yieldSeat(seat);
+                }
+            }
             open.sort((left, right) => sides.indexOf(left) - sides.indexOf(right));
             const leftover = [];
             for (const subject of waiting) {
@@ -238,7 +253,7 @@ export function createGameNightTable({
                 if (seat) this.#seats[seat] = subject;
                 else leftover.push(subject);
             }
-            this.#next = leftover.filter(subject => !this.seat(subject));
+            this.#next = [...leftover, ...displaced].filter(subject => !this.seat(subject));
         }
     };
 }
