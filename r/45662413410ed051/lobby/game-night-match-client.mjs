@@ -129,7 +129,11 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
             const connection = new WebSocket(url, [grant.protocol, grant.ticket]);
             socket = connection;
             let stateFrameType;
-            connection.addEventListener('close', event => retry(attempt, event.reason === 'banned' ? 'banned' : socketErrors[event.code]));
+            connection.addEventListener('close', event => {
+                const reason = event.reason === 'banned' || event.reason === 'kicked' ? event.reason
+                    : event.code === 1008 ? 'banned' : socketErrors[event.code];
+                retry(attempt, reason);
+            });
             connection.addEventListener('message', event => {
                 if (attempt !== generation) return;
                 let frame;
