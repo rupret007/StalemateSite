@@ -123,6 +123,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await expect(play).toBeFocused();
         await expect(play).toBeInViewport();
         await expect(play).toHaveAccessibleDescription(/you’re still connected/i);
+        await expect(page.getByRole('button', { name: /^Leave( session)?$/ })).toHaveCount(1);
         await page.screenshot({ path: testInfo.outputPath(`camera-playback-recovery-${width}x${height}.png`) });
 
         await play.press('Enter');
