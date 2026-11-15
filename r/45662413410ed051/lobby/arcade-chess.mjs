@@ -17,6 +17,20 @@ const reasonText = {
     'rematch-unavailable': 'A rematch is unavailable right now.',
     'storage-unavailable': 'The change was not confirmed. Try again.'
 };
+
+export function chessTurnText(seat, turn) {
+    const who = seat ? `You’re ${colorName(seat)}` : 'Watching';
+    if (seat && seat === turn) return `${who} · Your turn`;
+    return `${who} · ${colorName(turn)} to move`;
+}
+
+export function chessResultText(result) {
+    if (!result) return '';
+    if (!result.winner) return `Draw · ${result.reason}`;
+    return result.reason?.toLowerCase().includes('checkmate')
+        ? `Checkmate · ${colorName(result.winner)} wins`
+        : `${colorName(result.winner)} wins · ${result.reason}`;
+}
 const markup = `
 <summary>Royal Flush Chess</summary>
 <p class="small arcade-chess-status" data-chess-status role="status"></p>
@@ -239,7 +253,14 @@ export function mountArcadeChess(container, onMatch) {
             button.toggleAttribute('data-capture', captures.has(square));
             button.toggleAttribute('data-last', lastSquares.includes(square));
             button.toggleAttribute('data-check', piece?.type === 'k' && piece.color === checkedSide);
-            button.setAttribute('aria-label', piece ? `${square}, ${colorName(piece.color)} ${pieceName(piece.type)}` : `${square}, empty`);
+            const annotations = [
+                square === selected ? 'Selected' : '',
+                targets.has(square) ? 'Legal move' : '',
+                captures.has(square) ? 'Capture' : '',
+                lastSquares.includes(square) ? 'Last move' : '',
+                piece?.type === 'k' && piece.color === checkedSide ? 'In check' : ''
+            ].filter(Boolean);
+            button.setAttribute('aria-label', `${piece ? `${square}, ${colorName(piece.color)} ${pieceName(piece.type)}` : `${square}, empty`}${annotations.length ? `. ${annotations.join('. ')}.` : ''}`);
             button.setAttribute('aria-pressed', String(square === selected));
             button.tabIndex = square === focused ? 0 : -1;
         }
@@ -283,6 +304,10 @@ export function mountArcadeChess(container, onMatch) {
         } else if (connection !== 'ready') {
             status.textContent = match ? 'Reconnecting to Chess… The clocks keep running.'
                 : connection === 'reconnecting' ? 'Reconnecting to Chess…' : 'Connecting to Chess…';
+            if (seated && match?.result && model.rematch !== model.seat) {
+                button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');
+                primary.disabled = true;
+            }
         } else if (!model && client.matchUnavailable()) {
             status.textContent = matchUnavailableText;
         } else if (!model && client.matchOpen()) {
@@ -296,13 +321,12 @@ export function mountArcadeChess(container, onMatch) {
                 : inWebJam ? 'A seat is open. Join Chess to play.' : 'Black is open. Join to play.';
             button(seated ? 'Close waiting match' : inWebJam ? 'Join Chess' : 'Join as Black', seated ? 'leave' : 'join');
         } else if (match?.result) {
-            status.textContent = `${match.result.winner ? colorName(match.result.winner) + ' wins' : 'Draw'} · ${match.result.reason}`;
+            status.textContent = chessResultText(match.result);
             if (seated && model.rematch !== model.seat) button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');
             if (seated && model.rematch) status.textContent += model.rematch === model.seat
                 ? ' · Rematch requested. Waiting for your opponent.' : ' · Your opponent requested a rematch.';
         } else {
-            const who = seated ? `You’re ${colorName(model.seat)}` : 'Watching';
-            status.textContent = `${who} · ${model.seat === match?.turn ? 'Your turn' : colorName(match?.turn) + ' to move'}`;
+            status.textContent = chessTurnText(model.seat, match.turn);
             if (chess?.isCheck()) status.textContent += ` · ${colorName(match.turn)} is in check`;
         }
         if (connection === 'ready' && seated && match && model.disconnectedSeats?.length) {

@@ -17,6 +17,7 @@ const markup = `
     <button class="btn btn--small" type="button" data-brick-main hidden></button>
     <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
     <button class="btn btn--small btn--ghost" type="button" data-brick-leave hidden>Leave race</button>
+    <button class="btn btn--small btn--ghost" type="button" data-brick-back hidden>Back to lobby</button>
 </div>
 <div data-card-table data-brick-match hidden>
     <div class="brick-race-layout">
@@ -93,13 +94,14 @@ export function mountArcadeTurdanoid(container, onMatch) {
     container.append(panel);
     const $ = selector => panel.querySelector(selector);
     const table = $('[data-brick-match]'), board = $('[data-brick-board]'), status = $('[data-brick-status]'),
-        error = $('[data-brick-error]'), main = $('[data-brick-main]'), leave = $('[data-brick-leave]'),
+        error = $('[data-brick-error]'), main = $('[data-brick-main]'), leave = $('[data-brick-leave]'), back = $('[data-brick-back]'),
         launch = $('[data-brick-serve]'), confirm = $('[data-brick-confirm]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
     if (matchMedia('(pointer: coarse)').matches) {
         $('.brick-race-help').textContent = 'Drag to move. Tap the stuck ball or press Launch.';
     }
     const paint = createPainter(board.querySelector('canvas'));
     let scope, model, canOpen, connection, connectionError, visual, wall, receivedAt, raf = 0, pending, pointer,
+        backRequested = false, returnAfterLeave = false,
         desiredAim = null, lastAim = -Infinity, lastSent = -Infinity, lastSync = -Infinity, retryAt = 0, redraw = true;
     const inputBufferLimit = 8;
     let launchPointer = null, desiredAxis = null, keyboardActive = false, pointerStart = null, canRetryAim = false, retryAim = null;
@@ -133,7 +135,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
             if (reason && reason !== 'rate-limited') model = visual = null;
             clearPending();
             clearInputs();
-            if (confirm.open) confirm.close();
+            if (confirm.open) { confirm.close(); backRequested = false; }
             render();
         },
         onState({ state, canOpen: host }) {
@@ -144,7 +146,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
             if (reveal) wall = brickRaceWall(state.match.seed);
             if (changed || state?.match?.result) {
                 clearInputs();
-                if (confirm.open) confirm.close();
+                if (confirm.open) { confirm.close(); backRequested = false; }
             } else if (state?.match) flights = flights.filter(flight => flight.sequence > state.match.runner.sequence);
             if (!reconnecting && !changed && state?.seat && state.match?.runner?.run.score > model?.match?.runner?.run.score) {
                 gameNightCue('ta.brick');
@@ -161,6 +163,10 @@ export function mountArcadeTurdanoid(container, onMatch) {
                 desiredAxis = 0;
             }
             render();
+            if (returnAfterLeave && state && (!state.seat || state.match?.result)) {
+                returnAfterLeave = false;
+                panel.open = false;
+            }
             if (reveal) container.scrollTop = 0;
         },
         onError(reason) {
@@ -195,11 +201,12 @@ export function mountArcadeTurdanoid(container, onMatch) {
     });
 
     function send(action) {
-        if (action === 'retry') { client.start(scope); return; }
-        if (connection !== 'ready' || pending || !client.send({ action, id: model?.id })) return;
+        if (action === 'retry') { client.start(scope); return true; }
+        if (connection !== 'ready' || pending || !client.send({ action, id: model?.id })) return false;
         put(error, '');
         pending = setTimeout(() => client.start(scope), 4000);
         render();
+        return true;
     }
 
     function queue(action, value, time = performance.now()) {
@@ -247,13 +254,18 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (connection === 'ready' && !match.result && countdown <= 0 && seat) advanceBrickRacer(visual, brickRaceTick(match.startsAt, at), wall, match.seed);
         const run = visual.run;
         const overlay = $('[data-brick-overlay]');
-        const label = match.result ? '' : countdown > 0 ? String(countdown) : run.status === 'out' ? 'Out of balls' : '';
+        const label = match.result ? '' : countdown > 0 ? `Starting in ${countdown}` : run.status === 'out' ? 'Out of balls' : '';
         overlay.hidden = !label;
         put(overlay, label);
         table.dataset.phase = match.result ? 'finished' : countdown > 0 ? 'countdown' : 'play';
         table.dataset.sequence = seat ? match.runner.sequence : '';
-        table.dataset.paddle = Math.round(run.paddleX);
-        table.dataset.stuck = String(run.ball.stuck);
+        if (seat) {
+            table.dataset.paddle = Math.round(run.paddleX);
+            table.dataset.stuck = String(run.ball.stuck);
+        } else {
+            delete table.dataset.paddle;
+            delete table.dataset.stuck;
+        }
         launch.disabled = connection !== 'ready' || countdown > 0 || !run.ball.stuck || run.status !== 'play' || !!pending;
         const showLaunchWait = !!seat && !match.result && countdown > 0;
         const launchWait = $('[data-brick-launch-wait]');
@@ -297,7 +309,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
                 : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
             message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
-            if (seat && seat === model.rematch) message += ' · Rematch requested';
+            if (seat && seat === model.rematch) message += ' · Rematch requested. Waiting for your rival.';
         } else if (match) message = match.wall.name;
         if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
             message += ` · Waiting for ${'your rival'}, link still works.`;
@@ -312,6 +324,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         main.disabled = !!pending;
         leave.hidden = !seat || !!result;
         leave.disabled = connection !== 'ready' || !!pending;
+        back.hidden = !match && !model?.upNext && !seat;
         table.hidden = !match;
         launch.hidden = !seat || !match || !!result;
         if (connection !== 'ready') launch.disabled = true;
@@ -320,6 +333,21 @@ export function mountArcadeTurdanoid(container, onMatch) {
 
     startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
+    back.addEventListener('click', () => {
+        if (model?.seat && !model?.match?.result) {
+            // A dropped connection cannot confirm a leave, so Back still returns to the lobby.
+            if (connection !== 'ready') {
+                panel.open = false;
+                return;
+            }
+            // Back must use the same confirmed leave/forfeit path as Leave.
+            if (leave.disabled) return;
+            backRequested = true;
+            leave.click();
+            return;
+        }
+        panel.open = false;
+    });
     const hitsLaunch = event => launch.contains(document.elementFromPoint(event.clientX, event.clientY));
     launch.addEventListener('pointerdown', event => {
         if (event.pointerType === 'touch' && event.isPrimary && event.button === 0 && !launch.disabled) launchPointer = event.pointerId;
@@ -340,8 +368,15 @@ export function mountArcadeTurdanoid(container, onMatch) {
         put($('[data-brick-confirm-text]'), model?.waiting ? 'The open seat will close.' : 'Leaving forfeits your race.');
         confirm.showModal();
     });
-    $('[data-brick-confirm-no]').addEventListener('click', () => confirm.close());
-    $('[data-brick-confirm-yes]').addEventListener('click', () => { confirm.close(); send(model?.waiting ? 'leave' : 'resign'); });
+    confirm.addEventListener('cancel', () => { backRequested = false; });
+    $('[data-brick-confirm-no]').addEventListener('click', () => { backRequested = false; confirm.close(); });
+    $('[data-brick-confirm-yes]').addEventListener('click', () => {
+        confirm.close();
+        const shouldReturn = backRequested;
+        backRequested = false;
+        const sent = send(model?.waiting ? 'leave' : 'resign');
+        returnAfterLeave = shouldReturn && sent;
+    });
     function axis() { return Number(keys.has('ArrowRight')) - Number(keys.has('ArrowLeft')); }
     function updateAxis() {
         const value = axis();
@@ -418,6 +453,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
 
     function reset() {
         client.stop();
+        backRequested = false;
+        returnAfterLeave = false;
         clearPending();
         clearInputs();
         cancelAnimationFrame(raf);

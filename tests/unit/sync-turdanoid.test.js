@@ -65,7 +65,7 @@ function snapshot(root) {
 }
 
 describe('committed Turdanoid synchronization', () => {
-    it('imports exact SHA, tag and branch reproducibly, discarding uncommitted source edits', () => {
+    it('imports an exact SHA while discarding uncommitted source edits', () => {
         const f = fixture();
         writeFileSync(join(f.upstream, 'game.js'), '/* second committed revision */');
         f.git('add', '.');
@@ -74,7 +74,6 @@ describe('committed Turdanoid synchronization', () => {
         const result = sync(f, f.first);
         expect(result.status, result.stderr).toBe(0);
         const play = join(f.root, 'play');
-        const firstSnapshot = snapshot(play);
         expect(readFileSync(join(play, 'VENDORED.txt'), 'utf8')).toContain(`Turdanoid@${f.first}`);
         expect(readFileSync(join(play, 'game.js'), 'utf8')).toBe('/* upstream game */');
         expect(existsSync(join(play, 'games/core.test.js'))).toBe(false);
@@ -102,14 +101,41 @@ describe('committed Turdanoid synchronization', () => {
         expect(hub).toContain('https://stalemate.band/play/stalemate/og-play.png');
         const overlayVersion = createHash('sha256').update(readFileSync(join(play, 'stalemate/stalemate-overlay.js'))).digest('hex').slice(0, 16);
         expect(readFileSync(join(play, 'TurdAnoid.html'), 'utf8').match(/src="stalemate\/stalemate-overlay\.js(?:\?[^"]*)?"/g)).toEqual([`src="stalemate/stalemate-overlay.js?v=${overlayVersion}"`]);
-        for (const ref of [f.first, 'release-test']) {
-            const repeated = sync(f, ref);
-            expect(repeated.status, repeated.stderr).toBe(0);
-            expect(snapshot(play)).toEqual(firstSnapshot);
-        }
+    });
+
+    it('repeats an exact SHA as the same imported snapshot', () => {
+        const f = fixture();
+        const first = sync(f, f.first);
+        expect(first.status, first.stderr).toBe(0);
+        const play = join(f.root, 'play');
+        const firstSnapshot = snapshot(play);
+        const repeated = sync(f, f.first);
+        expect(repeated.status, repeated.stderr).toBe(0);
+        expect(snapshot(play)).toEqual(firstSnapshot);
+    });
+
+    it('resolves a tag to the same imported snapshot as its exact SHA', () => {
+        const f = fixture();
+        const first = sync(f, f.first);
+        expect(first.status, first.stderr).toBe(0);
+        const firstSnapshot = snapshot(join(f.root, 'play'));
+        const tagged = sync(f, 'release-test');
+        expect(tagged.status, tagged.stderr).toBe(0);
+        expect(snapshot(join(f.root, 'play'))).toEqual(firstSnapshot);
+    });
+
+    it('imports the committed branch revision after an earlier exact SHA import', () => {
+        const f = fixture();
+        writeFileSync(join(f.upstream, 'game.js'), '/* second committed revision */');
+        f.git('add', '.');
+        f.git('-c', 'user.name=Arcade test', '-c', 'user.email=arcade-test@example.invalid', 'commit', '--quiet', '-m', 'Second revision');
+        writeFileSync(join(f.upstream, 'game.js'), '/* uncommitted source edit */');
+        const first = sync(f, f.first);
+        expect(first.status, first.stderr).toBe(0);
+        expect(readFileSync(join(f.root, 'play/game.js'), 'utf8')).toBe('/* upstream game */');
         const latest = sync(f, 'main');
         expect(latest.status, latest.stderr).toBe(0);
-        expect(readFileSync(join(play, 'game.js'), 'utf8')).toBe('/* second committed revision */');
+        expect(readFileSync(join(f.root, 'play/game.js'), 'utf8')).toBe('/* second committed revision */');
     });
 
     it('preserves the previous import when ref resolution or transformation fails', () => {
