@@ -204,7 +204,9 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             const attachment = peer.deserializeAttachment();
             if (!attachment || attachment.ref !== scope.ref || attachment.room !== scope.room) continue;
             const peerBinding = member(attachment);
-            if (peerBinding?.canPlay && canView(game, peerBinding, attachment) && game.enqueue(peerBinding.betaSid)) added = true;
+            // An explicit watch invite is read-only: it is never lined up for a seat (#557/#560).
+            if (peerBinding?.canPlay && !peerBinding.gameGuest?.watch && canView(game, peerBinding, attachment)
+                && game.enqueue(peerBinding.betaSid)) added = true;
         }
         return added;
     }
