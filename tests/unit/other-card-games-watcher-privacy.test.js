@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ARCADE_TAG, createArcadeTransport } from '../../hangout-worker/src/arcade-transport.mjs';
 import { CrapeightsMatch } from '../../hangout-worker/arcade/games/crapeights-match.js';
 import { TurdRummyMatch } from '../../hangout-worker/arcade/games/turdrummy-match.js';
+import { RANKS } from '../../hangout-worker/arcade/games/cards.js';
 import { TurdJackMatch, TURDJACK_MATCH_VERSION } from '../../hangout-worker/arcade/games/turdjack-match.js';
 
 const matchId = 'privacy-match-001';
@@ -161,6 +162,25 @@ describe('turdrummy watcher privacy', () => {
 });
 
 describe('turdjack watcher privacy', () => {
+    const jackSeats = ['one', 'two'];
+
+    function jackCardId(rank, suitIndex = 0) {
+        const index = RANKS.indexOf(rank);
+        if (index < 0) { throw new TypeError(`unknown rank: ${rank}`); }
+        return suitIndex * 13 + index;
+    }
+
+    /** First id in dealOrder is the first card popped from the shoe (two-player initial deal). */
+    function turdJackWithStackedDeal(dealOrder) {
+        const match = new TurdJackMatch(matchId, jackSeats);
+        const checkpoint = match.checkpoint();
+        const forced = new Set(dealOrder);
+        const shoe = checkpoint.shoe.filter(id => !forced.has(id));
+        for (let i = dealOrder.length - 1; i >= 0; i--) { shoe.push(dealOrder[i]); }
+        checkpoint.shoe = shoe;
+        return TurdJackMatch.restore(checkpoint);
+    }
+
     function dealTwoPlayerJack(match) {
         const id = match.checkpoint().id;
         let revision = 0;
@@ -177,30 +197,78 @@ describe('turdjack watcher privacy', () => {
         return match;
     }
 
-    it('view(null) hides player cards and the dealer hole card while keeping public table state', () => {
-        const match = dealTwoPlayerJack(new TurdJackMatch(matchId, ['one', 'two']));
+    function assertWatcherHidesSeatedHands(watch, seated) {
+        const serialized = JSON.stringify(watch);
+        for (const seat of jackSeats) {
+            for (const hand of seated[seat].self.hands) {
+                expect(serialized).not.toContain(JSON.stringify(hand.cards));
+            }
+        }
+        expect(serialized).not.toMatch(/"cards":\s*\[/);
+    }
+
+    it('view(null) hides player cards and the dealer hole card while play is in progress', () => {
+        const dealOrder = [
+            jackCardId('2'), jackCardId('2', 1), jackCardId('5'),
+            jackCardId('3'), jackCardId('3', 1), jackCardId('7')
+        ];
+        const match = dealTwoPlayerJack(turdJackWithStackedDeal(dealOrder));
         const seated = { one: match.view('one'), two: match.view('two') };
         const watch = match.view(null);
 
+        expect(match.checkpoint().phase).toBe('play');
         expect(seated.one.self.hands[0].cards).toHaveLength(2);
         expect(seated.two.self.hands[0].cards).toHaveLength(2);
         expect(watch.self).toBeNull();
         expect(watch.phase).toBe(seated.one.phase);
         expect(watch.active).toBe(seated.one.active);
-        expect(watch.players).toEqual(['one', 'two']);
+        expect(watch.players).toEqual(jackSeats);
         expect(watch.table).toEqual(seated.one.table);
         expect(watch.dealerHidden).toBe(true);
         expect(watch.dealer).toHaveLength(1);
         expect(Object.keys(watch)).not.toContain('shoe');
         expect(watch.actions).toEqual([]);
 
-        const serialized = JSON.stringify(watch);
-        for (const seat of ['one', 'two']) {
-            for (const hand of seated[seat].self.hands) {
-                expect(serialized).not.toContain(JSON.stringify(hand.cards));
-            }
-        }
-        expect(serialized).not.toMatch(/"cards":\s*\[/);
+        assertWatcherHidesSeatedHands(watch, seated);
+    });
+
+    it('view(null) shows the same public dealer reveal as seated players after settlement', () => {
+        const dealOrder = [
+            jackCardId('2'), jackCardId('2', 1), jackCardId('K'),
+            jackCardId('3'), jackCardId('3', 1), jackCardId('A')
+        ];
+        const match = dealTwoPlayerJack(turdJackWithStackedDeal(dealOrder));
+        const seated = { one: match.view('one'), two: match.view('two') };
+        const watch = match.view(null);
+
+        expect(match.checkpoint().phase).toBe('settled');
+        expect(watch.self).toBeNull();
+        expect(watch.phase).toBe('settled');
+        expect(watch.dealerHidden).toBe(false);
+        expect(watch.dealer).toHaveLength(2);
+        expect(watch.dealer).toEqual(seated.one.dealer);
+        expect(watch.dealer).toEqual(seated.two.dealer);
+        expect(watch.dealerTotal).toBe(seated.one.dealerTotal);
+        expect(Object.keys(watch)).not.toContain('shoe');
+        expect(watch.actions).toEqual([]);
+
+        assertWatcherHidesSeatedHands(watch, seated);
+    });
+
+    it('view(null) reveals dealer after ace-up natural once insurance is declined', () => {
+        const dealOrder = [
+            jackCardId('2'), jackCardId('2', 1), jackCardId('A'),
+            jackCardId('3'), jackCardId('3', 1), jackCardId('K')
+        ];
+        const match = dealTwoPlayerJack(turdJackWithStackedDeal(dealOrder));
+        const seated = { one: match.view('one'), two: match.view('two') };
+        const watch = match.view(null);
+
+        expect(match.checkpoint().phase).toBe('settled');
+        expect(watch.dealerHidden).toBe(false);
+        expect(watch.dealer).toHaveLength(2);
+        expect(watch.dealer).toEqual(seated.one.dealer);
+        assertWatcherHidesSeatedHands(watch, seated);
     });
 
     it('projects the same match through watch-only transport sync', async () => {
