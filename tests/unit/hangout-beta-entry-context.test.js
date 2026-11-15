@@ -127,6 +127,42 @@ it.each(['details', 'accept'])('uses the shared copy on a guest %s 410', async o
     }
 });
 
+it.each(['chess', 'turdspades'])('moves focus from the successful %s invitation retry to Join game', async game => {
+    const pagePath = '/beta/game-night/guest';
+    const config = env({
+        HANGOUT_GAME_NIGHT_GUESTS: '1',
+        ASSETS: { fetch: vi.fn(request => new Response(readFileSync(new URL('../..' + new URL(request.url).pathname, import.meta.url), 'utf8'))) }
+    });
+    const request = path => new Request('https://beta.example.test' + path);
+    const html = await (await betaFetch(request(pagePath), config)).text();
+    const client = await (await betaFetch(request(pagePath + '.js'), config)).text();
+    const dom = new JSDOM(html, { url: request(pagePath).url + '#invite=fixture', runScripts: 'outside-only' });
+    const { window } = dom;
+    try {
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE, unlockGameNightAudio: vi.fn() };
+        window.TextEncoder = TextEncoder;
+        Object.defineProperty(window.crypto, 'subtle', { value: crypto.subtle });
+        const title = game === 'chess' ? 'Royal Flush Chess' : 'TurdSpades';
+        window.fetch = vi.fn()
+            .mockResolvedValueOnce(Response.json({ error: 'Temporary connection failure.' }, { status: 503 }))
+            .mockResolvedValueOnce(Response.json({ game: title, host: 'Fixture host' }));
+        window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
+            'const { $1 } = sharedGameNight;'));
+        const retry = window.document.querySelector('[data-guest-retry]');
+        const join = window.document.querySelector('[data-guest-join]');
+        await vi.waitFor(() => expect(retry.hidden).toBe(false));
+        retry.focus();
+        retry.click();
+        await vi.waitFor(() => expect(join.closest('section').hidden).toBe(false));
+        expect(window.document.querySelector('[data-guest-game]').textContent).toBe(title);
+        expect(retry.hidden).toBe(true);
+        expect(window.document.activeElement).toBe(join);
+        expect(window.fetch.mock.calls.map(([path]) => path)).toEqual(Array(2).fill('/beta/game-night/invitation/details'));
+    } finally {
+        window.close();
+    }
+});
+
 it('offers a shareable fresh link when a guest invite has expired', async () => {
     const pagePath = '/beta/game-night/guest';
     const config = env({
