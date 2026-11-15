@@ -72,7 +72,9 @@ export function mountArcadeTurdSpades(container, onMatch) {
         clearTimeout(watchTimer);
         if (connection !== 'ready' || model?.watchOnly !== true) return;
         watchTimer = setTimeout(() => {
-            if (document.hidden || !client.send({ action: 'sync' })) watchSync();
+            watchTimer = null;
+            if (!document.hidden) client.send({ action: 'sync' });
+            watchSync();
         }, WATCH_SYNC_INTERVAL);
     }
     function clearPending() { clearTimeout(timer); pending = false; }
@@ -110,7 +112,12 @@ export function mountArcadeTurdSpades(container, onMatch) {
             connection = 'ready';
             connectionError = undefined;
             clearPending();
-            watchSync();
+            if (model?.watchOnly === true) {
+                if (watchTimer == null) watchSync();
+            } else {
+                clearTimeout(watchTimer);
+                watchTimer = null;
+            }
             draw();
             if (revealing) container.scrollTop = 0;
         },

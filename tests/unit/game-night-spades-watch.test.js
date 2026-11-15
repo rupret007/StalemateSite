@@ -64,9 +64,11 @@ describe('TurdSpades watcher view', () => {
         expect(match.send).not.toHaveBeenCalled();
         vi.advanceTimersByTime(1);
         expect(match.send).toHaveBeenCalledExactlyOnceWith({ action: 'sync' });
-        // The reply is the next state frame, which schedules the following sync.
         show(waiting(['south', 'north', 'east'], { watchOnly: true }));
-        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL);
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL / 2);
+        // Table updates during the interval must not push the heartbeat later.
+        show(waiting(['south', 'west', 'north', 'east'], { watchOnly: true }));
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL / 2);
         expect(match.send).toHaveBeenCalledTimes(2);
 
         // A page in the background is not watching. It resumes once it is back.
