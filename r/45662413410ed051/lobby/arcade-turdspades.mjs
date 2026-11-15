@@ -272,7 +272,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             $(`[data-spades-score="${team}"]`).textContent = `${teams[team]} · ${match.scores[team]}/${match.target} · ${match.bags[team]} bags`;
         }
         $('.arcade-card-score').hidden = false;
-        $('[data-spades-trick]').hidden = paired && match.phase === 'bid';
+        $('[data-spades-trick]').hidden = match.phase === 'bid';
         const completed = Object.values(match.tricks).reduce((total, count) => total + count, 0);
         $('[data-spades-trick-summary]').textContent = match.phase === 'bid'
             ? 'Bids · no cards played yet'

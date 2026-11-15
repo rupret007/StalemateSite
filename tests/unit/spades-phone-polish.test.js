@@ -73,6 +73,36 @@ describe('Spades phone table', () => {
         expect(view.find('[data-spades-score="0"]').textContent).toContain('South + North');
     });
 
+    it('hides a stale trick while bidding in both modes and shows trick cards during play', () => {
+        const four = new GameNightTurdSpades('spades-four-trick-fixture', 'host');
+        for (const [subject, position] of [['west-player', 'west'], ['north-player', 'north'], ['east-player', 'east']]) {
+            expect(four.join(subject, 'spades-four-trick-fixture', 0, position)).toBe(true);
+        }
+        const view = mount();
+        const trick = view.find('[data-spades-trick]');
+        const previousCard = { seat: 'north', rank: 'A', suit: 'S' };
+        const currentCard = { seat: 'south', rank: 'K', suit: 'H' };
+        for (const table of [partnersTable(), four]) {
+            const state = table.view('host');
+            const bidding = { ...state, match: { ...state.match, phase: 'bid', canBid: true, trick: [], lastTrick: [previousCard] } };
+            client.handlers.onState({ state: bidding, canOpen: true, partners: true });
+            expect(trick.hidden).toBe(true);
+            expect(view.find('[data-spades-score="0"]').hidden).toBe(false);
+            expect(view.find('[data-spades-bid]').hidden).toBe(false);
+            expect(view.find('[data-spades-trick-summary]').textContent).toBe('Bids · no cards played yet');
+
+            const showingLast = { ...bidding, match: { ...bidding.match, phase: 'play' } };
+            client.handlers.onState({ state: showingLast, canOpen: true, partners: true });
+            expect(trick.hidden).toBe(false);
+            expect(trick.children[2].querySelector('b').textContent).toBe('A♠');
+
+            const showingCurrent = { ...showingLast, match: { ...showingLast.match, trick: [currentCard] } };
+            client.handlers.onState({ state: showingCurrent, canOpen: true, partners: true });
+            expect(trick.hidden).toBe(false);
+            expect(trick.children[0].querySelector('b').textContent).toBe('K♥');
+        }
+    });
+
     it('gives watchers the exact privacy sentence and no private card controls', () => {
         const table = partnersTable();
         const view = mount();
