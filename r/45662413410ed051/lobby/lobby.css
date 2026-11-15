@@ -831,6 +831,76 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .arcade-brick-race .brick-race-rail { display: grid; grid-template-columns: minmax(0, 1fr); }
   .arcade-brick-race .brick-race-rail > :is(time, button, [data-brick-power]) { grid-column: 1 / -1; }
 }
+@media (max-width: 900px) and (pointer: coarse) {
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) {
+    position: fixed;
+    z-index: 20;
+    inset: 0;
+    width: 100dvw;
+    height: 100dvh;
+    margin: 0;
+    padding: max(6px, env(safe-area-inset-top)) 10px max(6px, env(safe-area-inset-bottom));
+    overflow: hidden;
+    background: var(--ink);
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) summary { min-height: 44px; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-actions {
+    display: flex;
+    position: static;
+    gap: 6px;
+    margin: 3px 0;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-actions .btn {
+    min-height: 44px;
+    padding: 6px 9px;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) [data-brick-leave] { position: static; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) [data-brick-match] { max-width: none; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-board {
+    width: min(100%, calc((100dvh - 320px) * 1.2));
+    max-width: none;
+    justify-self: center;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail > time,
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail [data-brick-serve] {
+    grid-column: 1 / -1;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail > div { font-size: .76rem; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail > div small { font-size: .72rem; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-help {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    margin-top: 4px;
+  }
+}
+@media (max-height: 450px) and (max-width: 900px) and (orientation: landscape) and (pointer: coarse) {
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-layout {
+    grid-template-columns: minmax(0, 1fr) 10rem;
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-board {
+    width: min(calc((100dvh - 180px) * 1.2), calc(100dvw - 190px));
+    max-width: none;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail {
+    display: flex;
+    flex-direction: column;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-help { display: none; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-status { margin-block: 1px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }

@@ -147,6 +147,29 @@ describe('Turdanoid brick race phone friction', () => {
         expect(view.launch.hidden).toBe(true);
     });
 
+    it('shows the result, rematch, and a working lobby path after a round', () => {
+        const view = mount();
+        view.publish(54_000, 'b', { winner: 'b', reason: 'time' });
+        view.pump();
+        expect(view.status.textContent).toBe('You win · time limit');
+        expect(view.main.textContent).toBe('Request Turdanoid rematch');
+        expect(view.main.hidden).toBe(false);
+        expect(view.back.hidden).toBe(false);
+        expect(view.scores[1].textContent).toContain('You');
+        expect(view.scores[1].textContent).toMatch(/pts · \d+ balls?/);
+        view.back.click();
+        expect(view.panel.open).toBe(false);
+    });
+
+    it('gives a spectator a way back without exposing a paddle control', () => {
+        const view = mount();
+        view.publish(54_000, null);
+        view.pump();
+        expect(view.back.hidden).toBe(false);
+        expect(view.launch.hidden).toBe(true);
+        expect(view.scores[0].textContent).toContain('Player 1');
+    });
+
     it('tells a touch player to drag and tap instead of using arrow keys and Space', () => {
         const touch = mount({ coarse: true });
         expect(touch.help.textContent).toBe('Drag to move. Tap the stuck ball or press Launch.');
@@ -181,16 +204,21 @@ function mount({ coarse = true } = {}) {
     api.setRoom({ room: '#game-2ca9e1x1be34a', ref: 'ref-1', actor: 'actor-1' });
     api.open();
     return {
+        panel: api.panel,
         board,
+        back: container.querySelector('[data-brick-back]'),
+        main: container.querySelector('[data-brick-main]'),
+        status: container.querySelector('[data-brick-status]'),
+        scores: [...container.querySelectorAll('[data-brick-score]')],
         hint: container.querySelector('[data-brick-launch-wait]'),
         help: container.querySelector('.brick-race-help'),
         launch: container.querySelector('[data-brick-serve]'),
         table: container.querySelector('[data-brick-match]'),
-        publish(now, seat = 'b') {
+        publish(now, seat = 'b', result = null) {
             client.handlers.onState({
                 state: {
                     version: 1, game: 'turdanoid', id: 'race-12345', seat, waiting: false, rematch: null,
-                    match: race.view(seat || 'a', now)
+                    match: { ...race.view(seat || 'a', now), result }
                 },
                 canOpen: false
             });

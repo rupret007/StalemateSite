@@ -17,6 +17,7 @@ const markup = `
     <button class="btn btn--small" type="button" data-brick-main hidden></button>
     <button type="button" class="btn btn--small btn--ghost" data-start-rematch hidden>Start now</button>
     <button class="btn btn--small btn--ghost" type="button" data-brick-leave hidden>Leave race</button>
+    <button class="btn btn--small btn--ghost" type="button" data-brick-back hidden>Back to lobby</button>
 </div>
 <div data-card-table data-brick-match hidden>
     <div class="brick-race-layout">
@@ -93,7 +94,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     container.append(panel);
     const $ = selector => panel.querySelector(selector);
     const table = $('[data-brick-match]'), board = $('[data-brick-board]'), status = $('[data-brick-status]'),
-        error = $('[data-brick-error]'), main = $('[data-brick-main]'), leave = $('[data-brick-leave]'),
+        error = $('[data-brick-error]'), main = $('[data-brick-main]'), leave = $('[data-brick-leave]'), back = $('[data-brick-back]'),
         launch = $('[data-brick-serve]'), confirm = $('[data-brick-confirm]'), motion = matchMedia('(prefers-reduced-motion: reduce)');
     if (matchMedia('(pointer: coarse)').matches) {
         $('.brick-race-help').textContent = 'Drag to move. Tap the stuck ball or press Launch.';
@@ -247,7 +248,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (connection === 'ready' && !match.result && countdown <= 0 && seat) advanceBrickRacer(visual, brickRaceTick(match.startsAt, at), wall, match.seed);
         const run = visual.run;
         const overlay = $('[data-brick-overlay]');
-        const label = match.result ? '' : countdown > 0 ? String(countdown) : run.status === 'out' ? 'Out of balls' : '';
+        const label = match.result ? '' : countdown > 0 ? `Starting in ${countdown}` : run.status === 'out' ? 'Out of balls' : '';
         overlay.hidden = !label;
         put(overlay, label);
         table.dataset.phase = match.result ? 'finished' : countdown > 0 ? 'countdown' : 'play';
@@ -297,7 +298,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
                 : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
             message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
             if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
-            if (seat && seat === model.rematch) message += ' · Rematch requested';
+            if (seat && seat === model.rematch) message += ' · Rematch requested. Waiting for your rival.';
         } else if (match) message = match.wall.name;
         if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
             message += ` · Waiting for ${'your rival'}, link still works.`;
@@ -312,6 +313,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         main.disabled = !!pending;
         leave.hidden = !seat || !!result;
         leave.disabled = connection !== 'ready' || !!pending;
+        back.hidden = !match && !model?.upNext;
         table.hidden = !match;
         launch.hidden = !seat || !match || !!result;
         if (connection !== 'ready') launch.disabled = true;
@@ -320,6 +322,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
 
     startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
+    back.addEventListener('click', () => { panel.open = false; });
     const hitsLaunch = event => launch.contains(document.elementFromPoint(event.clientX, event.clientY));
     launch.addEventListener('pointerdown', event => {
         if (event.pointerType === 'touch' && event.isPrimary && event.button === 0 && !launch.disabled) launchPointer = event.pointerId;
