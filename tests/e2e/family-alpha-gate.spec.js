@@ -24,8 +24,10 @@ const sendTails = new WeakMap();
 function sendAndRecord(route, frames, raw) {
     const previous = sendTails.get(frames) || Promise.resolve();
     const delivery = previous.then(() => route.send(raw));
-    const recorded = delivery.then(() => { frames.push(String(raw)); }, () => {});
-    sendTails.set(frames, recorded);
+    // Keep the returned promise observable to callers, while recovering only
+    // the internal tail so one failed frame cannot poison later sends.
+    const recorded = delivery.then(() => { frames.push(String(raw)); });
+    sendTails.set(frames, recorded.catch(() => {}));
     return recorded;
 }
 
@@ -45,12 +47,16 @@ test('match socket delivery records only successful sends and watcher frames sta
     resolveDelivery();
     await first;
     expect(frames).toEqual(['{"n":1}']);
-    expect(await sendAndRecord({ send: () => Promise.reject(new Error('delivery failed')) }, frames, '{"n":2}')).toBeUndefined();
+    await expect(sendAndRecord({ send: () => Promise.reject(new Error('delivery failed')) }, frames, '{"n":2}'))
+        .rejects.toThrow('delivery failed');
     expect(frames).toEqual(['{"n":1}']);
-    await expect(sendAndRecord({ send: () => { throw new Error('send threw'); } }, frames, '{"n":3}')).resolves.toBeUndefined();
+    const syncError = new Error('send threw');
+    await expect(sendAndRecord({ send: () => { throw syncError; } }, frames, '{"n":3}'))
+        .rejects.toBe(syncError);
     expect(frames).toEqual(['{"n":1}']);
 
-    await sendAndRecord({ send: raw => { sent.push(String(raw)); return Promise.resolve(); } }, frames, '{"n":4}');
+    const recovered = sendAndRecord({ send: raw => { sent.push(String(raw)); return Promise.resolve(); } }, frames, '{"n":4}');
+    await recovered;
     await sendAndRecord({ send: raw => { sent.push(String(raw)); return Promise.resolve(); } }, frames, '{"n":5}');
     expect(sent).toEqual(['{"n":1}', '{"n":4}', '{"n":5}']);
     expect(frames).toEqual(['{"n":1}', '{"n":4}', '{"n":5}']);
@@ -68,6 +74,17 @@ test('match socket delivery records only successful sends and watcher frames sta
     releases.shift()();
     await fourth;
     expect(frames.slice(-2)).toEqual(['{"n":6}', '{"n":7}']);
+
+    const independentFrames = [];
+    let releaseIndependent;
+    const independentPending = new Promise(resolve => { releaseIndependent = resolve; });
+    const blocked = sendAndRecord({ send: () => independentPending }, independentFrames, '{"n":"blocked"}');
+    await sendAndRecord({ send: raw => { independentSent.push(String(raw)); return Promise.resolve(); } }, frames, '{"n":"independent"}');
+    expect(independentFrames).toEqual([]);
+    expect(frames.at(-1)).toBe('{"n":"independent"}');
+    releaseIndependent();
+    await blocked;
+    expect(independentFrames).toEqual(['{"n":"blocked"}']);
 
     const publicState = { state: { match: { hand: [] } } };
     const privateMarker = { state: { match: { hand: ['PRIVATE_CARD_HAND_MARKER'] } } };
