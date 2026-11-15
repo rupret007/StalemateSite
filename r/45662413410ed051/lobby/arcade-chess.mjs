@@ -20,6 +20,7 @@ const reasonText = {
 const markup = `
 <summary>Royal Flush Chess</summary>
 <p class="small arcade-chess-status" data-chess-status role="status"></p>
+<p class="small arcade-next-game" data-next-game hidden>Table full, you're up next game</p>
 <p class="small arcade-chess-feedback" data-chess-error role="status"></p>
 <button type="button" class="btn btn--small" data-chess-primary hidden></button>
 <button type="button" class="btn btn--small btn--ghost" data-chess-start-rematch hidden>Start now</button>
@@ -319,6 +320,7 @@ export function mountArcadeChess(container, onMatch) {
                     : !active || action === 'offer-draw' && !!match.drawOffer || action === 'claim-draw' && (model.seat !== match.turn || !availableClaims().length);
         }
         if (match && panel.open) { drawBoard(); drawClocks(); }
+        $('[data-next-game]').hidden = !model?.upNext;
     }
 
     function availableClaims() {

@@ -116,11 +116,7 @@ describe.each(games)('family alpha: $label has no dead ends', game => {
         expect(extra.frames.at(-1)).toEqual({ t: 'match-error', reason: 'seat-unavailable' });
     });
 
-    // BUG (server half of check 2): nothing queues the extra phone for the next
-    // game. hangout-worker/src/game-night-table.mjs:164-176 (requestRematch /
-    // startReadyRematch) always re-seats the current roster, so "you're up next
-    // game" has nothing behind it unless a seated guest leaves first.
-    it.fails('2b. the extra phone is seated when the next game starts', async () => {
+    it('2b. the extra phone is seated when the next game starts', async () => {
         const { f, phones, id } = await seated(game);
         const extra = f.phone(game.seats);
         await f.hello(extra);
