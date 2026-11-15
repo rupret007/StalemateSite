@@ -7,6 +7,8 @@ import { LOG_TTL } from './community-state.mjs';
 import { createAiModerator } from './ai-moderation.mjs';
 import { aiEligibility } from './ai-eligibility.mjs';
 import { activeBetaSession, validBetaSession } from './beta-session-client.mjs';
+import { readBetaBody } from './beta-auth.mjs';
+import { VIDEO_ADMISSION_INTERNAL, videoAdmissionEnabled } from './webjam-video-admission.mjs';
 import { INTERNAL_HEALTH_PATH, aiHealth, dailyUsage, healthJson } from './beta-ops.mjs';
 import { createPrivateReportQueue, privateReportRef, validatePrivateReportControl, LIMITS as PRIVATE_REPORT_LIMITS } from './private-reports.mjs';
 import { createSocketDelivery } from './socket-delivery.mjs';
@@ -336,6 +338,7 @@ export class HangoutLobby {
             incidentSources: !!this.incidentSourceMode,
             gameNight: env.HANGOUT_BETA_MODE === 'protected',
             directMusicInvites: env.HANGOUT_BETA_MODE === 'protected',
+            privateVideoAdmission: videoAdmissionEnabled(env),
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
             ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority,
                 dispatchStart: request => this.dispatchParticipationStart(request, participationStartOwner) }) } : {}),
@@ -530,6 +533,28 @@ export class HangoutLobby {
             // ordinary validation denial or a controlled retirement refusal.
             this.authorityUnavailable = true; this.storageFailed(); return false;
         }
+    }
+    async verifyVideoAdmission(request) {
+        const proof = await readBetaBody(request);
+        const participants = () => this.engine.videoAdmissionParticipants(proof?.session_id, proof?.invite_digest);
+        const ids = await participants();
+        if (!ids) return new Response(null, { status: 403 });
+        const sockets = ids.map(id => this.byId(id));
+        const read = (id, socket) => {
+            if (!socket || this.byId(id) !== socket || socket.readyState !== 1 || this.closedSockets.has(socket)) return null;
+            const a = socket.deserializeAttachment();
+            return a?.id === id && !socketIdentityInvalid(a, this.env)
+                && (!this.authorityMode || this.bindingLive(a)) ? a : null;
+        };
+        const before = ids.map((id, i) => read(id, sockets[i]));
+        if (before.some(a => !a)) return new Response(null, { status: 403 });
+        const active = await Promise.all(before.map(a => this.sessionActive(a)));
+        const current = await participants();
+        const after = ids.map((id, i) => read(id, sockets[i]));
+        if (this.authorityUnavailable) return new Response(null, { status: 503 });
+        const approved = active.every(Boolean) && ids.every((id, i) => current?.[i] === id && after[i]
+            && ['betaSid', 'betaInviteVersion', 'expiresAt'].every(key => before[i][key] === after[i][key]));
+        return new Response(null, { status: approved ? 204 : 403 });
     }
     async dispatchParticipationStart(request, owner) {
         // This is a private in-process capability, never a browser/RPC payload.
@@ -962,6 +987,10 @@ export class HangoutLobby {
         const { pathname: path, searchParams } = new URL(request.url);
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
+        if (path === VIDEO_ADMISSION_INTERNAL) {
+            if (!videoAdmissionEnabled(this.env) || request.method !== 'POST') return new Response(null, { status: 404 });
+            return retirementGate(this, () => this.verifyVideoAdmission(request), false);
+        }
         if (path.startsWith(GAME_INVITATION_PATH + '/') && request.method === 'POST') {
             return retirementGate(this, async () => {
                 try {
