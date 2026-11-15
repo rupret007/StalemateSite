@@ -713,7 +713,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await page.keyboard.press('Enter');
         await expect(camera).toHaveAttribute('aria-disabled', 'true');
         await expect(camera).toBeFocused();
+        await expect(page.locator('[data-video-status]')).toHaveText(
+            'Waiting for camera access. If your browser asks, choose Allow. Music stays connected.',
+        );
         await expect(stop).toBeInViewport({ ratio: 1 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
         await page.keyboard.press('Enter');
         expect(await page.evaluate(() => window.cameraChecks)).toEqual([{ video: true, audio: false }]);
         await page.screenshot({ path: testInfo.outputPath(`private-camera-permission-pending-${width}x${height}.png`) });

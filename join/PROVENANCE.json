@@ -90,8 +90,8 @@
       "shippedSha256": "61f873de784b320d1a5921cf1bdb9078a29912b26e939b7e1b1438eb6b5c3bbe"
     },
     "video-room.js": {
-      "upstreamSha256": "407d2b6a2dbea797ec42cb3849fcef6206eb1b2b4011576a8515694dfe56ee3e",
-      "shippedSha256": "407d2b6a2dbea797ec42cb3849fcef6206eb1b2b4011576a8515694dfe56ee3e"
+      "upstreamSha256": "97d0fc536f661c3c5d17b422e1847719b46eaaf528daf16071dd8907ea911bbe",
+      "shippedSha256": "97d0fc536f661c3c5d17b422e1847719b46eaaf528daf16071dd8907ea911bbe"
     }
   },
   "composedWith": [
@@ -128,7 +128,7 @@
     }
   ],
   "phase1Composition": {
-    "sourceCommit": "e2535c71cca786eb1212a3cdb8dbece97aa6e886",
+    "sourceCommit": "3d5e9d59738ab59e43e368216b0e6d23c19c4ed3",
     "existingJoinCommit": "07b1b28c5b3dc381f4edc448f4eef6647e357610",
     "previousSiteSource": "eda19e803992db41a634ed66382bd383aa3e77ec",
     "stagedModuleSources": [
