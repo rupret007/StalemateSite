@@ -802,7 +802,15 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 if (missing) {
                     if (app.me) return endSession('private-access');
                     gateStatus(gameGuest ? 'Your game access expired. Ask your host for a fresh invitation.' : 'Your private access needs renewal. Reopen your invitation link or enter its code.');
-                    if (privateEntry) privateEntry.hidden = false;
+                    if (gameGuest) {
+                        // The same link cannot admit this guest again. Retry and
+                        // cancel only return to the connecting spinner.
+                        $('[data-game-guest-retry]').hidden = true;
+                        $('[data-game-guest-cancel]').hidden = true;
+                        const status = $('[data-game-guest-status]');
+                        status.tabIndex = -1;
+                        status.focus({ preventScroll: true });
+                    } else if (privateEntry) privateEntry.hidden = false;
                     return;
                 }
             }
