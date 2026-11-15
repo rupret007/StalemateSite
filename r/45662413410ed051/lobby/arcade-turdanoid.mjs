@@ -336,7 +336,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     // puts the button through the section tabs. Scroll the race panel until the
     // whole control sits above them. Landscape already clears the tabs.
     function clearLaunchFromTabs() {
-        if (!panel.isConnected || launch.hidden) return;
+        if (!panel.isConnected || panel.hidden || !panel.open || launch.hidden) return;
         const navigation = document.querySelector('.phonetabs');
         const nav = navigation?.getBoundingClientRect();
         if (!nav?.height) return;
@@ -346,8 +346,18 @@ export function mountArcadeTurdanoid(container, onMatch) {
         if (room <= 0) return;
         panel.scrollTop += Math.min(room, Math.ceil(overlap));
     }
-    addEventListener('resize', clearLaunchFromTabs);
-    addEventListener('orientationchange', clearLaunchFromTabs);
+    let layoutAbort = null;
+    function bindLayout() {
+        if (layoutAbort) return;
+        layoutAbort = new AbortController();
+        const signal = layoutAbort.signal;
+        window.addEventListener('resize', clearLaunchFromTabs, { signal });
+        window.addEventListener('orientationchange', clearLaunchFromTabs, { signal });
+    }
+    function unbindLayout() {
+        layoutAbort?.abort();
+        layoutAbort = null;
+    }
 
     startRematch.addEventListener('click', () => send('start-rematch'));
     main.addEventListener('click', () => send(main.dataset.command));
@@ -470,6 +480,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     });
 
     function reset() {
+        unbindLayout();
         client.stop();
         backRequested = false;
         returnAfterLeave = false;
@@ -490,6 +501,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
     }, true);
     panel.addEventListener('toggle', () => {
         if (!panel.open || !scope) { reset(); return; }
+        bindLayout();
         for (const other of container.querySelectorAll(':scope > details[open]')) if (other !== panel) other.open = false;
         container.scrollTop = 0;
         client.start(scope);
@@ -500,6 +512,8 @@ export function mountArcadeTurdanoid(container, onMatch) {
         open() {
             if (!scope) return;
             panel.open = true;
+            // The toggle task is queued. Bind now so a resize in this turn still clears Launch.
+            bindLayout();
             return panel;
         },
         setRoom(next) {
