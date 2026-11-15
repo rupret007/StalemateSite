@@ -8,10 +8,14 @@ const arcadeFeatures = { arcadeChess: 1, arcadeTurdSpades: 1, arcadeTurdanoid: 1
 async function gameNight(browser, baseURL) {
     const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
     const { arcadeGame, arcadeRoomRequest, createArcadeTransport } = await import('../../hangout-worker/src/arcade-transport.mjs');
-    const contexts = [], lobbySockets = new Map(), people = new Map(), matchSockets = [], departures = [], records = new Map();
+    const contexts = [], lobbySockets = new Map(), people = new Map(), matchSockets = [], departures = [], records = new Map(), harnessErrors = [];
     let at = 1800000000000, alarm = null, upgrading = null, queue = Promise.resolve();
     // A Durable Object handles one event at a time.
-    const serial = task => { const run = queue.then(task); queue = run.catch(() => {}); return run; };
+    const serial = task => {
+        const run = queue.then(task);
+        queue = run.catch(error => { harnessErrors.push(error.stack || error.message || String(error)); });
+        return run;
+    };
     const storage = {
         getAlarm: async () => alarm, setAlarm: async value => { alarm = value; },
         get: async key => structuredClone(records.get(key)),
@@ -141,7 +145,12 @@ async function gameNight(browser, baseURL) {
         record: async game => [...(await storage.list({ prefix: game === 'chess' ? 'game-night-match:' : `game-night-${game}:` })).values()][0],
         errors: () => [...people.values()].flatMap(person => person.errors.map(error => `${person.nick}: ${error}`)),
         frames: nick => people.get(nick).frames,
-        close: () => Promise.all(contexts.map(context => context.close()))
+        close: async () => {
+            await serial(() => undefined);
+            await Promise.all(contexts.map(context => context.close()));
+            const errors = [...harnessErrors, ...[...people.values()].flatMap(person => person.errors.map(error => `${person.nick}: ${error}`))];
+            expect(errors, 'harness callbacks and browser pages should not report errors').toEqual([]);
+        }
     };
 }
 
@@ -182,14 +191,15 @@ const showTable = async page => {
     await picker.selectOption('turdanoid');
     await expect(page.locator(game.status)).toBeVisible();
 };
-async function openRace(fixture, viewport) {
-    const pages = await room(fixture, ['RaceHost', 'RaceGuest'], viewport);
-    const [host, guest] = pages;
+async function openRace(fixture, viewport, { watcher = false } = {}) {
+    const nicks = watcher ? ['RaceHost', 'RaceGuest', 'RaceWatcher'] : ['RaceHost', 'RaceGuest'];
+    const pages = await room(fixture, nicks, viewport);
+    const [host, guest, observer] = pages;
     for (const page of pages) await showTable(page);
     await game.open(host);
     await game.join(guest);
     await expect(host.locator(game.board)).toBeVisible();
-    return host;
+    return { host, guest, observer };
 }
 async function inViewport(locator) {
     return locator.evaluate(node => {
@@ -204,20 +214,43 @@ async function expectContained(page, selectors) {
         expect(await inViewport(locator), `${selector} should fit in the viewport`).toBe(true);
     }
 }
+async function expectPanelContained(page, selectors) {
+    const panel = page.locator('.arcade-brick-race');
+    const bounds = await panel.evaluate(node => {
+        const r = node.getBoundingClientRect();
+        return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, clientHeight: node.clientHeight, scrollHeight: node.scrollHeight };
+    });
+    expect(bounds.scrollHeight, 'race panel content should not be clipped vertically').toBeLessThanOrEqual(bounds.clientHeight);
+    for (const selector of selectors) {
+        const locator = page.locator(selector);
+        await expect(locator).toBeVisible();
+        const contained = await locator.evaluate((node, panelBounds) => {
+            const r = node.getBoundingClientRect();
+            return r.width > 0 && r.height > 0 && r.left >= panelBounds.left && r.right <= panelBounds.right && r.top >= panelBounds.top && r.bottom <= panelBounds.bottom;
+        }, bounds);
+        expect(contained, `${selector} should fit inside the race panel`).toBe(true);
+    }
+}
 test.describe('Turdanoid phone and landscape layout', () => {
     test('390×844 private race fits, exposes controls, and supports touch', async ({ browser, baseURL }) => {
         const fixture = await gameNight(browser, baseURL);
         try {
-            const page = await openRace(fixture, { width: 390, height: 844 });
+            const { host: page, guest, observer } = await openRace(fixture, { width: 390, height: 844 }, { watcher: true });
             await expectContained(page, ['[data-brick-match]', '[data-brick-status]', '[data-brick-back]', '[data-brick-leave]', '[data-brick-serve]', '.brick-race-rail']);
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-            const panel = page.locator('.arcade-brick-race');
-            const panelMetrics = await panel.evaluate(node => ({ height: node.getBoundingClientRect().height, scrollHeight: node.scrollHeight, innerHeight }));
-            expect(panelMetrics.height).toBeLessThanOrEqual(panelMetrics.innerHeight);
-            expect(panelMetrics.scrollHeight).toBeLessThanOrEqual(panelMetrics.innerHeight);
+            await expectPanelContained(page, ['[data-brick-match]', '[data-brick-status]', '[data-brick-back]', '[data-brick-leave]', '[data-brick-serve]']);
+            await expectContained(guest, ['[data-brick-match]', '[data-brick-status]', '[data-brick-back]', '[data-brick-leave]', '[data-brick-serve]']);
+            await expectPanelContained(guest, ['[data-brick-match]', '[data-brick-status]', '[data-brick-back]', '[data-brick-leave]', '[data-brick-serve]']);
+            await expect(observer.locator(game.status)).toBeVisible();
+            await expect(observer.locator(game.board)).toBeHidden();
+            expect(fixture.view('RaceWatcher', 'turdanoid')).toBeUndefined();
+            expect(fixture.frames('RaceWatcher')).toEqual([]);
             expect(await page.evaluate(() => navigator.maxTouchPoints)).toBeGreaterThan(0);
+            const serve = page.locator('[data-brick-serve]');
+            await expect(serve).toBeVisible();
+            await expect(serve).toBeEnabled();
             await page.locator('[data-brick-serve]').tap();
-            await expect(page.locator('[data-brick-match]')).toBeVisible();
+            await expect(page.locator('[data-brick-match]')).toHaveAttribute('data-stuck', 'false');
             expect(new URL(page.url()).pathname).toBe(LOBBY);
         } finally { await fixture.close(); }
     });
@@ -225,13 +258,15 @@ test.describe('Turdanoid phone and landscape layout', () => {
     test('844×390 private race keeps board, rail, launch, and scores in landscape', async ({ browser, baseURL }) => {
         const fixture = await gameNight(browser, baseURL);
         try {
-            const page = await openRace(fixture, { width: 844, height: 390 });
+            const { host: page } = await openRace(fixture, { width: 844, height: 390 });
             await expect(page.locator('[data-brick-match]')).toBeVisible();
             const board = page.locator('.brick-race-board'), rail = page.locator('.brick-race-rail');
-            const boardRight = await board.evaluate(node => node.getBoundingClientRect().right);
-            const railLeft = await rail.evaluate(node => node.getBoundingClientRect().left);
+            await expectContained(page, ['.brick-race-board', '.brick-race-rail', '[data-brick-serve]', '[data-brick-score="a"]', '[data-brick-score="b"]']);
+            const boardRight = await board.evaluate(node => { const r = node.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r.right : NaN; });
+            const railLeft = await rail.evaluate(node => { const r = node.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r.left : NaN; });
             expect(boardRight).toBeLessThanOrEqual(railLeft);
-            await expectContained(page, ['[data-brick-serve]', '[data-brick-score="a"]', '[data-brick-score="b"]']);
+            const metrics = await page.locator('.arcade-brick-race').evaluate(node => ({ scrollHeight: node.scrollHeight, clientHeight: node.clientHeight }));
+            expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.clientHeight);
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         } finally { await fixture.close(); }
     });
