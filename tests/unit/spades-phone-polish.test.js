@@ -385,12 +385,12 @@ describe('Spades phone table', () => {
         expect(view.find('[data-spades-bid]').hidden).toBe(true);
     });
 
-    it('keeps the full-table up-next sentence', () => {
+    it('explains that a full-table guest is waiting for an open seat', () => {
         const table = partnersTable();
         const state = { ...table.view('watcher'), upNext: true };
         mount();
         client.handlers.onState({ state, canOpen: false, partners: true });
-        expect(document.querySelector('[data-next-game]').textContent).toBe("Table full, you're up next game");
+        expect(document.querySelector('[data-next-game]').textContent).toBe("Table full. You’re in line for the next open seat.");
         expect(document.querySelector('[data-next-game]').hidden).toBe(false);
     });
 
