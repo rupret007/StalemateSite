@@ -91,13 +91,17 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         try { socket.send(JSON.stringify({ version: 1, ...frame })); return true; }
         catch { socket.close(1000); return false; }
     }
-    function retry(attempt, reason) {
+    function retry(attempt, reason, terminal = false) {
         if (attempt !== generation || !scope) return;
-        if (tableSeen && reason === 'room') reason = undefined;
-        if (!reason && navigator.onLine === false) return pauseForNetwork();
-        if (reason) {
+        if (!terminal && tableSeen && reason === 'room') reason = undefined;
+        if (!terminal && !reason && navigator.onLine === false) return pauseForNetwork();
+        if (terminal || reason) {
             reset(false, true);
             terminalError = true;
+            lastSeq = 0;
+            shownMatch = null;
+            matchOpen = false;
+            matchUnavailable = false;
             setPlaying(false);
             onStatus('unavailable', reason);
             return;
@@ -144,7 +148,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     } catch { /* Ignore the rejected pass in memory if storage is unavailable. */ }
                     return retry(attempt);
                 }
-                retry(attempt, socketErrors[event.code]);
+                const terminal = event.code === 4001 || event.code === 4003 || event.reason === 'banned';
+                const terminalReason = event.reason || (event.code === 4001 ? 'kicked' : event.code === 4003 ? 'banned' : undefined);
+                retry(attempt, terminal ? terminalReason : socketErrors[event.code], terminal);
             });
             connection.addEventListener('message', event => {
                 if (attempt !== generation) return;

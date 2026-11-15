@@ -337,17 +337,40 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .arcade-rummy .arcade-card-hand [aria-pressed="true"] { background: var(--lime); box-shadow: inset 0 0 0 2px #354624; }
 .arcade-rummy .arcade-card-hand [data-drawn="true"]:not([aria-pressed="true"]) { box-shadow: inset 0 0 0 2px #a07c32; }
 .arcade-spades .arcade-card-hand { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.arcade-spades .arcade-card-hand button { justify-items: center; align-content: center; padding-inline: 1px; }
+.arcade-spades .arcade-card-hand button { justify-items: center; align-content: center; padding-inline: 2px; }
+.arcade-spades .arcade-card-hand b { font-size: 1.2rem; }
+.arcade-spades .spades-seat { color: var(--cream); font-weight: 650; margin: 5px 0; }
+.arcade-spades .spades-trick-summary { margin: 6px 0 3px; }
+.arcade-spades .arcade-card-score > span { min-width: 0; overflow-wrap: anywhere; }
+.arcade-spades .arcade-card-status { color: var(--cream); font-weight: 650; }
 .spades-trick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 4px 0; padding: 0; }
-.spades-trick li { min-width: 0; display: grid; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); padding: 2px 4px; }
-.spades-trick span { font-size: .66rem; overflow-wrap: anywhere; }
+.spades-trick li { min-width: 0; display: grid; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); padding: 4px 6px; }
+.spades-trick span { font-size: .75rem; line-height: 1.3; overflow-wrap: anywhere; }
 .arcade-spades .arcade-card-hand [data-cannot-follow] { opacity: .52; }
 .spades-trick b { font: bold 1rem var(--mono); }
 [data-spades-table][data-phase="bid"] .spades-trick b { display: none; }
 .spades-trick [data-active="true"] { border-color: var(--lime); }
 .spades-trick [data-red="true"] b { color: #ffa6aa; }
 .arcade-spades [data-spades-bid] select { padding: 4px; min-height: 38px; }
+@media (max-width: 600px) {
+  .arcade-spades, .arcade-spades [data-spades-table] { min-width: 0; max-width: 100%; }
+  .arcade-spades summary { width: 100%; overflow-wrap: anywhere; }
+  .arcade-spades summary .arcade-reconnect { max-width: calc(100% - 6px); margin-inline-start: 6px; white-space: normal; }
+  .arcade-spades .arcade-card-status, .arcade-spades .spades-seat,
+  .arcade-spades .spades-trick-summary { font-size: 13px; overflow-wrap: anywhere; }
+  .arcade-spades .btn { font-size: 13px; }
+  .arcade-spades .arcade-card-hand { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .arcade-spades .arcade-card-hand button { min-width: 0; min-height: 50px; }
+  .arcade-spades .spades-trick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .arcade-spades .spades-trick span, .arcade-spades .arcade-card-score > span { font-size: 13px; }
+  .arcade-spades .arcade-card-score { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .arcade-spades [data-spades-bid] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .arcade-spades [data-spades-bid] label { grid-column: 1 / -1; }
+  .arcade-spades [data-spades-bid] :is(select, button) { width: 100%; min-width: 0; }
+  .arcade-spades > .arcade-card-actions > .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+}
 @media (max-width: 900px) {
+  .arcade-spades summary { min-height: 44px; }
   .game-night :is(.arcade-eights, .arcade-rummy, .arcade-spades, .arcade-jack) :is(.btn, select) {
     min-width: 44px;
     min-height: 44px;
@@ -363,13 +386,29 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .arcade-spades [data-spades-table][data-phase="bid"] :is(.spades-trick, .arcade-card-hand-label) {
     margin-block: 2px;
   }
+}
+@media (max-width: 900px) and (max-height: 720px) {
+  .arcade-spades [data-spades-bid]:not([hidden]) { display: flex; }
+  .arcade-spades [data-spades-bid] :is(select, button) { width: auto; min-width: 44px; }
+  .spades-trick { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .spades-trick li { padding: 2px 4px; }
+  .spades-trick span { font-size: .66rem; }
   .arcade-spades [data-spades-table][data-phase="bid"] .arcade-card-score,
   .arcade-spades [data-spades-table][data-phase="bid"]:not([data-watching]) .arcade-card-hand-label {
     display: none;
   }
+  /* The bid row sits under a two-line trick on a short phone. Drop the
+     extra block margins so that row, the hand, and Send share the screen. */
+  .arcade-spades [data-spades-table][data-phase="bid"] :is(.spades-seat, .spades-trick-summary, .spades-trick) {
+    margin-block: 0;
+  }
 }
-@media (max-width: 355px) {
-  .arcade-spades .arcade-card-hand { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (min-width: 375px) and (max-width: 900px) and (max-height: 720px) {
+  /* Seven 44px-tall columns once the row is wide enough (10px padding each
+     side, 4px gaps: 7×44 + 6×4 + 20 = 352). 320–360px stay on the four-column
+     hand from the 600px rule so a card cannot fall under 44px wide. */
+  .arcade-spades .arcade-card-hand { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .arcade-spades .arcade-card-hand button { min-height: 44px; }
 }
 .jack-dealer, .jack-hand { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 5px 0; }
 .jack-dealer > b, .jack-hand > b { min-width: 75px; }
@@ -482,6 +521,7 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .arcade-brick-race [data-brick-leave] { position: absolute; inset: 1px 0 auto auto; }
 .brick-race-actions:has([data-brick-main][hidden]) { display: none; }
 .brick-race-actions:has([data-brick-main][hidden]):has([data-brick-leave]:not([hidden])) { display: contents; }
+.brick-race-actions:has([data-brick-back]:not([hidden])) { display: flex; }
 .brick-race-layout { display: grid; grid-template-columns: minmax(0, 1fr) 4.75rem; gap: 6px; align-items: start; }
 .brick-race-board { position: relative; width: 100%; aspect-ratio: 6 / 5; overflow: hidden;
   border: 1px solid #75a99d; border-radius: 8px; background: #10272d; touch-action: none; user-select: none; scroll-margin-top: 50px; }
@@ -832,8 +872,170 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .arcade-brick-race .brick-race-rail { display: grid; grid-template-columns: minmax(0, 1fr); }
   .arcade-brick-race .brick-race-rail > :is(time, button, [data-brick-power]) { grid-column: 1 / -1; }
 }
+@media (max-width: 900px) and (pointer: coarse) {
+  .chat:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])),
+  .game-night:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])) {
+    overflow: visible;
+    max-height: none;
+  }
+  .chat:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])) > .roombar,
+  .game-night:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])) > .game-actions {
+    position: relative;
+    z-index: 30;
+    pointer-events: none;
+  }
+  .chat:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])) > .roombar :is(button, a, select),
+  .game-night:has(.arcade-brick-race[open] [data-brick-match]:not([hidden])) > .game-actions :is(button, a, select) {
+    pointer-events: auto;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) {
+    position: fixed;
+    z-index: 20;
+    inset: 0;
+    box-sizing: border-box;
+    width: 100dvw;
+    height: 100dvh;
+    margin: 0;
+    padding: 14rem 10px max(6px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--ink);
+    pointer-events: none;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) > * { pointer-events: auto; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-layout,
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-board,
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) [data-brick-match] { min-width: 0; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) summary { min-height: 44px; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-actions {
+    display: flex;
+    position: static;
+    gap: 6px;
+    margin: 3px 0;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-actions .btn {
+    min-height: 44px;
+    padding: 6px 9px;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) [data-brick-leave] { position: static; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) [data-brick-match] { max-width: none; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-board {
+    width: min(100%, calc(clamp(170px, 100dvh - 560px, 320px) * 1.2));
+    max-width: none;
+    justify-self: center;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail > time,
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail [data-brick-serve] {
+    grid-column: 1 / -1;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail > div { font-size: .76rem; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail > div small { font-size: .72rem; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-help {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    margin-top: 4px;
+  }
+}
+@media (max-height: 450px) and (max-width: 900px) and (orientation: landscape) and (pointer: coarse) {
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) {
+    padding-top: max(6px, env(safe-area-inset-top));
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-layout {
+    grid-template-columns: minmax(0, 1fr) 10rem;
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-board {
+    width: min(calc((100dvh - 180px) * 1.2), calc(100dvw - 190px));
+    max-width: none;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-rail {
+    display: flex;
+    flex-direction: column;
+  }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-help { display: none; }
+  .arcade-brick-race[open]:has([data-brick-match]:not([hidden])) .brick-race-status { margin-block: 1px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}
+
+/* Royal Flush Chess: sharpen state cues while preserving the square phone board. */
+.arcade-chess-status { color: var(--cream); font-weight: 700; line-height: 1.3; }
+.arcade-chess .arcade-chess-square[aria-pressed="true"] { background: #d8ef91; box-shadow: inset 0 0 0 3px #263d12, inset 0 0 0 6px #f8ffd8; }
+.arcade-chess .arcade-chess-square[data-legal]:not([data-capture])::after { width: 27%; border: 3px solid #173538; background: #f7fff0; box-shadow: 0 0 0 2px #f7fff0; }
+.arcade-chess .arcade-chess-square[data-last] { box-shadow: inset 0 0 0 3px #513811, inset 0 0 0 6px #ffe096; }
+.arcade-chess .arcade-chess-square[aria-pressed="true"][data-last] { box-shadow: inset 0 0 0 3px #263d12, inset 0 0 0 6px #f8ffd8, inset 0 0 0 9px #ffe096; }
+.arcade-chess .arcade-chess-square[data-check] { background-image: radial-gradient(ellipse at center, #ee5266 0%, #bd274b 58%, #8d163b 100%); box-shadow: inset 0 0 0 3px #2b0a1c, inset 0 0 0 6px #fff0dc; }
+.arcade-chess [data-chess-start-rematch] { min-height: 44px; }
+.arcade-chess [data-chess-status]:not(:empty) { overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  /* Give all eight files a 44px touch target even with a classic scrollbar. */
+  .game-night:has(> .arcade-chess[open]) {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .game-night.game-night:has(> .arcade-chess[open] [data-chess-playing]:not([hidden])) > .arcade-chess {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    padding-inline: 4px;
+  }
+  .chat > .game-night:has(> .arcade-chess[open] [data-chess-playing]:not([hidden])) {
+    padding-inline: 0;
+  }
+  .game-night > .arcade-chess[open] > summary {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .game-night > .arcade-chess[open] > summary .arcade-reconnect:not([hidden]) {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    margin: 4px 0 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .game-night > .arcade-chess[open] :is([data-chess-primary], [data-chess-start-rematch]) {
+    box-sizing: border-box;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .game-night > .arcade-chess[open] :is([data-chess-status], [data-chess-error]) {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Tall phones can enlarge the board without using the compact layout’s space. */
+@media (max-width: 900px) and (min-height: 800px) {
+  .game-night > .arcade-chess[open] #board {
+    width: 100%;
+    max-width: 25rem;
+    min-width: 0;
+  }
 }
 
 /* Private C3 controls stay within their pane and leave the composer visible. */

@@ -64,11 +64,72 @@ describe('TurdSpades with computer partners', () => {
         expect(scored.bids.east).not.toBeNull();
         expect(table.view(human.west).match.scores).toEqual(scored.scores);
         expect(table.command(human.south, request(scored, { action: 'resign' })).ok).toBe(true);
-        expect(table.requestRematch(human.south, matchId, 'spades-next-fixture', 1)).toBe(true);
-        expect(table.requestRematch(human.west, matchId, 'spades-next-fixture', 1)).toBe(true);
-        const next = table.view(human.south);
-        expect(next).toMatchObject({ id: 'spades-next-fixture', seat: 'south', match: { round: 1, phase: 'bid', scores: [0, 0] } });
-        expect(next.match.hand).toHaveLength(13);
+        const finished = table.checkpoint();
+        for (const order of [[human.south, human.west], [human.west, human.south]]) {
+            const rematch = GameNightSpadesPartners.restore(finished);
+            expect(rematch.requestRematch(order[0], matchId, 'spades-next-fixture', 1)).toBe(true);
+            expect(rematch.view(human.south).id).toBe(matchId);
+            expect(rematch.view(human.south).match.result).toBeTruthy();
+            expect(rematch.requestRematch(order[1], matchId, 'spades-next-fixture', 1)).toBe(true);
+            const next = rematch.view(human.south);
+            expect(next).toMatchObject({ id: 'spades-next-fixture', seat: 'south', match: { round: 1, phase: 'bid', scores: [0, 0] } });
+            const west = rematch.view(human.west);
+            expect(west).toMatchObject({ id: 'spades-next-fixture', seat: 'west', match: { round: 1, phase: 'bid', scores: [0, 0] } });
+            const dealt = rematch.checkpoint().match.hands;
+            expect(next.match.hand.map(card => card.id).sort((a, b) => a - b)).toEqual([...dealt.south].sort((a, b) => a - b));
+            expect(west.match.hand.map(card => card.id).sort((a, b) => a - b)).toEqual([...dealt.west].sort((a, b) => a - b));
+            expect(new Set([...next.match.hand, ...west.match.hand].map(card => card.id)).size).toBe(26);
+            const lateWatcher = rematch.view('late-watcher');
+            expect(lateWatcher.seat).toBeNull();
+            expect(lateWatcher.match.hand).toEqual([]);
+        }
+    });
+
+    it.each(['partners', 'four'])('projects no trick, last trick or last winner while bidding round 2, after a reconnect and after a rematch in %s mode', mode => {
+        const id = `spades-stale-${mode}-fixture`, nextId = `spades-stale-${mode}-next`;
+        const subjects = mode === 'partners' ? human : { south: 'host', west: 'west-player', north: 'north-player', east: 'east-player' };
+        let table = mode === 'partners' ? new GameNightSpadesPartners(id, 'host') : new GameNightTurdSpades(id, 'host');
+        for (const [position, subject] of Object.entries(subjects)) {
+            if (subject !== 'host') expect(table.join(subject, id, 0, mode === 'partners' ? 'next' : position)).toBe(true);
+        }
+        const act = () => {
+            const subject = subjects[table.view('spectator').match.turn];
+            const match = table.view(subject).match;
+            const action = match.phase === 'bid' ? { action: 'bid', bid: 3 }
+                : { action: 'play', card: match.hand.find(card => card.playable).id };
+            expect(table.command(subject, request(match, action))).toEqual({ ok: true });
+        };
+        const expectCleanBid = round => {
+            for (const viewer of [...Object.values(subjects), 'spectator']) {
+                const view = table.view(viewer);
+                expect(view.match).toMatchObject({ round, phase: 'bid', trick: [], lastTrick: [], lastWinner: null, roundResult: null });
+                expect(Object.values(view.match.tricks)).toEqual([0, 0, 0, 0]);
+                expect(view.seat ?? null).toBe(Object.keys(subjects).find(position => subjects[position] === viewer) ?? null);
+                if (viewer === 'spectator') {
+                    expect(view.match.hand).toEqual([]);
+                    expect(view.match.canBid).toBe(false);
+                }
+            }
+        };
+        for (let turn = 0; turn < 60 && table.view('spectator').match.phase !== 'round-end'; turn++) act();
+        const scored = table.view('host').match;
+        expect(scored).toMatchObject({ phase: 'round-end', trick: [] });
+        expect(scored.lastTrick).toHaveLength(4);
+        expect(scored.lastWinner).not.toBeNull();
+
+        expect(table.command('host', request(scored, { action: 'next-round' }))).toEqual({ ok: true });
+        expectCleanBid(2);
+        table = (mode === 'partners' ? GameNightSpadesPartners : GameNightTurdSpades).restore(table.checkpoint());
+        expectCleanBid(2);
+
+        while (table.view('spectator').match.phase === 'bid') act();
+        for (let turn = 0; turn < 6; turn++) act();
+        const playing = table.view('host').match;
+        expect(playing.trick.length + playing.lastTrick.length).toBeGreaterThan(0);
+        expect(table.command('host', request(playing, { action: 'resign' })).ok).toBe(true);
+        for (const subject of Object.values(subjects)) expect(table.requestRematch(subject, id, nextId, 1)).toBe(true);
+        expect(table.view('host')).toMatchObject({ id: nextId, seat: 'south' });
+        expectCleanBid(1);
     });
 
     it('suggests Nil for a blank hand and a stable 1–9 bid for aces', () => {

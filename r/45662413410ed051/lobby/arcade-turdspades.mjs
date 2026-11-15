@@ -25,11 +25,16 @@ const markup = `
 <div class="arcade-card-actions">
     <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>
     <button class="btn btn--small" type="button" data-spades-main hidden></button>
-    <button class="btn btn--small btn--ghost" type="button" data-spades-start-rematch hidden>Start now</button>
 </div>
 <div class="arcade-card-actions" data-spades-seats hidden></div>
 <div data-card-table data-spades-table hidden>
+    <p class="small spades-seat" data-spades-seat></p>
+    <div class="arcade-card-actions" data-spades-rematch-actions hidden>
+        <button class="btn btn--small" style="min-width:44px;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere" type="button" data-spades-rematch-vote hidden></button>
+        <button class="btn btn--small btn--ghost" style="min-width:44px;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere" type="button" data-spades-start-rematch hidden>Start now</button>
+    </div>
     <div class="arcade-card-score" aria-label="Partnership scores"><span data-spades-score="0"></span><span data-spades-score="1"></span></div>
+    <p class="small spades-trick-summary" data-spades-trick-summary></p>
     <ul class="spades-trick" aria-label="Bids and trick cards" data-spades-trick></ul>
     <div class="arcade-card-actions" data-spades-bid hidden>
         <label for="spades-bid">Your bid</label><select id="spades-bid"></select>
@@ -128,7 +133,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 clearWatch();
             }
             draw();
-            if (revealing) container.scrollTop = 0;
+            if (revealing || (!prior?.result && next?.result)) container.scrollTop = 0;
         },
         onError(reason) {
             clearPending();
@@ -185,7 +190,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         bid.append(option);
     }
     bid.value = '3';
-    bid.addEventListener('change', () => { if (!applyingBid) bidEdited = true; });
+    bid.addEventListener('change', () => { if (!applyingBid) { bidEdited = true; draw(); } });
 
     function showHand(cards, choosingCard = false) {
         const old = new Map([...hand.children].map(button => [button.dataset.spadesCard, button]));
@@ -209,7 +214,20 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (next.length !== old.size || next.some((button, index) => hand.children[index] !== button)) hand.replaceChildren(...next);
     }
 
-    const startRematch = $('[data-spades-start-rematch]');
+    const rematchActions = $('[data-spades-rematch-actions]');
+    const rematchVote = $('[data-spades-rematch-vote]'), startRematch = $('[data-spades-start-rematch]');
+
+    function trickSummary(match, nameFor) {
+        const completed = Object.values(match.tricks || {}).reduce((total, count) => total + count, 0);
+        const winner = match.lastWinner ? ` · Last won by ${nameFor(match.lastWinner)}` : '';
+        if (match.result || match.phase === 'round-end') {
+            const label = match.result ? 'Game over' : completed >= 13 ? '13 tricks complete' : 'Hand over';
+            return `${label}${winner}`;
+        }
+        if (match.phase === 'bid') return 'Bids · no cards played yet';
+        const showingLast = !match.trick.length && match.lastTrick.length ? ' · showing last trick' : '';
+        return `Trick ${Math.min(completed + 1, 13)} of 13${showingLast}`;
+    }
 
     function draw() {
         const match = model?.match, seat = model?.seat, occupied = model?.occupied || [];
@@ -218,6 +236,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
         const nameFor = position => names[position] + (computer(position) ? ' (CPU)' : '');
         const away = model?.disconnectedSeats ?? [];
         const teams = paired ? ['South + North CPU', 'West + East CPU'] : partnerships;
+        if (match?.canBid) {
+            const bidKey = `${model.id}:${match.revision}`;
+            if (bidKey !== suggestedBidKey) { suggestedBidKey = bidKey; bidEdited = false; }
+        }
         let command = '', label = '', message = 'Connecting to the table…';
         if (connection === 'unavailable') {
             message = matchConnectionErrors[connectionError] || 'The table couldn’t reconnect. Try again from this room.';
@@ -248,12 +270,14 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
             if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
         } else if (match?.result) {
-            message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
+            message = `Game over · ${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
             if (seat) {
                 const votes = model.rematchVotes ?? (model.rematch ? [model.rematch] : []);
                 const ready = votes.filter(vote => !away.includes(vote)).length;
                 message += ` ${ready}/${occupied.length - away.length} ready for a rematch.`;
                 if (!votes.includes(seat)) { command = 'rematch'; label = votes.length ? 'Accept Spades rematch' : 'Request Spades rematch'; }
+                message += model.canStartRematch ? ' Tap Start now to play again.'
+                    : command ? ` Tap ${label}.` : ' Waiting for the other players to accept.';
             }
         } else if (match?.roundResult) {
             message = match.roundResult.map((result, team) => {
@@ -262,28 +286,30 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 if (result.bagPenalties) nil.push('bag penalty');
                 return `${teams[team]} ${signed}${nil.length ? ' · ' + nil.join(', ') : ''}`;
             }).join(' / ');
+            if (seat) message += ' · tap Next round';
+            message += ' · Hand over';
         } else if (match) {
             const yourTurn = seat === match.turn;
-            if (paired && match.phase === 'bid' && yourTurn && seat === 'west') {
-                message = 'You and a computer partner vs the host and a computer · tap Bid for me';
-            } else if (paired && match.phase === 'bid' && yourTurn && seat === 'south') {
-                message = 'You and a computer partner vs your friend and a computer · tap Bid for me';
-            } else if (paired && match.phase === 'bid' && seat === 'west') {
-                message = 'Waiting for the host to bid';
-            } else {
-                const turn = yourTurn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
-                message = `Round ${match.round} · ${turn}`;
-                if (yourTurn && match.phase === 'play' && !match.trick.length && !match.lastTrick.length) message += ' · tap a card';
-                if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
+            const turn = yourTurn
+                ? (match.phase === 'bid' ? `Your bid · tap ${bidEdited ? 'Lock bid' : 'Bid for me'}` : 'Your turn · tap a card')
+                : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
+            message = `Round ${match.round} · ${turn}`;
+            if (match.phase !== 'bid' && match.lastWinner && (paired || !match.trick.length)) {
+                message += ` · ${nameFor(match.lastWinner)} won the last trick`;
             }
         }
         if (connection === 'ready' && seat && match && away.length) {
             message += ` · Waiting for ${away.map(nameFor).join(', ')}, link still works.`;
         }
-        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        const rematchReady = connection === 'ready' && !!seat && !!match?.result;
+        rematchActions.hidden = !rematchReady;
+        rematchVote.hidden = command !== 'rematch';
+        rematchVote.textContent = label;
+        rematchVote.disabled = pending;
+        startRematch.hidden = !rematchReady || !model.canStartRematch;
         startRematch.disabled = pending;
         if (status.textContent !== message) status.textContent = message;
-        main.hidden = !command;
+        main.hidden = !command || command === 'rematch';
         main.textContent = label;
         main.dataset.command = command;
         main.disabled = pending;
@@ -292,18 +318,25 @@ export function mountArcadeTurdSpades(container, onMatch) {
         seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat || model.watchOnly === true;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
         table.hidden = !match;
-        $('[data-next-game]').hidden = !model?.upNext;
+        // A queued guest (no seat, up next, not a watch invite) is the only viewer of this line.
+        $('[data-next-game]').hidden = !(model?.upNext && !seat && model.watchOnly !== true);
         if (!match) { showHand([]); return; }
         table.dataset.phase = match.phase;
         table.dataset.mode = paired ? 'partners' : 'four';
         table.toggleAttribute('data-watching', !seat);
+        const partner = seat && seats[(seats.indexOf(seat) + 2) % seats.length];
+        $('[data-spades-seat]').textContent = seat
+            ? `You’re ${nameFor(seat)} · Partner: ${nameFor(partner)}`
+            : 'Watching · hands are private';
 
         for (let team = 0; team < 2; team++) {
             $(`[data-spades-score="${team}"]`).textContent = `${teams[team]} · ${match.scores[team]}/${match.target} · ${match.bags[team]} bags`;
         }
-        $('.arcade-card-score').hidden = paired && match.phase !== 'round-end' && match.lastTrick.length !== 4;
-        $('[data-spades-trick]').hidden = paired && match.phase === 'bid';
-        const shown = match.trick.length ? match.trick : match.lastTrick;
+        $('.arcade-card-score').hidden = false;
+        $('[data-spades-trick-summary]').textContent = trickSummary(match, nameFor);
+        // Keep the bid rows on screen. Blank the card faces so a previous trick cannot linger into the next bid.
+        $('[data-spades-trick]').hidden = false;
+        const shown = match.phase === 'bid' ? [] : (match.trick.length ? match.trick : match.lastTrick);
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
             const called = match.bids[position];
@@ -317,11 +350,6 @@ export function mountArcadeTurdSpades(container, onMatch) {
         });
         $('[data-spades-bid]').hidden = !match.canBid;
         if (match.canBid) {
-            const bidKey = `${model.id}:${match.revision}`;
-            if (bidKey !== suggestedBidKey) {
-                suggestedBidKey = bidKey;
-                bidEdited = false;
-            }
             if (!bidEdited) {
                 const suggestion = String(suggestSpadesBid(match.hand));
                 if (bid.value !== suggestion) {
@@ -332,9 +360,13 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
         }
         bid.disabled = connection !== 'ready' || pending;
-        $('[data-spades-hand-label]').textContent = seat
+        $('[data-spades-action="bid"]').textContent = bidEdited ? 'Lock bid' : 'Bid for me';
+        const handLabel = $('[data-spades-hand-label]');
+        handLabel.textContent = seat
             ? `Your hand · ${match.hand.length} cards${match.phase === 'play' && match.spadesBroken ? ' · Spades broken' : ''}`
             : 'Watching · hands are private';
+        handLabel.hidden = !!seat && !!match.result;
+        hand.hidden = !seat || !!match.result;
         for (const control of actions) {
             const action = control.dataset.spadesAction;
             control.hidden = !seat || (action === 'bid' ? !match.canBid
@@ -342,7 +374,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
                     : action === 'resign' && !!match.result);
             control.disabled = connection !== 'ready' || pending;
         }
-        showHand(match.hand, connection === 'ready' && match.phase === 'play' && match.turn === seat && !match.result);
+        showHand(seat && !match.result ? match.hand : [], connection === 'ready' && match.phase === 'play' && match.turn === seat && !match.result);
     }
 
     hand.addEventListener('click', event => {
@@ -350,6 +382,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (button && !button.disabled) send('play', { card: Number(button.dataset.spadesCard) });
     });
     startRematch.addEventListener('click', () => send('start-rematch'));
+    rematchVote.addEventListener('click', () => send('rematch'));
     main.addEventListener('click', () => {
         const action = main.dataset.command;
         if (action === 'retry') client.start(scope);
