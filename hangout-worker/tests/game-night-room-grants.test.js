@@ -296,7 +296,7 @@ describe('redeemGrant', () => {
         await register([1, 2]);
         const third = await grants.redeemGrant({ value: value(2), now: NOW + 1 });
         expect(third).toEqual({ ok: false, status: 409, reason: 'table-full', body: { tableFull: true, message: TABLE_FULL_COPY } });
-        expect(TABLE_FULL_COPY).toBe("Table full, you're up next game");
+        expect(TABLE_FULL_COPY).toBe('Table full. You’re in line for the next open seat.');
         expect(table.game.subjects).toEqual([HOST]);
         // The seat holder is unaffected by the standby attempt.
         expect((await grants.redeemGrant({ value: value(1), now: NOW + 2 })).seat).toBe('b');
