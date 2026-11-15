@@ -397,10 +397,16 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .arcade-spades [data-spades-table][data-phase="bid"]:not([data-watching]) .arcade-card-hand-label {
     display: none;
   }
+  /* The bid row sits under a two-line trick on a short phone. Drop the
+     extra block margins so that row, the hand, and Send share the screen. */
+  .arcade-spades [data-spades-table][data-phase="bid"] :is(.spades-seat, .spades-trick-summary, .spades-trick) {
+    margin-block: 0;
+  }
 }
-@media (min-width: 601px) and (max-width: 900px) and (max-height: 720px) {
-  /* Seven columns only when each card still clears 44px. Phones at 600px and
-     below keep the four-column hand from the narrow rule above. */
+@media (min-width: 375px) and (max-width: 900px) and (max-height: 720px) {
+  /* Seven 44px-tall columns once the row is wide enough (10px padding each
+     side, 4px gaps: 7×44 + 6×4 + 20 = 352). 320–360px stay on the four-column
+     hand from the 600px rule so a card cannot fall under 44px wide. */
   .arcade-spades .arcade-card-hand { grid-template-columns: repeat(7, minmax(0, 1fr)); }
   .arcade-spades .arcade-card-hand button { min-height: 44px; }
 }
