@@ -1,9 +1,9 @@
-// Cases for scripts/family-alpha-regrade-shots-lib.mjs. Runs under either runner:
-//   npx --no-install vitest run tests/unit/family-alpha-regrade-shots.test.js
-//   node --test scripts/family-alpha-regrade-shots.test.mjs
+// Dry-run 2 (08:00-09:00) verification command: node scripts/family-alpha-regrade-shots.test.mjs
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { arcadeHello, assertPort, brickWallShown, controlFloor, gameSpecs, layoutFindings, matchSocket, retireMatchSocket, seatStarted, settle } from './family-alpha-regrade-shots-lib.mjs';
+import { checkedOutHead } from './family-alpha-regrade-shots.mjs';
 
 const captureScript = readFileSync(new URL('./family-alpha-regrade-shots.mjs', import.meta.url), 'utf8');
 const lobby = name => readFileSync(new URL(`../r/45662413410ed051/lobby/${name}`, import.meta.url), 'utf8');
@@ -13,13 +13,28 @@ const test = (name, run) => { cases.push([name, run]); };
 
 test('capture versions archive the G3 baseline and the private-demo head', () => {
     const current = captureScript.match(/\{ version: 'current', sha: '([0-9a-f]+)', treeSha: '([0-9a-f]+)'/);
-    const next = captureScript.match(/\{ version: 'new', sha: '([0-9a-f]+)'/);
+    const next = captureScript.match(/\{ version: 'new', \.\.\.checkedOutHead\(\)/);
     assert.ok(current, 'current capture version metadata exists');
     assert.ok(next, 'new capture version metadata exists');
     assert.equal(current[1], '59a77531e858b80a606858c8a0f94b3861e6136d');
     assert.equal(current[2], 'b4468b55c1ecb397825917df4584127ef7724107');
     assert.notEqual(current[2], '6a773061aa01d6966403da3960ac29f1b056ae19', 'current must not archive the fifth-phone tree');
-    assert.equal(next[1], 'da871f3ac9fcc632df84da6629b2e130af881d6a');
+    assert.ok(next, 'new capture version uses the checked-out head');
+});
+
+test('recorded head and tree SHAs match git rev-parse for this checkout', () => {
+    const recorded = checkedOutHead();
+    const revParse = args => {
+        try { return execFileSync('git', ['rev-parse', ...args], { encoding: 'utf8' }).trim(); }
+        catch (error) {
+            if (error.status === 0 && typeof error.stdout === 'string') return error.stdout.trim();
+            throw error;
+        }
+    };
+    const expectedHead = revParse(['HEAD']);
+    const expectedTree = revParse(['HEAD^{tree}']);
+    assert.equal(recorded.sha, expectedHead);
+    assert.equal(recorded.treeSha, expectedTree);
 });
 
 test('the fixture hello carries the arcade flags the lobby client gates each game on', () => {

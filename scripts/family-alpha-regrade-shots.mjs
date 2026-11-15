@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Capture deterministic seated Game Night states for the family-alpha visual re-grade.
 // Run with: node scripts/family-alpha-regrade-shots.mjs
+// Verify the dry-run 2 (08:00-09:00) harness from any checkout head with: node scripts/family-alpha-regrade-shots.test.mjs
 // Optional: REGRADE_OUTPUT_DIR=/path/to/regrade-20261115, REGRADE_PORT=48xx (default 4825),
 // REGRADE_STRICT=1 to fail on layout findings instead of recording them in manifest.json.
 // The default output is the requested re-grade delivery folder under Documents.
@@ -27,11 +28,25 @@ const output = path.resolve(process.env.REGRADE_OUTPUT_DIR || path.join(homedir(
 const port = Number(process.env.REGRADE_PORT || 4825);
 const strict = process.env.REGRADE_STRICT === '1';
 const viewports = [{ name: '390x844', width: 390, height: 844 }, { name: '1440x900', width: 1440, height: 900 }];
+export function checkedOutHead() {
+    const revParse = args => {
+        try { return execFileSync('git', ['rev-parse', ...args], { cwd: repo, encoding: 'utf8' }).trim(); }
+        catch (error) {
+            // Some restricted runners report EPERM after git exits successfully; retain only successful output.
+            if (error.status === 0 && typeof error.stdout === 'string') return error.stdout.trim();
+            throw error;
+        }
+    };
+    const sha = revParse(['HEAD']);
+    const treeSha = revParse(['HEAD^{tree}']);
+    return { sha, treeSha };
+}
+
 const versions = [
     // Compare the G3 private-demo baseline with the requested private-demo head.
     { version: 'current', sha: '59a77531e858b80a606858c8a0f94b3861e6136d', treeSha: 'b4468b55c1ecb397825917df4584127ef7724107',
         games: ['chess', 'partners-spades', 'four-player-spades', 'turdanoid'] },
-    { version: 'new', sha: 'da871f3ac9fcc632df84da6629b2e130af881d6a', games: ['chess', 'partners-spades', 'four-player-spades', 'turdanoid'] }
+    { version: 'new', ...checkedOutHead(), games: ['chess', 'partners-spades', 'four-player-spades', 'turdanoid'] }
 ];
 const lobbyPath = '/r/45662413410ed051/lobby/';
 const preview = 'local-preview-key-0001';
@@ -204,7 +219,7 @@ const measureLayout = page => page.evaluate(() => {
     return { scrollWidth: document.documentElement.scrollWidth, controls };
 });
 
-async function capture(browser, origin, sourceRoot, spec, viewport, target, sha, base) {
+async function capture(browser, origin, sourceRoot, spec, viewport, target, sha, treeSha, base) {
     const fixture = await createFixture(browser, origin, sourceRoot, viewport);
     const nicks = ['HostExample', 'GuestWest', 'GuestNorth', 'GuestEast'].slice(0, spec.seats);
     try {
@@ -247,7 +262,7 @@ async function capture(browser, origin, sourceRoot, spec, viewport, target, sha,
         if (fixture.errors().length) throw new Error(`Browser errors: ${fixture.errors().join('; ')}`);
         const buffer = await host.screenshot({ type: 'png', fullPage: false, animations: 'disabled' });
         await mkdir(path.dirname(target), { recursive: true }); await writeFile(target, buffer);
-        return { game: spec.label, version: spec.version, sha, viewport: viewport.name, path: path.relative(base, target), notes: 'Live in-process Game Night fixture; all seats joined; seated board/deal/wall visible; host screenshot.', findings };
+        return { game: spec.label, version: spec.version, sha, treeSha, viewport: viewport.name, path: path.relative(base, target), notes: 'Live in-process Game Night fixture; all seats joined; seated board/deal/wall visible; host screenshot.', findings };
     } finally { await fixture.close(); }
 }
 
@@ -275,7 +290,7 @@ export async function main() {
             for (const key of activeGames) for (const viewport of viewports) {
                 const spec = { ...gameSpecs[key], label: ({ 'partners-spades': 'partners Spades', 'four-player-spades': 'four-player Spades' })[key] || key, version: entry.version };
                 const target = path.join(staging, entry.version, key, `${viewport.name}.png`);
-                const shot = await capture(browser, site.origin, root, spec, viewport, target, entry.sha, staging);
+                const shot = await capture(browser, site.origin, root, spec, viewport, target, entry.sha, entry.treeSha || entry.sha, staging);
                 manifest.push(shot);
                 process.stdout.write(`Captured ${entry.version} ${key} ${viewport.name} (${shot.findings.length} layout findings)\n`);
             }
