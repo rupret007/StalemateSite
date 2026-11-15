@@ -28,8 +28,8 @@ const port = Number(process.env.REGRADE_PORT || 4825);
 const strict = process.env.REGRADE_STRICT === '1';
 const viewports = [{ name: '390x844', width: 390, height: 844 }, { name: '1440x900', width: 1440, height: 900 }];
 const versions = [
-    // Main 990a18c has no Game Night bundle; archive the seated baseline it compares against.
-    { version: 'current', sha: '990a18c73de7b9b6710626167f2f368368132467', treeSha: '6a773061aa01d6966403da3960ac29f1b056ae19',
+    // Compare the G3 private-demo baseline with the requested private-demo head.
+    { version: 'current', sha: '59a77531e858b80a606858c8a0f94b3861e6136d', treeSha: 'b4468b55c1ecb397825917df4584127ef7724107',
         games: ['chess', 'partners-spades', 'four-player-spades', 'turdanoid'] },
     { version: 'new', sha: 'da871f3ac9fcc632df84da6629b2e130af881d6a', games: ['chess', 'partners-spades', 'four-player-spades', 'turdanoid'] }
 ];

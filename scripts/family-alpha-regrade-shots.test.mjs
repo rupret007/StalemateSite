@@ -5,10 +5,22 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { arcadeHello, assertPort, brickWallShown, controlFloor, gameSpecs, layoutFindings, matchSocket, retireMatchSocket, seatStarted, settle } from './family-alpha-regrade-shots-lib.mjs';
 
+const captureScript = readFileSync(new URL('./family-alpha-regrade-shots.mjs', import.meta.url), 'utf8');
 const lobby = name => readFileSync(new URL(`../r/45662413410ed051/lobby/${name}`, import.meta.url), 'utf8');
 const phone = { width: 390, height: 844 }, desktop = { width: 1440, height: 900 };
 export const cases = [];
 const test = (name, run) => { cases.push([name, run]); };
+
+test('capture versions archive the G3 baseline and the private-demo head', () => {
+    const current = captureScript.match(/\{ version: 'current', sha: '([0-9a-f]+)', treeSha: '([0-9a-f]+)'/);
+    const next = captureScript.match(/\{ version: 'new', sha: '([0-9a-f]+)'/);
+    assert.ok(current, 'current capture version metadata exists');
+    assert.ok(next, 'new capture version metadata exists');
+    assert.equal(current[1], '59a77531e858b80a606858c8a0f94b3861e6136d');
+    assert.equal(current[2], 'b4468b55c1ecb397825917df4584127ef7724107');
+    assert.notEqual(current[2], '6a773061aa01d6966403da3960ac29f1b056ae19', 'current must not archive the fifth-phone tree');
+    assert.equal(next[1], 'da871f3ac9fcc632df84da6629b2e130af881d6a');
+});
 
 test('the fixture hello carries the arcade flags the lobby client gates each game on', () => {
     const hello = arcadeHello({ t: 'hello', features: { gameNight: 1 } });
