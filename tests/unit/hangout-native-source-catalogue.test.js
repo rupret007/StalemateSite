@@ -12,6 +12,7 @@ describe('exact native Lobby source catalogue', () => {
         expect(assertNativeLobbySourceCatalogue(graph().reverse(), roots)).toEqual(NATIVE_LOBBY_INPUTS);
         expect(NATIVE_LOBBY_INPUTS).toContain('application/hangout-worker/src/lobby-incident-sources.mjs');
         expect(NATIVE_LOBBY_INPUTS).toContain('application/hangout-worker/src/incident-cases.mjs');
+        expect(NATIVE_LOBBY_INPUTS).toContain('application/join/crypto.js');
     });
     it('rejects missing sources and an equal-count substituted application source', () => {
         expect(() => assertNativeLobbySourceCatalogue(graph().slice(1), roots)).toThrow('source catalogue');

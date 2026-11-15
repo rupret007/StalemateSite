@@ -12,6 +12,7 @@ import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
 import { ENTRY_SITES, normalizeEntrySource } from '../../r/45662413410ed051/entry-sites.mjs';
 import { createParticipationCheckpoint } from './participation-checkpoint.mjs';
 import { validPublicReportOrigin } from './lobby-incident-sources.mjs';
+import { readInvite, toHex, turnToken } from '../../join/crypto.js';
 
 export const BOT = 'StaleBot';
 export const LOBBY = '#stalemate';
@@ -147,7 +148,7 @@ const PERSON_COMMANDS = new Set(['msg', 'query', 'whois', 'ignore', 'unignore', 
 const NAMED_PERSON_COMMANDS = new Set([...PERSON_COMMANDS, 'accept', 'decline', 'report', 'mode']);
 const PERSON_ROOM_COMMANDS = new Set(['slap', 'kick', 'ban', 'invite', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer']);
 
-export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, directMusicInvites = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, directMusicInvites = false, privateVideoAdmission = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     if (typeof incidentSources !== 'boolean') throw Error('incident-source-configuration');
     const L = { ...LOBBY_LIMITS, ...limits };
     const entrySites = L.entrySites || ENTRY_SITES;
@@ -157,6 +158,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     // One volatile music offer per Jam room. This is neither room metadata
     // nor a device grant until the intended live connection accepts it.
     const musicInvites = new Map();
+    // Session IDs stay reserved until expiry even after revocation, so a
+    // copied invitation cannot re-establish a departed pair's admission.
+    const videoAdmissions = new Map();
     const pm = new Map();             // exact connection pair -> consent; device IDs are rate limits, never consent grants
     const roomInvites = new Map();    // short-lived offers between current connections
     const devStats = new Map();       // dev -> {day, msgs, lastRoom}
@@ -941,6 +945,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!chan || !chan.members.has(c.id)) return;
         const musicInvite = musicInvites.get(chan.name);
         if (musicInvite && (musicInvite.host === c.id || musicInvite.guest === c.id)) finishMusicInvite(chan.name, 'unavailable');
+        revokeVideoAdmission(chan, c.id);
         chan.members.delete(c.id);
         c.channels.delete(chan.name);
         for (const [request, offer] of roomInvites) {
@@ -1021,6 +1026,45 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (guest && guest.id !== disconnected && status !== 'accepted') out(guest, { t: 'music-invite-ended', id: offer.id });
     }
 
+    function pruneVideoAdmissions(time) {
+        for (const [session, entry] of videoAdmissions) if (entry.expires <= time) videoAdmissions.delete(session);
+    }
+
+    function revokeVideoAdmission(room, participant) {
+        for (const entry of videoAdmissions.values()) {
+            if (entry.room === room.keepRef && (!participant || [entry.host, entry.guest].includes(participant))) entry.proof = null;
+        }
+    }
+
+    function rememberVideoAdmission(room, offer) {
+        if (!privateVideoAdmission || net.shield || net.lock !== 'off') return;
+        const time = now();
+        pruneVideoAdmissions(time);
+        let invite;
+        try { invite = readInvite(new URL(offer.href).hash, time); } catch { return; }
+        if (videoAdmissions.has(invite.session) || videoAdmissions.size >= L.lobbyMax) return;
+        revokeVideoAdmission(room);
+        const proof = turnToken(invite)
+            .then(token => crypto.subtle.digest('SHA-256', encoder.encode(token)))
+            .then(digest => toHex(new Uint8Array(digest)), () => null);
+        videoAdmissions.set(invite.session, { channel: room.name, room: room.keepRef,
+            host: offer.host, guest: offer.guest, expires: offer.expires, proof });
+    }
+
+    async function videoAdmissionParticipants(session, digest) {
+        if (!privateVideoAdmission || typeof session !== 'string' || !/^[0-9a-f]{64}$/.test(session)
+            || typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) return null;
+        const entry = videoAdmissions.get(session);
+        const proof = entry?.proof;
+        if (!proof || entry.expires <= now() || await proof !== digest) return null;
+        const room = ch(entry.channel);
+        const host = conns.get(entry.host), guest = conns.get(entry.guest);
+        if (entry.proof !== proof || entry.expires <= now() || net.shield || net.lock !== 'off'
+            || !room || !musicInviteRoom({ ch: room.name, roomInstance: entry.room })
+            || !room.members.has(entry.guest) || !canInviteMusic(host, guest, room)) return null;
+        return [entry.host, entry.guest];
+    }
+
     function offerMusicInvite(host, frame) {
         if (!validPmRef(frame.request)) return;
         const result = status => out(host, { t: 'music-invite-result', request: frame.request, status });
@@ -1057,6 +1101,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (frame.t === 'music-invite-decline') return finishMusicInvite(room.name, 'declined');
         personDependency(host, room);
         if (!acceptJamInvitation(guest, room)) return finishMusicInvite(room.name, 'unavailable');
+        rememberVideoAdmission(room, offer);
         finishMusicInvite(room.name, 'accepted');
         out(guest, { t: 'music-invite-accepted', id: offer.id, ch: room.name, roomInstance: room.keepRef, href: offer.href, expires: offer.expires });
     }
@@ -2306,6 +2351,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function closeRoom(chan, by, why) {
         finishMusicInvite(chan.name, 'unavailable');
+        revokeVideoAdmission(chan);
         const members = membersOf(chan);
         for (const m of members) { out(m, { t: 'closed', ch: chan.name, by, reason: why }); m.channels.delete(chan.name); m.cams.delete(lc(chan.name)); }
         for (const [request, offer] of roomInvites) if (offer.room === chan) finishRoomInvite(request, offer, 'expired');
@@ -2748,6 +2794,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const t = now();
         for (const [room, offer] of musicInvites) if (offer.expires <= t) finishMusicInvite(room, 'expired');
         expireRoomInvites(t);
+        pruneVideoAdmissions(t);
         rates.prune();
         if (hourKey() !== lastStatSave) { lastStatSave = hourKey(); saveNet(); } // stats: ~24 row writes/day
         for (const [key, v] of devStats) if ((!v.lastRoom || now() - v.lastRoom > HOUR) && v.day !== new Date(now()).toISOString().slice(0, 10)) devStats.delete(key);
@@ -2861,7 +2908,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return controlledRun(message, [...args, true], safetyMessage(args[1]));
         }, flushPresence,
         transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
-        arcadeActor, fourGuestSeat, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: name => {
+        videoAdmissionParticipants, arcadeActor, fourGuestSeat, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: name => {
             const room = ch(name);
             return room && roomKind(room) === 'game' ? room.keepRef : null;
         }, approveArcade: id => execute(approveArcade, [id]),

@@ -1,5 +1,6 @@
 // @vitest-environment node
 // Hang Out lobby engine: IRC commands, server-side permissions, filters, PMs, moderation, budget, stats.
+import { createHash, hkdfSync } from 'node:crypto';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { createLobby, COMMANDS, LOBBY, validWebjamInvite, validWebJoin } from '../../hangout-worker/src/lobby-core.mjs';
 import { discordCallLink, dropFour, fourFinished, openFour } from '../../r/45662413410ed051/lobby/game-night.mjs';
@@ -9,11 +10,11 @@ let clock;
 let L;
 let inbox;
 let closed;
-function boot(limits = {}, gameNight = false, directMusicInvites = false) {
+function boot(limits = {}, gameNight = false, directMusicInvites = false, privateVideoAdmission = false) {
     clock = 1_800_000_000_000;
     inbox = new Map();
     closed = [];
-    L = createLobby({ gameNight, directMusicInvites, now: () => clock, limits, send: (id, m) => { if (!inbox.has(id)) inbox.set(id, []); inbox.get(id).push(m); }, close: (id, code) => closed.push([id, code]) });
+    L = createLobby({ gameNight, directMusicInvites, privateVideoAdmission, now: () => clock, limits, send: (id, m) => { if (!inbox.has(id)) inbox.set(id, []); inbox.get(id).push(m); }, close: (id, code) => closed.push([id, code]) });
 }
 let n = 0;
 function join(nick, { role = 'fan', iph = 'ip1', dev, admin } = {}) {
@@ -147,7 +148,7 @@ describe('direct Jam music invitations', () => {
     const send = (user, frame) => L.message(user.id, JSON.stringify(frame));
     let host, guest, peer, invite, roomInstance;
     beforeEach(() => {
-        boot({ webJoinOrigins: [origin] }, false, true);
+        boot({ webJoinOrigins: [origin] }, false, true, true);
         host = join('GuitarHost');
         guest = join('DrumGuest');
         peer = join('OtherBandmate');
@@ -193,6 +194,45 @@ describe('direct Jam music invitations', () => {
         cmd(returning, 'part', [], room);
         cmd(returning, 'join', [room]);
         expect(got(returning).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
+    });
+    function videoInvite(seed) {
+        const capability = Buffer.alloc(32, seed);
+        const salt = Buffer.alloc(32, seed + 1);
+        const session = salt.toString('hex');
+        const proof = Buffer.from(hkdfSync('sha256', capability, salt, 'webjam/web-join/1/turn-token', 32)).toString('base64url');
+        const digest = createHash('sha256').update(proof).digest('hex');
+        invite = `${origin}/join/#k=${capability.toString('base64url')}&s=${session}&g=1&e=${clock / 1000 + 60}`;
+        return { lookup: (d = digest) => L.videoAdmissionParticipants(session, d), digest };
+    }
+    it('requires the chosen guest to accept and stops authorizing when the guest leaves', async () => {
+        const { lookup, digest } = videoInvite(4);
+        const pending = offer();
+        expect(await lookup()).toBeNull();
+        accept(peer, pending);
+        expect(await lookup()).toBeNull();
+        accept(guest, pending);
+        expect(await lookup('b'.repeat(64))).toBeNull();
+        expect(await lookup()).toEqual([host.id, guest.id]);
+        for (const snapshot of [L.roomSnapshot(), L.sessionSnapshot()]) {
+            const json = JSON.stringify(snapshot);
+            expect(json).not.toContain(digest);
+            expect(json).not.toContain(invite);
+        }
+        cmd(guest, 'part', [], room);
+        expect(await lookup()).toBeNull();
+        cmd(guest, 'join', [room]);
+        expect(await lookup()).toBeNull();
+        const reused = offer();
+        expect(reused.id).not.toBe(pending.id);
+        accept(guest, reused);
+        expect(await lookup()).toBeNull();
+    });
+    it('expires admission even while both participants stay in the room', async () => {
+        const { lookup } = videoInvite(5);
+        accept(guest, offer());
+        expect(await lookup()).toEqual([host.id, guest.id]);
+        later(61_000);
+        expect(await lookup()).toBeNull();
     });
     it('reports a decline only from the selected guest and expires a replacement separately', () => {
         const pending = offer();
