@@ -1,9 +1,11 @@
-// Actual keyboard events and local WebSockets. Responsive viewport checks are
-// zoom/reflow equivalents, not native browser zoom, screen-reader speech or iOS.
+// Actual keyboard events and local WebSockets. The Chromium zoom test uses
+// browser zoom. The responsive fixtures exercise viewport reflow.
 const { randomUUID } = require('node:crypto');
-const { writeFile } = require('node:fs/promises');
+const { mkdir, mkdtemp, rm, writeFile } = require('node:fs/promises');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
-const { test, expect } = require('@playwright/test');
+const { chromium, test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const ROOT = '/r/45662413410ed051/lobby/';
 
@@ -27,6 +29,9 @@ async function replaceText(page, value) {
 }
 async function guest(browser, baseURL, nickname, viewport, relayOverride, preparePage) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' });
+    return guestInContext(context, baseURL, nickname, relayOverride, preparePage);
+}
+async function guestInContext(context, baseURL, nickname, relayOverride, preparePage) {
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.route(/youtube\.com|ytimg|googlevideo|goatcounter/, route => route.abort());
@@ -384,6 +389,80 @@ test('short deep-zoom equivalent: Tab to Send keeps the whole composer visible b
         contained(await composerGeometry(page));
         expect(visitor.errors).toEqual([]);
     } finally { await visitor.close(); }
+});
+
+test('native Chromium zoom keeps Jam invitations and the composer usable', async ({ browser, baseURL }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'Native tab zoom uses Chromium’s extension API');
+    test.setTimeout(60000);
+    const directory = await mkdtemp(join(tmpdir(), 'hangout-page-zoom-'));
+    let context, peer;
+    try {
+        const extension = join(directory, 'extension');
+        await mkdir(extension);
+        await writeFile(join(extension, 'manifest.json'), JSON.stringify({
+            manifest_version: 3, name: 'Hang Out page zoom fixture', version: '1.0',
+            background: { service_worker: 'worker.js' },
+        }));
+        await writeFile(join(extension, 'worker.js'), 'chrome.runtime.onInstalled.addListener(() => {});\n');
+        // A real window viewport lets native tab zoom change CSS layout dimensions.
+        context = await chromium.launchPersistentContext(join(directory, 'profile'), {
+            baseURL, channel: 'chromium', viewport: null, reducedMotion: 'reduce',
+            args: ['--window-size=1280,900', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+        });
+        const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+        const relay = hangoutRelayWsBase(baseURL, `native-zoom-${randomUUID()}`);
+        const host = await guestInContext(context, baseURL, 'ZoomHost', relay);
+        peer = await guest(browser, baseURL, 'ZoomBandmate', { width: 1280, height: 900 }, relay);
+        const { page } = host;
+        await page.bringToFront();
+        await page.getByRole('button', { name: /Jam \(WebJam\)/ }).click();
+        await expect(page.locator('[data-jam]')).toBeVisible();
+        const width = await page.evaluate(() => innerWidth);
+        expect(width).toBeGreaterThanOrEqual(1200);
+        const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+        const sendButton = page.getByRole('button', { name: 'Send', exact: true });
+        const inviteButton = page.getByRole('button', { name: 'Invite bandmate to room', exact: true });
+        await page.screenshot({ path: testInfo.outputPath('jam-native-zoom-100.png') });
+        for (const zoom of [2, 4]) {
+            const reported = await worker.evaluate(async factor => {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                await chrome.tabs.setZoom(tab.id, factor);
+                return chrome.tabs.getZoom(tab.id);
+            }, zoom);
+            expect(reported).toBeCloseTo(zoom, 2);
+            await expect.poll(() => page.evaluate(() => innerWidth))
+                .toBeLessThanOrEqual(Math.ceil(width / zoom) + 1);
+            expect(await page.evaluate(() => innerWidth)).toBeGreaterThanOrEqual(Math.floor(width / zoom) - 1);
+
+            await expect(inviteButton).toBeEnabled();
+            await tabTo(page, inviteButton);
+            await page.keyboard.press('Enter');
+            const cancel = page.getByRole('button', { name: 'Cancel', exact: true });
+            const roster = page.getByRole('group', { name: 'Online guests' });
+            await expect(roster.getByRole('button', { name: 'Invite ZoomBandmate', exact: true })).toBeVisible();
+            await tabTo(page, cancel);
+            await expect(cancel).toBeInViewport({ ratio: 1 });
+            await page.screenshot({ path: testInfo.outputPath(`jam-native-roster-${zoom * 100}.png`) });
+            await page.keyboard.press('Enter');
+            await expect(cancel).toBeHidden();
+
+            await tabTo(page, composer);
+            const message = `Keyboard send at ${zoom * 100} percent.`;
+            await page.keyboard.type(message);
+            await tabTo(page, sendButton);
+            const geometry = await composerGeometry(page);
+            contained(geometry);
+            await attachGeometry(testInfo, `jam-native-geometry-${zoom * 100}`, { zoom: reported, ...geometry });
+            await page.screenshot({ path: testInfo.outputPath(`jam-native-composer-${zoom * 100}.png`) });
+            await page.keyboard.press('Space');
+            await expect(page.getByRole('log', { name: 'Conversation' })).toContainText(message);
+        }
+        expect(host.errors).toEqual([]);
+        expect(peer.errors).toEqual([]);
+    } finally {
+        try { await Promise.all([context?.close(), peer?.close()]); }
+        finally { await rm(directory, { recursive: true, force: true }); }
+    }
 });
 
 // A retained rejected message adds a separate scrollable recovery row. Deep
