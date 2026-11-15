@@ -179,17 +179,16 @@ body.bob-mode.faces-on .call{grid-column:auto}
     body.faces-on .room{padding:8px;gap:6px;height:calc(100dvh - env(safe-area-inset-top,0px));max-height:100dvh;overflow:hidden;grid-template-rows:auto minmax(0,1fr)}
     body.faces-on .room>.bar{gap:6px;padding:0;margin:0}
     body.faces-on .room>.bar .btn--bob,body.faces-on .room>.bar .host-only,body.faces-on .room>.bar [data-private-report]{display:none}
-    body.faces-on .call{padding:6px 0 0;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+    body.faces-on .call{padding:6px 0 calc(72px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;min-height:0;overflow:hidden}
     body.faces-on .call>h2{font-size:1.05rem;margin:0 0 4px}
     body.faces-on .call>.small,body.faces-on .call>[data-turn-status],body.faces-on .call>[data-hands],body.faces-on .call>.host-call{display:none}
-    body.faces-on .tiles{flex:1 1 auto;min-height:0;align-content:center;position:relative;gap:6px}
+    body.faces-on .tiles{flex:1 1 auto;min-height:0;align-content:start;grid-auto-rows:max-content;position:relative;gap:6px}
     body.faces-on .tiles .tile,.tiles .tile.tile--canvas{aspect-ratio:1;border-width:2px;border-radius:6px}
     body.faces-on .tiles .tile .nm{font-size:.8rem;line-height:1.25;padding:3px 7px;max-width:calc(100% - 8px)}
     body.faces-on .tiles .tile figcaption{right:6px;left:6px}
-    body.faces-on .tiles:has(.tile:nth-child(2):last-child){grid-template-columns:minmax(0,1.15fr) minmax(0,.72fr);grid-template-rows:minmax(0,1fr);max-height:calc(100dvh - 156px - env(safe-area-inset-bottom,0px))}
-    body.faces-on .tiles:has(.tile:nth-child(3):last-child){grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:minmax(0,1fr);max-height:calc(100dvh - 156px - env(safe-area-inset-bottom,0px))}
-    body.faces-on .tiles:has(.tile:nth-child(3):last-child) .tile[data-tile=me],body.faces-on .tiles:has(.tile:nth-child(4)) .tile[data-tile=me]{position:absolute;right:8px;bottom:8px;width:min(30vw,104px);max-height:38%;z-index:4;aspect-ratio:3/4;border-color:var(--lime);box-shadow:0 6px 18px rgba(0,0,0,.55)}
-    body.faces-on .tiles:has(.tile:nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));max-height:calc(100dvh - 156px - env(safe-area-inset-bottom,0px))}
+    body.faces-on .tiles:has(.tile:nth-child(2):last-child){grid-template-columns:minmax(0,1.15fr) minmax(0,.72fr)}
+    body.faces-on .tiles:has(.tile:nth-child(3):last-child),body.faces-on .tiles:has(.tile:nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}
+    body.faces-on .tiles:has(.tile:nth-child(3):last-child) .tile[data-tile=me],body.faces-on .tiles:has(.tile:nth-child(4):last-child) .tile[data-tile=me]{grid-column:2;grid-row:2;justify-self:end;align-self:start;width:min(30vw,104px);z-index:4;aspect-ratio:3/4;border-color:var(--lime);box-shadow:0 6px 18px rgba(0,0,0,.55)}
     body.faces-on .callbar{flex-wrap:wrap;justify-content:center;overflow-x:hidden;row-gap:4px;padding-top:6px}
     body.faces-on .callbar [data-hand],body.faces-on .callbar [data-settings],body.faces-on .callbar [data-canvas-cam],body.faces-on .callbar [data-view-toggle],body.faces-on .callbar [data-pip],body.faces-on .callbar [data-reacts],body.faces-on .callbar .host-only{display:none}
     body.faces-on .callbar .btn{min-width:58px;min-height:44px}
