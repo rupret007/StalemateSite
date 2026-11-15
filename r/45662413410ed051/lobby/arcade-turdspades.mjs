@@ -67,10 +67,19 @@ export function mountArcadeTurdSpades(container, onMatch) {
     let suggestedBidKey = '', bidEdited = false, applyingBid = false;
 
     // A watcher sends nothing else, so a sync while the page is on screen is
-    // what tells the server they are still here.
-    function watchSync() {
+    // what tells the server they are still here. A table update must not
+    // restart a pending wait. A drop or a closed panel clears the handle so
+    // the next watch-only frame can arm one timer again.
+    function clearWatch() {
         clearTimeout(watchTimer);
-        if (connection !== 'ready' || model?.watchOnly !== true) return;
+        watchTimer = null;
+    }
+    function watchSync() {
+        if (connection !== 'ready' || model?.watchOnly !== true) {
+            clearWatch();
+            return;
+        }
+        if (watchTimer != null) return;
         watchTimer = setTimeout(() => {
             watchTimer = null;
             if (!document.hidden) client.send({ action: 'sync' });
@@ -115,8 +124,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             if (model?.watchOnly === true) {
                 if (watchTimer == null) watchSync();
             } else {
-                clearTimeout(watchTimer);
-                watchTimer = null;
+                clearWatch();
             }
             draw();
             if (revealing) container.scrollTop = 0;
@@ -148,7 +156,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         connectionError = undefined;
         feedback.textContent = '';
         clearPending();
-        clearTimeout(watchTimer);
+        clearWatch();
         closeConfirmation();
         draw();
     }

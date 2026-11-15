@@ -16,7 +16,7 @@ import { WATCH_ACTIVITY_INTERVAL } from '../../hangout-worker/src/arcade-transpo
 import { GAME_NIGHT_IDLE } from '../../hangout-worker/src/game-night-lifetime.mjs';
 
 describe('TurdSpades watcher view', () => {
-    let container, status, hidden;
+    let container, status, hidden, view;
     const waiting = (occupied, fields = {}) => ({ state: { version: 1, game: 'turdspades', id: 'c8eb7f10-e113-418f-9900-000000000002',
         tableId: 'c8eb7f10-e113-418f-9900-000000000001', seat: null, waiting: true, match: null, occupied, ...fields }, canOpen: false });
     const show = frame => match.options.onState(frame);
@@ -28,7 +28,7 @@ describe('TurdSpades watcher view', () => {
         match.send = vi.fn(() => true);
         container = document.createElement('div');
         document.body.append(container);
-        const view = mountArcadeTurdSpades(container, () => {});
+        view = mountArcadeTurdSpades(container, () => {});
         view.setRoom({ room: '#game-2ca9e1x1be34a', ref: '0'.repeat(32), actor: 'c' + '1'.repeat(32) });
         status = container.querySelector('[data-spades-status]');
     });
@@ -64,7 +64,7 @@ describe('TurdSpades watcher view', () => {
         expect(match.send).not.toHaveBeenCalled();
         vi.advanceTimersByTime(1);
         expect(match.send).toHaveBeenCalledExactlyOnceWith({ action: 'sync' });
-        show(waiting(['south', 'north', 'east'], { watchOnly: true }));
+        // The callback itself arms the next wait. A reply is not required.
         vi.advanceTimersByTime(WATCH_SYNC_INTERVAL / 2);
         // Table updates during the interval must not push the heartbeat later.
         show(waiting(['south', 'west', 'north', 'east'], { watchOnly: true }));
@@ -80,12 +80,58 @@ describe('TurdSpades watcher view', () => {
         vi.advanceTimersByTime(WATCH_SYNC_INTERVAL);
         expect(match.send).toHaveBeenCalledTimes(3);
 
-        // A dropped connection or a seat at the table ends the watcher sync.
+        // While the socket is down, or after taking a seat, watcher sync stays quiet.
         show(waiting(['south', 'north', 'east'], { watchOnly: true }));
         match.options.onStatus('reconnecting');
         vi.advanceTimersByTime(WATCH_SYNC_INTERVAL * 2);
         show(waiting(['south', 'west', 'north', 'east'], { seat: 'west' }));
         vi.advanceTimersByTime(WATCH_SYNC_INTERVAL * 2);
+        expect(match.send).toHaveBeenCalledTimes(3);
+    });
+
+    it('resumes watcher sync after a socket drop while the board stays watch-only', () => {
+        show(waiting(['south', 'north', 'east'], { watchOnly: true }));
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL);
+        expect(match.send).toHaveBeenCalledExactlyOnceWith({ action: 'sync' });
+
+        match.options.onStatus('reconnecting');
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL * 2);
+        expect(match.send).toHaveBeenCalledTimes(1);
+
+        show(waiting(['south', 'west', 'north', 'east'], { watchOnly: true }));
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL / 2);
+        show(waiting(['south', 'north', 'east'], { watchOnly: true }));
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL / 2 - 1);
+        expect(match.send).toHaveBeenCalledTimes(1);
+        vi.advanceTimersByTime(1);
+        expect(match.send).toHaveBeenCalledTimes(2);
+        expect(match.send).toHaveBeenLastCalledWith({ action: 'sync' });
+
+        show(waiting(['south', 'west', 'north', 'east'], { seat: 'west' }));
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL * 2);
+        expect(match.send).toHaveBeenCalledTimes(2);
+    });
+
+    it('resumes watcher sync after the panel is closed and reopened', () => {
+        const panel = view.panel;
+        panel.open = true;
+        show(waiting(['south', 'north', 'east'], { watchOnly: true }));
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL);
+        expect(match.send).toHaveBeenCalledExactlyOnceWith({ action: 'sync' });
+
+        panel.open = false;
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL * 2);
+        expect(match.send).toHaveBeenCalledTimes(1);
+
+        panel.open = true;
+        show(waiting(['south', 'west', 'north', 'east'], { watchOnly: true }));
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL / 2);
+        show(waiting(['south', 'north', 'east'], { watchOnly: true }));
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL / 2);
+        expect(match.send).toHaveBeenCalledTimes(2);
+        expect(match.send).toHaveBeenLastCalledWith({ action: 'sync' });
+
+        vi.advanceTimersByTime(WATCH_SYNC_INTERVAL);
         expect(match.send).toHaveBeenCalledTimes(3);
     });
 });
