@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ARCADE_TAG, createArcadeTransport } from '../../hangout-worker/src/arcade-transport.mjs';
 import { CrapeightsMatch } from '../../hangout-worker/arcade/games/crapeights-match.js';
 import { TurdRummyMatch } from '../../hangout-worker/arcade/games/turdrummy-match.js';
-import { RANKS } from '../../hangout-worker/arcade/games/cards.js';
+import { RANKS, SUITS } from '../../hangout-worker/arcade/games/cards.js';
 import { TurdJackMatch, TURDJACK_MATCH_VERSION } from '../../hangout-worker/arcade/games/turdjack-match.js';
 
 const matchId = 'privacy-match-001';
@@ -226,6 +226,11 @@ describe('turdjack watcher privacy', () => {
         expect(watch.table).toEqual(seated.one.table);
         expect(watch.dealerHidden).toBe(true);
         expect(watch.dealer).toHaveLength(1);
+        const upcardId = dealOrder[2];
+        expect(watch.dealer[0]).toEqual({
+            rank: RANKS[upcardId % 13],
+            suit: SUITS[Math.floor(upcardId / 13) % 4]
+        });
         expect(Object.keys(watch)).not.toContain('shoe');
         expect(watch.actions).toEqual([]);
 
