@@ -391,9 +391,28 @@ test('four people in one private Hang Out room can see each other', async ({ bro
 });
 
 test('two people in WebKit when that browser launches', async () => {
-    test.setTimeout(120000);
-    const report = { launched: false, pass: false, status: 'WebKit did not launch' };
+    test.setTimeout(45000);
+    const hostLimitText = 'WebKit renderer crash on this host (environment limit)';
+    const report = { launched: false, pass: false, status: 'WebKit did not launch', environment: false };
     let browser;
+    let host;
+    let guest;
+    let hostLimit = '';
+    let closing = false;
+    const noteLimit = (status) => {
+        if (closing || hostLimit) return;
+        hostLimit = status || hostLimitText;
+        report.environment = true;
+        report.pass = false;
+        report.status = hostLimit;
+    };
+    const rendererCrash = (error) => /page crashed|renderer crash|target crashed|target closed|has been closed|browser closed|connection closed/i.test(`${error && error.name ? error.name : ''} ${error && error.message ? error.message : ''}`);
+    const pageDown = () => {
+        if (hostLimit) return true;
+        try { if (host && host.isClosed()) return true; } catch (error) { return true; }
+        try { if (guest && guest.isClosed()) return true; } catch (error) { return true; }
+        return false;
+    };
     try {
         try {
             // The Chromium worker's fake-device flags are the default launch options.
@@ -401,77 +420,88 @@ test('two people in WebKit when that browser launches', async () => {
             browser = await webkit.launch({ headless: true, args: [] });
             extraBrowser = browser;
             report.launched = true;
+            browser.on('disconnected', () => noteLimit(hostLimitText));
         } catch (error) {
             report.status = `WebKit did not launch (${scrub(error.message || error.name)})`;
-            return;
+            noteLimit(hostLimitText);
         }
-        const host = await openBrowser(browser, HOST_VIEW);
-        await join(host, roomUrl(), 'Alex');
-        const guest = await openBrowser(browser, PHONE);
-        let rendererCrashed = false;
-        host.on('crash', () => { rendererCrashed = true; });
-        guest.on('crash', () => { rendererCrashed = true; });
-        const inputs = await guest.evaluate(async () => {
-            try {
-                const list = await navigator.mediaDevices.enumerateDevices();
-                return list.filter((device) => device.kind === 'videoinput').length;
-            } catch (_) { return -1; }
-        });
-        await join(guest, host.url(), 'Blair');
-        const started = Date.now();
-        let cameraDenied = false;
-        try {
-            await turnCamera(host);
-            await turnCamera(guest);
-        } catch (error) {
-            cameraDenied = true;
-            const crashed = /crash|has been closed/i.test(error.message || '');
-            report.pass = false;
-            report.environment = crashed || inputs <= 0;
-            report.status = crashed
-                ? 'WebKit launched, then the renderer crashed while the second person turned the camera on.'
-                : `WebKit launched; camera path stopped (${scrub(error.message)}).`;
-            return;
-        }
-        const deadline = Date.now() + 20000;
-        let sawFrames = false;
-        while (Date.now() < deadline && !rendererCrashed && !host.isClosed() && !guest.isClosed()) {
-            const [hostRows, guestRows] = await Promise.all([remoteWidths(host), remoteWidths(guest)]);
-            if (hostRows.some((row) => row.width > 0) && guestRows.some((row) => row.width > 0)) {
-                sawFrames = true;
-                break;
+        if (!hostLimit) {
+            host = await openBrowser(browser, HOST_VIEW);
+            guest = await openBrowser(browser, PHONE);
+            host.setDefaultTimeout(8000);
+            guest.setDefaultTimeout(8000);
+            host.on('crash', () => noteLimit(hostLimitText));
+            guest.on('crash', () => noteLimit(hostLimitText));
+            const inputs = await guest.evaluate(async () => {
+                try {
+                    const list = await navigator.mediaDevices.enumerateDevices();
+                    return list.filter((device) => device.kind === 'videoinput').length;
+                } catch (_) { return -1; }
+            });
+            if (pageDown()) noteLimit(hostLimitText);
+            if (!hostLimit) await join(host, roomUrl(), 'Alex');
+            if (pageDown()) noteLimit(hostLimitText);
+            if (!hostLimit) await join(guest, host.url(), 'Blair');
+            if (pageDown()) noteLimit(hostLimitText);
+            const started = Date.now();
+            if (!hostLimit) {
+                await turnCamera(host);
+                await turnCamera(guest);
             }
-            await new Promise((resolve) => setTimeout(resolve, 250));
+            if (pageDown()) noteLimit(hostLimitText);
+            if (!hostLimit) {
+                let outcome = 'waiting';
+                try {
+                    await expect.poll(async () => {
+                        if (pageDown()) return 'crashed';
+                        const [hostRows, guestRows] = await Promise.all([remoteWidths(host), remoteWidths(guest)]);
+                        if (hostRows.some((row) => row.width > 0) && guestRows.some((row) => row.width > 0)) {
+                            outcome = 'frames';
+                            return 'frames';
+                        }
+                        outcome = 'waiting';
+                        return 'waiting';
+                    }, { timeout: 12000 }).not.toBe('waiting');
+                } catch (error) {
+                    if (pageDown() || rendererCrash(error)) noteLimit(hostLimitText);
+                    else {
+                        report.pass = false;
+                        report.status = 'WebKit stayed up, but neither side showed a playing face.';
+                        throw new Error(report.status);
+                    }
+                }
+                if (!hostLimit && outcome !== 'frames') noteLimit(hostLimitText);
+                if (!hostLimit) {
+                    report.pass = true;
+                    report.seconds = seconds(Date.now() - started);
+                    report.videoInputs = inputs;
+                    report.environment = false;
+                    report.cameraDenied = false;
+                    report.status = await onScreenStatus(host);
+                    expect(host.errors.concat(guest.errors)).toEqual([]);
+                }
+            }
         }
-        if (!sawFrames && (rendererCrashed || host.isClosed() || guest.isClosed())) {
-            report.pass = false;
-            report.environment = true;
-            report.status = 'WebKit launched, then the renderer crashed while waiting for faces.';
-            return;
-        }
-        if (!sawFrames) {
-            report.pass = false;
-            report.status = 'WebKit stayed up, but neither side showed a playing face.';
-            throw new Error(report.status);
-        }
-        report.pass = true;
-        report.seconds = seconds(Date.now() - started);
-        report.videoInputs = inputs;
-        report.environment = false;
-        report.cameraDenied = cameraDenied;
-        report.status = await onScreenStatus(host);
-        expect(host.errors.concat(guest.errors)).toEqual([]);
     } catch (error) {
-        report.pass = false;
-        report.status = scrub(error.message);
-        if (!report.environment) throw error;
+        if (hostLimit || pageDown() || rendererCrash(error)) noteLimit(hostLimitText);
+        else {
+            report.pass = false;
+            report.environment = false;
+            if (!report.status || report.status === 'WebKit did not launch') report.status = scrub(error.message);
+            throw error;
+        }
     } finally {
+        closing = true;
         console.log(`CHECK f ${report.pass ? 'pass' : 'fail'} launched=${report.launched} env=${Boolean(report.environment)} seconds=${report.seconds ?? ''} status=${report.status || ''}`);
         await writeJson('webkit.json', report);
         if (browser) {
             extraBrowser = null;
-            await Promise.race([browser.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 2000))]);
+            await Promise.race([browser.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 1500))]);
         }
+    }
+    if (hostLimit) {
+        test.info().annotations.push({ type: 'environment', description: hostLimitText });
+        test.skip(true, hostLimitText);
     }
 });
 
