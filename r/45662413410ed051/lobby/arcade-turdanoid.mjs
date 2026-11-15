@@ -211,7 +211,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
 
     function queue(action, value, time = performance.now()) {
         const match = model?.match;
-        if (connection !== 'ready' || !model?.seat || !match || match.result || pending || confirm.open || buffer.length >= inputBufferLimit ||
+        if (connection !== 'ready' || model?.watchOnly === true || !model?.seat || !match || match.result || pending || confirm.open || buffer.length >= inputBufferLimit ||
             visual?.run.status !== 'play' || serverNow(time) < match.startsAt) return false;
         const tick = Math.max(visual.tick + 1, brickRaceTick(match.startsAt, serverNow(time)) + 1, visual.queue.at(-1)?.[0] || 1);
         if (tick > BRICK_LIMIT_TICKS) return false;
@@ -292,6 +292,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
 
     function render() {
         const match = model?.match, seat = model?.seat, result = match?.result;
+        const watchOnly = model?.watchOnly === true;
         let message = 'Connecting to the race…', action = '', label = '';
         if (connection === 'unavailable') {
             message = matchConnectionErrors[connectionError] || 'The race couldn’t reconnect. Try again from this room.';
@@ -302,31 +303,42 @@ export function mountArcadeTurdanoid(container, onMatch) {
             message = 'Same wall and three balls. Clear it first or break the most bricks in 75 seconds.';
             if (canOpen) { action = 'open'; label = 'Open Turdanoid race'; }
         } else if (model?.waiting) {
-            message = seat ? 'Waiting for a second player.' : 'An opponent is ready.';
-            if (!seat) { action = 'join'; label = 'Join Turdanoid race'; }
+            if (watchOnly) message = 'Watching · waiting for players';
+            else {
+                message = seat ? 'Waiting for a second player.' : 'An opponent is ready.';
+                if (!seat) { action = 'join'; label = 'Join Turdanoid race'; }
+            }
         } else if (result) {
             message = result.winner === null ? 'Draw' : seat ? (result.winner === seat ? 'You win' : 'Rival wins')
                 : (result.winner === 'a' ? 'Player 1 wins' : 'Player 2 wins');
             message += ' · ' + { clear: 'wall cleared', time: 'time limit', out: 'out of balls', resign: 'forfeit' }[result.reason];
-            if (seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
-            if (seat && seat === model.rematch) message += ' · Rematch requested. Waiting for your rival.';
+            if (!watchOnly && seat && seat !== model.rematch) { action = 'rematch'; label = model.rematch ? 'Accept Turdanoid rematch' : 'Request Turdanoid rematch'; }
+            if (!watchOnly && seat && seat === model.rematch) message += ' · Rematch requested. Waiting for your rival.';
         } else if (match) message = match.wall.name;
         if (connection === 'ready' && seat && match && model.disconnectedSeats?.length) {
             message += ` · Waiting for ${'your rival'}, link still works.`;
         }
         put(status, message);
         $('[data-next-game]').hidden = !model?.upNext;
-        startRematch.hidden = !(connection === 'ready' && seat && match?.result && model.canStartRematch);
+        startRematch.hidden = !(connection === 'ready' && !watchOnly && seat && match?.result && model.canStartRematch);
         startRematch.disabled = !!pending;
         main.hidden = !action;
         main.dataset.command = action;
         put(main, label);
         main.disabled = !!pending;
-        leave.hidden = !seat || !!result;
+        leave.hidden = watchOnly || !seat || !!result;
         leave.disabled = connection !== 'ready' || !!pending;
         back.hidden = !match && !model?.upNext && !seat;
         table.hidden = !match;
-        launch.hidden = !seat || !match || !!result;
+        launch.hidden = watchOnly || !seat || !match || !!result;
+        $('.brick-race-help').hidden = watchOnly;
+        if (watchOnly) {
+            board.tabIndex = -1;
+            board.removeAttribute('aria-describedby');
+        } else {
+            board.tabIndex = 0;
+            board.setAttribute('aria-describedby', 'brick-race-help');
+        }
         if (connection !== 'ready') launch.disabled = true;
         if (!raf && match && panel.open) raf = requestAnimationFrame(drawFrame);
     }
@@ -388,6 +400,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         return true;
     }
     board.addEventListener('keydown', event => {
+        if (model?.watchOnly === true) return;
         if (event.ctrlKey || event.altKey || event.metaKey || !['ArrowLeft', 'ArrowRight', ' '].includes(event.key)) return;
         event.preventDefault();
         if (event.repeat) return;
@@ -422,7 +435,7 @@ export function mountArcadeTurdanoid(container, onMatch) {
         return Math.hypot(x - ball.x, y - ball.y) <= radius;
     }
     board.addEventListener('pointerdown', event => {
-        if (connection !== 'ready' || !model?.seat || pointer !== null && pointer !== undefined || event.isPrimary === false || event.button !== 0) return;
+        if (model?.watchOnly === true || connection !== 'ready' || !model?.seat || pointer !== null && pointer !== undefined || event.isPrimary === false || event.button !== 0) return;
         event.preventDefault();
         keys.clear();
         keyboardActive = false;
