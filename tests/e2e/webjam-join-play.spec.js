@@ -1,5 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
+test.use({ video: 'off' });
+
 test('the packaged website explains when browser audio is unavailable', async ({ page, baseURL }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(() => { window.AudioContext = undefined; });
@@ -630,10 +632,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         await page.addInitScript(() => {
             window.cameraChecks = [];
             window.musicConnected = false;
-            navigator.mediaDevices.getUserMedia = async constraints => {
-                window.cameraChecks.push({ video: !!constraints.video, audio: !!constraints.audio });
-                throw new DOMException('Synthetic camera refusal', 'NotAllowedError');
-            };
+            Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
+                configurable: true, value: async constraints => {
+                    window.cameraChecks.push({ video: !!constraints.video, audio: !!constraints.audio });
+                    throw new DOMException('Synthetic camera refusal', 'NotAllowedError');
+                },
+            });
         });
         let admittedRelay = false;
         let issuance = 0;
@@ -691,7 +695,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         const retry = room.getByRole('button', { name: 'Retry', exact: true });
         await expect(retry).toBeInViewport({ ratio: 1 });
         await expect(stop).toBeFocused();
-        await expect(page.locator('#status')).toHaveText('Connected. You’re listening with your microphone off.');
+        const musicStatus = page.locator('#status');
+        await expect(musicStatus).toHaveText('Listening · microphone off');
+        expect(await musicStatus.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
         expect(await page.evaluate(() => window.cameraChecks)).toEqual([]);
         await page.screenshot({ path: testInfo.outputPath(`private-camera-unavailable-${width}x${height}.png`) });
 

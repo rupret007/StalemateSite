@@ -488,7 +488,8 @@ async function startJoin(listenOnly = false) {
         timingReady: () => joinedSession.authorized && !!joinedSession.videoBaseline,
       });
     }
-    if (listenOnly) $("status").textContent = "Connected. You’re listening with your microphone off.";
+    if (videoRoom) $("status").textContent = listenOnly ? "Listening · microphone off" : "Connected to music";
+    else if (listenOnly) $("status").textContent = "Connected. You’re listening with your microphone off.";
     clearJoinFailure(failureElements(), $("status").textContent);
     $("join").hidden = true;
     const resumeAudio = $("play-audio");

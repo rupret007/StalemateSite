@@ -3,7 +3,7 @@
   "commit": "07b1b28c5b3dc381f4edc448f4eef6647e357610",
   "license": "MIT",
   "modifications": {
-    "app.js": "Preserve private listen-only joining, playback recovery and focus when adding the optional camera stage.",
+    "app.js": "Preserve private listen-only joining, playback recovery and focus when adding the optional camera stage. Use a compact status in the optional camera stage so the full microphone state fits on phones.",
     "index.html": "Preserve private listening and playback controls and add a disabled-by-default camera marker.",
     "join-entry.js": "Keep the host camera closed unless the protected document enables it.",
     "session.js": "Preserve listen-only music and admitted-session error guidance during camera teardown.",
@@ -22,7 +22,7 @@
     },
     "app.js": {
       "upstreamSha256": "39648f3ee6d145e4f60a93439f148fa298e15942c2e01572c8a639c9c085ba37",
-      "shippedSha256": "937432c2e504f8257dabcf3c24c7ef09f71b126101f053fb352ebce2d9428080"
+      "shippedSha256": "c37dd323f6699bcc47edfdcc4e00abfa1b27f99dbb09cfc447f30b2a0b958627"
     },
     "audio.js": {
       "source": "web/join/audio.js",
