@@ -19,6 +19,7 @@ const reasonText = {
 };
 
 export function chessTurnText(seat, turn) {
+    if (turn !== 'w' && turn !== 'b') return 'Reconnecting to Chess…';
     const who = seat ? `You’re ${colorName(seat)}` : 'Watching';
     if (seat && seat === turn) return `${who} · Your turn`;
     return `${who} · ${colorName(turn)} to move`;
@@ -26,7 +27,9 @@ export function chessTurnText(seat, turn) {
 
 export function chessResultText(result) {
     if (!result) return '';
-    if (!result.winner) return `Draw · ${result.reason}`;
+    if (result.winner !== 'w' && result.winner !== 'b') {
+        return result.winner ? 'Reconnecting to Chess…' : `Draw · ${result.reason}`;
+    }
     return result.reason?.toLowerCase().includes('checkmate')
         ? `Checkmate · ${colorName(result.winner)} wins`
         : `${colorName(result.winner)} wins · ${result.reason}`;
@@ -159,7 +162,7 @@ export function mountArcadeChess(container, onMatch) {
         }
         clearPending();
         if (next?.fen !== prior?.fen || !chess) chess = next ? new Chess(next.fen) : null;
-        if (next?.id !== prior?.id || next?.moves.length !== prior?.moves.length) claimOptions = undefined;
+        if (next?.id !== prior?.id || next?.moves?.length !== prior?.moves?.length) claimOptions = undefined;
         model = frame.state; canOpen = frame.canOpen === true;
         receivedAt = performance.now(); deadlineSynced = false;
         connection = 'ready'; connectionError = undefined;
@@ -325,6 +328,8 @@ export function mountArcadeChess(container, onMatch) {
             if (seated && model.rematch !== model.seat) button(model.rematch ? 'Accept rematch' : 'Request rematch', 'rematch');
             if (seated && model.rematch) status.textContent += model.rematch === model.seat
                 ? ' · Rematch requested. Waiting for your opponent.' : ' · Your opponent requested a rematch.';
+        } else if (!match?.turn) {
+            status.textContent = 'Reconnecting to Chess…';
         } else {
             status.textContent = chessTurnText(model.seat, match.turn);
             if (chess?.isCheck()) status.textContent += ` · ${colorName(match.turn)} is in check`;
