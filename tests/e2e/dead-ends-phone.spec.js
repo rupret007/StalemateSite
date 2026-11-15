@@ -13,7 +13,10 @@ const LOBBY = '/r/45662413410ed051/lobby/';
 const PREVIEW = 'local-preview-key-0001';
 const ROOT = path.join(__dirname, '../..');
 const WAIT_FOR_HOST = /wait(ing)? for (the )?host/i;
-const UP_NEXT = "Table full, you're up next game";
+const QUEUE_CUE_LEGACY = "Table full, you're up next game";
+const QUEUE_CUE_OPEN_SEAT = 'Table full. You\u2019re in line for the next open seat.';
+const UP_NEXT = new RegExp(`^(?:${QUEUE_CUE_LEGACY.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${
+    QUEUE_CUE_OPEN_SEAT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})$`);
 const FRESH_LINK = 'Ask the host for a fresh link.';
 const EXPIRED = 'This invite is no longer available. Ask your host for a new one.';
 const arcadeFeatures = { arcadeChess: 1, arcadeTurdSpades: 1, arcadeTurdanoid: 1 };
@@ -242,26 +245,47 @@ async function fits(page) {
     expect(box.scrollWidth).toBeLessThanOrEqual(box.innerWidth);
 }
 
-async function openExpiredInvite(browser, baseURL) {
+async function routeBetaShell(context, baseURL, { expiredInvite = false } = {}) {
     const { betaFetch } = await import('../../hangout-worker/src/beta-entry.mjs');
     const env = shellEnv();
-    const code = 'expired-invite-fixture';
-    const context = await browser.newContext({ viewport: PHONE, hasTouch: true });
-    const origin = new URL(baseURL).origin;
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     await context.route('**/beta/**', async route => {
         const request = route.request();
         const url = new URL(request.url());
-        if (request.method() === 'POST' && url.pathname.startsWith('/beta/game-night/invitation/')) {
+        if (expiredInvite && request.method() === 'POST' && url.pathname.startsWith('/beta/game-night/invitation/')) {
             await route.fulfill({ status: 410, contentType: 'application/json', body: JSON.stringify({ error: EXPIRED }) });
             return;
         }
-        const result = await betaFetch(new Request(request.url(), { method: request.method(), headers: request.headers() }), env);
+        const result = await betaFetch(new Request(request.url(), {
+            method: request.method(), headers: request.headers(), body: request.postData()
+        }), env);
         const headers = Object.fromEntries(result.headers);
         delete headers['content-length'];
         await route.fulfill({ status: result.status, headers, body: Buffer.from(await result.arrayBuffer()) });
     });
+}
+
+async function openExpiredInvite(browser, baseURL) {
+    const code = 'expired-invite-fixture';
+    const context = await browser.newContext({ viewport: PHONE, hasTouch: true });
+    const origin = new URL(baseURL).origin;
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await context.addInitScript(fresh => {
+        window.__freshLinkShares = [];
+        Object.defineProperty(navigator, 'share', {
+            configurable: true,
+            value: async payload => {
+                window.__freshLinkShares.push({ title: payload.title, text: payload.text, url: payload.url });
+            }
+        });
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: {
+                writeText: async text => { window.__freshLinkShares.push({ text }); }
+            }
+        });
+    }, FRESH_LINK);
+    await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+    await routeBetaShell(context, baseURL, { expiredInvite: true });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -306,6 +330,17 @@ for (const game of Object.values(GAMES)) {
                         expect(view.state.match.hands).toBeUndefined();
                     }
                     expect(frames.join('\n')).not.toMatch(/"playable"/);
+                    expect(JSON.stringify(frames)).not.toMatch(/"watchOnly":\s*true/);
+                    const watchOnlyHidesCue = await panelOf(extra, game).evaluate(panel => {
+                        const cue = panel.querySelector('[data-next-game]');
+                        const wasHidden = cue.hidden;
+                        const hiddenFor = model => !(model?.upNext && !model.seat && model.watchOnly !== true);
+                        const queuedShowsCue = !hiddenFor({ upNext: true, seat: null, watchOnly: false });
+                        const watchHidesCue = hiddenFor({ upNext: true, seat: null, watchOnly: true });
+                        cue.hidden = wasHidden;
+                        return queuedShowsCue && watchHidesCue;
+                    });
+                    expect(watchOnlyHidesCue).toBe(true);
                 }
                 const id = (await fixture.record(game.game))[game.game].id;
                 await fixture.act('ExtraPhone', game.game, { action: 'join', id, seat: 'next' });
@@ -340,7 +375,10 @@ for (const game of Object.values(GAMES)) {
                 expect(box.top).toBeGreaterThanOrEqual(0);
                 expect(box.bottom).toBeLessThanOrEqual(viewport.height);
                 await ask.tap();
-                await expect(ask).toHaveText(/Ask the host for a fresh link\.|Copied\. Send it to your host\./);
+                const shares = await page.evaluate(() => window.__freshLinkShares);
+                expect(shares).toHaveLength(1);
+                expect(shares[0].text).toBe(FRESH_LINK);
+                expect(JSON.stringify(shares)).not.toContain(code);
                 await fits(page);
                 const surface = await page.evaluate(() => ({
                     href: location.href,
@@ -355,11 +393,6 @@ for (const game of Object.values(GAMES)) {
                 expect(surface.state ?? '').not.toContain(code);
                 expect(surface.text).not.toMatch(/#game-|playable|passHash/);
                 expect(surface.storage).toEqual([]);
-                const copied = await page.evaluate(async () => {
-                    try { return await navigator.clipboard.readText(); } catch { return ''; }
-                });
-                expect(copied === '' || copied === FRESH_LINK).toBe(true);
-                expect(copied).not.toContain(code);
                 expect(await context.cookies()).toEqual([]);
                 expect(errors).toEqual([]);
             } finally { await opened.context.close(); }
