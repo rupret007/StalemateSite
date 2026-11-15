@@ -354,11 +354,20 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .arcade-spades [data-spades-bid] select { padding: 4px; min-height: 38px; }
 @media (max-width: 600px) {
   .arcade-spades, .arcade-spades [data-spades-table] { min-width: 0; max-width: 100%; }
+  .arcade-spades summary { width: 100%; overflow-wrap: anywhere; }
+  .arcade-spades summary .arcade-reconnect { max-width: calc(100% - 6px); margin-inline-start: 6px; white-space: normal; }
+  .arcade-spades .arcade-card-status, .arcade-spades .spades-seat,
+  .arcade-spades .spades-trick-summary { font-size: 13px; overflow-wrap: anywhere; }
+  .arcade-spades .btn { font-size: 13px; }
   .arcade-spades .arcade-card-hand { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .arcade-spades .arcade-card-hand button { min-width: 0; min-height: 50px; }
   .arcade-spades .spades-trick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .arcade-spades .spades-trick span, .arcade-spades .arcade-card-score > span { font-size: 13px; }
   .arcade-spades .arcade-card-score { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .arcade-spades [data-spades-bid] { display: grid; grid-template-columns: auto minmax(64px, 1fr) minmax(110px, 1.4fr); }
+  .arcade-spades [data-spades-bid] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .arcade-spades [data-spades-bid] label { grid-column: 1 / -1; }
+  .arcade-spades [data-spades-bid] :is(select, button) { width: 100%; min-width: 0; }
+  .arcade-spades > .arcade-card-actions > .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 }
 @media (max-width: 900px) {
   .arcade-spades summary { min-height: 44px; }
