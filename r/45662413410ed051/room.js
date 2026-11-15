@@ -14,7 +14,7 @@
     const mq = (q) => { try { return Boolean(win.matchMedia && win.matchMedia(q).matches); } catch (error) { return false; } };
     const PHONE = V.isPhoneDevice({ ua: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints, coarse: mq('(pointer: coarse)'), fine: mq('(any-pointer: fine)'), cores: navigator.hardwareConcurrency });
     const CAM = PHONE
-        ? { width: { ideal: 480, max: 640 }, height: { ideal: 360, max: 480 }, frameRate: { ideal: 15, max: 20 } }
+        ? { width: { ideal: 640, max: 640 }, height: { ideal: 480, max: 480 }, frameRate: { ideal: 24, max: 24 } }
         : { width: { ideal: 640, max: 640 }, height: { ideal: 360, max: 480 }, frameRate: { ideal: 24, max: 24 } };
     const CANVAS_CAM = { width: { ideal: 640, max: 640 }, height: { ideal: 480, max: 480 }, frameRate: { ideal: 15, max: 15 }, facingMode: { ideal: 'environment' } };
     const CAM_BPS = 250000;
@@ -1777,6 +1777,7 @@
             for (const kind of ['audio', 'video']) {
                 const sender = entry.senders[kind];
                 if (!sender || !sender.track) continue;
+                if (typeof sender.getParameters !== 'function' || typeof sender.setParameters !== 'function') continue;
                 const p = sender.getParameters();
                 if (!p.encodings || !p.encodings.length) p.encodings = [{}];
                 if (kind === 'video') {
