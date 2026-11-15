@@ -1,5 +1,5 @@
 // @vitest-environment node
-// Transport-level kick/ban before rematch for Chess and Spades (read-only src).
+// Transport-level kick/ban before rematch for Chess, Spades, and partner Spades.
 import { describe, expect, it } from 'vitest';
 import { ARCADE_TAG, createArcadeTransport } from '../../hangout-worker/src/arcade-transport.mjs';
 
@@ -25,6 +25,15 @@ const cases = [
         seated: [0, 1, 2, 3],
         kickIndex: 1,
         banIndex: 3,
+        privateHands: true
+    },
+    {
+        label: 'Spades partners',
+        name: 'turdspades',
+        open: { mode: 'partners' },
+        seated: [0, 1],
+        kickIndex: 1,
+        banIndex: 2,
         privateHands: true
     }
 ];
@@ -60,6 +69,14 @@ function fixture(name) {
         connections.push(socket);
         return socket;
     }
+    function watch(index) {
+        const socket = phone(index);
+        const actor = actors.get(actorId(index));
+        actor.canPlay = false;
+        actor.canOpen = false;
+        actor.gameGuest = { watch: true, game: name, room, ref, host: sidFor(0) };
+        return socket;
+    }
     const transport = createArcadeTransport({
         state: { storage, getWebSockets: () => connections }, name,
         now: () => now, uuid: () => 'c8eb7f10-e113-418f-9900-' + String(++matchCount).padStart(12, '0'),
@@ -80,7 +97,9 @@ function fixture(name) {
         transport.reconcile();
         return { socket, boundary, betaSid };
     }
-    return { phone, send, hello, last, view, transport, removeGuest, advance: ms => { now += ms; } };
+    const prefix = name === 'chess' ? ARCADE_TAG + ':' : 'game-night-' + name + ':';
+    const saved = () => records.get(prefix + ref)?.[name];
+    return { phone, watch, send, hello, last, view, transport, removeGuest, saved, advance: ms => { now += ms; } };
 }
 
 async function ready(game) {
@@ -88,14 +107,16 @@ async function ready(game) {
     const phones = [];
     for (const index of game.seated) phones[index] = f.phone(index);
     if (game.banIndex !== undefined && !game.seated.includes(game.banIndex)) phones[game.banIndex] = f.phone(game.banIndex);
+    const watcher = game.privateHands ? f.watch(8) : null;
     for (const socket of phones.filter(Boolean)) await f.hello(socket);
+    if (watcher) await f.hello(watcher);
     await f.send(phones[0], 'open', game.open);
     const { id } = f.view(phones[0]);
     for (const index of game.seated.slice(1)) {
         await f.send(phones[index], 'join', { id, seat: 'next' });
     }
     const seats = game.seated.map(index => f.view(phones[index]).seat);
-    return { f, phones, id, seats };
+    return { f, phones, watcher, id, seats };
 }
 
 function postCloseFrames(socket, boundary) {
@@ -109,7 +130,7 @@ function reportHandLeak(socket, boundary) {
 
 describe.each(cases)('Game Night kick/ban before rematch ($label)', game => {
     it('frees removed guests, keeps same seats for stayers, and sends no post-close frames or hand', async () => {
-        const { f, phones, id, seats } = await ready(game);
+        const { f, phones, watcher, id, seats } = await ready(game);
         const stayers = game.seated.filter(index => index !== game.kickIndex && index !== game.banIndex);
         await f.send(phones[game.seated.at(-1)], 'resign', { id, revision: f.view(phones[game.seated.at(-1)]).match?.revision ?? 0 });
         for (const socket of game.seated.map(index => phones[index])) {
@@ -118,8 +139,10 @@ describe.each(cases)('Game Night kick/ban before rematch ($label)', game => {
 
         const kick = await f.removeGuest(game.kickIndex, 4001, 'kicked');
         const ban = await f.removeGuest(game.banIndex, 4003, 'banned');
-        expect(kick.socket.closed).toEqual({ code: 4001, reason: 'kicked' });
-        expect(ban.socket.closed).toEqual({ code: 4003, reason: 'banned' });
+        // The fixture closes the session. Revoke does not emit 4001/4003, and a
+        // socket that is already closed is outside sockets(), so nothing replaces it.
+        expect(kick.socket.readyState).toBe(3);
+        expect(ban.socket.readyState).toBe(3);
 
         for (const socket of [kick.socket, ban.socket]) {
             expect(postCloseFrames(socket, socket === kick.socket ? kick.boundary : ban.boundary)).toEqual([]);
@@ -127,7 +150,14 @@ describe.each(cases)('Game Night kick/ban before rematch ($label)', game => {
         if (game.privateHands) {
             expect(reportHandLeak(kick.socket, kick.boundary)).toBe(false);
             expect(reportHandLeak(ban.socket, ban.boundary)).toBe(false);
+            expect(reportHandLeak(watcher, 0)).toBe(false);
         }
+
+        const stayed = f.saved();
+        expect(stayed.id).toBe(id);
+        expect(stayed.seats[seats[game.kickIndex]]).toBeNull();
+        if (game.seated.includes(game.banIndex)) expect(stayed.seats[seats[game.banIndex]]).toBeNull();
+        for (const index of stayers) expect(stayed.seats[seats[index]]).toBe(sidFor(index));
 
         await f.send(phones[0], 'start-rematch', { id });
         const nextId = f.view(phones[0])?.id;
@@ -142,15 +172,36 @@ describe.each(cases)('Game Night kick/ban before rematch ($label)', game => {
         }
 
         const table = f.view(phones[0]);
-        expect(table.occupied).toEqual(stayers.map(index => seats[index]));
-        expect(table.occupied).not.toContain(seats[game.kickIndex]);
-        if (game.seated.includes(game.banIndex)) expect(table.occupied).not.toContain(seats[game.banIndex]);
+        // Chess view() omits occupied. Spades and partner Spades include it.
+        if (Object.hasOwn(table, 'occupied')) {
+            expect(table.occupied).toEqual(stayers.map(index => seats[index]));
+            expect(table.occupied).not.toContain(seats[game.kickIndex]);
+            if (game.seated.includes(game.banIndex)) expect(table.occupied).not.toContain(seats[game.banIndex]);
+        } else {
+            expect(table.seat).toBe(seats[stayers[0]]);
+        }
+        const dealt = f.saved();
+        expect(dealt.match.id).toBe(nextId);
+        expect(dealt.seats[seats[game.kickIndex]]).toBeNull();
+        if (game.seated.includes(game.banIndex)) expect(dealt.seats[seats[game.banIndex]]).toBeNull();
+        for (const index of stayers) expect(dealt.seats[seats[index]]).toBe(sidFor(index));
+        await f.send(phones[0], 'sync');
+        expect(phones[0].frames.at(-1).t).not.toBe('match-error');
+        expect(f.view(phones[0]).id).toBe(nextId);
 
         for (const socket of [kick.socket, ban.socket]) {
             expect(postCloseFrames(socket, socket === kick.socket ? kick.boundary : ban.boundary)).toEqual([]);
             expect(socket.frames.some(frame => frame.t === 'rematch')).toBe(false);
-            expect(f.view(socket) ?? null).toBeNull();
+            // sockets() publishes only while readyState === 1, so the last view stays the finished hand.
+            expect(f.view(socket)?.id).toBe(id);
+            expect(f.last(socket)).toMatchObject({ phase: 'finished', currentMatchId: id });
             if (game.privateHands) expect(reportHandLeak(socket, socket === kick.socket ? kick.boundary : ban.boundary)).toBe(false);
+        }
+        if (game.privateHands) {
+            expect(f.view(watcher).watchOnly).toBe(true);
+            expect(f.view(watcher).seat).toBeNull();
+            expect(f.view(watcher).match?.hand ?? []).toEqual([]);
+            expect(reportHandLeak(watcher, 0)).toBe(false);
         }
     });
 });

@@ -45,13 +45,17 @@ export function createGameNightTable({
                 game.#seats[seat] = subject;
             }
             const occupied = game.#occupied();
-            if (record.match ? occupied.length < minSeats || record.match.id !== record.id
-                : !manualStart && occupied.length === sides.length) throw new TypeError('Invalid match seats');
+            // A full waiting table would already have dealt. A match may continue
+            // with fewer seats after a guest is removed between hands.
+            if (record.match) {
+                if (record.match.id !== record.id) throw new TypeError('Invalid match seats');
+            } else if (!manualStart && occupied.length === sides.length) throw new TypeError('Invalid match seats');
             if (record.match) {
                 game.#match = Match.restore(record.match);
-                if (manualStart && JSON.stringify(game.#match.players) !== JSON.stringify(occupied)) throw new TypeError('Invalid active seats');
+                const done = !!finished(game.#match);
+                if (manualStart && !done && JSON.stringify(game.#match.players) !== JSON.stringify(occupied)) throw new TypeError('Invalid active seats');
                 const votes = twoSeats ? (record.rematch ? [record.rematch] : []) : record.rematchVotes;
-                if (finished(game.#match) && Array.isArray(votes) && votes.length <= occupied.length &&
+                if (done && Array.isArray(votes) && votes.length <= occupied.length &&
                     new Set(votes).size === votes.length && votes.every(seat => occupied.includes(seat))) game.#votes = [...votes];
             }
             const queued = [];
@@ -174,6 +178,18 @@ export function createGameNightTable({
                 this.#seats[seat] = null;
                 this.dequeue(subject);
             }
+        }
+
+        // Kick or ban while the hand is over. The finished match stays so the
+        // host can rematch; this guest's seat is empty and they are not dealt
+        // the next hand. The host seat stays. An in-progress hand is held.
+        releaseFinishedSeat(subject) {
+            const seat = this.seat(subject);
+            if (this.#closed || !this.#match || !finished(this.#match) || !seat || seat === first || subject === this.#host) return false;
+            this.#votes = this.#votes.filter(entry => entry !== seat);
+            this.#seats[seat] = null;
+            this.dequeue(subject);
+            return true;
         }
 
         // A guest gives up a seat once play is over. The table, its host and the

@@ -463,7 +463,10 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             const released = !!record && claims.length < record.claims.length;
             let remaining = null;
             if (occupied) {
-                if (game.releaseSeat(subject)) {
+                // releaseSeat refuses every chess seat and any seat that still has
+                // a match. A finished hand must survive the kick so the host can
+                // rematch the people who stayed. An in-progress hand still ends the table.
+                if (game.releaseSeat(subject) || game.releaseFinishedSeat(subject)) {
                     remaining = game;
                     await state.storage.put(key(scope), savedRecord(scope, game, record.expiresAt, claims, record.seq + 1));
                 } else await state.storage.delete(key(scope));
