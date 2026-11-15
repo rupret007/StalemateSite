@@ -85,6 +85,23 @@ describe('TURN public endpoint', () => {
         expect((await request({}, { method: 'GET', body: undefined })).status).toBe(405);
         expect(upstream).not.toHaveBeenCalled();
     });
+    it('serves runtime TURN from env without provider calls when Cloudflare TURN is off', async () => {
+        const runtime = {
+            HANGOUT_PREVIEW_KEY: env.HANGOUT_PREVIEW_KEY,
+            HANGOUT_HMAC_KEY: env.HANGOUT_HMAC_KEY,
+            HANGOUT_TURN_URLS: 'turn:relay.example.invalid:3478',
+            HANGOUT_TURN_USERNAME: 'runtime-fixture-user',
+            HANGOUT_TURN_CREDENTIAL: 'runtime-fixture-credential'
+        };
+        const res = await request({}, {}, runtime);
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({
+            iceServers: [{ urls: ['turn:relay.example.invalid:3478'], username: 'runtime-fixture-user', credential: 'runtime-fixture-credential' }],
+            ttl: TURN_TTL,
+            expiresAt: Date.now() + 600000
+        });
+        expect(upstream).not.toHaveBeenCalled();
+    });
     it('defaults off and fails closed when accounting is unavailable', async () => {
         expect((await request({}, {}, { ...env, HANGOUT_TURN_ENABLED: undefined })).status).toBe(503);
         state.storage.get.mockRejectedValue(new Error('private diagnostic'));
