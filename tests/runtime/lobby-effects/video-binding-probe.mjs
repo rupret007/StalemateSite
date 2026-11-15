@@ -9,7 +9,7 @@ export default { fetch(request, env) {
     return target.fetch(new Request('https://video-admission.invalid/v1/check', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: '1'.repeat(64), invite_digest: (path === '/denied' ? '3' : '2').repeat(64) }),
-        redirect: 'error',
+        redirect: 'manual',
     }));
 } };
 `;
