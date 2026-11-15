@@ -10,16 +10,18 @@ const PREVIEW = 'local-preview-key-0001';
 const arcadeFeatures = { arcadeChess: 1, arcadeTurdSpades: 1, arcadeTurdanoid: 1 };
 
 const TAP_CSS = {
-    'picker-switch': 'r/45662413410ed051/lobby/lobby.css:220 (.btn.btn--small; r/45662413410ed051/lobby/lobby.css:48 min-height 38px)',
+    'picker-switch': 'r/45662413410ed051/lobby/lobby.css:325 (.roombar .arcade-game-picker min-height 44px at max-width 900px)',
     'picker-chess-summary': 'r/45662413410ed051/lobby/arcade-chess.css:9',
     'picker-spades-summary': 'r/45662413410ed051/lobby/lobby.css:276',
     'picker-turdanoid-summary': 'r/45662413410ed051/lobby/lobby.css:481',
     'chess-primary': 'r/45662413410ed051/lobby/arcade-chess.css:110',
     'chess-rematch-host': 'r/45662413410ed051/lobby/arcade-chess.css:110',
     'chess-board-square': 'r/45662413410ed051/lobby/arcade-chess.css:53',
-    'spades-bid-select': 'r/45662413410ed051/lobby/lobby.css:349 (38px base; r/45662413410ed051/lobby/lobby.css:351-353 at max-width 900px sets 44px)',
-    'spades-bid-button': 'r/45662413410ed051/lobby/lobby.css:351',
-    'spades-play-card': 'r/45662413410ed051/lobby/lobby.css:290',
+    'spades-main-open': 'r/45662413410ed051/lobby/lobby.css:372-377',
+    'spades-join-west': 'r/45662413410ed051/lobby/lobby.css:372-377',
+    'spades-bid-select': 'r/45662413410ed051/lobby/lobby.css:372-377 (44px phone rule; base select min-height 38px at :354)',
+    'spades-bid-button': 'r/45662413410ed051/lobby/lobby.css:372-377',
+    'spades-play-card': 'r/45662413410ed051/lobby/lobby.css:363 (arcade-spades hand button min-height 50px at max-width 600px)',
     'turdanoid-launch': 'r/45662413410ed051/lobby/lobby.css:498',
     'turdanoid-back-summary': 'r/45662413410ed051/lobby/lobby.css:481',
     'turdanoid-leave': 'r/45662413410ed051/lobby/lobby.css:481',
@@ -160,6 +162,23 @@ async function openGameNight(host, guest, guestNick) {
     if (await host.locator('[data-invite-dialog][open]').count()) await host.keyboard.press('Escape');
 }
 
+async function openGameNightRoom(fixture, nicks) {
+    const pages = await Promise.all(nicks.map(nick => fixture.phone(nick)));
+    const [host, ...guests] = pages;
+    const start = host.getByRole('button', { name: /Game Night/ });
+    if (!await start.isVisible()) await host.locator('.phonetabs [data-show="rooms"]').click();
+    await start.click();
+    await expect(host.getByRole('region', { name: /Game Night/ })).toBeVisible();
+    for (const [index, guest] of guests.entries()) {
+        await host.getByRole('button', { name: 'Invite players' }).click();
+        await host.getByRole('button', { name: `Invite ${nicks[index + 1]}`, exact: true }).click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night' }).click();
+        await expect(guest.getByRole('region', { name: /Game Night/ })).toBeVisible();
+        if (await host.locator('[data-invite-dialog][open]').count()) await host.keyboard.press('Escape');
+    }
+    return pages;
+}
+
 async function switchGame(page, value) {
     const picker = page.getByRole('combobox', { name: 'Switch game' });
     await expect(picker).toBeVisible();
@@ -230,10 +249,10 @@ test.describe('Game Night phone tap targets at 390×844', () => {
             await openGameNight(host, guest, 'TapGuest');
             const picker = host.getByRole('combobox', { name: 'Switch game' });
             await measureTapTarget(picker, { id: 'picker-switch', css: TAP_CSS['picker-switch'] });
-            const options = await picker.evaluate(select => [...select.options].filter(option => !option.disabled && option.value));
-            expect(options.map(option => option.value)).toEqual(
-                expect.arrayContaining(['chess', 'turdspades', 'turdanoid'])
-            );
+            const optionValues = await picker.evaluate(select => [...select.options]
+                .filter(option => !option.disabled && option.value)
+                .map(option => option.value));
+            expect(optionValues).toEqual(expect.arrayContaining(['chess', 'turdspades', 'turdanoid']));
             const summaries = {
                 chess: host.locator('details.arcade-chess > summary'),
                 turdspades: host.locator('details.arcade-spades > summary'),
@@ -276,42 +295,37 @@ test.describe('Game Night phone tap targets at 390×844', () => {
     test('Spades bid controls and a playable card', async ({ browser, baseURL }) => {
         const fixture = await gameNight(browser, baseURL);
         try {
-            const host = await fixture.phone('SpadesHost');
-            const guest = await fixture.phone('SpadesGuest');
-            await openGameNight(host, guest, 'SpadesGuest');
-            await switchGame(host, 'turdspades');
-            await switchGame(guest, 'turdspades');
-            await host.getByRole('button', { name: 'Open 2-player Spades' }).click();
-            await guest.getByRole('button', { name: 'Join West' }).click();
-            await expect(host.locator('[data-spades-table]')).toBeVisible();
-            const firstBidder = await host.locator('[data-spades-bid]:not([hidden])').count() ? host : guest;
-            await expect(firstBidder.locator('[data-spades-bid]')).toBeVisible();
-            await measureTapTarget(firstBidder.locator('#spades-bid'), {
+            const nicks = ['SpadesHost', 'SpadesWest', 'SpadesNorth', 'SpadesEast'];
+            const [host, west, north, east] = await openGameNightRoom(fixture, nicks);
+            for (const page of [host, west, north, east]) await switchGame(page, 'turdspades');
+            const openMain = host.locator('[data-spades-main]');
+            await expect(openMain).toHaveText('Open 4-player Spades');
+            await measureTapTarget(openMain, { id: 'spades-main-open', css: TAP_CSS['spades-main-open'] });
+            await openMain.click();
+            const joinWest = west.getByRole('button', { name: 'Join West', exact: true });
+            await measureTapTarget(joinWest, { id: 'spades-join-west', css: TAP_CSS['spades-join-west'] });
+            await joinWest.click();
+            await north.getByRole('button', { name: 'Join North', exact: true }).click();
+            await east.getByRole('button', { name: 'Join East', exact: true }).click();
+            for (const page of [host, west, north, east]) {
+                await expect(page.locator('[data-spades-table]')).toBeVisible();
+                await expect(page.locator('[data-spades-hand] [data-spades-card]')).toHaveCount(13);
+            }
+            await expect(west.locator('[data-spades-bid]')).toBeVisible();
+            await measureTapTarget(west.locator('#spades-bid'), {
                 id: 'spades-bid-select',
                 css: TAP_CSS['spades-bid-select'],
             });
-            await measureTapTarget(firstBidder.getByRole('button', { name: 'Bid for me' }), {
+            await measureTapTarget(west.getByRole('button', { name: 'Bid for me' }), {
                 id: 'spades-bid-button',
                 css: TAP_CSS['spades-bid-button'],
             });
-            let activePlayer = guest;
-            await expect.poll(async () => {
-                for (const page of [host, guest]) {
-                    if (await page.locator('[data-spades-bid]:not([hidden])').count()) {
-                        await page.getByRole('button', { name: 'Bid for me' }).tap();
-                    }
-                }
-                for (const page of [guest, host]) {
-                    const text = await page.locator('[data-spades-status]').textContent();
-                    const cards = await page.locator('[data-spades-hand] [data-spades-card]:not([disabled])').count();
-                    if (cards && (/Your play|tap a card/i.test(text) || cards > 0)) {
-                        activePlayer = page;
-                        return true;
-                    }
-                }
-                return false;
-            }, { timeout: 45000 }).toBe(true);
-            const playable = activePlayer.locator('[data-spades-hand] [data-spades-card]:not([disabled])').first();
+            await west.getByRole('button', { name: 'Bid for me' }).tap();
+            for (const page of [north, east, host]) {
+                await page.getByRole('button', { name: 'Bid for me' }).tap();
+            }
+            await expect(west.locator('[data-spades-status]')).toHaveText(/Your turn · tap a card/);
+            const playable = west.locator('[data-spades-hand] [data-spades-card]:not([disabled])').first();
             await expect(playable).toBeVisible();
             await measureTapTarget(playable, { id: 'spades-play-card', css: TAP_CSS['spades-play-card'] });
         } finally { await fixture.close(); }

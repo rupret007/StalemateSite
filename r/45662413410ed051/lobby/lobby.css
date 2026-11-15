@@ -322,7 +322,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 }
 @media (max-width: 900px) {
   .roombar:has([data-arcade-game]:not([hidden])) .modes { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .roombar .arcade-game-picker { width: 5.1rem; min-height: 44px; padding-inline: 6px; font-size: 11px; }
+  .roombar .arcade-game-picker { width: 5.1rem; min-height: 44px; height: 44px; padding-block: 0; padding-inline: 6px; font-size: 11px; }
   .chat:has(.arcade-card-table[open] [data-card-table]:not([hidden])) .buffer { min-height: 46px; padding-block: 4px; }
   .chat:has(.arcade-card-table[open] [data-card-table]:not([hidden])) .quick { display: none; }
   .chat:has(.arcade-card-table[open] [data-card-table]:not([hidden])) .roombar { padding: 4px 10px; }
