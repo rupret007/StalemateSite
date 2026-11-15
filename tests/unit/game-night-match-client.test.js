@@ -164,7 +164,6 @@ describe('Game Night phone wake and history recovery', () => {
 
     it.each([
         ['a ban', { code: 1008, reason: 'banned' }, 'banned'],
-        ['a ban reason on an abnormal close', { code: 1006, reason: 'banned' }, 'banned'],
         ['a ban without a reason', { code: 1008, reason: '' }, 'banned'],
         ['a ban with its own close code', { code: 4003 }, 'banned'],
         ['a kick', { code: 4001 }, 'kicked'],
@@ -179,7 +178,8 @@ describe('Game Night phone wake and history recovery', () => {
 
         sockets.at(-1).dispatchEvent(new CloseEvent('close', close));
         expect(status).toHaveBeenLastCalledWith('unavailable', reason);
-        expect(status.mock.calls.every(([value]) => value !== 'reconnecting')).toBe(true);
+        expect(status.mock.calls.flat()).not.toContain('reconnecting');
+        expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
         await vi.advanceTimersByTimeAsync(30_000);
         visibility(true);
         visibility(false);
@@ -187,7 +187,8 @@ describe('Game Night phone wake and history recovery', () => {
         await vi.advanceTimersByTimeAsync(30_000);
         expect(issue).toHaveBeenCalledTimes(2);
         expect(sockets).toHaveLength(2);
-        expect(status.mock.calls.every(([value]) => value !== 'reconnecting')).toBe(true);
+        expect(status.mock.calls.flat()).not.toContain('reconnecting');
+        expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
     });
 
     it.each([
@@ -207,16 +208,17 @@ describe('Game Night phone wake and history recovery', () => {
         active.dispatchEvent(new CloseEvent('close', close));
 
         expect(status).toHaveBeenLastCalledWith('unavailable', reason);
-        expect(status.mock.calls.every(([value]) => value !== 'reconnecting')).toBe(true);
+        expect(status.mock.calls.flat()).not.toContain('reconnecting');
         expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
         expect(vi.getTimerCount()).toBe(0);
         await vi.advanceTimersByTimeAsync(30_000);
         expect(issue).toHaveBeenCalledTimes(priorRequests);
         expect(sockets).toHaveLength(priorSockets);
-        expect(status.mock.calls.every(([value]) => value !== 'reconnecting')).toBe(true);
+        expect(status.mock.calls.flat()).not.toContain('reconnecting');
+        expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
     });
 
-    it('keeps a terminal close while hidden terminal after the page is shown', async () => {
+    it('keeps a terminal close received while the page is hidden after it is shown', async () => {
         const status = vi.fn();
         client.stop();
         client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
@@ -229,14 +231,36 @@ describe('Game Night phone wake and history recovery', () => {
         visibility(true);
         active.dispatchEvent(new CloseEvent('close', { code: 4001 }));
         expect(status).toHaveBeenLastCalledWith('unavailable', 'kicked');
-        visibility(false);
+        expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
         restored();
+        visibility(false);
         await vi.advanceTimersByTimeAsync(30_000);
 
         expect(issue).toHaveBeenCalledTimes(priorRequests);
         expect(sockets).toHaveLength(priorSockets);
         expect(status).toHaveBeenLastCalledWith('unavailable', 'kicked');
-        expect(status.mock.calls.every(([value]) => value !== 'reconnecting')).toBe(true);
+        expect(status.mock.calls.flat()).not.toContain('reconnecting');
+        expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('treats an online 4403 ban close as terminal without reconnecting', async () => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const original = sockets.at(-1);
+        const priorRequests = issue.mock.calls.length;
+        const priorSockets = sockets.length;
+        original.dispatchEvent(new CloseEvent('close', { code: 4403, reason: 'banned' }));
+        expect(status).toHaveBeenLastCalledWith('unavailable', 'banned');
+        expect(status.mock.calls.flat()).not.toContain('reconnecting');
+        expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(issue).toHaveBeenCalledTimes(priorRequests);
+        expect(sockets).toHaveLength(priorSockets);
     });
 
     it.each([
@@ -258,7 +282,8 @@ describe('Game Night phone wake and history recovery', () => {
         const priorSockets = sockets.length;
         kickedSocket.dispatchEvent(new CloseEvent('close', close));
         expect(status).toHaveBeenLastCalledWith('unavailable', reason);
-        expect(status.mock.calls.every(([value]) => value !== 'reconnecting')).toBe(true);
+        expect(status.mock.calls.flat()).not.toContain('reconnecting');
+        expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
 
         online = true;
         window.dispatchEvent(new Event('online'));
@@ -270,7 +295,8 @@ describe('Game Night phone wake and history recovery', () => {
         expect(issue).toHaveBeenCalledTimes(priorRequests);
         expect(sockets).toHaveLength(priorSockets);
         expect(status).toHaveBeenLastCalledWith('unavailable', reason);
-        expect(status.mock.calls.every(([value]) => value !== 'reconnecting')).toBe(true);
+        expect(status.mock.calls.flat()).not.toContain('reconnecting');
+        expect(status.mock.calls.flat()).not.toContain('Reconnecting…');
     });
 
     it('retries a generic policy close without reporting a ban', async () => {
@@ -363,7 +389,7 @@ describe('Game Night phone wake and history recovery', () => {
             state: { id: 'match-fixture', seat: 'w', match: {} }
         }) }));
         expect(onState).toHaveBeenCalledTimes(priorStateCalls + 1);
-        expect(onState.mock.calls.at(-1)[0].seq).toBe(2);
+        expect(onState.mock.calls.at(-1)[0]).toMatchObject({ seq: 2, state: { seat: 'w' } });
         const recoveredRequests = issue.mock.calls.length;
         const recoveredSockets = sockets.length;
         await vi.advanceTimersByTimeAsync(30_000);
