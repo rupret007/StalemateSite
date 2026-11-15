@@ -388,8 +388,8 @@ for (const game of Object.values(GAMES)) {
         });
 
         if (game.game === 'chess') {
-            for (const [code, reason] of [[4403, 'banned'], [4001, 'kicked']]) {
-                test(`1e. a seated phone stops retrying after being ${reason}`, async ({ browser, baseURL }) => {
+            for (const [code, reason] of [[4003, 'banned'], [4403, 'banned'], [4001, 'kicked']]) {
+                test(`1e. a seated phone stops retrying after being ${reason} (${code})`, async ({ browser, baseURL }) => {
                     const fixture = await gameNight(browser, baseURL);
                     try {
                         const pages = await seated(fixture, game, nicks);
