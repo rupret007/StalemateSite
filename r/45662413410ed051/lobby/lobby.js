@@ -1551,9 +1551,13 @@ import { discordCallLink, FOUR_COLUMNS, FOUR_ROWS, fourFinished, fourMark, fourW
             if (l.me) li.classList.add('act');
         }
         const stick = buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
+        // Deep zoom can leave the short Jam transcript scrolled up while the
+        // composer is in use. Reveal the sender's confirmed message in place.
+        const ownJamSend = !replaying && l.personSelf === true && currentJam()
+            && innerWidth <= 900 && innerHeight <= 450 && document.activeElement?.closest('[data-say]');
         lines.append(li);
         while (lines.children.length > 300) lines.firstChild.remove();
-        if (stick) buf.scrollTop = buf.scrollHeight;
+        if (stick || ownJamSend) buf.scrollTop = buf.scrollHeight;
         else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
     }
 
