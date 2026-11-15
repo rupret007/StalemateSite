@@ -93,6 +93,31 @@ describe('Spades phone table', () => {
         expect(document.querySelector('[data-next-game]').hidden).toBe(false);
     });
 
+    it('reserves Game over for a match result and keeps the last trick winner', () => {
+        const four = new GameNightTurdSpades('spades-four-summary', 'host');
+        for (const [subject, position] of [['west-player', 'west'], ['north-player', 'north'], ['east-player', 'east']]) {
+            expect(four.join(subject, 'spades-four-summary', 0, position)).toBe(true);
+        }
+        const view = mount();
+        for (const table of [partnersTable(), four]) {
+            const state = table.view('host');
+            const roundEnd = { ...state, match: {
+                ...state.match, phase: 'round-end', lastWinner: 'north',
+                tricks: { south: 0, west: 0, north: 0, east: 0 }, result: null
+            } };
+            client.handlers.onState({ state: roundEnd, canOpen: true, partners: true });
+            expect(view.find('[data-spades-trick-summary]').textContent).toBe('Hand over · Last won by North' + (state.mode === 'partners' ? ' (CPU)' : ''));
+
+            const completed = { ...roundEnd, match: { ...roundEnd.match, tricks: { south: 13, west: 0, north: 0, east: 0 } } };
+            client.handlers.onState({ state: completed, canOpen: true, partners: true });
+            expect(view.find('[data-spades-trick-summary]').textContent).toBe('13 tricks complete · Last won by North' + (state.mode === 'partners' ? ' (CPU)' : ''));
+
+            const finished = { ...completed, match: { ...completed.match, result: { winner: 0, reason: 'score' } } };
+            client.handlers.onState({ state: finished, canOpen: true, partners: true });
+            expect(view.find('[data-spades-trick-summary]').textContent).toBe('Game over · Last won by North' + (state.mode === 'partners' ? ' (CPU)' : ''));
+        }
+    });
+
     it('uses four phone hand columns and two trick columns with full-width controls', () => {
         const css = readFileSync(join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
         const phone = css.slice(css.indexOf('@media (max-width: 600px)'), css.indexOf('@media (max-width: 900px)', css.indexOf('@media (max-width: 600px)')));

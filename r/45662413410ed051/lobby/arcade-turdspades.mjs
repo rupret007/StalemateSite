@@ -277,7 +277,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         $('[data-spades-trick-summary]').textContent = match.phase === 'bid'
             ? 'Bids · no cards played yet'
             : match.phase === 'round-end' || match.result
-                ? `${completed >= 13 ? '13 tricks complete' : 'Game over'}${match.lastWinner ? ` · Last won by ${nameFor(match.lastWinner)}` : ''}`
+                ? `${match.result ? 'Game over' : completed >= 13 ? '13 tricks complete' : 'Hand over'}${match.lastWinner ? ` · Last won by ${nameFor(match.lastWinner)}` : ''}`
                 : `Trick ${Math.min(completed + 1, 13)} of 13${!match.trick.length && match.lastTrick.length ? ' · showing last trick' : ''}`;
         const shown = match.trick.length ? match.trick : match.lastTrick;
         trickSlots.forEach(({ row, label, card }, index) => {
