@@ -981,3 +981,76 @@ test('outbound generation: reconnect drops paced camera state while preserving o
     await expect(host.locator('[data-log]')).toContainText('Delivered before the relay reconnect');
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });
+
+// One phone loses its network long enough to use up every ICE restart, then gets it back.
+const remoteFaces = (page) => page.evaluate(async () => {
+    const app = window.__hangout;
+    const read = () => [...document.querySelectorAll('[data-tiles] .tile:not([data-tile="me"])')].map((tile) => {
+        const id = tile.dataset.tile;
+        const video = tile.querySelector('video');
+        const tracks = video?.srcObject?.getTracks() || [];
+        const live = (kind) => tracks.some((t) => t.kind === kind && t.readyState === 'live' && !t.muted);
+        return { id, known: app.av.pcs.has(id) && app.names.has(id), state: app.av.pcs.get(id)?.pc.connectionState || 'none',
+            video: live('video'), audio: live('audio'), playing: Boolean(video && !video.paused && video.videoWidth > 0), at: video ? video.currentTime : 0 };
+    });
+    const first = read();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    return read().map((face) => {
+        const before = first.find((x) => x.id === face.id);
+        const advancing = Boolean(before) && face.at > before.at;
+        return { known: face.known, state: face.state, video: face.video, audio: face.audio, playing: face.playing && advancing };
+    });
+});
+const LIVE_FACE = { known: true, state: 'connected', video: true, audio: true, playing: true };
+
+test('a face that drops off the network past every ICE restart comes back for all three people', async ({ browser }) => {
+    test.setTimeout(150000);
+    const pages = [];
+    for (const name of ['Jeff', 'Karen', 'Sam']) {
+        const page = await openBrowser(browser);
+        // Chromium's offline switch leaves established WebRTC media flowing on this
+        // machine, so the dead network is modelled where it bites: while a page is
+        // "down" its media transports are gone and new ones cannot gather a path.
+        await page.addInitScript(() => {
+            const Native = window.RTCPeerConnection;
+            window.__mediaPcs = [];
+            window.RTCPeerConnection = class extends Native {
+                constructor(config) {
+                    super(window.__mediaDown ? { ...config, iceTransportPolicy: 'relay', iceServers: [] } : config);
+                    window.__mediaPcs.push(this);
+                }
+            };
+        });
+        await join(page, pages[0] ? pages[0].url() : roomUrl(), name);
+        pages.push(page);
+    }
+    for (const page of pages) { await camOn(page); await micOn(page); }
+    for (const page of pages) await expect.poll(() => remoteFaces(page), { timeout: 30000 }).toEqual([LIVE_FACE, LIVE_FACE]);
+    const [jeff, karen, sam] = pages;
+
+    await sam.context().setOffline(true);
+    await sam.evaluate(() => {
+        window.__mediaDown = true;
+        for (const pc of window.__mediaPcs) Object.getPrototypeOf(window.RTCPeerConnection).prototype.close.call(pc);
+    });
+    // Stay down until the others have used every paced restart and started over.
+    for (const page of [jeff, karen]) {
+        await expect(page.locator('[data-status]')).toContainText('Reconnecting to Sam', { timeout: 20000 });
+    }
+    for (const page of [jeff, karen]) {
+        await expect(page.locator('[data-status]')).toContainText('Trying a fresh connection', { timeout: 40000 });
+    }
+    for (const page of [jeff, karen]) expect((await remoteFaces(page)).filter((face) => face.state === 'connected' && face.playing)).toHaveLength(1);
+
+    await sam.evaluate(() => {
+        window.__mediaDown = false;
+        for (const pc of window.__mediaPcs) {
+            if (pc.connectionState !== 'closed') pc.setConfiguration({ ...pc.getConfiguration(), iceTransportPolicy: 'all' });
+        }
+    });
+    await sam.context().setOffline(false);
+    // Every person sees and hears both others again, and nobody keeps a ghost tile.
+    await Promise.all(pages.map((page) => expect.poll(() => remoteFaces(page), { timeout: 20000 }).toEqual([LIVE_FACE, LIVE_FACE])));
+    for (const page of pages) await expect(page.locator('[data-tiles] .tile')).toHaveCount(3);
+    expect(pages.flatMap((page) => page.errors)).toEqual([]);
+});

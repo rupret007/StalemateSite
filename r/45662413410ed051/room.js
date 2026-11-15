@@ -1811,10 +1811,10 @@
             const pc = new RTCPeerConnection({ iceServers: app.av.ice || STUN });
             const conn = navigator.connection || {};
             const thrifty = Boolean(conn.saveData) || conn.type === 'cellular' || /(^|-)2g|3g/.test(conn.effectiveType || '');
-            const entry = { pc, polite: app.myId > id, makingOffer: false, offerNeeded: false, waitingInitialOffer: false, ignoreOffer: false, settingRemoteAnswer: false, remoteOfferPending: false, remoteOfferJobs: 0, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
+            const entry = { pc, polite: app.myId > id, makingOffer: false, offerNeeded: false, waitingInitialOffer: false, ignoreOffer: false, settingRemoteAnswer: false, remoteOfferPending: false, remoteOfferJobs: 0, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, restartTimer: 0, last: null };
             app.av.pcs.set(id, entry);
             const current = () => peer.live && app.av.pcs.get(id) === entry;
-            pc.onicecandidate = (e) => { if (current() && e.candidate) send({ type: 'rtc', to: id, ice: e.candidate.toJSON() }); };
+            pc.onicecandidate = (e) => { if (current() && e.candidate) send(rtcMsg(peer, id, { ice: e.candidate.toJSON() })); };
             const initial = () => !pc.localDescription && !pc.remoteDescription;
             const waitForInitialOffer = () => initial() && entry.polite && (app.av.mic || app.av.cam) && app.av.peers.has(id);
             entry.pumpOffer = async () => {
@@ -1844,7 +1844,7 @@
                     await pc.setLocalDescription(offer);
                     if (!current()) return;
                     entry.waitingInitialOffer = false;
-                    await send({ type: 'rtc', to: id, sdp: pc.localDescription.toJSON() });
+                    await send(rtcMsg(peer, id, { sdp: pc.localDescription.toJSON() }));
                 } catch (error) {
                     failed = true;
                     if (initialAttempt && !pc.remoteDescription) entry.waitingInitialOffer = true;
@@ -1876,7 +1876,7 @@
             pc.onconnectionstatechange = () => {
                 if (!current()) return;
                 const s = pc.connectionState;
-                if (s === 'connected') { entry.restarts = 0; checkRelay(id, entry); layout(); }
+                if (s === 'connected') { entry.restarts = 0; clearTimeout(entry.restartTimer); entry.restartTimer = 0; checkRelay(id, entry); layout(); }
                 if (s === 'disconnected') win.setTimeout(() => { if (pc.connectionState === 'disconnected') restartIce(id, entry); }, 3000);
                 if (s === 'failed') restartIce(id, entry);
             };
@@ -1893,17 +1893,49 @@
         }
     }
 
-    /* Reconnect: ICE restart a few times, then give up on that one face politely. */
+    /* Reconnect: paced ICE restarts (each one gets 2 s / 4 s / 8 s to finish its
+     * negotiation before the next counts), then replace the connection with a fresh one. */
+    const ICE_RETRY_MS = [2000, 4000, 8000];
+    const rtcMsg = (peer, to, body) => Object.assign({ type: 'rtc', to }, peer.rtcEpoch ? { e: peer.rtcEpoch } : null, body);
     function restartIce(id, entry) {
-        if (app.av.pcs.get(id) !== entry) return;
+        if (app.av.pcs.get(id) !== entry || entry.restartTimer) return;
+        if (entry.restarts >= ICE_RETRY_MS.length) { rebuildPc(id); return; }
+        const wait = ICE_RETRY_MS[entry.restarts];
         entry.restarts += 1;
-        if (entry.restarts > 3) {
-            say(`Couldn’t connect faces with ${peerName(id)}. Chat and draw still work.`);
-            closePc(id);
-            return;
-        }
         say(`Reconnecting to ${peerName(id)}…`);
         try { entry.pc.restartIce(); } catch (error) { /* old browser */ }
+        entry.restartTimer = win.setTimeout(() => {
+            entry.restartTimer = 0;
+            if (app.av.pcs.get(id) === entry && entry.pc.connectionState !== 'connected') restartIce(id, entry);
+        }, wait);
+    }
+
+    // The network is back: retry any face that is still down now instead of waiting out a backoff.
+    win.addEventListener('online', () => {
+        for (const [id, entry] of app.av.pcs) {
+            if (entry.pc.connectionState === 'connected') continue;
+            clearTimeout(entry.restartTimer);
+            entry.restartTimer = 0;
+            entry.restarts = 0;
+            restartIce(id, entry);
+        }
+    });
+
+    /* Restarts ran out: start over with a fresh RTCPeerConnection on both ends. The
+     * epoch rides on every rtc message so signaling from the replaced connection is
+     * dropped and simultaneous rebuilds settle on one pair. */
+    function rebuildPc(id, epoch) {
+        const peer = relayPeers.get(id);
+        if (!peer?.live) { closePc(id); return; }
+        const mine = peer.rtcEpoch || 0;
+        if (epoch !== undefined && epoch <= mine) return;
+        peer.rtcEpoch = epoch === undefined ? mine + 1 : epoch;
+        closePc(id);
+        if (epoch === undefined) {
+            say(`Couldn’t connect faces with ${peerName(id)} yet. Trying a fresh connection; chat and draw still work.`);
+            send(rtcMsg(peer, id, { reset: true }));
+        }
+        openPc(id);
     }
 
     async function checkRelay(id, entry) {
@@ -1956,6 +1988,10 @@
     async function onRtc(from, msg, peer) {
         if (!peer.live || app.av.removed.has(from)) return;
         if (!(app.av.mic || app.av.cam) && !app.av.peers.has(from)) return;
+        const epoch = Number.isSafeInteger(msg.e) && msg.e > 0 ? msg.e : 0;
+        if (epoch < (peer.rtcEpoch || 0)) return;
+        if (epoch > (peer.rtcEpoch || 0)) rebuildPc(from, epoch);
+        if (msg.reset) return;
         if (!app.av.pcs.has(from)) await openPc(from);
         const entry = app.av.pcs.get(from);
         if (!entry || !peer.live) return;
@@ -1988,7 +2024,7 @@
                         if (app.av.music) answer.sdp = V.musicSdp(answer.sdp);
                         await pc.setLocalDescription(answer);
                         if (!current()) return;
-                        await send({ type: 'rtc', to: from, sdp: pc.localDescription.toJSON() });
+                        await send(rtcMsg(peer, from, { sdp: pc.localDescription.toJSON() }));
                     }
                 } finally {
                     if (offer) {
@@ -2009,7 +2045,7 @@
 
     function closePc(id) {
         const entry = app.av.pcs.get(id);
-        if (entry) { entry.offerNeeded = false; entry.waitingInitialOffer = false; entry.pc.close(); app.av.pcs.delete(id); }
+        if (entry) { entry.offerNeeded = false; entry.waitingInitialOffer = false; clearTimeout(entry.restartTimer); entry.pc.close(); app.av.pcs.delete(id); }
         app.av.relayed.delete(id);
         delete app.av.levels[id];
         const meter = app.av.meters.get(id);
