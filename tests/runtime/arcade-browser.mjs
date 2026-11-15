@@ -249,7 +249,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await host.getByRole('button', { name: 'Open Chess match' }).click();
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await accept.tap();
-                    await expect(friend.getByText('This game invitation no longer has an open seat. Ask the host for a fresh invitation.')).toBeVisible();
+                    const guidance = 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.';
+                    const toast = friend.locator('[data-toast]');
+                    await expect(toast).toBeVisible();
+                    await expect(toast).toHaveText(guidance);
+                    const announcement = friend.locator('[data-toast-announcement]');
+                    await expect(announcement).toHaveRole('status');
+                    await expect(announcement).toHaveText(guidance);
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await friend.locator('[data-leave]').click();
                     await expect(friend.locator('[data-game-night]')).toBeHidden();
@@ -620,7 +626,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const joinOffer = player.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night', exact: true });
         async function expectRefusal() {
             await joinOffer.click();
-            await expect(player.getByText('Couldn’t join Game Night. Ask the host for a fresh invitation.', { exact: true })).toBeVisible();
+            const guidance = 'Couldn’t join Game Night. Ask the host for a fresh invitation.';
+            const toast = player.locator('[data-toast]');
+            await expect(toast).toBeVisible();
+            await expect(toast).toHaveText(guidance);
+            const announcement = player.locator('[data-toast-announcement]');
+            await expect(announcement).toHaveRole('status');
+            await expect(announcement).toHaveText(guidance);
             await expect(player.locator('[data-game-night]')).toBeHidden();
         }
         assert.equal(new URL(player.url()).hash, '');
