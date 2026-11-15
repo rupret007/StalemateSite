@@ -780,7 +780,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             uncertainMessages();
             // Ordinary 4403 can follow a temporary loss of room membership.
             const removed = e.code === 4001 || ([4403, 4003].includes(e.code) && e.reason === 'banned');
-            if (removed && app.me) {
+            if (removed) {
                 if (gameGuest) return leaveGameGuest('removed');
                 return endSession('removed');
             }

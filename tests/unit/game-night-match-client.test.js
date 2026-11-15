@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { JSDOM } from 'jsdom';
+import { readFileSync } from 'node:fs';
 import { createGameNightMatchClient, matchUnavailableText } from '../../r/45662413410ed051/lobby/game-night-match-client.mjs';
+import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs';
 
 describe('Game Night phone wake and history recovery', () => {
     let client, sockets, issue, hidden, events;
@@ -218,11 +221,26 @@ describe('Game Night phone wake and history recovery', () => {
         expect(sockets).toHaveLength(before + 1);
     });
 
-    it('classifies 4003 banned as removal in the lobby close handler', async () => {
-        const { readFileSync } = await import('node:fs');
-        const source = readFileSync('r/45662413410ed051/lobby/lobby.js', 'utf8');
-        const handler = source.slice(source.indexOf('const onClose = async'), source.indexOf('ws.onclose = onClose'));
-        expect(handler).toMatch(/\[4403, 4003\]\.includes\(e\.code\) && e\.reason === 'banned'/);
+    it.each([false, true])('ends a 4003 banned match after a %s table snapshot without retrying', async tableVisible => {
+        const status = vi.fn();
+        client.stop();
+        client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
+        client.start({ room: '#game-fixture', ref: 'fixture' });
+        await vi.advanceTimersByTimeAsync(0);
+        const current = sockets.at(-1);
+        ready(current, { snapshots: true });
+        current.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({ t: 'snapshot', version: 1, room: '#game-fixture', seq: 1,
+                phase: 'playing', currentMatchId: 'match-hidden', state: tableVisible ? { id: 'match-hidden', seat: null } : null })
+        }));
+        const count = sockets.length, tickets = issue.mock.calls.length;
+        current.dispatchEvent(new CloseEvent('close', { code: 4003, reason: 'banned' }));
+        expect(status).toHaveBeenLastCalledWith('unavailable', 'room');
+        await vi.advanceTimersByTimeAsync(20_000);
+        expect(sockets).toHaveLength(count);
+        expect(issue).toHaveBeenCalledTimes(tickets);
+        restored();
+        expect(issue).toHaveBeenCalledTimes(tickets);
     });
 
     it('keeps trying to reconnect with a capped wait while the page is visible', async () => {
@@ -388,5 +406,94 @@ describe('Game Night phone wake and history recovery', () => {
         expect(sockets[1].close).not.toHaveBeenCalled();
         ready(sockets[1]);
         expect(sockets[1].send).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('lobby room refusal closes', () => {
+    const html = readFileSync('r/45662413410ed051/lobby/index.html', 'utf8');
+    const lobby = readFileSync('r/45662413410ed051/lobby/lobby.js', 'utf8');
+    const discovery = readFileSync('r/45662413410ed051/lobby/discovery-core.js', 'utf8');
+    const windows = [];
+    afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
+
+    async function visitor({ guest = false, welcomed = true } = {}) {
+        const dom = new JSDOM(html, {
+            url: 'http://127.0.0.1:8801/r/45662413410ed051/lobby/?preview=fixture&relay=ws%3A%2F%2F127.0.0.1%3A8801%2Frelay',
+            runScripts: 'outside-only'
+        });
+        windows.push(dom);
+        const { window } = dom, sockets = [], timers = new Map();
+        let nextTimer = 0;
+        window.setTimeout = (fn, delay) => { timers.set(++nextTimer, { fn, delay }); return nextTimer; };
+        window.clearTimeout = id => timers.delete(id);
+        if (guest) {
+            const bootstrap = window.document.createElement('script');
+            bootstrap.src = '/beta/bootstrap.js';
+            window.document.head.append(bootstrap);
+            window.HangoutBootstrap = { preview: 'fixture', gameGuest: {
+                room: '#game-fixture', ref: 'fixture', sessionRef: 'fixture-session', tableId: 'fixture-table', game: 'chess'
+            } };
+        }
+        window.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+        window.WebSocket = class {
+            static CLOSING = 2;
+            readyState = 0;
+            constructor() { sockets.push(this); }
+            send() {}
+            open() { this.readyState = 1; this.onopen?.(); }
+            receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
+            close(code = 1000, reason = '') { this.readyState = 3; return this.onclose?.({ code, reason }); }
+        };
+        window.HangoutClientTestModules = createHangoutClientTestModules(window);
+        window.eval(discovery);
+        const imports = [...lobby.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
+        window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${lobby.replace(/^import .*$/gm, '')}`);
+        if (!guest) {
+            window.document.querySelector('[data-nick]').value = 'Viewer';
+            window.document.querySelector('[data-enter]').click();
+        }
+        await vi.waitFor(() => expect(sockets).toHaveLength(1));
+        const ws = sockets[0];
+        ws.open();
+        if (welcomed) {
+            ws.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok', features: {} });
+            ws.receive({ t: 'welcome', nick: 'Viewer', role: 'fan', band: false, verified: false, capabilities: {} });
+        }
+        const fireRetries = () => {
+            for (const [id, task] of [...timers]) {
+                if (task.delay >= 750 && task.delay <= 10_000) { timers.delete(id); task.fn(); }
+            }
+        };
+        const pendingRetries = () => [...timers.values()].filter(task => task.delay >= 750 && task.delay <= 1_000);
+        return { window, ws, sockets, fireRetries, pendingRetries };
+    }
+
+    it.each([
+        { guest: false, welcomed: true },
+        { guest: true, welcomed: true },
+        { guest: false, welcomed: false },
+        { guest: true, welcomed: false }
+    ])('removes a banned visitor and stops retrying (guest=$guest, welcomed=$welcomed)', async options => {
+        const { window, ws, sockets, fireRetries, pendingRetries } = await visitor(options);
+        await ws.close(4003, 'banned');
+        const reason = window.document.querySelector('[data-session-reason]').textContent;
+        expect(reason).toContain(options.guest ? 'You were removed from Game Night.' : 'You were removed from this session.');
+        expect(window.document.querySelector('[data-session-ended]').hidden).toBe(false);
+        if (options.guest) {
+            expect(window.history.state.gameExit).toBe('removed');
+            expect(window.fetch).toHaveBeenCalledWith('/beta/game-night/invitation/leave', expect.objectContaining({ method: 'POST' }));
+        }
+        expect(pendingRetries()).toHaveLength(0);
+        fireRetries();
+        expect(sockets).toHaveLength(1);
+    });
+
+    it('retries an ordinary 4403 room membership close', async () => {
+        const { window, ws, sockets, fireRetries, pendingRetries } = await visitor();
+        await ws.close(4403, 'room membership ended');
+        expect(window.document.querySelector('[data-session-ended]').hidden).toBe(true);
+        expect(pendingRetries()).toHaveLength(1);
+        fireRetries();
+        await vi.waitFor(() => expect(sockets).toHaveLength(2));
     });
 });

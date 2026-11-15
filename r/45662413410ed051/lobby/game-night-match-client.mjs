@@ -91,9 +91,9 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
         try { socket.send(JSON.stringify({ version: 1, ...frame })); return true; }
         catch { socket.close(1000); return false; }
     }
-    function retry(attempt, reason) {
+    function retry(attempt, reason, terminal = false) {
         if (attempt !== generation || !scope) return;
-        if (tableSeen && reason === 'room') reason = undefined;
+        if (!terminal && tableSeen && reason === 'room') reason = undefined;
         if (!reason && navigator.onLine === false) return pauseForNetwork();
         if (reason) {
             reset(false, true);
@@ -144,7 +144,8 @@ export function createGameNightMatchClient({ prefix, onStatus, onState, onError,
                     } catch { /* Ignore the rejected pass in memory if storage is unavailable. */ }
                     return retry(attempt);
                 }
-                retry(attempt, socketErrors[event.code]);
+                retry(attempt, event.code === 4003 && event.reason === 'banned' ? 'room' : socketErrors[event.code],
+                    event.code === 4003 && event.reason === 'banned');
             });
             connection.addEventListener('message', event => {
                 if (attempt !== generation) return;
