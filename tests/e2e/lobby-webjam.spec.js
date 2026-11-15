@@ -138,7 +138,7 @@ const paste = async (page, value) => {
     await page.locator('[data-jam-form] button[type="submit"]').click();
 };
 
-test('the native return page clears the invitation fragment and returns it to its original tab', async ({ browser }) => {
+test('the native return page clears the fragment and accepts a delayed confirmation from the original tab', async ({ browser }) => {
     const context = await browser.newContext();
     const origin = 'https://webjam.example';
     const request = 'b'.repeat(32);
@@ -158,15 +158,21 @@ test('the native return page clears the invitation fragment and returns it to it
             const channel = new BroadcastChannel(`webjam-music-${request}`);
             channel.onmessage = ({ data }) => {
                 window.returnedInvite = data.href;
+            };
+            window.confirmDelivery = () => {
                 channel.postMessage({ returned: true });
                 channel.close();
             };
         }, request);
         const callback = await context.newPage();
+        await callback.clock.install();
         await callback.goto(`${origin}/join/handoff.html#${request}&${fragment}`);
-        await expect(callback.getByRole('status')).toHaveText('Return to your Jam room. You can close this tab.');
         await expect(callback).toHaveURL(`${origin}/join/handoff.html`);
-        expect(await host.evaluate(() => window.returnedInvite)).toBe(`${origin}/join/#${fragment}`);
+        await expect.poll(() => host.evaluate(() => window.returnedInvite)).toBe(`${origin}/join/#${fragment}`);
+        await callback.clock.fastForward(8000);
+        await expect(callback.getByRole('status')).toContainText('Still waiting for Hang Out');
+        await host.evaluate(() => window.confirmDelivery());
+        await expect(callback.getByRole('status')).toHaveText('Return to your Jam room. You can close this tab.');
     } finally { await context.close(); }
 });
 
