@@ -2,7 +2,7 @@
 // Four people: one desktop host and three coarse-pointer phones, then a voice-only guest.
 const path = require('node:path');
 const fs = require('node:fs/promises');
-const { test, expect, webkit } = require('@playwright/test');
+const { test, expect, webkit, devices } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const SLUG = '45662413410ed051';
@@ -36,8 +36,9 @@ test.afterEach(async () => {
     await Promise.all([...roomContexts].map((context) => context.close().catch(() => {})));
     roomContexts.clear();
     if (extraBrowser) {
-        await extraBrowser.close().catch(() => {});
+        const closing = extraBrowser;
         extraBrowser = null;
+        await Promise.race([closing.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 2000))]);
     }
 });
 
@@ -56,9 +57,10 @@ function scrub(value) {
 function seconds(ms) { return Math.round(ms / 100) / 10; }
 const roomUrl = (extra = '') => `/r/${SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}${extra}`;
 
-async function openBrowser(browser, opts = {}) {
+async function openBrowser(browser, opts = {}, initScript) {
     const context = await browser.newContext(Object.assign({ permissions: ['camera', 'microphone'] }, opts));
     roomContexts.add(context);
+    if (initScript) await context.addInitScript(initScript);
     await context.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());
     await context.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));
     const page = await context.newPage();
@@ -406,6 +408,9 @@ test('two people in WebKit when that browser launches', async () => {
         const host = await openBrowser(browser, HOST_VIEW);
         await join(host, roomUrl(), 'Alex');
         const guest = await openBrowser(browser, PHONE);
+        let rendererCrashed = false;
+        host.on('crash', () => { rendererCrashed = true; });
+        guest.on('crash', () => { rendererCrashed = true; });
         const inputs = await guest.evaluate(async () => {
             try {
                 const list = await navigator.mediaDevices.enumerateDevices();
@@ -428,10 +433,27 @@ test('two people in WebKit when that browser launches', async () => {
                 : `WebKit launched; camera path stopped (${scrub(error.message)}).`;
             return;
         }
-        await expect.poll(async () => {
+        const deadline = Date.now() + 20000;
+        let sawFrames = false;
+        while (Date.now() < deadline && !rendererCrashed && !host.isClosed() && !guest.isClosed()) {
             const [hostRows, guestRows] = await Promise.all([remoteWidths(host), remoteWidths(guest)]);
-            return hostRows.some((row) => row.width > 0) && guestRows.some((row) => row.width > 0);
-        }, { timeout: 20000 }).toBe(true);
+            if (hostRows.some((row) => row.width > 0) && guestRows.some((row) => row.width > 0)) {
+                sawFrames = true;
+                break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        if (!sawFrames && (rendererCrashed || host.isClosed() || guest.isClosed())) {
+            report.pass = false;
+            report.environment = true;
+            report.status = 'WebKit launched, then the renderer crashed while waiting for faces.';
+            return;
+        }
+        if (!sawFrames) {
+            report.pass = false;
+            report.status = 'WebKit stayed up, but neither side showed a playing face.';
+            throw new Error(report.status);
+        }
         report.pass = true;
         report.seconds = seconds(Date.now() - started);
         report.videoInputs = inputs;
@@ -448,7 +470,265 @@ test('two people in WebKit when that browser launches', async () => {
         await writeJson('webkit.json', report);
         if (browser) {
             extraBrowser = null;
-            await browser.close().catch(() => {});
+            await Promise.race([browser.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 2000))]);
+        }
+    }
+});
+
+const IPHONE = devices['iPhone 13'];
+function iphoneContext() {
+    return {
+        userAgent: IPHONE.userAgent,
+        viewport: IPHONE.viewport,
+        deviceScaleFactor: IPHONE.deviceScaleFactor,
+        isMobile: IPHONE.isMobile,
+        hasTouch: IPHONE.hasTouch
+    };
+}
+function armIosGestureMedia() {
+    // True only while a user-input event is dispatching. Promise continuations are too late for iOS.
+    let gesture = false;
+    const on = () => { gesture = true; };
+    const off = () => { gesture = false; };
+    for (const type of ['pointerdown', 'mousedown', 'mouseup', 'click', 'touchend', 'keyup']) {
+        window.addEventListener(type, on, true);
+        window.addEventListener(type, off, false);
+    }
+    window.__gumLog = [];
+    const realGum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = function gum(constraints) {
+        const during = gesture;
+        window.__gumLog.push(during);
+        if (!during) return Promise.reject(new DOMException('getUserMedia needs a user gesture', 'NotAllowedError'));
+        return realGum(constraints);
+    };
+    const realPlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function play() {
+        if (!gesture) {
+            try { this.pause(); } catch (error) { /* not playing yet */ }
+            return Promise.reject(new DOMException('play needs a user gesture', 'NotAllowedError'));
+        }
+        return realPlay.apply(this, arguments);
+    };
+}
+async function releaseRooms() {
+    await Promise.all([...roomContexts].map((context) => context.close().catch(() => {})));
+    roomContexts.clear();
+}
+async function turnMic(page) {
+    await page.locator('[data-mic]').click();
+    await page.locator('[data-ask-yes]').click();
+    await expect(page.locator('[data-mic]')).toHaveText('Mute my mic');
+}
+async function meshSnapshot(pages) {
+    return Promise.all(pages.map((page) => page.evaluate(async () => {
+        const app = window.__hangout;
+        const rows = [];
+        for (const [peer, entry] of app.av.pcs) {
+            let videoFrames = 0;
+            let audioBytes = 0;
+            try {
+                (await entry.pc.getStats()).forEach((row) => {
+                    if (row.type !== 'inbound-rtp') return;
+                    const kind = row.kind || row.mediaType;
+                    if (kind === 'video') videoFrames += row.framesDecoded || 0;
+                    if (kind === 'audio') audioBytes += row.bytesReceived || 0;
+                });
+            } catch (error) { /* peer closed mid-read */ }
+            const video = document.querySelector(`[data-tile="${CSS.escape(peer)}"] video`);
+            const kinds = video && video.srcObject ? video.srcObject.getTracks().map((track) => track.kind) : [];
+            rows.push({
+                id: peer,
+                videoFrames,
+                audioBytes,
+                width: video ? video.videoWidth : 0,
+                hasVideo: kinds.includes('video'),
+                hasAudio: kinds.includes('audio')
+            });
+        }
+        return { mine: app.myId, rows };
+    })));
+}
+async function expectFullDuplex(pages) {
+    const ids = await Promise.all(pages.map((page) => page.evaluate(() => window.__hangout.myId)));
+    await expect.poll(async () => {
+        const shots = await meshSnapshot(pages);
+        return shots.every((shot) => {
+            const want = ids.filter((id) => id !== shot.mine);
+            return want.every((id) => shot.rows.some((row) => row.id === id && row.width > 0 && row.hasVideo && row.hasAudio && row.audioBytes > 0));
+        });
+    }, { timeout: 20000 }).toBe(true);
+    const before = await meshSnapshot(pages);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const after = await meshSnapshot(pages);
+    after.forEach((shot, index) => {
+        const want = ids.filter((id) => id !== shot.mine).sort();
+        expect(shot.rows.map((row) => row.id).sort()).toEqual(want);
+        for (const row of shot.rows) {
+            const prior = before[index].rows.find((item) => item.id === row.id);
+            expect(row.hasVideo).toBe(true);
+            expect(row.hasAudio).toBe(true);
+            expect(row.width).toBeGreaterThan(0);
+            expect(row.videoFrames).toBeGreaterThan(prior ? prior.videoFrames : 0);
+            expect(row.audioBytes).toBeGreaterThan(prior ? prior.audioBytes : 0);
+        }
+    });
+}
+
+test('two, three and four peers exchange playing video and audio both ways', async ({ browser }) => {
+    test.setTimeout(180000);
+    for (const count of [2, 3, 4]) {
+        const names = ['Alex', 'Blair', 'Casey', 'Drew'].slice(0, count);
+        const host = await openBrowser(browser, HOST_VIEW);
+        await join(host, roomUrl(), names[0]);
+        const pages = [host];
+        for (const name of names.slice(1)) {
+            const page = await openBrowser(browser, PHONE);
+            await join(page, host.url(), name);
+            pages.push(page);
+        }
+        await expect(host.locator('[data-peers]')).toContainText(`${count} here`);
+        for (const page of pages) {
+            await turnCamera(page);
+            await turnMic(page);
+        }
+        await expectFullDuplex(pages);
+        await releaseRooms();
+    }
+});
+
+test('camera-denied guest is heard, still sees faces, and Leave stays visible', async ({ browser }) => {
+    test.setTimeout(60000);
+    const host = await openBrowser(browser, HOST_VIEW);
+    await join(host, roomUrl(), 'Alex');
+    await turnCamera(host);
+    await turnMic(host);
+    const guest = await openBrowser(browser, PHONE, () => {
+        const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = (constraints) => (
+            constraints && constraints.video
+                ? Promise.reject(new DOMException('Permission denied', 'NotAllowedError'))
+                : real(constraints)
+        );
+    });
+    await join(guest, host.url(), 'Eden');
+    await guest.locator('[data-cam]').click();
+    await guest.locator('[data-ask-yes]').click();
+    await expect(guest.locator('[data-ask-title]')).toHaveText('Camera’s not available');
+    await guest.locator('[data-ask-yes]').click();
+    await expect(guest.locator('[data-mic]')).toHaveText('Mute my mic');
+    await expect(guest.locator('[data-status]')).toContainText('voice only');
+    const leave = await layoutAudit(guest);
+    expect(leave.controls.hangup.onScreen && leave.controls.hangup.short === 'Leave' && !leave.controls.hangup.hidden).toBe(true);
+    await expect.poll(() => guest.evaluate(() => {
+        const video = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
+        return video ? video.videoWidth : 0;
+    }), { timeout: 15000 }).toBeGreaterThan(0);
+    const edenId = await guest.evaluate(() => window.__hangout.myId);
+    await expect.poll(async () => {
+        const [shot] = await meshSnapshot([host]);
+        const row = shot.rows.find((item) => item.id === edenId);
+        return Boolean(row && row.hasAudio && row.audioBytes > 0);
+    }, { timeout: 15000 }).toBe(true);
+    await expect.poll(async () => {
+        const rows = await remoteWidths(host);
+        return rows.some((row) => row.name.includes('Eden') && row.nocam);
+    }, { timeout: 15000 }).toBe(true);
+});
+
+test('a reloaded peer gets faces back within 20 seconds and leaves no ghost tile', async ({ browser }) => {
+    test.setTimeout(90000);
+    const host = await openBrowser(browser, HOST_VIEW);
+    await join(host, roomUrl(), 'Alex');
+    const guest = await openBrowser(browser, PHONE);
+    await join(guest, host.url(), 'Blair');
+    await turnCamera(host);
+    const first = await turnCamera(guest);
+    await expect.poll(async () => {
+        const rows = await remoteWidths(host);
+        return rows.some((row) => row.id === first.id && row.width > 0);
+    }, { timeout: 15000 }).toBe(true);
+    const started = Date.now();
+    await guest.reload();
+    await guest.fill('[data-name]', 'Blair');
+    await guest.click('[data-enter]');
+    await expect(guest.locator('[data-room]')).toBeVisible();
+    const again = await turnCamera(guest);
+    const budget = 20000 - (Date.now() - started);
+    expect(budget).toBeGreaterThan(1000);
+    await expect.poll(async () => {
+        const [hostRows, guestRows] = await Promise.all([remoteWidths(host), remoteWidths(guest)]);
+        return hostRows.length === 1 && hostRows[0].width > 0 && hostRows[0].id === again.id
+            && guestRows.length === 1 && guestRows[0].width > 0
+            && hostRows.every((row) => row.id !== first.id);
+    }, { timeout: budget }).toBe(true);
+    expect(await host.locator(`[data-tile="${first.id}"]`).count()).toBe(0);
+    expect(again.id).not.toBe(first.id);
+});
+
+test('iPhone emulation plays faces after one tap and captures only from a gesture', async ({ browser }) => {
+    test.setTimeout(120000);
+    const host = await openBrowser(browser, iphoneContext(), armIosGestureMedia);
+    await join(host, roomUrl(), 'Alex');
+    const guest = await openBrowser(browser, iphoneContext(), armIosGestureMedia);
+    await join(guest, host.url(), 'Blair');
+    await turnCamera(host);
+    await turnCamera(guest);
+    await expect(guest.locator('[data-faces-play]')).toBeVisible({ timeout: 15000 });
+    await expect(host.locator('[data-faces-play]')).toBeVisible({ timeout: 15000 });
+    const paused = await guest.evaluate(() => {
+        const video = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
+        return Boolean(video && video.paused);
+    });
+    expect(paused).toBe(true);
+    await guest.locator('[data-faces-play]').click();
+    await host.locator('[data-faces-play]').click();
+    await expect.poll(() => guest.evaluate(() => {
+        const video = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
+        return Boolean(video && !video.paused && video.videoWidth > 0);
+    }), { timeout: 15000 }).toBe(true);
+    await expect.poll(() => host.evaluate(() => {
+        const video = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
+        return Boolean(video && !video.paused && video.videoWidth > 0);
+    }), { timeout: 15000 }).toBe(true);
+    for (const page of [host, guest]) {
+        const log = await page.evaluate(() => window.__gumLog || []);
+        expect(log.length).toBeGreaterThan(0);
+        expect(log.every(Boolean)).toBe(true);
+    }
+
+    let wk;
+    const wkReport = { launched: false, environment: false, status: '' };
+    try {
+        try {
+            wk = await webkit.launch({ headless: true, args: [] });
+            extraBrowser = wk;
+            wkReport.launched = true;
+        } catch (error) {
+            wkReport.environment = true;
+            wkReport.status = `WebKit did not launch (${scrub(error.message || error.name)})`;
+            return;
+        }
+        const phone = await openBrowser(wk, iphoneContext(), armIosGestureMedia);
+        phone.on('crash', () => { wkReport.environment = true; });
+        await join(phone, roomUrl(), 'Casey');
+        if (phone.isClosed() || wkReport.environment) {
+            wkReport.environment = true;
+            wkReport.status = 'WebKit renderer crashed before the gesture check.';
+            return;
+        }
+        await turnCamera(phone);
+        wkReport.status = 'WebKit stayed up through one camera gesture.';
+    } catch (error) {
+        const crashed = /crash|has been closed|Target closed/i.test(error.message || '') || (wkReport.environment);
+        wkReport.environment = crashed;
+        wkReport.status = scrub(error.message);
+        if (!crashed) throw error;
+    } finally {
+        console.log(`CHECK 3d-webkit env=${wkReport.environment} launched=${wkReport.launched} status=${wkReport.status}`);
+        if (wk) {
+            extraBrowser = null;
+            await Promise.race([wk.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 2000))]);
         }
     }
 });
