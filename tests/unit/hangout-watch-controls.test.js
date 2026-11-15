@@ -60,6 +60,27 @@ describe('host YouTube control intent and initialization echoes', () => {
         const f = await fixture(); f.player.pauseVideo(); f.callbacks.onAutoplayBlocked({ target: f.player }); f.flush();
         expect(f.w.__lobbyRoom.player.autoplayBlocked).toBe(false); expect(f.sent).toHaveLength(1); expect(f.sent[0].playing).toBe(false);
     });
+    it('moves focus from a resolved playback action to the activity summary', async () => {
+        const f = await fixture({ startsPlaying: false });
+        const { document } = f.w;
+        document.querySelector('[data-activity]').hidden = false;
+        const tap = document.querySelector('[data-act-tap]');
+        f.callbacks.onAutoplayBlocked({ target: f.player });
+        tap.focus();
+        expect(document.activeElement).toBe(tap);
+        f.play();
+        expect(tap.hidden).toBe(true);
+        expect(document.activeElement).toBe(document.querySelector('[data-activity] > summary'));
+    });
+    it('preserves chat focus when playback starts after the guest moves on', async () => {
+        const f = await fixture({ startsPlaying: false });
+        const { document } = f.w;
+        f.callbacks.onAutoplayBlocked({ target: f.player });
+        const composer = document.querySelector('[data-text]');
+        composer.focus();
+        f.play();
+        expect(document.activeElement).toBe(composer);
+    });
     it('does not treat a stale PLAYING callback as current playback evidence', async () => {
         const f = await fixture({ startsPlaying: false }); f.callbacks.onAutoplayBlocked({ target: f.player });
         f.callbacks.onStateChange({ target: f.player, data: 1 }); f.flush();

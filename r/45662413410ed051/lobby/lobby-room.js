@@ -465,6 +465,13 @@
             ui.tap.addEventListener('click', () => syncToState(true, true));
         }
 
+        function hidePlaybackAction() {
+            if (document.activeElement === ui.tap) {
+                $('[data-activity] > summary')?.focus({ preventScroll: true });
+            }
+            ui.tap.hidden = true;
+        }
+
         function videoFailure(key, error) {
             if (!state.ch || player.key !== key) return;
             player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
@@ -486,7 +493,7 @@
             player.readyKey = ''; player.failedKey = '';
             player.autoplayBlocked = false;
             player.seenPlaying = false; player.playPending = false;
-            ui.tap.hidden = true; ui.tap.textContent = 'Tap to play';
+            hidePlaybackAction(); ui.tap.textContent = 'Tap to play';
             ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
             player.kind = 'yt';
             player.yt = null;
@@ -523,7 +530,7 @@
             if (!await ensureSource(requested.source, retry)) return;
             const v = state.room.video;
             if (generation !== roomGeneration || v !== requested || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
-            if (!v.playing) { player.autoplayBlocked = false; ui.tap.hidden = true; }
+            if (!v.playing) { player.autoplayBlocked = false; hidePlaybackAction(); }
             else if (player.autoplayBlocked && !force) return;
             const want = H.expectedPosition(v, state.clock.relayNow());
             if (force || H.needsCorrection(localTime(), want)) seekTo(want);
@@ -567,7 +574,12 @@
         }
         function onYtState(ev) {
             if (!state.ch || ev.target !== player.yt || ev.data !== player.yt?.getPlayerState()) return;
-            if (ev.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
+            if (ev.data === 1) {
+                player.seenPlaying = true;
+                player.playPending = false;
+                player.autoplayBlocked = false;
+                hidePlaybackAction();
+            }
             if (!isOp() || pendingLesson || player.autoplayBlocked || !state.room.video || (!player.seenPlaying && state.room.video.playing)
                 || player.readyKey !== `${state.room.video.source.kind}:${state.room.video.source.id}`) return;
             if (ev.data !== 1 && ev.data !== 2) return;
