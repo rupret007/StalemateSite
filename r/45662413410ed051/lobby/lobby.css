@@ -275,6 +275,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .arcade-card-table { margin: 6px 0; border-block: 1px solid var(--line); padding: 4px 0 8px; }
 .arcade-card-table summary { display: list-item; min-height: 34px; padding: 6px 2px; font-weight: 650; color: var(--cream); }
 .arcade-card-status, .arcade-card-error, .arcade-card-hand-label { margin: 4px 0; }
+.arcade-next-game { margin: 4px 0; overflow-wrap: anywhere; }
 .arcade-card-error:empty { display: none; }
 .arcade-card-error { color: #ffc497; }
 .arcade-invite-friend { min-height: 44px; margin: 0 8px 8px 0; }

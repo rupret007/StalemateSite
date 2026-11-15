@@ -92,6 +92,7 @@ async function gameNight(browser, baseURL) {
         });
         const page = await context.newPage();
         person.page = page;
+        person.frames = [];
         person.errors = [];
         page.on('pageerror', error => person.errors.push(error.message));
         await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
@@ -106,7 +107,8 @@ async function gameNight(browser, baseURL) {
             const game = arcadeGame(new URL(route.url()).pathname), transport = transports.get(game);
             let attachment = null;
             const socket = { readyState: 1, serializeAttachment: value => { attachment = value; }, deserializeAttachment: () => attachment,
-                send: raw => { if (socket.readyState === 1) route.send(raw); },
+                // Routed sockets do not emit page websocket events. These are the bytes the browser receives.
+                send: raw => { if (socket.readyState !== 1) return; person.frames.push(String(raw)); route.send(raw); },
                 close: (code = 1000, reason = '') => { if (socket.readyState !== 1) return; socket.readyState = 3; void route.close({ code, reason }); } };
             route.onMessage(raw => void serial(() => transport.receive(socket, String(raw))));
             route.onClose(() => void serial(() => retire(socket, transport)));
@@ -151,6 +153,7 @@ async function gameNight(browser, baseURL) {
         }),
         record: async game => [...(await storage.list({ prefix: game === 'chess' ? 'game-night-match:' : `game-night-${game}:` })).values()][0],
         errors: () => [...people.values()].flatMap(person => person.errors.map(error => `${person.nick}: ${error}`)),
+        frames: nick => people.get(nick).frames,
         close: () => Promise.all(contexts.map(context => context.close()))
     };
 }
@@ -266,14 +269,7 @@ for (const game of Object.values(GAMES)) {
         // Up to five phone browsers share one worker.
         test.beforeEach(() => test.slow());
 
-        // BUG: a phone that arrives at a full table is never told the table is full
-        // or that it is up next. It gets the watcher view with no seat control:
-        // Chess r/45662413410ed051/lobby/arcade-chess.mjs:303 ("Watching · …"),
-        // Spades arcade-turdspades.mjs:239-242 and :300, Turdanoid
-        // arcade-turdanoid.mjs:300 (the wall name only). The server has no queue
-        // either (hangout-worker/src/game-night-table.mjs:164-176 re-seats the
-        // same roster on every rematch).
-        test.fixme(`2. one phone too many is told the table is full and that it is up next game`, async ({ browser, baseURL }) => {
+        test(`2. one phone too many is told the table is full and that it is up next game`, async ({ browser, baseURL }) => {
             const fixture = await gameNight(browser, baseURL);
             try {
                 const pages = await seated(fixture, game, nicks);
@@ -298,7 +294,6 @@ for (const game of Object.values(GAMES)) {
                 await expect(status(extra, game)).not.toHaveText(WAIT_FOR_HOST);
                 await expect(panel(extra, game).getByRole('button', { name: /^Join /, includeHidden: false })).toHaveCount(0);
                 expect(fixture.view('ExtraPhone', game.game).deserializeAttachment().seat).toBeNull();
-                // Chat is the only way forward this phone has today.
                 await expect(extra.locator('[data-send]')).toBeInViewport();
                 expect(await extra.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(PHONE.width);
             } finally { await fixture.close(); }
@@ -391,9 +386,7 @@ for (const game of Object.values(GAMES)) {
             const fixture = await gameNight(browser, baseURL);
             try {
                 const pages = await seated(fixture, game, nicks);
-                const frames = [];
                 const late = await fixture.phone('LateWatcher');
-                late.on('websocket', socket => { if (/-match$/.test(new URL(socket.url()).pathname)) socket.on('framereceived', ({ payload }) => frames.push(String(payload))); });
                 await invite(pages[0], late, 'LateWatcher');
                 await showTable(late, game);
                 await expect(late.locator(game.board)).toBeVisible();
@@ -403,6 +396,7 @@ for (const game of Object.values(GAMES)) {
                 if (game.game === 'turdspades') {
                     await expect(late.locator('[data-spades-hand-label]')).toHaveText('Watching · hands are private');
                     await expect(late.locator('[data-spades-hand] button')).toHaveCount(0);
+                    const frames = fixture.frames('LateWatcher');
                     const views = frames.map(raw => JSON.parse(raw)).filter(frame => frame.state?.match);
                     expect(views.length).toBeGreaterThan(0);
                     for (const view of views) { expect(view.state.match.hand).toEqual([]); expect(view.state.match.hands).toBeUndefined(); }

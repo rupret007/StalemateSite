@@ -127,6 +127,42 @@ it.each(['details', 'accept'])('uses the shared copy on a guest %s 410', async o
     }
 });
 
+it('offers a shareable fresh link when a guest invite has expired', async () => {
+    const pagePath = '/beta/game-night/guest';
+    const config = env({
+        HANGOUT_GAME_NIGHT_GUESTS: '1',
+        ASSETS: { fetch: vi.fn(request => new Response(readFileSync(new URL('../..' + new URL(request.url).pathname, import.meta.url), 'utf8'))) }
+    });
+    const request = path => new Request('https://example.com' + path);
+    const html = await (await betaFetch(request(pagePath), config)).text();
+    const client = await (await betaFetch(request(pagePath + '.js'), config)).text();
+    const dom = new JSDOM(html, { url: request(pagePath).url + '#invite=fixture-link', runScripts: 'outside-only' });
+    const { window } = dom;
+    const share = vi.fn().mockResolvedValue(undefined);
+    try {
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE, unlockGameNightAudio: vi.fn() };
+        window.TextEncoder = TextEncoder;
+        Object.defineProperty(window.crypto, 'subtle', { configurable: true, value: crypto.subtle });
+        Object.defineProperty(window.navigator, 'share', { configurable: true, value: share });
+        window.fetch = vi.fn(async () => Response.json({ error: 'expired' }, { status: 410 }));
+        window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
+            'const { $1 } = sharedGameNight;'));
+        const status = window.document.querySelector('[data-guest-status]');
+        const ask = window.document.querySelector('[data-guest-fresh]');
+        const retry = window.document.querySelector('[data-guest-retry]');
+        await vi.waitFor(() => expect(status.textContent).toBe(GAME_INVITE_UNAVAILABLE));
+        expect(retry.hidden).toBe(true);
+        expect(ask.hidden).toBe(false);
+        expect(ask.textContent).toBe('Ask the host for a fresh link.');
+        ask.click();
+        await vi.waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+        expect(share).toHaveBeenCalledWith({ title: 'Game Night', text: 'Ask the host for a fresh link.' });
+        expect(JSON.stringify(share.mock.calls)).not.toContain('fixture-link');
+    } finally {
+        window.close();
+    }
+});
+
 async function shell(address, config = env(), prepare) {
     const request = (path) => new Request(new URL(path, address));
     const html = await (await betaFetch(request('/'), config)).text();

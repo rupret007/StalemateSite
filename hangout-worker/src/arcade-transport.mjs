@@ -187,6 +187,17 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 ? [attachment.betaSid] : [];
         }));
     }
+    // Anyone already on a full table is lined up before a rematch or a new game starts.
+    function queueArrivals(scope, game) {
+        let added = false;
+        for (const peer of sockets()) {
+            const attachment = peer.deserializeAttachment();
+            if (!attachment || attachment.ref !== scope.ref || attachment.room !== scope.room) continue;
+            const peerBinding = member(attachment);
+            if (peerBinding?.canPlay && canView(game, peerBinding, attachment) && game.enqueue(peerBinding.betaSid)) added = true;
+        }
+        return added;
+    }
     function canView(game, binding, scope) {
         const seated = !!game?.seat(binding.betaSid);
         if (game && otherTable(game, binding.gameGuest, scope)) return false;
@@ -280,6 +291,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             // Lost join replies can be retried after the host closes or reopens the table.
             if (frame.action === 'join' && game?.seat(subject)) frame = { version: 1, action: 'sync' };
             let changed = game?.expire(now()) || false;
+            if (game && !game.closed && queueArrivals(scope, game)) changed = true;
             const resume = frame.action === 'sync' && game?.seat(subject) && !scope.synced;
             let expiresAt = record?.expiresAt;
             let error = '', nextMatch;
@@ -288,7 +300,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                 else if (frame.action === 'open') {
                     const SelectedTable = frame.mode === undefined ? Table : frame.mode === 'partners' ? PartnerTable : null;
                     if (!binding.canOpen || !SelectedTable) error = 'unavailable';
-                    else if (game?.closed && game.reopen(subject, uuid(), frame.mode, now())) {
+                    else if (game?.closed && game.reopen(subject, uuid(), frame.mode, now(), connectedPlayers(scope))) {
                         claims = [];
                         changed = true;
                     } else if (game && !(game.closed && game.host === subject && game.subjects.length === 1)) error = 'unavailable';
@@ -339,6 +351,7 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
                     changed = true;
                 }
             }
+            if (game && !game.closed && queueArrivals(scope, game)) changed = true;
             if (changed) {
                 if (game) {
                     await scheduleTableAlarm(expiresAt, claims);

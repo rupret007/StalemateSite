@@ -18,6 +18,7 @@ const errors = {
 const markup = `
 <summary>TurdSpades</summary>
 <p class="small arcade-card-status" data-spades-status role="status"></p>
+<p class="small arcade-next-game" data-next-game hidden>Table full, you're up next game</p>
 <p class="small arcade-card-error" data-spades-error role="status"></p>
 <div class="arcade-card-actions">
     <button class="btn btn--small" type="button" data-spades-partners hidden>Open 2-player Spades</button>
@@ -257,6 +258,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         seatsHost.hidden = connection !== 'ready' || !model?.waiting || !!seat;
         seatButtons.forEach((button, index) => { button.hidden = computer(seats[index]) || occupied.includes(seats[index]); button.disabled = pending; });
         table.hidden = !match;
+        $('[data-next-game]').hidden = !model?.upNext;
         if (!match) { showHand([]); return; }
         table.dataset.phase = match.phase;
         table.dataset.mode = paired ? 'partners' : 'four';
