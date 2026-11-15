@@ -8,6 +8,7 @@ import { join, dirname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { assertNativeLobbySourceCatalogue } from './source-catalogue.mjs';
+import { verifyNamedVideoBinding } from './video-binding-probe.mjs';
 const FILE = fileURLToPath(import.meta.url), HERE = dirname(FILE);
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
 const APP = fileURLToPath(new URL('../../../', import.meta.url));
@@ -25,6 +26,8 @@ const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex
 const sources = () => Object.fromEntries([
     ['fixture/runner.mjs', FILE], ['fixture/worker.mjs', join(HERE, 'worker.mjs')],
     ['fixture/source-catalogue.mjs', join(HERE, 'source-catalogue.mjs')],
+    ...['video-binding-worker.mjs', 'video-binding-probe.mjs'].map(name => [`fixture/${name}`, join(HERE, name)]),
+    ...['beta-video-entry.mjs', 'beta-entry.mjs', 'webjam-video-admission.mjs'].map(name => [`application/${name}`, join(APP, 'hangout-worker/src', name)]),
     ...['lobby-core.mjs', 'lobby-effect-records.mjs', 'durable-record-storage.mjs', 'community-state.mjs', 'filter.mjs', 'lobby-act.mjs', 'message-receipts.mjs', 'transport-budget.mjs', 'participation-checkpoint.mjs', 'lobby-incident-sources.mjs', 'incident-cases.mjs'].map(name => [`application/${name}`, join(APP, 'hangout-worker/src', name)]),
     ...['join/crypto.js', 'r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'r/45662413410ed051/lobby/game-night.mjs', 'r/45662413410ed051/lobby/lobby-roster.mjs', 'package.json', 'package-lock.json', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
     ...['package.json', 'package-lock.json'].map(name => [`tools/${name}`, join(TOOLS, name)])
@@ -117,10 +120,12 @@ async function child(state, nonce) {
         assert.equal(outboundCalls, 0); assert.equal(runtimeRestarts, 0); assert.deepEqual(sources(), before);
         for (const [path, sha256] of Object.entries(bundleInputs)) assert.equal(hash(path), sha256);
         assert.equal(hash(bindingFile), rolldownBindingSha256);
+        const namedVideoBinding = await verifyNamedVideoBinding({ Miniflare, convertOptions: convertV4MiniflareOptions, rolldown,
+            state, fixturePath: join(HERE, 'video-binding-worker.mjs') });
         const checks = [...qualified.main.checks, ...qualified.logs.checks, { name: 'fresh-workerd-process-recovers-exact-domain-digests', pass: true }];
         proof = { versions, binarySha256, compatibilityDate: '2026-10-01', compatibilityFlags: [], qualified, recovered, checks,
             rolldownVersion, rolldownBindingSha256, bundleSha256, bundleInputs, sourceCatalogue, firstWorkerdPids, secondWorkerdPids, admissionDenials: 3,
-            sources: before, outboundCalls, runtimeRestarts, node: process.version, platform: process.platform, architecture: process.arch,
+            sources: before, outboundCalls, runtimeRestarts, namedVideoBinding, node: process.version, platform: process.platform, architecture: process.arch,
             scope: 'Actual source-engine effect generation and domain mapper/codec on local SQLite workerd at the beta date/empty flags; two fresh native processes and deliberate post-write faults. Pure engine capture is not C3 output staging or trusted session/guardian authority. Only the executing supported platform is qualified; no Windows/hosted limits/cost/recovery/deployment qualification.' };
         const acknowledged = new Promise((resolve, reject) => process.once('message', message => {
             try { assert.deepEqual(message, { type: 'cleanup-approved', nonce }); resolve(); } catch (error) { reject(error); }
