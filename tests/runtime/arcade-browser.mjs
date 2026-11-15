@@ -1459,6 +1459,16 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(friend.locator('[data-square="d5"]')).toHaveAttribute('data-legal', '');
                 await tapSquare(friend, 'd5', phone);
                 await expect(host.getByRole('button', { name: 'd5, Black pawn' })).toBeAttached();
+                if (!phone) {
+                    const closedGames = host.locator('[data-game-night] > details:not([open]):not([hidden]) > summary');
+                    await expect.poll(async () => closedGames.evaluateAll(nodes => nodes
+                        .map(node => ({ label: node.innerText.trim(), top: node.getBoundingClientRect().top }))
+                        .sort((a, b) => a.top - b.top).map(node => node.label))).toEqual([
+                        'TurdSpades', 'Turdanoid Brick Race', 'Crappy Eights', 'TurdRummy',
+                        'Crapjack 21', 'Turdtris Sprint', 'Turdomania Duel', 'Turd Rush Race'
+                    ]);
+                    await captureArcadeInvite(host, viewport, step('04-active-chess-lineup'));
+                }
                 await expect(friend.locator('[data-square][data-legal]')).toHaveCount(0);
                 await captureArcadeInvite(friend, viewport, step('04-playing'));
                 assert.equal((await friend.context().request.get(origin + '/beta/state')).status(), 401, 'the guest has only game access');

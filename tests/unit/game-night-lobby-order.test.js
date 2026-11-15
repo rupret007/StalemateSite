@@ -66,6 +66,15 @@ describe('Game Night beta lobby lineup', () => {
         expect(rows.slice(0, 3)).toEqual(['chess', 'spades', 'brick']);
     });
 
+    it('keeps the remaining desktop games in lineup order while Chess is active', () => {
+        const css = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/arcade-chess.css'), 'utf8');
+        const grid = css.match(/grid-template:\s*("chess heading"[^;]+);/);
+        expect(grid, 'desktop Chess grid').toBeTruthy();
+        const gameRows = [...grid[1].matchAll(/"chess\s+(\w+)"/g)].map(match => match[1])
+            .filter(area => !['heading', 'actions', 'call'].includes(area));
+        expect(gameRows).toEqual(expectedDesktopGridRowAreas().filter(area => area !== 'chess'));
+    });
+
     it('repositions panels after mount so DOM follows GAME_NIGHT_LOBBY_ORDER', () => {
         const lobby = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.js'), 'utf8');
         expect(lobby).toContain('placeArcadePanelInLobbyOrder');
