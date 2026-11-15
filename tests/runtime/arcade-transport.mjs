@@ -73,14 +73,12 @@ assert.ok(siteGuest === undefined || browserName && !mixedRef && !relay &&
     'choose a browser and --site-guest=stalemate or --site-guest=rad-dad (requires ARCADE_PREVIEW_RAD_DAD)');
 const previousAssets = new Map();
 if (mixedRef) {
-    for (const file of ['entry-sites.mjs', 'lobby/index.html', 'lobby/lobby.js', 'lobby/lobby.css', 'lobby/game-night-match-client.mjs']) {
-        const path = 'r/45662413410ed051/' + file;
-        try {
-            previousAssets.set('/' + path, execFileSync('git', ['show', `${mixedRef}:${path}`], { cwd: app, stdio: ['ignore', 'pipe', 'ignore'] }));
-        } catch (error) {
-            if (!file.endsWith('game-night-match-client.mjs')) throw error;
-        }
-    }
+    const root = 'r/45662413410ed051/';
+    const files = execFileSync('git', ['ls-tree', '-r', '--name-only', '-z', mixedRef, '--', root + 'entry-sites.mjs', root + 'lobby/'],
+        { cwd: app, encoding: 'utf8' }).split('\0').filter(Boolean);
+    // The old page, lazy game adapters and their imports must come from the
+    // same revision to model a browser tab that was open before the update.
+    for (const path of files) previousAssets.set('/' + path, execFileSync('git', ['show', mixedRef + ':' + path], { cwd: app }));
 }
 const directory = await mkdtemp(join(tmpdir(), 'game-night-arcade-'));
 const arcadeCapabilities = {
