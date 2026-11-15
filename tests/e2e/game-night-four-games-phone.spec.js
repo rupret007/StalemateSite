@@ -133,8 +133,10 @@ async function openGameNight(page) {
 async function invite(host, guest, nick) {
     await host.getByRole('button', { name: 'Invite players' }).click();
     await host.getByRole('button', { name: `Invite ${nick}`, exact: true }).click();
-    const offer = guest.locator('[data-game-offer]').getByRole('button', { name: /^(?:Join Game Night|Play .+)$/ });
-    const arcadeOffer = (await offer.textContent()).startsWith('Play ');
+    const offers = guest.locator('[data-game-offer]');
+    const playSpades = offers.getByRole('button', { name: 'Play TurdSpades', exact: true });
+    const offer = offers.getByRole('button', { name: 'Join Game Night', exact: true }).or(playSpades);
+    const arcadeOffer = (await offer.textContent()) === 'Play TurdSpades';
     await offer.click();
     await expect(guest.getByRole('region', { name: /Game Night/ })).toBeVisible();
     if (await host.locator('[data-invite-dialog][open]').count()) await host.keyboard.press('Escape');
@@ -180,15 +182,16 @@ async function assertWatcherSpades(watcher, mode) {
 
 async function dealSpades(fixture, host, { mode, seats }) {
     const players = [];
-    for (const seat of seats) {
+    for (const [index, seat] of seats.entries()) {
         const nick = `Phone${seat}`;
         const guest = await fixture.phone(nick);
         const arcadeOffer = await invite(host, guest, nick);
         await pickGame(guest, 'turdspades');
         // Accepting an arcade offer already joins the invited match.
         if (!arcadeOffer) await guest.getByRole('button', { name: `Join ${seat}`, exact: true }).tap();
-        const seatStatus = guest.locator('[data-spades-status], [data-spades-seat]').filter({ hasText: `You’re ${seat}` });
-        await expect(seatStatus).toBeVisible();
+        if (index < seats.length - 1) {
+            await expect(guest.locator('[data-spades-status]')).toContainText(`You’re ${seat}`);
+        }
         players.push({ guest, seat });
     }
     const table = host.locator('[data-spades-table]');
@@ -197,7 +200,9 @@ async function dealSpades(fixture, host, { mode, seats }) {
     await expect(table).toHaveAttribute('data-phase', 'bid');
     await expect(host.locator('[data-spades-hand] button')).toHaveCount(13);
     for (const { guest, seat } of players) {
-        await expect(guest.locator('[data-spades-seat]')).toContainText(`You’re ${seat}`);
+        const seatLabel = guest.locator('[data-spades-seat]');
+        await expect(seatLabel).toBeVisible();
+        await expect(seatLabel).toContainText(`You’re ${seat}`);
     }
 }
 
