@@ -1018,9 +1018,12 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(open).toBeVisible();
                 assert.equal(issues, 0, 'the host opens a waiting match before preparing its invitation');
                 const deadline = Date.UTC(2031, 3, 6, 18, 15);
+                const legacyDeadline = Date.UTC(2031, 3, 7, 18, 15);
                 await host.route('**/beta/game-night/invitation/issue', async route => {
                     const response = await route.fetch();
-                    await route.fulfill({ response, json: { ...(await response.json()), inviteExpiresAt: deadline } });
+                    await route.fulfill({ response, json: {
+                        ...(await response.json()), until: legacyDeadline, inviteExpiresAt: deadline
+                    } });
                 }, { times: 1 });
                 await open.click();
                 const share = host.getByRole('button', { name: webShare ? 'Share invite' : 'Email invite', exact: true });
