@@ -27,7 +27,9 @@ const markup = `
 </div>
 <div class="arcade-card-actions" data-spades-seats hidden></div>
 <div data-card-table data-spades-table hidden>
+    <p class="small spades-seat" data-spades-seat></p>
     <div class="arcade-card-score" aria-label="Partnership scores"><span data-spades-score="0"></span><span data-spades-score="1"></span></div>
+    <p class="small spades-trick-summary" data-spades-trick-summary></p>
     <ul class="spades-trick" aria-label="Bids and trick cards" data-spades-trick></ul>
     <div class="arcade-card-actions" data-spades-bid hidden>
         <label for="spades-bid">Your bid</label><select id="spades-bid"></select>
@@ -156,7 +158,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
         bid.append(option);
     }
     bid.value = '3';
-    bid.addEventListener('change', () => { if (!applyingBid) bidEdited = true; });
+    bid.addEventListener('change', () => { if (!applyingBid) { bidEdited = true; draw(); } });
 
     function showHand(cards, choosingCard = false) {
         const old = new Map([...hand.children].map(button => [button.dataset.spadesCard, button]));
@@ -189,6 +191,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
         const nameFor = position => names[position] + (computer(position) ? ' (CPU)' : '');
         const away = model?.disconnectedSeats ?? [];
         const teams = paired ? ['South + North CPU', 'West + East CPU'] : partnerships;
+        if (match?.canBid) {
+            const bidKey = `${model.id}:${match.revision}`;
+            if (bidKey !== suggestedBidKey) { suggestedBidKey = bidKey; bidEdited = false; }
+        }
         let command = '', label = '', message = 'Connecting to the table…';
         if (connection === 'unavailable') {
             message = matchConnectionErrors[connectionError] || 'The table couldn’t reconnect. Try again from this room.';
@@ -220,6 +226,8 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 const ready = votes.filter(vote => !away.includes(vote)).length;
                 message += ` ${ready}/${occupied.length - away.length} ready for a rematch.`;
                 if (!votes.includes(seat)) { command = 'rematch'; label = votes.length ? 'Accept Spades rematch' : 'Request Spades rematch'; }
+                message += model.canStartRematch ? ' Tap Start now to play again.'
+                    : command ? ` Tap ${label}.` : ' Waiting for the other players to accept.';
             }
         } else if (match?.roundResult) {
             message = match.roundResult.map((result, team) => {
@@ -228,20 +236,13 @@ export function mountArcadeTurdSpades(container, onMatch) {
                 if (result.bagPenalties) nil.push('bag penalty');
                 return `${teams[team]} ${signed}${nil.length ? ' · ' + nil.join(', ') : ''}`;
             }).join(' / ');
+            if (seat) message += ' · tap Next round';
         } else if (match) {
             const yourTurn = seat === match.turn;
-            if (paired && match.phase === 'bid' && yourTurn && seat === 'west') {
-                message = 'You and a computer partner vs the host and a computer · tap Bid for me';
-            } else if (paired && match.phase === 'bid' && yourTurn && seat === 'south') {
-                message = 'You and a computer partner vs your friend and a computer · tap Bid for me';
-            } else if (paired && match.phase === 'bid' && seat === 'west') {
-                message = 'Waiting for the host to bid';
-            } else {
-                const turn = yourTurn ? (match.phase === 'bid' ? 'Your bid' : 'Your play') : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
-                message = `Round ${match.round} · ${turn}`;
-                if (yourTurn && match.phase === 'play' && !match.trick.length && !match.lastTrick.length) message += ' · tap a card';
-                if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
-            }
+            const turn = yourTurn ? (match.phase === 'bid' ? `Your bid · tap ${bidEdited ? 'Lock bid' : 'Bid for me'}` : 'Your turn · tap a card')
+                : `${nameFor(match.turn)} to ${match.phase === 'bid' ? 'bid' : 'play'}`;
+            message = `Round ${match.round} · ${turn}`;
+            if (match.lastWinner && (paired || !match.trick.length)) message += ` · ${nameFor(match.lastWinner)} won the last trick`;
         }
         if (connection === 'ready' && seat && match && away.length) {
             message += ` · Waiting for ${away.map(nameFor).join(', ')}, link still works.`;
@@ -262,12 +263,22 @@ export function mountArcadeTurdSpades(container, onMatch) {
         if (!match) { showHand([]); return; }
         table.dataset.phase = match.phase;
         table.dataset.mode = paired ? 'partners' : 'four';
+        const partner = seat && seats[(seats.indexOf(seat) + 2) % seats.length];
+        $('[data-spades-seat]').textContent = seat
+            ? `You’re ${nameFor(seat)} · Partner: ${nameFor(partner)}`
+            : 'Watching · hands are private';
 
         for (let team = 0; team < 2; team++) {
             $(`[data-spades-score="${team}"]`).textContent = `${teams[team]} · ${match.scores[team]}/${match.target} · ${match.bags[team]} bags`;
         }
-        $('.arcade-card-score').hidden = paired && match.phase !== 'round-end' && match.lastTrick.length !== 4;
+        $('.arcade-card-score').hidden = false;
         $('[data-spades-trick]').hidden = paired && match.phase === 'bid';
+        const completed = Object.values(match.tricks).reduce((total, count) => total + count, 0);
+        $('[data-spades-trick-summary]').textContent = match.phase === 'bid'
+            ? 'Bids · no cards played yet'
+            : match.phase === 'round-end' || match.result
+                ? `${completed >= 13 ? '13 tricks complete' : 'Game over'}${match.lastWinner ? ` · Last won by ${nameFor(match.lastWinner)}` : ''}`
+                : `Trick ${Math.min(completed + 1, 13)} of 13${!match.trick.length && match.lastTrick.length ? ' · showing last trick' : ''}`;
         const shown = match.trick.length ? match.trick : match.lastTrick;
         trickSlots.forEach(({ row, label, card }, index) => {
             const position = seats[index], entry = shown.find(value => value.seat === position);
@@ -282,11 +293,6 @@ export function mountArcadeTurdSpades(container, onMatch) {
         });
         $('[data-spades-bid]').hidden = !match.canBid;
         if (match.canBid) {
-            const bidKey = `${model.id}:${match.revision}`;
-            if (bidKey !== suggestedBidKey) {
-                suggestedBidKey = bidKey;
-                bidEdited = false;
-            }
             if (!bidEdited) {
                 const suggestion = String(suggestSpadesBid(match.hand));
                 if (bid.value !== suggestion) {
@@ -297,9 +303,11 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
         }
         bid.disabled = connection !== 'ready' || pending;
+        $('[data-spades-action="bid"]').textContent = bidEdited ? 'Lock bid' : 'Bid for me';
         $('[data-spades-hand-label]').textContent = seat
             ? `Your hand · ${match.hand.length} cards${match.phase === 'play' && match.spadesBroken ? ' · Spades broken' : ''}`
-            : 'Watching · hands are private';
+            : '';
+        $('[data-spades-hand-label]').hidden = !seat;
         for (const control of actions) {
             const action = control.dataset.spadesAction;
             control.hidden = !seat || (action === 'bid' ? !match.canBid

@@ -337,17 +337,31 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .arcade-rummy .arcade-card-hand [aria-pressed="true"] { background: var(--lime); box-shadow: inset 0 0 0 2px #354624; }
 .arcade-rummy .arcade-card-hand [data-drawn="true"]:not([aria-pressed="true"]) { box-shadow: inset 0 0 0 2px #a07c32; }
 .arcade-spades .arcade-card-hand { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.arcade-spades .arcade-card-hand button { justify-items: center; align-content: center; padding-inline: 1px; }
+.arcade-spades .arcade-card-hand button { justify-items: center; align-content: center; padding-inline: 2px; }
+.arcade-spades .arcade-card-hand b { font-size: 1.2rem; }
+.arcade-spades .spades-seat { color: var(--cream); font-weight: 650; margin: 5px 0; }
+.arcade-spades .spades-trick-summary { margin: 6px 0 3px; }
+.arcade-spades .arcade-card-score > span { min-width: 0; overflow-wrap: anywhere; }
+.arcade-spades .arcade-card-status { color: var(--cream); font-weight: 650; }
 .spades-trick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; list-style: none; margin: 4px 0; padding: 0; }
-.spades-trick li { min-width: 0; display: grid; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); padding: 2px 4px; }
-.spades-trick span { font-size: .66rem; overflow-wrap: anywhere; }
+.spades-trick li { min-width: 0; display: grid; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); padding: 4px 6px; }
+.spades-trick span { font-size: .75rem; line-height: 1.3; overflow-wrap: anywhere; }
 .arcade-spades .arcade-card-hand [data-cannot-follow] { opacity: .52; }
 .spades-trick b { font: bold 1rem var(--mono); }
 [data-spades-table][data-phase="bid"] .spades-trick b { display: none; }
 .spades-trick [data-active="true"] { border-color: var(--lime); }
 .spades-trick [data-red="true"] b { color: #ffa6aa; }
 .arcade-spades [data-spades-bid] select { padding: 4px; min-height: 38px; }
+@media (max-width: 600px) {
+  .arcade-spades, .arcade-spades [data-spades-table] { min-width: 0; max-width: 100%; }
+  .arcade-spades .arcade-card-hand { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .arcade-spades .arcade-card-hand button { min-width: 0; min-height: 50px; }
+  .arcade-spades .spades-trick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .arcade-spades .arcade-card-score { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .arcade-spades [data-spades-bid] { display: grid; grid-template-columns: auto minmax(64px, 1fr) minmax(110px, 1.4fr); }
+}
 @media (max-width: 900px) {
+  .arcade-spades summary { min-height: 44px; }
   .game-night :is(.arcade-eights, .arcade-rummy, .arcade-spades, .arcade-jack) :is(.btn, select) {
     min-width: 44px;
     min-height: 44px;
@@ -363,12 +377,6 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .arcade-spades [data-spades-table][data-phase="bid"] :is(.spades-trick, .arcade-card-hand-label) {
     margin-block: 2px;
   }
-  .arcade-spades [data-spades-table][data-phase="bid"] :is(.arcade-card-score, .arcade-card-hand-label) {
-    display: none;
-  }
-}
-@media (max-width: 355px) {
-  .arcade-spades .arcade-card-hand { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 .jack-dealer, .jack-hand { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 5px 0; }
 .jack-dealer > b, .jack-hand > b { min-width: 75px; }
