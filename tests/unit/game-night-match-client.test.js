@@ -139,7 +139,8 @@ describe('Game Night phone wake and history recovery', () => {
             expect(source.slice(hidden, waiting)).toContain('matchHiddenText');
         });
 
-    it('treats a 4403 after the table is on screen as a drop, including a following 403', async () => {
+    it.each([0, 0.999])('retries a room refusal during recovery at jitter %s', async jitter => {
+        vi.spyOn(Math, 'random').mockReturnValue(jitter);
         const status = vi.fn();
         client.stop();
         client = createGameNightMatchClient({ prefix: '/beta/arcade', onStatus: status, onState: vi.fn(), onError: vi.fn() });
@@ -156,11 +157,16 @@ describe('Game Night phone wake and history recovery', () => {
         expect(status).toHaveBeenLastCalledWith('reconnecting');
         expect(status).not.toHaveBeenCalledWith('unavailable', 'room');
         const tickets = issue.mock.calls.length;
-        await vi.advanceTimersByTimeAsync(1_000);
-        expect(issue.mock.calls.length).toBe(tickets + 1);
+        // The first retry fires at 300–500 ms. The second cannot fire before 900 ms.
+        await vi.advanceTimersByTimeAsync(500);
+        expect(issue).toHaveBeenCalledTimes(tickets + 1);
         expect(sockets).toHaveLength(before);
         expect(status).toHaveBeenLastCalledWith('reconnecting');
         expect(status).not.toHaveBeenCalledWith('unavailable', 'room');
+
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(issue).toHaveBeenCalledTimes(tickets + 2);
+        expect(sockets).toHaveLength(before + 1);
     });
 
     it('cancels a pending match retry when the lobby stops a seated match', async () => {
