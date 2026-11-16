@@ -120,8 +120,10 @@
             <button class="btn faces-play" type="button" data-faces-play hidden>Tap to play and unmute</button>
             <div class="react-float" data-react-float aria-live="polite"></div>
             <div class="tools callbar" role="toolbar" aria-label="Call controls">
-                <button class="btn" type="button" data-mic>Turn on my mic</button>
-                <button class="btn" type="button" data-cam>Turn on my camera</button>
+                <button class="btn" type="button" data-mic>Unmute mic</button>
+                <button class="btn" type="button" data-cam>Start video</button>
+                <button class="btn btn--ghost" type="button" data-chat-toggle aria-expanded="true" aria-controls="room-chat">Chat</button>
+                <a class="btn btn--ghost leave-room" href="lobby/">Leave</a>
                 <button class="btn btn--ghost desk-only" type="button" data-share aria-pressed="false">Share screen</button>
                 <button class="btn btn--ghost" type="button" data-hand aria-pressed="false">Raise hand</button>
                 <span class="reacts" data-reacts role="group" aria-label="Reactions"></span>
@@ -137,7 +139,7 @@
             </div>
         </section>
 
-        <section class="panel chat" aria-label="Chat">
+        <section class="panel chat" id="room-chat" aria-label="Chat">
             <details data-chat-details open><summary><h2>Chat</h2></summary>
             <p class="small" data-sync-status role="status" hidden></p>
             <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>

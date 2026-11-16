@@ -42,6 +42,7 @@
         reportStatus: $('[data-report-status]'), reportAvailability: $('[data-report-availability]'), reportSend: $('[data-report-send]'),
         reportRetry: $('[data-report-retry]'), reportNew: $('[data-report-new]'), reportClose: $('[data-report-close]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
+        chatToggle: $('[data-chat-toggle]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
         yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), facesPlay: $('[data-faces-play]'), videoStatus: $('[data-video-status]'),
         bobToggle: $('[data-bob-toggle]'), bob: $('[data-bob]'), bobNow: $('[data-bob-now]'), bobHold: $('[data-bob-hold]'),
@@ -1910,8 +1911,8 @@
         ui.canvasCam.textContent = app.av.canvas ? 'Stop showing my canvas' : 'Show my real canvas';
         ui.mic.setAttribute('aria-pressed', String(app.av.mic));
         ui.cam.setAttribute('aria-pressed', String(app.av.cam && !app.av.screen));
-        ui.mic.textContent = app.av.mic ? 'Mute my mic' : (app.av.jam ? 'Talk (browser mic)' : 'Turn on my mic');
-        ui.cam.textContent = app.av.cam && !app.av.screen ? 'Turn off my camera' : 'Turn on my camera';
+        ui.mic.textContent = app.av.mic ? 'Mute mic' : (app.av.jam ? 'Unmute mic' : 'Unmute mic');
+        ui.cam.textContent = app.av.cam && !app.av.screen ? 'Stop video' : 'Start video';
         ui.cam.disabled = app.av.canvas;
         ui.share.setAttribute('aria-pressed', String(Boolean(app.av.screen)));
         ui.share.textContent = app.av.screen ? 'Stop sharing' : 'Share screen';
@@ -2461,7 +2462,12 @@
             const react = doc.createElement('em');
             react.className = 'react';
             react.setAttribute('aria-live', 'polite');
-            tile.append(v, cap, badge, more, react);
+            const startVideo = doc.createElement('button');
+            startVideo.type = 'button';
+            startVideo.className = 'tile-start-video';
+            startVideo.textContent = 'Start video';
+            startVideo.addEventListener('click', (event) => { event.stopPropagation(); ui.cam.click(); });
+            tile.append(v, cap, badge, more, react, ...(id === 'me' ? [startVideo] : []));
             ui.tiles.append(tile);
             if (id !== 'me' && app.av.sink && v.setSinkId) v.setSinkId(app.av.sink).catch(() => {});
         }
@@ -3058,6 +3064,11 @@
     ui.devMic.addEventListener('change', () => switchDevice('mic', ui.devMic.value));
     ui.devSpk.addEventListener('change', () => switchDevice('spk', ui.devSpk.value));
     ui.music.addEventListener('change', () => setMusic(ui.music.checked));
+    ui.chatToggle.addEventListener('click', () => {
+        const open = !doc.body.classList.contains('chat-closed');
+        doc.body.classList.toggle('chat-closed', open);
+        ui.chatToggle.setAttribute('aria-expanded', String(!open));
+    });
     ui.bgPicks.addEventListener('click', (e) => { const b = e.target.closest('button[data-bg]'); if (b && !app.av.bg.loading) setBackground(b.dataset.bg); });
     ui.lock.addEventListener('click', () => hostAct({ kind: 'lock', on: !app.av.locked }));
     ui.allCamsOff.addEventListener('click', () => hostAct({ kind: 'camoff', target: '*' }));
