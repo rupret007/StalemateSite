@@ -1655,7 +1655,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         channel.onmessage = ({ data }) => {
             if (musicHandoff !== pending || pending.submitted || typeof data?.href !== 'string') return;
             const expires = musicInviteDeadline(data.href);
-            if (expires <= Date.now() || expires > Date.now() + 600000 || new URL(data.href).origin !== location.origin
+            if (expires <= Date.now() || expires > Date.now() + 600000
                 || currentJam() !== room || room.keepRef !== context.instance || !amOp(room) || !readyForMusicOffer()
                 || !app.chans.get('#stalemate')?.names?.some(person => person.id === context.peer) || !send({ t: 'music-invite-offer', request, ch: room.name,
                     roomInstance: context.instance, peer: context.peer, href: data.href })) {
