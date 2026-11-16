@@ -88,6 +88,25 @@ for (const viewport of sizes) {
         await expect(chat.getByRole('heading', { name: 'Chat' })).toBeFocused();
         const message = chat.getByRole('textbox', { name: 'Message' });
         await message.fill('An unsent message stays here');
+        if (viewport.width > 820) {
+            const footer = page.locator('#room-call-controls');
+            const hostControls = page.locator('.host-call button');
+            await expect(hostControls).toHaveCount(2);
+            await expect.poll(() => page.evaluate(() => {
+                const footerTop = document.querySelector('#room-call-controls').getBoundingClientRect().top;
+                return [...document.querySelectorAll('.host-call button, #room-chat .say > *')].every(control => {
+                    const rect = control.getBoundingClientRect();
+                    return rect.height > 0 && rect.top >= 0 && rect.bottom <= footerTop;
+                });
+            })).toBe(true);
+            for (const control of await hostControls.all()) {
+                await control.focus();
+                await expect(control).toBeFocused();
+                await control.click({ trial: true });
+            }
+            await expect(footer).toBeInViewport();
+            await message.focus();
+        }
         await page.screenshot({ path: testInfo.outputPath('04-chat-drawer.png') });
 
         await chat.getByRole('button', { name: 'Close chat' }).click();
