@@ -495,6 +495,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const drafts = new Map();
     const pendingReports = new Map();
     let connectionState = 'offline';
+    let inviteJoinFocus = null;
     let sessionEnded = false;
     let endedPmLabel = null; // Display only; never a view, endpoint or send context.
     let inviteContext = null;
@@ -643,6 +644,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function setConnection(state) {
         connectionState = state;
         if (state !== 'connected') {
+            inviteJoinFocus = null;
             if (gameOpenPending) {
                 clearTimeout(gameOpenPending.timer); gameOpenPending = null;
                 gameOpenError = 'Connection interrupted. Reconnect and try opening Game Night again.';
@@ -1183,6 +1185,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         case 'join': {
             const c = { ...m.ch, lines: [] };
+            const inviteFocus = inviteJoinFocus?.room === c.name ? inviteJoinFocus : null;
+            if (inviteFocus) inviteJoinFocus = null;
             const gameOfferAccepted = joiningGameRoom === c.name;
             const invite = gameOfferAccepted ? joiningArcadeOffer : null;
             const returningToGame = gameReturnOffered && gameReturn?.room === c.name;
@@ -1219,6 +1223,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 }
             }
             if (gameOfferAccepted && !arcadeInvitation && !returningGame) focusChannelTab(c.name);
+            if (inviteFocus && document.activeElement === inviteFocus.anchor) focusChannelTab(c.name, { preventScroll: false });
             followPendingRoomJoin();
             break;
         }
@@ -1283,6 +1288,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         case 'notice':
             line(app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
             if (m.kind === 'error') {
+                inviteJoinFocus = null;
                 const failedGameJoin = !!joiningGameRoom;
                 if (joiningGameRoom) {
                     const failedRoom = joiningGameRoom;
@@ -1343,7 +1349,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                     }
                     drawGameOffer();
                 }
-            } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => cmd('join', [m.ch])]]);
+            } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => joinInvitedChannel(m.ch)]]);
             break;
         case 'kicked': {
             if (gameGuest && m.ch === gameGuest.room) { gameGuestExit = 'removed'; break; }
@@ -1722,6 +1728,20 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const tab = $$('[data-tabs] [data-channel-key]').find(tab => tab.dataset.channelKey === key);
         tab?.focus({ preventScroll });
         if (document.activeElement !== tab) $('.phonetabs [aria-current="true"]')?.focus({ preventScroll });
+    }
+    function joinInvitedChannel(room) {
+        let anchor = null;
+        if (toastRegion.contains(document.activeElement)) {
+            if (document.body.dataset.show !== 'chat') $('.phonetabs [aria-current="true"]')?.focus({ preventScroll: true });
+            if (toastRegion.contains(document.activeElement)) $('#chat-pane').focus({ preventScroll: true });
+            if (!toastRegion.contains(document.activeElement)) anchor = document.activeElement;
+        }
+        if (cmd('join', [room])) {
+            inviteJoinFocus = anchor ? { room, anchor } : null;
+        } else {
+            inviteJoinFocus = null;
+            toast(`Couldn’t send the request to join ${room}. Check your connection and try again.`, [['Retry join', () => joinInvitedChannel(room)]]);
+        }
     }
     function readGameReturn() {
         let saved = gameReturn;

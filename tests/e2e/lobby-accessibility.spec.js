@@ -400,6 +400,10 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
         await visitor.page.keyboard.press('Enter');
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#invitation-studio');
         await expect(status).toBeHidden();
+        await expect(visitor.page.getByRole('tab', { name: '#invitation-studio', selected: true })).toBeFocused();
+        await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-invitation-joined.png`) });
+        await send(visitor.page, 'I found the invited room.');
+        await expect(host.page.locator('[data-buffer]')).toContainText('I found the invited room.');
         expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]);
     } finally { await visitor?.close(); await host.close(); }
 });

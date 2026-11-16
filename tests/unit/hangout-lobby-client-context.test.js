@@ -89,6 +89,57 @@ it('announces a room invitation in an existing live region and describes its Joi
     expect(announcement.textContent).toBe('');
 });
 
+describe('keyboard room invitation acceptance', () => {
+    it.each([false, true])('retains a meaningful focus target while joining (guest moved focus: %s)', async (moved) => {
+        const { window, ws, welcome, join } = await visitor();
+        const { document } = window;
+        welcome(); join();
+        const room = '#invitation-studio';
+        const notice = document.querySelector('[data-toast]');
+        ws.receive({ t: 'invite', ch: room, by: 'InvitationHost' });
+        const action = notice.querySelector('button');
+        action.focus();
+        action.click();
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room] });
+        expect(document.activeElement).toBe(document.querySelector('#chat-pane'));
+        expect(notice.hidden).toBe(true);
+        const composer = document.querySelector('[data-text]');
+        if (moved) composer.focus();
+
+        join(room);
+
+        const tab = document.querySelector('[data-channel-key="#invitation-studio"]');
+        expect(tab.getAttribute('aria-selected')).toBe('true');
+        expect(document.activeElement).toBe(moved ? composer : tab);
+    });
+
+    it('keeps Join available with an explanation when the invitation request could not be sent', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        const { document } = window;
+        welcome(); join();
+        ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost' });
+        const notice = document.querySelector('[data-toast]');
+        const action = notice.querySelector('button');
+        const send = ws.send;
+        ws.send = vi.fn(() => { throw new Error('socket closed during send'); });
+        action.focus();
+        action.click();
+
+        expect(notice.hidden).toBe(false);
+        expect(notice.textContent).toContain('Couldn’t send the request to join #invitation-studio.');
+        const retry = notice.querySelector('button');
+        expect(retry?.textContent).toBe('Retry join');
+        expect(document.activeElement).toBe(document.querySelector('#chat-pane'));
+
+        ws.send = send;
+        retry.focus();
+        retry.click();
+        join('#invitation-studio');
+        expect(document.activeElement.dataset.channelKey).toBe('#invitation-studio');
+        expect(notice.hidden).toBe(true);
+    });
+});
+
 describe('targeted Music invitation', () => {
     async function setup(features = { directMusicInvites: 1 }) {
         const { window, ws, welcome, join, flush } = await visitor('rad-dad', features);
