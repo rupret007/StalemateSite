@@ -228,6 +228,54 @@ for (const width of [375, 390]) test(`mobile keyboard section shortcuts focus th
     } finally { await visitor.close(); }
 });
 
+for (const [width, height] of [[390, 844], [1440, 900]]) test(`a named channel request can be retried after reconnect at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const room = '#retry-channel';
+    let requests = 0;
+    const visitor = await guest(browser, baseURL, 'ChannelRetryGuest', { width, height }, undefined, async page => {
+        await page.routeWebSocket(/\/sessions\/accessibility-/, socket => {
+            const server = socket.connectToServer();
+            socket.onMessage(message => {
+                const frame = JSON.parse(String(message));
+                if (frame.t === 'cmd' && frame.name === 'join' && frame.args?.[0] === room) {
+                    requests += 1;
+                    if (requests === 1) {
+                        socket.close({ code: 4402, reason: 'Fixture interrupted channel request' });
+                        return;
+                    }
+                }
+                server.send(message);
+            });
+        });
+    });
+    const { page } = visitor;
+    try {
+        await section(page, 'rooms');
+        await tabTo(page, page.locator('[data-start="chat"]'));
+        await page.keyboard.press('Enter');
+        const dialog = page.getByRole('dialog', { name: 'Your own #channel', exact: true });
+        const name = dialog.getByRole('textbox', { name: 'Channel name' });
+        await expect(name).toBeFocused();
+        await page.keyboard.type(room);
+        await page.screenshot({ path: testInfo.outputPath(`named-channel-before-reconnect-${width}.png`) });
+        await page.keyboard.press('Enter');
+
+        await expect(dialog.getByRole('status')).toHaveText('Connected again. Choose Join / create to try this name again.');
+        await expect(name).toHaveValue(room);
+        await expect(name).toBeFocused();
+        expect(requests).toBe(1);
+        await page.screenshot({ path: testInfo.outputPath(`named-channel-ready-to-retry-${width}.png`) });
+
+        await page.keyboard.press('Enter');
+        await expect(dialog).toBeHidden();
+        await expect(page.locator('[data-chat-context]')).toHaveText(room);
+        expect(requests).toBe(2);
+        await send(page, 'First message in the recovered channel');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('First message in the recovered channel');
+        await page.screenshot({ path: testInfo.outputPath(`named-channel-after-reconnect-${width}.png`) });
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 test('keyboard guest can join, recover a named-room error, chat, navigate tabs and leave host dialogs', async ({ browser, baseURL }, testInfo) => {
     const visitor = await guest(browser, baseURL, 'KeyboardVisitor', { width: 1280, height: 900 });
     const { page } = visitor;

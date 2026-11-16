@@ -141,6 +141,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const recoveryContexts = new WeakMap(), recoveryDrafts = new WeakMap();
     let nextRecoveryContext = 0, recoveryBytes = 2, messageEpoch = 0, recoveryLifecycle = 0;
     let messageResultsSupported = false, copyingMessage = null;
+    let channelJoinInterrupted = false;
     function recoveryContext() {
         const view = store(app.active);
         if (!view) return null;
@@ -652,6 +653,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     let retry = 0;
     let retryTimer;
     let connectionAttempt = 0;
+    function drawInterruptedChannelRequest() {
+        const message = connectionState === 'connected' ? 'Connected again. Choose Join / create to try this name again.'
+            : connectionState === 'offline' ? 'Connection lost. Choose Cancel, then Try again. Your channel name stays here.'
+                : 'Connection lost. Reconnecting…';
+        const channelStatus = $('[data-channel-error]');
+        if (channelStatus.textContent !== message) channelStatus.textContent = message;
+    }
     function setConnection(state) {
         connectionState = state;
         if (state !== 'connected') {
@@ -683,10 +691,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting' || state === 'ended' && betaShell;
         if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline' && !gameGuestReloadOffered;
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });
-        if (state === 'offline' && app.pendingChannel) {
+        if ((state === 'offline' || state === 'reconnecting') && app.pendingChannel) {
             app.pendingChannel = '';
-            $('[data-channel-error]').textContent = 'Connection lost. Reconnect and try this channel again.';
+            channelJoinInterrupted = true;
         }
+        if (channelJoinInterrupted && $('[data-channel-dialog]').open) drawInterruptedChannelRequest();
         drawCommunity(); drawRooms(); drawMessageRecovery(); refreshPaletteCohosts();
     }
     const JOIN_TIMEOUT_MS = 20_000;
@@ -2880,6 +2889,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     // Activity tiles pick a name; plain chat lets guests name their own channel.
     $$('[data-start]').forEach((b) => b.addEventListener('click', () => {
         if (b.dataset.start === 'chat') {
+            channelJoinInterrupted = false;
             $('[data-channel-error]').textContent = '';
             $('[data-channel-dialog]').showModal();
             $('[data-channel-name]').focus();
@@ -2905,6 +2915,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     });
     $('[data-channel-form]').addEventListener('submit', (e) => {
         e.preventDefault();
+        channelJoinInterrupted = false;
         const name = `#${$('[data-channel-name]').value.trim().replace(/^#/, '').toLowerCase()}`;
         if (!/^#[a-z0-9-]{2,30}$/.test(name)) {
             $('[data-channel-error]').textContent = 'Use 2–30 letters, numbers or dashes.';
@@ -2922,7 +2933,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             return;
         }
         if (!cmd('join', [name])) {
-            $('[data-channel-error]').textContent = 'Reconnect before joining a channel. Your name stays here.';
+            channelJoinInterrupted = connectionState === 'offline' || connectionState === 'reconnecting';
+            if (channelJoinInterrupted) drawInterruptedChannelRequest();
+            else $('[data-channel-error]').textContent = 'Couldn’t request this channel. Your channel name stays here.';
             return;
         }
         app.pendingChannel = name;

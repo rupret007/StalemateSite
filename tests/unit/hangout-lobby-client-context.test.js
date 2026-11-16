@@ -86,6 +86,48 @@ it('returns keyboard focus to the transcript when jumping to new chat messages',
     expect(transcript.textContent).toContain('New line below the fold');
 });
 
+it('recovers an interrupted named channel request without replaying it', async () => {
+    const { window, ws, welcome, join, sockets, timers, flush } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const dialog = document.querySelector('[data-channel-dialog]');
+    const name = document.querySelector('[data-channel-name]');
+    const status = document.querySelector('[data-channel-error]');
+    const submit = () => document.querySelector('[data-channel-form]').dispatchEvent(
+        new window.Event('submit', { bubbles: true, cancelable: true }));
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; };
+    document.querySelector('[data-start="chat"]').click();
+    name.value = '#reconnect-studio';
+    submit();
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: ['#reconnect-studio'] });
+    expect(status.textContent).toBe('Joining…');
+
+    await ws.close(1006);
+    expect(status.textContent).toBe('Connection lost. Reconnecting…');
+    expect(dialog.open).toBe(true);
+    expect(name.value).toBe('#reconnect-studio');
+    const retry = [...timers.values()].find(task => task.delay >= 750 && task.delay <= 1000);
+    expect(retry).toBeDefined();
+    flush(retry.delay);
+    await vi.waitFor(() => expect(sockets).toHaveLength(2));
+    const replacement = sockets[1];
+    replacement.open();
+    replacement.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok' });
+    welcome(replacement);
+    replacement.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', title: 'Shared chat', topic: '', count: 1, modes: {}, names: [] } });
+    expect(status.textContent).toBe('Connected again. Choose Join / create to try this name again.');
+    expect(replacement.sent.some(frame => frame.t === 'cmd' && frame.name === 'join')).toBe(false);
+    expect(dialog.open).toBe(true);
+    expect(name.value).toBe('#reconnect-studio');
+
+    submit();
+    expect(replacement.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: ['#reconnect-studio'] });
+    replacement.receive({ t: 'join', ch: { name: '#reconnect-studio', kind: 'chat', title: 'Reconnect studio', topic: '', count: 1, modes: {}, names: [] } });
+    expect(dialog.open).toBe(false);
+    expect(document.querySelector('[data-chat-context]').textContent).toBe('#reconnect-studio');
+});
+
 it('keeps the guest’s Join action after the notice timer and unrelated chat feedback', async () => {
     const { window, ws, welcome, join, flush } = await visitor();
     welcome(); join();
