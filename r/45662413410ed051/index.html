@@ -33,7 +33,7 @@
         <img src="../../assets/mark.svg" alt="" width="40" height="40">
         <div>
             <h1>Hang Out</h1>
-            <p class="tag">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p>
+            <details class="room-description" open><summary class="tag">Room details</summary><p class="tag">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p></details>
         </div>
         <a class="show-link lobby-link" href="lobby/">← #stalemate lobby</a>
         <a class="show-link" data-next-show data-starts-at="2026-10-24T16:45:00-05:00" href="../../#home">Next show: Sat Oct 24 · Los Amigo’s, Plano →</a>
@@ -138,7 +138,7 @@
         </section>
 
         <section class="panel chat" aria-label="Chat">
-            <h2>Chat</h2>
+            <details data-chat-details open><summary><h2>Chat</h2></summary>
             <p class="small" data-sync-status role="status" hidden></p>
             <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>
             <ol class="log" data-log aria-live="polite"></ol>
@@ -146,6 +146,7 @@
                 <input data-text maxlength="400" placeholder="Say something dumb" aria-label="Message">
                 <button class="btn" type="submit">Send</button>
             </form>
+            </details>
         </section>
     </main>
 

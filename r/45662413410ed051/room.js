@@ -1044,6 +1044,10 @@
         stopPreCheck();
         ui.gate.hidden = true;
         ui.room.hidden = false;
+        if (mq('(max-width: 820px)')) {
+            doc.querySelector('.room-description').open = false;
+            doc.querySelector('[data-chat-details]').open = false;
+        }
         doc.body.classList.toggle('is-host', app.isHost);
         ui.hostNote.textContent = app.isHost ? 'You started this room, so you drive the video and the wipe.' : 'The person who started the room drives the video.';
         say('You’re in. Say hi?');

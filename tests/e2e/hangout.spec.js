@@ -1005,6 +1005,32 @@ test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and
     await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(95);
 });
 
+test('both participants see a live remote tile in Hang Out and Paint Along phone layout stays separated', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    for (const page of [host, guest]) {
+        await page.click('[data-cam]');
+        if (await page.locator('[data-ask-yes]').isVisible()) await page.click('[data-ask-yes]');
+    }
+    const remoteWidth = page => page.evaluate(() => [...document.querySelectorAll('[data-tiles] .tile video')]
+        .find(video => video.closest('[data-tile]')?.dataset.tile !== 'me')?.videoWidth || 0);
+    await expect.poll(() => remoteWidth(host), { timeout: 15000 }).toBeGreaterThan(0);
+    await expect.poll(() => remoteWidth(guest), { timeout: 15000 }).toBeGreaterThan(0);
+
+    await host.setViewportSize({ width: 390, height: 844 });
+    await guest.setViewportSize({ width: 390, height: 844 });
+    await host.click('[data-bob-toggle]');
+    await expect(host.locator('body')).toHaveClass(/bob-mode/);
+    const boxes = await host.evaluate(() => ['.screen', '[data-tiles]', '.callbar', '[data-chat-details]']
+        .map(selector => ({ selector, box: document.querySelector(selector)?.getBoundingClientRect().toJSON() }))
+        .filter(item => item.box && item.box.width && item.box.height));
+    const overlap = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+    for (let i = 0; i < boxes.length; i += 1) for (let j = i + 1; j < boxes.length; j += 1) {
+        expect(overlap(boxes[i].box, boxes[j].box), `${boxes[i].selector} overlaps ${boxes[j].selector}`).toBe(false);
+    }
+    await expect.poll(() => remoteWidth(host), { timeout: 15000 }).toBeGreaterThan(0);
+    await expect.poll(() => remoteWidth(guest), { timeout: 15000 }).toBeGreaterThan(0);
+});
+
 test('show your real canvas: opt-in, rectangular tile for everyone, still capped', async ({ browser }) => {
     const { host, guest } = await hostAndGuest(browser);
     await host.click('[data-canvas-cam]');
