@@ -17,3 +17,7 @@
 - Done 3 — Promoted camera consent, fitted the top bar, enlarged touch targets and arranged live canvas feeds in a horizontal strip above chat.
 - Evidence — Both phone projects pass the 48px checks and geometry checks. Paint Along points at the real canvas through the camera and keeps it uncropped.
 - Next — Verify Watch opens the same stage, filmstrip, chat and dock from its invitation.
+
+- Done 6 — Watch and Paint Along use the same stage, camera strip, chat and dock. Private movie invitations carry the activity, and video selection stays with the host.
+- Evidence — Both engines pass the movie invite, shared layout, live tiles and guest control checks at both phone sizes.
+- Next — Capture the four phone screenshots and compare the full unit and e2e runs to 4ab24333.
