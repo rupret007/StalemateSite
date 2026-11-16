@@ -51,3 +51,16 @@ Hosted run [43885398784](https://github.com/rupret007/StalemateSite/actions/runs
 - Done — Restored signed playback and lobby lesson controls after the hosted comparison.
 - Evidence — All 24 focused checks passed with one worker, including 12 phone checks in Chromium and WebKit. The rapid guest seek checks passed twice in each selected test. Four 390×844 screenshots are in `test-evidence/paint-focus-5e536127/`.
 - Next — Bobserver compares the updated branch with `4ab24333`. Karen’s hands-on verdict is still pending.
+
+### Final hosted comparison on 3ecab61e
+
+- [Hosted candidate](https://github.com/rupret007/StalemateSite/actions/runs/43896524339) passed all 2,343 unit tests. Its main browser run reported 1,036 passes, four failures, one flaky case, and five skips. [Hosted base 4ab24333](https://github.com/rupret007/StalemateSite/actions/runs/43787445092) passed all 2,342 unit tests and all 1,022 main browser cases.
+- The four failures are the two Paint Along keyboard-leave cases at 390px and 1280px in Chromium and WebKit. Both widths require the old drawing canvas to be visible before testing focus return. Real-canvas painting hides that canvas. The assertion stays intact in both cases.
+- The 375px Jam composer case in WebKit passed on the hosted retry. Six focused repeats on base and six on candidate all passed with one worker on the Mini. This did not reproduce the hosted flake.
+- Bobserver denied the configured account again. The exact-head Bobserver comparison and Karen’s verdict remain outstanding. See local `BLOCKED.md` for the handoff.
+
+### Karen review follow-up
+
+- Done — Put the phone spec in the standard Chromium and WebKit projects with the same 390×844 camera fixtures. Only the host can initiate a room activity change. Background player events cannot issue shared playback commands.
+- Evidence — The standard projects discover six phone cases each. All 21 focused checks passed with one worker. The Draw together keyboard cases still assert a visible drawing surface, and the added Paint Along cases assert the visible lesson stage and real-canvas hint, the hidden drawing surface, and the same keyboard focus return. The failed guest player still tests Catchup and Retry in a host-selected Paint Along session.
+- Next — Send the pushed head to Bobserver and Karen through the auto-gate bus. Compare the full result with `4ab24333` and check the reported WebKit media failures against that run.

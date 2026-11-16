@@ -425,13 +425,13 @@ for (const surface of ['private', 'channel']) {
 test('private guest Bob Catchup keeps failed retry visible and Retry stays local to that guest', async ({ browser, baseURL }) => {
     const room = await pair(browser, baseURL, 'private', undefined, undefined,
         (route, attempt) => attempt < 3 ? route.abort('failed') : route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));
+    await room.host.page.click('[data-bob-toggle]');
     await room.load(VIDEO);
     await expect(room.host.page.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
     await expect(room.guest.page.locator(room.status)).toContainText('YouTube couldn’t load');
     await expect(room.guest.page.locator(room.tap)).toHaveText('Retry video');
     expect(await room.guest.page.evaluate(() => window.__hangout.isHost)).toBe(false);
     const hostSequence = await room.host.page.evaluate(() => window.__hangout.lastHostSeq);
-    await room.guest.page.click('[data-bob-toggle]');
     if (await room.guest.page.locator('[data-ask-no]').isVisible()) await room.guest.page.click('[data-ask-no]');
     await expect(room.guest.page.locator('[data-bob-catchup]')).toBeVisible();
     await room.guest.page.click('[data-bob-catchup]');

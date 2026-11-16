@@ -1,14 +1,33 @@
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
-const { test, expect } = require('@playwright/test');
+const { test: base, expect, devices } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const FAKE_YT = path.join(__dirname, 'support/fake-youtube.js');
 
+// Use phone-sized media fixtures in the standard Chromium and WebKit suites.
+const test = base.extend({
+    launchOptions: [async ({ browserName, launchOptions }, use) => {
+        if (browserName !== 'chromium') return use(launchOptions);
+        await use({ ...launchOptions, args: [...(launchOptions.args || []),
+            '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+    }, { scope: 'worker' }],
+    userAgent: async ({ browserName }, use) => {
+        await use(devices[browserName === 'webkit' ? 'iPhone 13' : 'Pixel 5'].userAgent);
+    }
+});
+test.use({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+    deviceScaleFactor: 1,
+    permissions: ['camera', 'microphone']
+});
+
 async function saveShot(page, filename) {
     const folder = process.env.PAINT_FOCUS_EVIDENCE;
-    if (!folder || test.info().project.name !== 'chromium-paint-focus') return;
+    if (!folder || test.info().project.name !== 'chromium') return;
     await fs.mkdir(folder, { recursive: true });
     await page.screenshot({ path: path.join(folder, filename), animations: 'disabled' });
 }
@@ -384,6 +403,11 @@ test('Watch a Movie Together uses the shared phone stage and keeps video selecti
         }
         await expect(host.locator('[data-load]')).toBeVisible();
         await expect(guest.locator('[data-load]')).toBeHidden();
+        await expect(host.locator('[data-bob-toggle]')).toBeVisible();
+        await expect(guest.locator('[data-bob-toggle]')).toBeHidden();
+        await guest.locator('[data-bob-toggle]').evaluate(button => button.click());
+        await expect(guest.locator('body')).toHaveAttribute('data-shared-layout', 'watch');
+        await expect(guest.locator('[data-bob]')).toBeHidden();
         await expect(guest.locator('[data-picks]')).toBeHidden();
         const tiles = guest.locator('[data-tiles] .tile');
         await expect(tiles).toHaveCount(2);

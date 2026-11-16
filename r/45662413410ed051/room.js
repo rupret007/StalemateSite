@@ -1074,6 +1074,7 @@
             if (!doc.body.dataset.sharedLayout) doc.querySelector('[data-chat-details]').open = false;
         }
         doc.body.classList.toggle('is-host', app.isHost);
+        ui.bobToggle.hidden = !app.isHost;
         ui.hostNote.textContent = app.isHost ? 'You started this room, so you drive the video and the wipe.' : 'The person who started the room drives the video.';
         say('You’re in. Say hi?');
         iceServers();
@@ -1438,7 +1439,7 @@
         if (!v.playing && localPlaying()) pauseLocal();
     }
     const videoSyncTimer = win.setInterval(() => {
-        if (!app.connected) return;
+        if (doc.hidden || !app.connected) return;
         if (!app.isHost && canSharePlayback(app.state.video?.source) && Date.now() - playbackIntentAt < 750) return;
         if (!app.isHost) return syncToState(false);
         const v = app.state.video;
@@ -1451,7 +1452,7 @@
     }, 2000);
     win.setInterval(() => {
         const v = app.state.video;
-        if (!app.connected || app.isHost || !canSharePlayback(v?.source) || player.autoplayBlocked
+        if (doc.hidden || !app.connected || app.isHost || !canSharePlayback(v?.source) || player.autoplayBlocked
             || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         const at = Date.now(), pos = localTime(), playing = localPlaying();
         if (player.buffering) { playbackSample = { at, pos, playing }; return; }
@@ -1465,7 +1466,10 @@
         }
         playbackSample = { at, pos, playing };
     }, 250);
-    doc.addEventListener('visibilitychange', () => { if (!doc.hidden) void syncToState(true); });
+    doc.addEventListener('visibilitychange', () => {
+        playbackSample = null;
+        if (!doc.hidden) void syncToState(true);
+    });
 
     let videoPublication = null;
     async function hostPublish(source, playing, pos, control) {
@@ -1545,6 +1549,7 @@
     ui.tap.addEventListener('click', () => { if (player.kind !== 'yt') ui.tap.hidden = true; syncToState(true, true); });
 
     async function publishVideoIntent(source, playing, pos, { localApplied = false, chooseEpisode = false } = {}) {
+        if (localApplied && doc.hidden) return false;
         if (app.isHost) return hostPublish(source, playing, pos);
         if (!app.connected || !canSharePlayback(source, { chooseEpisode })) return false;
         // Guests send an intent. The host signs the result for playback and
@@ -3491,6 +3496,7 @@
         ui.bobEpisodes.append(li);
     });
     ui.watchToggle.addEventListener('click', () => {
+        if (!app.isHost) return;
         app.watchLayout = true;
         const url = new URL(win.location.href);
         url.searchParams.set('activity', 'watch');
@@ -3499,7 +3505,9 @@
         const v = app.state.video;
         if (v) void hostPublish(v.source, v.playing, H.expectedPosition(v, app.clock.relayNow()));
     });
-    ui.bobToggle.addEventListener('click', () => setBob(!app.bob.on, true));
+    ui.bobToggle.addEventListener('click', () => {
+        if (app.isHost) setBob(!app.bob.on, true);
+    });
     ui.bobHold.addEventListener('click', async () => {
         const v = app.state.video;
         if ((!app.isHost && !app.bob.on) || !v) return;

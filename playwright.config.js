@@ -36,30 +36,16 @@ module.exports = defineConfig({
     projects: [
         {
             name: 'chromium',
-            testIgnore: [/phones\.spec\.js/, /paint-along-focus\.spec\.js$/],
+            testIgnore: /phones\.spec\.js/,
             use: { browserName: 'chromium' }
         },
         {
             name: 'webkit-community',
             // Phone projects select a different file set. Exercise the shared
             // entrance and invitation/Stop journeys in WebKit explicitly.
-            testMatch: /(?:community-entry|community-moderation|lobby-webjam|lobby-invitation-lifecycle|webjam-join-play|band-demo-journey|lobby-workspace|lobby-idle-heartbeat|lobby-private-entry|lobby-accessibility|ux-polish-screens)\.spec\.js$/,
+            testMatch: /(?:community-entry|community-moderation|lobby-webjam|lobby-invitation-lifecycle|webjam-join-play|band-demo-journey|lobby-workspace|lobby-idle-heartbeat|lobby-private-entry|lobby-accessibility|ux-polish-screens|paint-along-focus)\.spec\.js$/,
             use: { browserName: 'webkit' }
         },
-        ...['chromium', 'webkit'].map(browserName => ({
-            name: `${browserName}-paint-focus`,
-            testMatch: /paint-along-focus\.spec\.js$/,
-            use: {
-                ...(browserName === 'webkit' ? devices['iPhone 13'] : devices['Pixel 5']),
-                browserName,
-                viewport: { width: 390, height: 844 },
-                deviceScaleFactor: 1,
-                permissions: ['camera', 'microphone'],
-                ...browserName === 'chromium' && {
-                    launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] }
-                }
-            }
-        })),
         phoneProject('webkit-iphone-se', {
             ...devices['iPhone SE (3rd gen)'],
             browserName: 'webkit',
