@@ -1349,7 +1349,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                     }
                     drawGameOffer();
                 }
-            } else toast(`${m.by} invited you to ${m.ch}`, [['Join', () => joinInvitedChannel(m.ch)]]);
+            } else if (roomNonce(m.roomInstance)) {
+                toast(`${m.by} invited you to ${m.ch}`, [['Join', () => joinInvitedChannel(m.ch, m.roomInstance)]]);
+            } else {
+                toast(`${m.by} invited you to ${m.ch}, but this invitation doesn’t identify the original room. Ask the host for a new invitation or find the room in Rooms.`);
+            }
             break;
         case 'kicked': {
             if (gameGuest && m.ch === gameGuest.room) { gameGuestExit = 'removed'; break; }
@@ -1729,18 +1733,18 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         tab?.focus({ preventScroll });
         if (document.activeElement !== tab) $('.phonetabs [aria-current="true"]')?.focus({ preventScroll });
     }
-    function joinInvitedChannel(room) {
+    function joinInvitedChannel(room, instance) {
         let anchor = null;
         if (toastRegion.contains(document.activeElement)) {
             if (document.body.dataset.show !== 'chat') $('.phonetabs [aria-current="true"]')?.focus({ preventScroll: true });
             if (toastRegion.contains(document.activeElement)) $('#chat-pane').focus({ preventScroll: true });
             if (!toastRegion.contains(document.activeElement)) anchor = document.activeElement;
         }
-        if (cmd('join', [room])) {
+        if (cmd('join', [room], app.active, instance)) {
             inviteJoinFocus = anchor ? { room, anchor } : null;
         } else {
             inviteJoinFocus = null;
-            toast(`Couldn’t send the request to join ${room}. Check your connection and try again.`, [['Retry join', () => joinInvitedChannel(room)]]);
+            toast(`Couldn’t send the request to join ${room}. Check your connection and try again.`, [['Retry join', () => joinInvitedChannel(room, instance)]]);
         }
     }
     function readGameReturn() {

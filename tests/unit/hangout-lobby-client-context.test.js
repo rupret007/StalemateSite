@@ -7,6 +7,7 @@ import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs'
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
 const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
+const invitationRoomInstance = 'a'.repeat(32);
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 
@@ -71,7 +72,7 @@ it('announces a room invitation in an existing live region and describes its Joi
     expect(notice.hidden).toBe(true);
     composer.focus();
 
-    ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost' });
+    ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost', roomInstance: invitationRoomInstance });
 
     const message = 'InvitationHost invited you to #invitation-studio';
     expect(document.querySelector('[data-toast-announcement]')).toBe(announcement);
@@ -96,11 +97,11 @@ describe('keyboard room invitation acceptance', () => {
         welcome(); join();
         const room = '#invitation-studio';
         const notice = document.querySelector('[data-toast]');
-        ws.receive({ t: 'invite', ch: room, by: 'InvitationHost' });
+        ws.receive({ t: 'invite', ch: room, by: 'InvitationHost', roomInstance: invitationRoomInstance });
         const action = notice.querySelector('button');
         action.focus();
         action.click();
-        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room] });
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room], roomInstance: invitationRoomInstance });
         expect(document.activeElement).toBe(document.querySelector('#chat-pane'));
         expect(notice.hidden).toBe(true);
         const composer = document.querySelector('[data-text]');
@@ -117,7 +118,7 @@ describe('keyboard room invitation acceptance', () => {
         const { window, ws, welcome, join } = await visitor();
         const { document } = window;
         welcome(); join();
-        ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost' });
+        ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost', roomInstance: invitationRoomInstance });
         const notice = document.querySelector('[data-toast]');
         const action = notice.querySelector('button');
         const send = ws.send;
@@ -134,9 +135,22 @@ describe('keyboard room invitation acceptance', () => {
         ws.send = send;
         retry.focus();
         retry.click();
+        expect(ws.sent.at(-1).roomInstance).toBe(invitationRoomInstance);
         join('#invitation-studio');
         expect(document.activeElement.dataset.channelKey).toBe('#invitation-studio');
         expect(notice.hidden).toBe(true);
+    });
+
+    it('offers recovery without a blind join when an older server sends an invitation without a room reference', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        const { document } = window;
+        const before = ws.sent.length;
+        ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost' });
+
+        expect(document.querySelector('[data-toast]').textContent).toContain('Ask the host for a new invitation or find the room in Rooms.');
+        expect(document.querySelector('[data-toast] button')).toBeNull();
+        expect(ws.sent).toHaveLength(before);
     });
 });
 

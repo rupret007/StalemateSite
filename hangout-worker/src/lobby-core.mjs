@@ -1644,7 +1644,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!/^#[a-z0-9-]{2,30}$/.test(name)) return bot(c, 'Room names look like #bobross-tuesday (letters, numbers, dashes).', 'error');
             const existing = ch(name);
             if (roomInstance !== undefined && (typeof roomInstance !== 'string' || !/^[a-f0-9]{32}$/.test(roomInstance) || !existing || existing.keepRef !== roomInstance))
-                return bot(c, 'That room changed or closed while you signed in. Choose a room to continue.', 'error');
+                return bot(c, 'That room changed or closed. Ask the host for a new invitation or choose another room.', 'error');
             if (existing) return enter(c, existing, { key });
             return create(c, name, key, titleWords.join(' '));
         },
@@ -1877,7 +1877,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const gameRoom = roomKind(chan) === 'game';
             const jamChess = webJamChess && privateWebJam(chan) && chan.modes.i && !!boundPeer && game === 'chess';
             const arcade = (gameRoom || jamChess) && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
-            out(t, { t: 'invite', ch: chan.name, by: c.nick, ...(gameRoom || jamChess && arcade ? { roomInstance: chan.keepRef } : {}), ...(arcade ? { arcade } : {}) });
+            out(t, { t: 'invite', ch: chan.name, by: c.nick, roomInstance: chan.keepRef, ...(arcade ? { arcade } : {}) });
             return arcade ? bot(c, `Invitation sent to ${t.nick} for ${gameNightLabels[arcade.game]}.`, 'game-invite-sent')
                 : bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },

@@ -408,6 +408,33 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
     } finally { await visitor?.close(); await host.close(); }
 });
 
+for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewport.label}: a closed-room invitation leaves the guest in the lobby with recovery guidance`, async ({ browser, baseURL }, testInfo) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const host = await guest(browser, baseURL, 'ClosingInviteHost', { width: 1280, height: 900 }, relay);
+    let visitor;
+    try {
+        await send(host.page, '/join #closed-invite-studio');
+        await expect(host.page.locator('[data-chat-context]')).toHaveText('#closed-invite-studio');
+        visitor = await guest(browser, baseURL, 'ClosingInviteGuest', viewport, relay);
+        await send(host.page, '/invite ClosingInviteGuest');
+        const status = visitor.page.locator('[data-toast]');
+        const action = status.getByRole('button', { name: 'Join', exact: true });
+        await tabTo(visitor.page, action);
+        await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-closed-invite-before-accept.png`) });
+
+        await send(host.page, '/close');
+        await expect(host.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await visitor.page.keyboard.press('Enter');
+        await expect(status).toContainText('That room changed or closed. Ask the host for a new invitation');
+        await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(visitor.page.getByRole('tab', { name: '#closed-invite-studio' })).toHaveCount(0);
+        await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-closed-invite-recovery.png`) });
+        await send(visitor.page, 'Still in the lobby after that invitation.');
+        await expect(host.page.locator('[data-buffer]')).toContainText('Still in the lobby after that invitation.');
+        expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]);
+    } finally { await visitor?.close(); await host.close(); }
+});
+
 test('a focused status survives its dismiss timer and dismisses after keyboard focus leaves', async ({ browser, baseURL }) => {
     const visitor = await guest(browser, baseURL, 'StatusKeyboardGuest', viewports[0]);
     try {

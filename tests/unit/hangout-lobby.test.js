@@ -494,6 +494,40 @@ describe('permissions are enforced on the server (forged commands)', () => {
         cmd(b, 'join', ['#watch-x']);
         expect(L._debug.channels.get('#watch-x').members.has(b.id)).toBe(true);
     });
+    it('binds an ordinary invitation to the original room without granting access by reference alone', () => {
+        const host = join('InviteHost');
+        const guest = join('InviteGuest');
+        const replacementHost = join('ReplacementHost');
+        const outsider = join('InviteOutsider');
+        const room = '#invite-studio';
+        const accept = (user, offer) => L.message(user.id, JSON.stringify({
+            t: 'cmd', name: 'join', args: [room], ch: LOBBY, roomInstance: offer.roomInstance,
+        }));
+        cmd(host, 'join', [room]);
+        namedCmd(host, 'invite', [guest.nick], room);
+        const originalOffer = got(guest).find(m => m.t === 'invite');
+        const originalRef = L._debug.channels.get(room).keepRef;
+
+        cmd(host, 'close', [], room);
+        accept(guest, originalOffer);
+        expect(L._debug.channels.has(room)).toBe(false);
+        expect(originalOffer.roomInstance).toBe(originalRef);
+        expect(notices(guest)).toContain('That room changed or closed. Ask the host for a new invitation');
+
+        cmd(replacementHost, 'join', [room]);
+        accept(guest, originalOffer);
+        const replacement = L._debug.channels.get(room);
+        expect(replacement.members.has(guest.id)).toBe(false);
+
+        cmd(replacementHost, 'mode', ['+i'], room);
+        namedCmd(replacementHost, 'invite', [guest.nick], room);
+        const freshOffer = got(guest).filter(m => m.t === 'invite').at(-1);
+        expect(freshOffer.roomInstance).toBe(replacement.keepRef);
+        accept(outsider, freshOffer);
+        expect(replacement.members.has(outsider.id)).toBe(false);
+        accept(guest, freshOffer);
+        expect(replacement.members.has(guest.id)).toBe(true);
+    });
 });
 
 describe('PMs are accept-first, blockable, switchable and need lobby time', () => {
