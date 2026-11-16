@@ -18,7 +18,7 @@ const PREVIEW = 'local-preview-key-0001';
 const WAIT_FOR_HOST = /wait(ing)? for (the )?host/i;
 const arcadeFeatures = { arcadeChess: 1, arcadeTurdSpades: 1, arcadeTurdanoid: 1 };
 
-async function gameNight(browser, baseURL) {
+async function gameNight(browser, baseURL, { extraFeatures = {}, extraGames = [] } = {}) {
     const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
     const { arcadeGame, arcadeRoomRequest, createArcadeTransport } = await import('../../hangout-worker/src/arcade-transport.mjs');
     const contexts = [], lobbySockets = new Map(), people = new Map(), matchSockets = [], departures = [], records = new Map();
@@ -41,10 +41,10 @@ async function gameNight(browser, baseURL) {
             const ref = engine.arcadeRoomRef(frame.ch, false);
             if (ref) departures.push({ scope: { room: frame.ch, ref }, subject: person.sid });
         }
-        const sent = frame.t === 'hello' ? { ...frame, features: { ...frame.features, ...arcadeFeatures } } : frame;
+        const sent = frame.t === 'hello' ? { ...frame, features: { ...frame.features, ...arcadeFeatures, ...extraFeatures } } : frame;
         lobbySockets.get(id)?.send(JSON.stringify(sent));
     } });
-    const names = ['chess', 'turdspades', 'turdanoid'];
+    const names = ['chess', 'turdspades', 'turdanoid', ...extraGames];
     const transports = new Map(names.map(name => [name, createArcadeTransport({
         name, state,
         current: scope => {
@@ -262,6 +262,53 @@ const finish = async (fixture, game, nick) => {
     const record = await fixture.record(game.game), saved = record[game.game];
     await fixture.act(nick, game.game, { action: 'resign', id: saved.id, revision: saved.match.revision ?? saved.match.state?.revision ?? 0 });
 };
+
+const probeBrowser = process.env.GAME_NIGHT_ACTION_TAP_PROBE;
+if (['chromium', 'webkit'].includes(probeBrowser)) {
+    test.use({ browserName: probeBrowser });
+    const actionGames = [
+        ['chess', 'chess', null, '[data-chess-primary]', '[data-chess-playing]'],
+        ['turdtris', 'tris', 'arcadeTurdtris', '[data-tris-main]', '[data-tris-match]'],
+        ['turdomania', 'mania', 'arcadeTurdomania', '[data-mania-main]', '[data-mania-match]'],
+        ['turdrush', 'race', 'arcadeTurdRush', '[data-race-main]', '[data-race-match]'],
+        ['turdanoid', 'brick', null, '[data-brick-main]', '[data-brick-match]']
+    ];
+    async function tapPhoneAction(button) {
+        await expect(button).toBeEnabled();
+        await expect(button).toBeInViewport({ ratio: 1 });
+        const box = await button.boundingBox();
+        expect(Math.min(box?.width ?? 0, box?.height ?? 0)).toBeGreaterThanOrEqual(44);
+        await button.tap();
+    }
+
+    test.describe(`Game Night action tap targets · ${probeBrowser}`, () => {
+        for (const [game, statusStem, feature, main, match] of actionGames) {
+            test(`${game} opener and rematch`, async ({ browser, baseURL }) => {
+                test.slow();
+                expect(browser.browserType().name()).toBe(probeBrowser);
+                const fixture = await gameNight(browser, baseURL, feature
+                    ? { extraFeatures: { [feature]: 1 }, extraGames: [game] } : {});
+                try {
+                    const [host, guest] = await room(fixture, ['TapHost', 'TapGuest']);
+                    const table = { game, status: `[data-${statusStem}-status]` };
+                    await showTable(host, table);
+                    await showTable(guest, table);
+                    await tapPhoneAction(host.locator(`${main}[data-command="open"]`));
+                    await guest.locator(`${main}[data-command="join"]`).tap();
+                    await expect(host.locator(match)).toBeVisible();
+                    await expect(guest.locator(match)).toBeVisible();
+                    const first = (await fixture.record(game))[game].id;
+                    await finish(fixture, table, 'TapGuest');
+                    await tapPhoneAction(host.locator(`${main}[data-command="rematch"]`));
+                    const accept = guest.locator(`${main}[data-command="rematch"]`);
+                    await expect(accept).toHaveText(/^Accept /);
+                    await tapPhoneAction(accept);
+                    await expect.poll(async () => (await fixture.record(game))[game].id).not.toBe(first);
+                } finally { await fixture.close(); }
+            });
+        }
+    });
+}
 
 for (const game of Object.values(GAMES)) {
     const nicks = ['HostExample', 'GuestWest', 'GuestNorth', 'GuestEast'].slice(0, game.seats);
