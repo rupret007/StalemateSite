@@ -2327,6 +2327,8 @@
             const stillPaused = [...ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')].some((el) => el.paused);
             if (!stillPaused) showAvResume(false);
         }).catch((error) => {
+            // Interrupted by a re-attach (renderTile) that already started a newer play(): that one decides.
+            if (error && error.name === 'AbortError' && !video.paused) return;
             if (!error || error.name === 'NotAllowedError') ui.facesPlay.hidden = false;
             showAvResume(true);
         });
@@ -2385,8 +2387,14 @@
             if (id !== 'me' && app.av.sink && v.setSinkId) v.setSinkId(app.av.sink).catch(() => {});
         }
         const v = tile.querySelector('video');
+        // A camera track that joins a stream the <video> already holds may never start decoding in
+        // WebKit (suspected on GStreamer builds, unknown on Apple's): attach again, once per new track.
+        const face = id !== 'me' && stream ? (stream.getVideoTracks().find((t) => t.readyState === 'live') || null) : null;
+        const lateFace = Boolean(face) && v.srcObject === stream && v.__hangoutFace !== face;
+        if (lateFace) v.srcObject = null;
         if (v.srcObject !== (stream || null)) v.srcObject = stream || null;
-        if (id !== 'me' && v.paused && stream) playRemoteFace(v);
+        v.__hangoutFace = face;
+        if (id !== 'me' && stream && (v.paused || lateFace)) playRemoteFace(v);
         const isCanvas = id === 'me' ? app.av.canvas : app.av.canvasPeers.has(id);
         const isScreen = id === 'me' ? Boolean(app.av.screen) : app.av.screenPeers.has(id);
         const camOn = id === 'me' ? app.av.cam : app.av.camPeers.has(id);

@@ -60,6 +60,7 @@ function seconds(ms) { return Math.round(ms / 100) / 10; }
 
 // WebKit host limits must have direct evidence: missing browser, observed renderer crash,
 // or no capture device / no local self-view frames after both cameras are turned on.
+// Faces captured but never shown is NOT a host limit: it fails, with receive-side evidence.
 const WEBKIT_MISSING = 'WebKit not launchable on this host';
 const WEBKIT_CRASH = 'WebKit renderer crash on this host (environment limit)';
 const WEBKIT_NO_CAPTURE = 'WEBKIT_NO_CAPTURE: WebKit cannot capture camera frames on this host';
@@ -159,6 +160,63 @@ async function localSelfView(page) {
         const video = document.querySelector('[data-tiles] [data-tile="me"] video');
         return { videoWidth: video?.videoWidth || 0, currentTime: video?.currentTime || 0 };
     });
+}
+/** Receive-side facts for one person: what arrived on the wire, what was decoded, and which
+ * video codecs this browser build says it can receive. Read through the existing test hook. */
+async function receiveEvidence(page) {
+    return page.evaluate(async () => {
+        const out = { peers: 0, connection: [], ice: [], packetsReceived: 0, bytesReceived: 0, framesDecoded: null, framesReceived: null, codecs: [], receiverCodecs: null, remote: [] };
+        const app = window.__hangout;
+        for (const [, entry] of (app ? app.av.pcs : [])) {
+            out.peers += 1;
+            out.connection.push(entry.pc.connectionState);
+            out.ice.push(entry.pc.iceConnectionState);
+            try {
+                const stats = await entry.pc.getStats();
+                stats.forEach((row) => {
+                    if (row.type !== 'inbound-rtp' || (row.kind !== 'video' && row.mediaType !== 'video')) return;
+                    out.packetsReceived += row.packetsReceived || 0;
+                    out.bytesReceived += row.bytesReceived || 0;
+                    if (Number.isFinite(row.framesDecoded)) out.framesDecoded = (out.framesDecoded || 0) + row.framesDecoded;
+                    if (Number.isFinite(row.framesReceived)) out.framesReceived = (out.framesReceived || 0) + row.framesReceived;
+                    const codec = row.codecId ? stats.get(row.codecId) : null;
+                    if (codec && codec.mimeType && !out.codecs.includes(codec.mimeType)) out.codecs.push(codec.mimeType);
+                });
+            } catch (_) { out.statsFailed = true; }
+        }
+        try {
+            const caps = window.RTCRtpReceiver && RTCRtpReceiver.getCapabilities ? RTCRtpReceiver.getCapabilities('video') : null;
+            if (caps && Array.isArray(caps.codecs)) out.receiverCodecs = [...new Set(caps.codecs.map((codec) => String(codec.mimeType || '').toLowerCase()))];
+        } catch (_) { /* capability list not readable: proves nothing */ }
+        out.remote = [...document.querySelectorAll('[data-tiles] .tile:not([data-tile="me"]) video')].map((video) => ({
+            videoWidth: video.videoWidth,
+            readyState: video.readyState,
+            paused: video.paused,
+            error: video.error ? video.error.code : 0,
+            tracks: video.srcObject ? video.srcObject.getTracks().map((track) => `${track.kind}:${track.readyState}:${track.muted ? 'muted' : 'unmuted'}`) : []
+        }));
+        return out;
+    }).catch(() => null);
+}
+/** Evidence only, never a verdict: one side's receive samples boiled down for webkit.json and
+ * the CI log. `packetsGrowing` is true only when every sample has more video packets than the
+ * one before it (at least two samples), so a link that got a few packets and died reads false. */
+function receiveSummary(samples, faceless) {
+    const seen = samples.filter(Boolean);
+    const last = seen[seen.length - 1] || null;
+    const packets = seen.map((sample) => sample.packetsReceived);
+    return {
+        faceless,
+        samples: seen.length,
+        connectionState: last ? last.connection : [],
+        iceConnectionState: last ? last.ice : [],
+        remoteVideos: last ? last.remote.length : 0,
+        packetsReceived: packets,
+        packetsGrowing: packets.length >= 2 && packets.every((count, index) => index === 0 || count > packets[index - 1]),
+        framesDecoded: seen.map((sample) => sample.framesDecoded),
+        first: seen[0] || null,
+        last
+    };
 }
 function watchRemoteFrames(pages, seenAt) {
     let stop = false;
@@ -541,6 +599,25 @@ test('two people in WebKit when that browser launches', async () => {
                         const observedBoth = Object.values(local).every((self) => self.samples > 0);
                         if (!captured && (inputs <= 0 || observedBoth)) noteLimit(WEBKIT_NO_CAPTURE);
                         else {
+                            // Faces were captured but never shown. Sample the receive side a few times
+                            // so "packets arrive, nothing decodes" is told apart from "never connected".
+                            const sides = { host: [], guest: [] };
+                            await expect.poll(async () => {
+                                const [hostSample, guestSample] = await Promise.all([receiveEvidence(host), receiveEvidence(guest)]);
+                                sides.host.push(hostSample);
+                                sides.guest.push(guestSample);
+                                return sides.host.length;
+                            }, { timeout: 6000, intervals: [1000] }).toBeGreaterThanOrEqual(3).catch(() => {});
+                            const [hostRows, guestRows] = await Promise.all([remoteWidths(host), remoteWidths(guest)]);
+                            // Evidence only: nothing here skips, the test still fails just below.
+                            report.receive = {};
+                            for (const [side, rows] of [['host', hostRows], ['guest', guestRows]]) {
+                                const got = receiveSummary(sides[side], !rows.some((row) => row.width > 0));
+                                report.receive[side] = got;
+                                console.log(`CHECK receive ${side} faceless=${got.faceless} samples=${got.samples} connection=${got.connectionState.join(',') || 'none'} ice=${got.iceConnectionState.join(',') || 'none'} remoteVideos=${got.remoteVideos} packets=${got.packetsReceived.join('>') || 'none'} growing=${got.packetsGrowing} framesDecoded=${got.framesDecoded.join('>') || 'none'} codecs=${got.last ? got.last.codecs.join(',') || 'none' : 'none'}`);
+                            }
+                        }
+                        if (!hostLimit) {
                             report.pass = false;
                             report.status = 'WebKit stayed up, but neither side showed a playing face.';
                             throw new Error(report.status);
