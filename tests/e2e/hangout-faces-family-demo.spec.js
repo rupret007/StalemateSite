@@ -574,7 +574,7 @@ test('two people in WebKit when that browser launches', async () => {
         await writeJson('webkit.json', report);
         extraBrowser = null;
         extraGuestBrowser = null;
-        await Promise.all([browser, guestBrowser].map((opened) => Promise.race([
+        await Promise.all([browser, guestBrowser].filter(Boolean).map((opened) => Promise.race([
             opened.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 1500))
         ])));
     }
