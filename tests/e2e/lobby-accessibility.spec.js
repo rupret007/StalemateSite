@@ -372,7 +372,7 @@ const invitationViewports = [
 for (const viewport of invitationViewports) test(`${viewport.label}: invitation status action remains keyboard-reachable without covering chat input`, async ({ browser, baseURL }, testInfo) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
     const host = await guest(browser, baseURL, 'InvitationHost', { width: 1280, height: 900 }, relay);
-    let visitor, holdJoin = false, releaseJoin;
+    let visitor, holdJoin = false, dropFirstConfirmation;
     const heldJoinFrames = [];
     try {
         await send(host.page, '/join #invitation-studio');
@@ -380,9 +380,9 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
         visitor = await guest(browser, baseURL, 'InvitationGuest', viewport, relay, viewport.label === 'phone390' ? async page => {
             await page.routeWebSocket(/\/sessions\/accessibility-/, socket => {
                 const server = socket.connectToServer();
-                releaseJoin = () => {
+                dropFirstConfirmation = () => {
                     holdJoin = false;
-                    for (const frame of heldJoinFrames.splice(0)) socket.send(frame);
+                    heldJoinFrames.length = 0;
                 };
                 server.onMessage(raw => {
                     const frame = JSON.parse(raw);
@@ -414,14 +414,19 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
         const action = status.getByRole('button', { name: 'Join', exact: true });
         await expect(action).toHaveAccessibleDescription('InvitationHost invited you to #invitation-studio');
         await tabTo(visitor.page, action);
-        holdJoin = Boolean(releaseJoin);
+        holdJoin = Boolean(dropFirstConfirmation);
         await visitor.page.keyboard.press('Enter');
         if (holdJoin) {
             await expect(status).toContainText('Waiting to join #invitation-studio');
             await expect(status.getByRole('button', { name: 'Joining…', exact: true })).toBeFocused();
             await expect.poll(() => heldJoinFrames.length).toBe(2);
             await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-waiting-for-room.png`) });
-            releaseJoin();
+            dropFirstConfirmation();
+            const retry = status.getByRole('button', { name: 'Retry join', exact: true });
+            await expect(retry).toBeVisible({ timeout: 12000 });
+            await expect(retry).toBeFocused();
+            await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-retry-room-join.png`) });
+            await retry.press('Enter');
         }
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#invitation-studio');
         await expect(status).toBeHidden();

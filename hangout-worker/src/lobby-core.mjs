@@ -931,6 +931,16 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         pushList({ presence: true });
     }
 
+    function sendRoomEntry(c, chan, reconfirmed = false) {
+        const act = actSnapshot(chan);
+        if (act?.video) {
+            if (!participationAllows(c, 'receiveMedia') || !participationAllows(c, 'externalProvider')) act.video = null;
+            else noteParticipationMedia(c, 'receiveMedia', 'externalProvider');
+        }
+        // Synchronize current room state without replaying earlier chat.
+        out(c, { t: 'join', ch: chanView(chan, c), act, ...(reconfirmed ? { reconfirmed } : {}) });
+    }
+
     function enter(c, chan, { key = '', invited = false, admitted } = {}) {
         if (chan.members.has(c.id)) return true;
         if (chan.kind !== 'lobby' && !chan.members.size && [...channels.values()].filter((r) => r.kind !== 'lobby' && r.members.size).length >= L.roomsListed) return bot(c, 'All 30 active room slots are busy. Try again shortly.', 'error');
@@ -951,14 +961,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             bump(net.stats.rooms, (label.endsWith(chan.title) ? label : `${label} · ${chan.title}`).slice(0, 60));
         }
         c.channels.add(chan.name);
-        const act = actSnapshot(chan);
-        if (act?.video) {
-            if (!participationAllows(c, 'receiveMedia') || !participationAllows(c, 'externalProvider')) act.video = null;
-            else noteParticipationMedia(c, 'receiveMedia', 'externalProvider');
-        }
-        // Classic IRC: channel metadata/current activity may synchronize, but chat begins now.
-        // The bounded moderation context above is not a visitor backlog.
-        out(c, { t: 'join', ch: chanView(chan, c), act });
+        sendRoomEntry(c, chan);
         event(chan, `${nickOf(c)} has joined ${chan.name}`);
         if (chan.kind === 'lobby') bot(c, `welcome to #stalemate, ${c.nick}. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.`);
         else if (chan.kind === 'jam') bot(c, `welcome to ${chan.name}. Music runs in the WebJam desktop app using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.`);
@@ -1654,6 +1657,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (roomInstance !== undefined && (typeof roomInstance !== 'string' || !/^[a-f0-9]{32}$/.test(roomInstance) || !existing || existing.keepRef !== roomInstance))
                 return bot(c, 'That room changed or closed. Ask the host for a new invitation or choose another room.', 'error');
             if (existing) {
+                if (result && existing.members.has(c.id)) {
+                    sendRoomEntry(c, existing, true);
+                    result('joined');
+                    return true;
+                }
                 const joined = enter(c, existing, { key });
                 if (joined === true) result?.('joined');
                 return joined;

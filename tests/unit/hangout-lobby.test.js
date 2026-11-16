@@ -535,6 +535,17 @@ describe('permissions are enforced on the server (forged commands)', () => {
         expect(joined).toBeGreaterThanOrEqual(0);
         expect(result).toBeGreaterThan(joined);
         expect(got(outsider).some(frame => frame.t === 'room-join-result')).toBe(false);
+
+        const retry = 'c'.repeat(32);
+        const before = got(guest).length, hostBefore = got(replacementHost).length;
+        accept(guest, freshOffer, retry);
+        const retryFrames = got(guest).slice(before);
+        expect(retryFrames).toEqual([
+            expect.objectContaining({ t: 'join', reconfirmed: true, ch: expect.objectContaining({ name: room, keepRef: replacement.keepRef }) }),
+            { t: 'room-join-result', id: retry, status: 'joined' },
+        ]);
+        expect(retryFrames[0].ch).not.toHaveProperty('lines');
+        expect(got(replacementHost)).toHaveLength(hostBefore);
     });
 
     it('keeps a stale room directory entry from creating or joining a different room', () => {

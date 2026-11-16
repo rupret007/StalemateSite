@@ -1200,6 +1200,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             break;
         }
         case 'join': {
+            const joined = app.chans.get(m.ch.name);
+            if (m.reconfirmed === true && joined && joined.keepRef === m.ch.keepRef) {
+                handle({ t: 'chan', ch: m.ch }, nick);
+                break;
+            }
             const c = { ...m.ch, lines: [] };
             let focusJoinedRoom = false;
             if (roomJoinFocus?.room === c.name && (!roomJoinFocus.instance || roomJoinFocus.instance === c.keepRef)) {

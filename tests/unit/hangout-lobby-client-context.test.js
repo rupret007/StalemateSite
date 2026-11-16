@@ -185,6 +185,26 @@ describe('keyboard room invitation acceptance', () => {
         expect(window.document.activeElement.dataset.channelKey).toBe(room);
     });
 
+    it('recovers a missed room confirmation and preserves active chat on a repeated receipt', async () => {
+        const { window, ws, welcome, join, flush } = await visitor();
+        welcome(); join();
+        const room = '#invitation-studio';
+        ws.receive({ t: 'invite', ch: room, by: 'InvitationHost', roomInstance: invitationRoomInstance });
+        const action = window.document.querySelector('[data-room-invite-join]');
+        action.focus();
+        action.click();
+        flush(10000);
+        action.click();
+        const confirmation = { t: 'join', reconfirmed: true, ch: { name: room, keepRef: invitationRoomInstance,
+            kind: 'chat', title: 'Rehearsal chat', modes: {}, names: [{ nick: 'Viewer', prefix: '' }] } };
+        ws.receive(confirmation);
+        expect(window.__lobby.active).toBe(room);
+        expect(window.document.activeElement.dataset.channelKey).toBe(room);
+        ws.receive({ t: 'line', ch: room, from: 'InvitationHost', text: 'A line received in this session.' });
+        ws.receive(confirmation);
+        expect(window.document.querySelector('[data-buffer]').textContent).toContain('A line received in this session.');
+    });
+
     it.each([false, true])('retains a meaningful focus target while joining (guest moved focus: %s)', async (moved) => {
         const { window, ws, welcome, join } = await visitor();
         const { document } = window;
