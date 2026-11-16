@@ -24,6 +24,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
         const bootstrap = window.document.createElement('script');
         bootstrap.src = '/beta/bootstrap.js'; window.document.head.append(bootstrap);
         window.HangoutBootstrap = { preview: 'local-preview-key-0001', owner: options.owner === true };
+        if (options.participation === true) window.HangoutParticipationControls = true;
     }
     window.fetch = options.fetch || vi.fn();
     const paint = () => { for (const [id, task] of [...timers]) if (task.delay === 16) { timers.delete(id); task.fn(); } };
@@ -315,6 +316,38 @@ describe('opening a room from the directory', () => {
         button.click();
         expect(ws.sent.at(-1)).toEqual({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
     });
+});
+
+it('keeps browser audio guidance and actions off under the protected participation policy', async () => {
+    const { window, ws, welcome, join } = await visitor('rad-dad', {}, { beta: true, participation: true });
+    const { document } = window;
+    window.open = vi.fn();
+    welcome(); join();
+    const room = '#jam-policy-room', href = 'https://audio.example.test/join/';
+    ws.receive({ t: 'join', ch: {
+        name: room, kind: 'jam', keepRef: 'd'.repeat(32), modes: { i: true },
+        names: [{ nick: 'Viewer', prefix: '@' }],
+        jam: { web: href, webReady: true, desktop: 'webjam://fixture-host/', invitation: 'webjam://fixture-host/' },
+    } });
+    const web = document.querySelector('[data-jam-web]');
+    expect(web.hidden).toBe(true);
+    expect(web.disabled).toBe(true);
+    expect(document.querySelector('[data-jam-invite-copy]').hidden).toBe(true);
+    expect(document.querySelector('[data-jam-invite-qr-toggle]').hidden).toBe(true);
+    expect(document.querySelector('[data-jam-desktop]').hidden).toBe(false);
+    expect(document.querySelector('[data-jam-browser-note]').textContent).toContain('Browser audio is unavailable');
+    web.click();
+    expect(window.open).not.toHaveBeenCalled();
+    const input = document.querySelector('[data-jam-link]');
+    const form = document.querySelector('[data-jam-form]');
+    input.value = href;
+    form.dispatchEvent(new window.Event('submit', { cancelable: true }));
+    expect(ws.sent.some(frame => frame.name === 'jamlink')).toBe(false);
+    expect(document.querySelector('[data-jam-share-status]').textContent).toContain('Paste a full desktop invitation');
+    expect(input.value).toBe(href);
+    input.value = 'webjam://fixture-host/';
+    form.dispatchEvent(new window.Event('submit', { cancelable: true }));
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'jamlink', args: ['invitation', input.value], ch: room });
 });
 
 describe('targeted Music invitation', () => {

@@ -289,6 +289,16 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     });
     window.addEventListener('pagehide', clearMessageRecovery);
     const sharingControls = betaShell && window.HangoutParticipationControls === true;
+    if (sharingControls) {
+        $('[data-jam-web]').hidden = true;
+        $('[data-jam-browser-help]').hidden = true;
+        $('[data-jam-browser-note]').textContent = 'Browser audio is unavailable under this community’s sharing policy. You can still chat here.';
+        $('[data-jam-browser-step]').textContent = 'Copy Invite';
+        $('[data-jam-wait]').textContent = 'Waiting for a desktop invitation from the host.';
+        $('[data-jam-link]').placeholder = 'Paste a full desktop invitation';
+        $('#jam-share-help').textContent = 'Paste the full desktop invitation, choose Share, and keep the Music session running.';
+        $('[data-jam-platform]').textContent = 'A Mac hosts music in WebJam. Use the compatible desktop build supplied by your host. Windows native music needs a signed build.';
+    }
     let sharingState = null, sharingBusy = false, sharingCleanup = 'unknown', sharingConfirmation = 0;
     const sharingRegion = $('[data-sharing-region]');
     const sharingStatus = text => { $('[data-sharing-status]').textContent = text; };
@@ -1980,7 +1990,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const musicDismiss = $('[data-music-invite-dismiss]');
     const musicStatus = $('[data-music-invite-status]');
     const musicAnnouncement = $('[data-music-invite-announcement]');
-    const readyForMusicOffer = () => directMusicInvitesSupported && !gameGuest && connectionState === 'connected'
+    const readyForMusicOffer = () => directMusicInvitesSupported && !sharingControls && !gameGuest && connectionState === 'connected'
         && !sessionEnded && !shieldActive && (!app.netLock || app.netLock === 'off') && !app.localMediaPaused && !app.sharingStopped;
 
     function clearMusicInvite() {
@@ -2126,7 +2136,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (app.sharingStopped || app.localMediaPaused) { resetJamControls(); $('[data-jam]').hidden = true; return; }
         const c = currentJam();
         const next = c ? { room: c, host: !!amOp(c), invitation: c.jam?.invitation || c.jam?.desktop || '',
-            desktop: c.jam?.desktop || '', web: c.jam?.web || '', webReady: c.jam?.webReady === true } : null;
+            desktop: c.jam?.desktop || '', web: sharingControls ? '' : c.jam?.web || '',
+            webReady: !sharingControls && c.jam?.webReady === true } : null;
         const unchanged = jamContext && next && Object.keys(next).every(key => next[key] === jamContext[key]);
         const pending = pendingJamShare;
         const ownPublication = pending?.requestId && pending.room === c && pending.context === jamContext && next?.host
@@ -3463,6 +3474,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         // desktop invitations, including sealed replies, byte-for-byte.
         const value = input.value, web = /^https:\/\//i.test(value.trim());
         if (!value) return;
+        if (web && sharingControls) {
+            $('[data-jam-share-status]').textContent = 'Browser audio is unavailable for this community. Paste a full desktop invitation instead.';
+            return;
+        }
         let sharedValue = web ? value.trim() : value;
         // Match the server's URL spelling only for confirmation. This does
         // not approve an origin or rewrite an opaque desktop invitation.
