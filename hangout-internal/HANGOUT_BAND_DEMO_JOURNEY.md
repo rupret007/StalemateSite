@@ -1,8 +1,30 @@
-# Band demo journey map (Stalemate → Hang Out → Web Join)
+# Private WebJam band demo
 
-End-to-end path for a first-time bandmate and a host, using local preview / `serve:test` fixtures. This is a working map for QA and Playwright; it is not a claim about production hosting.
+Use this walkthrough with the review candidate that includes **Invite to Music**. Stalemate and Rad Dad open the same private Hang Out lobby. The host supplies the private community invitation separately. Use the build ID provided by the test coordinator to identify the native Mac app.
 
-## Steps
+## Mac host
+
+1. Open the private Hang Out invitation and pick a nickname. In native WebJam, choose **Music** → **Host**. Select **Start Session** if shown.
+2. In Hang Out, choose **Rooms** → **Jam (WebJam)**, then **Invite to Music** in the Jam room.
+3. Choose the guest already online in Hang Out, then select **Continue in WebJam**. If the browser asks to open WebJam, choose **Open**. Confirm the invitation in the app.
+4. Check the status in Hang Out. It shows when the invitation was sent, whether the guest accepted or declined, and whether it expired. If Hang Out cannot confirm delivery, check with your guest before sending again.
+
+## Browser guest
+
+1. Open the private community invitation from the host, pick a nickname, and tell the host the nickname you chose. On Windows, join from your browser. The handoff requires the host's Mac app.
+2. When the Music invitation appears, choose **Accept and join**. Then select **Open WebJam in browser**. You can return to the Hang Out tab for room chat.
+3. Choose **Join to listen** to keep your microphone off. To play or speak, run **Check microphone**, confirm you're wearing headphones, and choose **Join with microphone**. If the browser blocks playback, choose **Resume audio**.
+4. Select **Leave session** to stop browser audio. Return to Hang Out if you want to keep chatting.
+
+If the invitation expires, ask the host to send a fresh one in Hang Out. If WebJam fails to return an invitation, the host can check that the Music session is running and try again. The **Share a link instead** fallback is available on the host's screen if the app handoff fails. Share private invitations directly with the intended guest.
+
+These steps describe a review candidate. The phone and desktop automated walkthrough uses the real Hang Out UI with a simulated native handoff and media transport. The [live-music acceptance checks](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md) cover actual Mac-to-Windows audio, a second network, Shared Track, and Webex. Keep rehearsals parked until Jeff gives the go.
+
+## Historical manual-invite journey
+
+Earlier builds used the manual Web Join link flow below. The retained checks cover that fallback and prior friction.
+
+### Steps
 
 | Step | Visitor action | Page / code | Notes |
 | --- | --- | --- | --- |
@@ -18,12 +40,12 @@ End-to-end path for a first-time bandmate and a host, using local preview / `ser
 | 10 | Web Join: headphones, mic check, connect | `/join/` (`join/app.js`, `join/session.js`); fake media in e2e | **Friction:** without host-side mailbox/relay, real join fails at credentials (`Web Join is unavailable` in `webjam-join-play.spec.js`); demo/tests must mock transport. CSP limits connect-src to turn worker origin. |
 | 11 | Connected audio ready | `#status` “Connected — Web Join…”; `join/session.js` `onStatus` | Not the same as native WebJam/TURN qualification across houses. |
 
-## Admin / alternate entry (out of band demo spec)
+### Admin / alternate entry (out of band demo spec)
 
 - **Guest nickname only** — same gate as step 2.
 - **Admin / room owner email code** — `data-owner-signin`, preview launcher “Room owner A/B”, `/lobby-owner/login` on preview server (`HANGOUT_LOCAL_TESTING.md`). Not required for the two-guest band demo.
 
-## Friction summary (open vs addressed in this branch)
+### Friction summary (open vs addressed in this branch)
 
 | Issue | Severity | Status |
 | --- | --- | --- |
@@ -36,7 +58,8 @@ End-to-end path for a first-time bandmate and a host, using local preview / `ser
 | Gate legal button text before “in” | Low | Open |
 | `/join` failure copy good; success path needs host mailbox in live env | Medium | Open for production qualification |
 
-## Automated coverage
+### Automated coverage
 
-- Full two-context path: `tests/e2e/band-demo-journey.spec.js`
+- Current targeted invitation across both entrances: `tests/e2e/music-invite-journey.spec.js`
+- Historical two-context path: `tests/e2e/band-demo-journey.spec.js`
 - Related: `community-entry.spec.js`, `lobby-guest-journeys.spec.js`, `lobby-webjam.spec.js`, `webjam-join-play.spec.js`
