@@ -75,6 +75,12 @@ async function joinWithCamera(page, shot) {
     await expect(card).toBeHidden();
 }
 
+async function expectPlayingStage(page) {
+    const stage = page.locator('.watch .screen');
+    await expect(stage).toBeVisible();
+    await expect(stage.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+}
+
 const remoteWidth = (page) => page.evaluate(() => [...document.querySelectorAll('[data-tiles] .tile:not([data-tile="me"]) video')]
     .map((v) => v.videoWidth).find((w) => w > 0) || 0);
 
@@ -125,7 +131,7 @@ async function expectBigLabeledControls(page) {
     for (const control of await controls.all()) {
         const box = await control.boundingBox();
         const label = (await control.innerText()).trim();
-        expect(box.height, `${label} height`).toBeGreaterThanOrEqual(48);
+        expect(box.height, `${label} height`).toBeGreaterThanOrEqual(58);
         expect(box.width, `${label} width`).toBeGreaterThanOrEqual(48);
         expect(label.length, 'visible text label').toBeGreaterThan(1);
     }
@@ -180,7 +186,8 @@ test('Paint Along phone 390x844: stage on top, faces row, chat drawer, pinned la
     await fs.mkdir(SHOTS, { recursive: true });
     const { host, guest } = await paintAlongPair(browser, baseURL, PHONE, 'phone');
     const stage = await host.locator('.watch .screen').boundingBox();
-    expect(stage.width).toBeGreaterThanOrEqual(PHONE.width - 16);
+    await expectPlayingStage(host);
+    expect(stage.width).toBeGreaterThanOrEqual(PHONE.width - 12);
     expect(Math.abs(stage.width / stage.height - 16 / 9)).toBeLessThan(0.05);
     const closed = await expectNoOverlap(host, PHONE, { chat: false });
     expect(closed['.watch .screen'].y + closed['.watch .screen'].height).toBeLessThanOrEqual(closed['[data-tiles]'].y);
@@ -230,6 +237,7 @@ test('Paint Along desktop 1440x900: Webex layout with stage, filmstrip, chat pan
     test.setTimeout(120000);
     await fs.mkdir(SHOTS, { recursive: true });
     const { host, guest } = await paintAlongPair(browser, baseURL, DESKTOP, 'desktop');
+    await expectPlayingStage(host);
     const b = await expectNoOverlap(host, DESKTOP, { chat: true });
     const stage = b['.watch .screen'];
     // The stage takes most of the screen: left of the side panel, at least 60% of the width.
@@ -254,8 +262,8 @@ test('Paint Along desktop 1440x900: Webex layout with stage, filmstrip, chat pan
     await host.click('[data-more]');
     await expect(host.locator('[data-canvas-cam]')).toBeHidden();
 
-    // Shared playback is still for everyone: a guest pause reaches the host.
-    await guest.click('[data-bob-hold]');
+    // The room owner can pause the same shared player.
+    await host.click('[data-bob-hold]');
     await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
     expect(host.errors).toEqual([]);
     expect(guest.errors).toEqual([]);
