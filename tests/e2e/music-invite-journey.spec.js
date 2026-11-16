@@ -65,8 +65,9 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             const peer = await enter('OtherGuest', guestSite);
             if (width < 901) await host.locator('.phonetabs [data-show="rooms"]').click();
             await host.getByRole('button', { name: /^jam \(webjam\)/i }).click();
-            const room = await host.locator('[data-chat-context]').textContent();
-            expect(room).toMatch(/^#jam-/);
+            const roomContext = host.locator('[data-chat-context]');
+            await expect(roomContext).toHaveText(/^#jam-/);
+            const room = await roomContext.textContent();
             const callback = await host.context().newPage();
             await callback.goto(baseURL);
             const inviteButton = host.getByRole('button', { name: 'Invite to Music', exact: true });
