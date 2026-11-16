@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import { readInvite } from '../../join/crypto.js';
 import { JOIN_SIGNAL, applyJoinFailure, clearJoinFailure, mapJoinError } from '../../join/errors.js';
 
 const read = (path) => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
@@ -11,9 +12,13 @@ const app = read('hangout-worker/web-join-music/app.js');
 const windows = [];
 afterEach(() => { for (const window of windows.splice(0)) window.close(); });
 
-function fixture({ firstJoinFails = false } = {}) {
+function testInviteHash({ capability = Buffer.alloc(32, 1), expiresAt = Math.floor(Date.now() / 1000) + 60 } = {}) {
+    return `#k=${capability.toString('base64url')}&s=${'1'.repeat(64)}&g=1&e=${expiresAt}`;
+}
+
+function fixture({ firstJoinFails = false, hash = testInviteHash() } = {}) {
     const { window } = new JSDOM(html, {
-        url: 'https://music.example.test/join/#synthetic',
+        url: `https://music.example.test/join/${hash}`,
         runScripts: 'outside-only',
     });
     windows.push(window);
@@ -33,7 +38,7 @@ function fixture({ firstJoinFails = false } = {}) {
     window.HTMLMediaElement.prototype.play = play;
     window.HTMLMediaElement.prototype.pause = () => {};
     window.fixture = {
-        readInvite: () => ({ expiresAt: Math.floor(Date.now() / 1000) + 60 }),
+        readInvite,
         acquireMusicStream: capture, closeAudioContext: () => Promise.resolve(),
         WebJoinSession: Session, RELAY_ORIGIN: 'https://relay.example.test',
         JOIN_SIGNAL, applyJoinFailure, clearJoinFailure, mapJoinError,
@@ -55,6 +60,23 @@ it('joins to listen on an explicit action without acquiring a microphone stream'
     expect(capture).not.toHaveBeenCalled();
     expect($('listen-actions').hidden).toBe(true);
     expect($('leave').hidden).toBe(false);
+});
+
+it.each([
+    ['invalid', { capability: Buffer.alloc(32) }],
+    ['expired', { expiresAt: 1 }],
+])('hides audio actions when the browser invite is %s', (_, invite) => {
+    const { $, capture, play, sessions } = fixture({ hash: testInviteHash(invite) });
+    expect($('status').textContent).toBe('This invite link is no longer valid.');
+    expect($('error-hint').textContent).toContain('Ask your host for a new browser invite');
+    expect($('listen-actions').hidden).toBe(true);
+    expect($('listen').disabled).toBe(true);
+    expect($('join').hidden).toBe(true);
+    expect($('retry').hidden).toBe(true);
+    expect($('resume-audio').hidden).toBe(true);
+    expect(sessions).toHaveLength(0);
+    expect(capture).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
 });
 
 it('keeps a listener’s Retry focused on listening after a host timeout', async () => {
