@@ -85,11 +85,31 @@ it('keeps a listener’s Retry focused on listening after a host timeout', async
     $('listen').click();
     await vi.waitFor(() => expect($('retry').hidden).toBe(false));
     expect($('error-hint').textContent).toContain('Retry to listen with your microphone off');
+    expect($('listen-actions').hidden).toBe(true);
+    expect($('prejoin').hidden).toBe(true);
+    expect($('audio-options').hidden).toBe(false);
     expect(window.document.activeElement).toBe($('retry'));
     $('retry').click();
     await vi.waitFor(() => expect($('status').textContent).toContain('microphone off'));
     expect(sessions).toHaveLength(2);
     expect(sessions.every(session => session.options.stream === undefined)).toBe(true);
+    expect(capture).not.toHaveBeenCalled();
+});
+
+it('returns to audio choices without starting capture or another session', async () => {
+    const { $, capture, sessions, window } = fixture({ firstJoinFails: true });
+    $('listen').focus();
+    $('listen').click();
+    await vi.waitFor(() => expect($('retry').hidden).toBe(false));
+    $('audio-options').click();
+
+    expect($('status').textContent).toBe('Choose how to join.');
+    expect($('prejoin').hidden).toBe(false);
+    expect($('listen-actions').hidden).toBe(false);
+    expect($('audio-options').hidden).toBe(true);
+    expect($('retry').hidden).toBe(true);
+    expect(window.document.activeElement).toBe($('listen'));
+    expect(sessions).toHaveLength(1);
     expect(capture).not.toHaveBeenCalled();
 });
 

@@ -188,6 +188,10 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             const retry = listener.getByRole('button', { name: 'Retry', exact: true });
             await expect(retry).toBeFocused();
             await expect(listener.locator('#error-hint')).toContainText('Retry to listen with your microphone off');
+            await expect(retry).toBeInViewport({ ratio: 1 });
+            await expect(listener.getByRole('button', { name: 'Back to audio options', exact: true })).toBeVisible();
+            await expect(listen).toBeHidden();
+            await expect(listener.getByRole('button', { name: 'Check microphone', exact: true })).toBeHidden();
             await capture(listener, '06-listen-retry');
             await retry.press('Enter');
             const resumeAudio = listener.getByRole('button', { name: 'Resume audio', exact: true });

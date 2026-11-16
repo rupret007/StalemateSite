@@ -11,6 +11,7 @@ import { JOIN_SIGNAL, applyJoinFailure, clearJoinFailure, mapJoinError } from ".
 const $ = (id) => document.getElementById(id);
 const listen = $("listen");
 const resumeAudio = $("resume-audio");
+const audioOptions = $("audio-options");
 const hostAudio = $("host-audio");
 const failureElements = () => ({
   status: $("status"),
@@ -40,7 +41,7 @@ function expireUnusedInvite() {
   if (!invite || session || Date.now() < invite.expiresAt * 1000) return false;
   const focused = document.activeElement;
   leave(undefined, new Error(JOIN_SIGNAL.INVITE_EXPIRED));
-  if ($("prejoin").contains(focused) || [ listen, $("join"), $("retry"), $("leave") ].includes(focused)) {
+  if ($("prejoin").contains(focused) || [ listen, $("join"), $("retry"), $("leave"), audioOptions ].includes(focused)) {
     $("status").focus({ preventScroll: true });
   }
   return true;
@@ -165,9 +166,12 @@ function focusNextAudioCheckControl() {
 }
 
 const refresh = () => {
-  $("prejoin").hidden = !invite || starting || !!session;
+  const isIdle = !!invite && !starting && !session;
+  const isListeningRetry = isIdle && retryListening && $("retry").hidden === false;
+  audioOptions.hidden = !isListeningRetry;
+  $("prejoin").hidden = !isIdle || isListeningRetry;
   $("join").disabled = !joinReady();
-  $("listen-actions").hidden = !invite || starting || !!session;
+  $("listen-actions").hidden = !isIdle || isListeningRetry;
   listen.disabled = $("listen-actions").hidden;
   const guidance = $("join-guidance");
   if (guidance) {
@@ -473,6 +477,15 @@ listen.addEventListener("click", () => {
 });
 $("retry").addEventListener("click", () => {
   void startJoin(retryListening);
+});
+audioOptions.addEventListener("click", () => {
+  if (expireUnusedInvite() || audioOptions.hidden) return;
+  const elements = failureElements();
+  retryListening = false;
+  delete elements.status.dataset.failure;
+  clearJoinFailure(elements, "Choose how to join.");
+  refresh();
+  listen.focus();
 });
 resumeAudio.addEventListener("click", () => {
   if (activeAttempt) void playHostAudio(activeAttempt);

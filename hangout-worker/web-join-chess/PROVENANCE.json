@@ -11,7 +11,7 @@
     },
     "index.html": {
       "source": "web/join/index.html",
-      "sha256": "5fb7f3386715e37cf5bdc2dad034f619e28de60e160a2233a4988a2d78ca88cc",
+      "sha256": "ba7de4588577ddb1051d5be020770c45a5078640db90b3f011f1991dead23598",
       "adaptation": "Chess and private Music preview controls layered over the pinned Web Join page. Keeps the listen-only and Resume audio controls in the protected beta."
     },
     "session.js": {
