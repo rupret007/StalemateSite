@@ -48,9 +48,8 @@ export const LOBBY_LIMITS = Object.freeze({
     lobbyMax: 150,
     roomMax: 8,
     roomsListed: 30,
-    roomPerDevice: 10 * MIN,
+    roomPerDevice: 10 * MIN, // unused since 2026-11-16: per-device new-room cooldown removed (owner decision); hourly allowance below still applies
     roomsPerIpHour: 3,
-    roomsPerTrustedIpHour: 10,
     burst: 5,
     perSecond: 1,
     maxChars: 300,
@@ -1433,7 +1432,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 devStats.set(k, v);
             }
             for (const [k, v] of saved.ips) {
-                if (!moderationIdentity(k) || !Array.isArray(v) || v.length > L.roomsPerTrustedIpHour || !v.every(Number.isFinite)) throw new Error('invalid IP allowance');
+                if (!moderationIdentity(k) || !Array.isArray(v) || v.length > L.roomsPerIpHour || !v.every(Number.isFinite)) throw new Error('invalid IP allowance');
                 ipRooms.set(k, v);
             }
         } catch { net.lock = 'readonly'; net.lockAuto = true; roomsBroken = true; }
@@ -2036,22 +2035,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const listed = [...channels.values()].filter((x) => x.kind !== 'lobby' && !x.owner).length;
         if (listed >= L.roomsListed) return bot(c, 'All 30 room slots are busy. Join one from the list.', 'error');
         let allowance;
-        // A creator cannot qualify through their own founder @; a second admitted host peer must confirm the beta session.
-        const admittedHost = [...channels.values()].some(room => room.kind !== 'lobby' && room.members.has(c.id)
-            && (owns(c, room) || c.betaSid && membersOf(room).some(peer => peer.id !== c.id && peer.betaSid === c.betaSid && isOp(peer, room))));
         if (!isStaff(c)) {
             if (devStats.size >= 5000 && !devStats.has(c.dev) || ipRooms.size >= 5000 && !ipRooms.has(c.iph)) return bot(c, 'Room creation is temporarily busy.', 'error');
             const st = devStats.get(c.dev) || {};
-            if (!admittedHost && st.lastRoom && now() - st.lastRoom < L.roomPerDevice) {
-                if (!st.roomLimitNotice || now() - st.roomLimitNotice >= L.roomPerDevice) {
-                    bot(c, 'One new room per 10 minutes.', 'error');
-                    devStats.set(c.dev, { ...st, roomLimitNotice: now() });
-                }
-                return;
-            }
             const hits = (ipRooms.get(c.iph) || []).filter((t) => t > now() - HOUR);
-            if (hits.length >= (admittedHost ? L.roomsPerTrustedIpHour : L.roomsPerIpHour)) return bot(c, 'Too many new rooms from your connection this hour.', 'error');
-            hits.push(now()); allowance = { hits, device: admittedHost ? st : { ...st, lastRoom: now(), roomLimitNotice: 0 } };
+            if (hits.length >= L.roomsPerIpHour) return bot(c, 'Too many new rooms from your connection this hour.', 'error');
+            hits.push(now()); allowance = { hits, device: st };
         }
         const title = titleText ? checkText(titleText, net.lists) : { verdict: 'ok', text: KINDS[kind].replace(/^\S+\s/, '') };
         if (title.verdict !== 'ok') return bot(c, 'Not cool here. Pick another title.', 'error');

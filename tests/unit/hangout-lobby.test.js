@@ -448,35 +448,21 @@ describe('abuse caps', () => {
         expect(join('Ddd').refused.status).toBe(429);
         expect(join('Band1', { role: 'band' }).refused).toBeUndefined();
     });
-    it('room creation is rate-limited per device and per IP hash', () => {
+    it('lets one device open rooms back to back while the hourly connection allowance still applies', () => {
         const a = join('Alpha', { iph: 'shared' });
         cmd(a, 'join', ['#watch-1']);
-        inbox.set(a.id, []);
         cmd(a, 'join', ['#watch-2']);
-        expect(notices(a)).toMatch(/One new room per 10 minutes/);
-        inbox.set(a.id, []);
-        cmd(a, 'join', ['#watch-3']);
-        expect(notices(a)).not.toMatch(/One new room per 10 minutes/);
+        expect(got(a).some(frame => frame.t === 'join' && frame.ch?.name === '#watch-2')).toBe(true);
+        expect(notices(a)).not.toMatch(/One new room per/);
         const b = join('Bravo', { iph: 'shared' });
         const c = join('Charlie', { iph: 'shared' });
-        const d = join('Delta', { iph: 'shared' });
-        cmd(b, 'join', ['#watch-3']); cmd(c, 'join', ['#watch-4']); cmd(d, 'join', ['#watch-5']);
-        expect(notices(d)).toMatch(/Too many new rooms/);
+        cmd(b, 'join', ['#watch-3']);
+        expect(got(b).some(frame => frame.t === 'join' && frame.ch?.name === '#watch-3')).toBe(true);
+        cmd(c, 'join', ['#watch-4']);
+        expect(notices(c)).toMatch(/Too many new rooms/);
+        expect(got(c).some(frame => frame.t === 'join' && frame.ch?.name === '#watch-4')).toBe(false);
     });
-    it('lets an admitted room host open another room during the device cooldown', () => {
-        const host = join('RoomHost');
-        cmd(host, 'join', ['#watch-host-first']);
-        L._debug.conns.get(host.id).betaSid = 'family-host-session';
-        const hostTab = join('RoomHostTab', { dev: 'dev-RoomHost' });
-        L._debug.conns.get(hostTab.id).betaSid = 'family-host-session';
-        cmd(hostTab, 'join', ['#watch-host-first']);
-        cmd(host, 'join', ['#watch-host-second']);
-        expect(got(host).some(frame => frame.t === 'join' && frame.ch?.name === '#watch-host-second')).toBe(true);
-        cmd(host, 'join', ['#watch-host-third']);
-        cmd(host, 'join', ['#watch-host-fourth']);
-        expect(got(host).some(frame => frame.t === 'join' && frame.ch?.name === '#watch-host-fourth')).toBe(true);
-    });
-    it('does not apply the device room cooldown to authenticated staff', () => {
+    it('does not apply the room allowance to authenticated staff', () => {
         const staff = join('ReviewMod', { role: 'moderator' });
         cmd(staff, 'join', ['#watch-staff-first']);
         cmd(staff, 'join', ['#watch-staff-second']);
@@ -955,7 +941,7 @@ describe('Game Night', () => {
         const ref = got(host).findLast(frame => frame.t === 'join').ch.keepRef;
         cmd(host, 'part', [first], first);
         cmd(host, 'join', [next]);
-        expect(notices(host)).toContain('One new room per 10 minutes');
+        expect(notices(host)).toContain('Too many new rooms from your connection this hour.');
         cmd(host, 'gameopen', [next]);
         expect(got(host).findLast(frame => frame.t === 'game-room-open')).toEqual({
             t: 'game-room-open', request: next, ok: true, room: first, ref

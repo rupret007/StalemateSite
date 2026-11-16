@@ -220,13 +220,9 @@ test('phone room creation keeps the name and shows a server rejection inside the
         await page.click('[data-start="chat"]');
         await page.fill('[data-channel-name]', '#another-chat');
         await page.locator('[data-channel-form] button[type="submit"]').click();
-        await expect(page.locator('[data-channel-dialog]')).toBeVisible();
-        await expect(page.locator('[data-channel-error]')).toContainText('One new room per 10 minutes');
-        await expect(page.locator('[data-channel-name]')).toHaveValue('#another-chat');
-        await expect(page.locator('[data-channel-error]')).toBeInViewport();
-        await expect(page.locator('[data-channel-cancel]')).toBeInViewport();
-        await page.click('[data-channel-cancel]');
-        await expect(page.locator('[data-start="chat"]')).toBeFocused();
+        await expect(page.locator('[data-channel-dialog]')).toBeHidden();
+        await expect(page.locator('[data-chat-context]')).toHaveText('#another-chat');
+        await page.click('[data-show="rooms"]');
         await page.click('[data-start="chat"]');
         await page.fill('[data-channel-name]', '#first-chat');
         await page.locator('[data-channel-form] button[type="submit"]').click();

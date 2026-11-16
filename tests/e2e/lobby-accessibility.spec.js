@@ -276,7 +276,7 @@ for (const viewport of viewports) test(`${viewport.label}: long chat, error and 
         await send(page, '/join #layout-studio'); await expect(page.locator('[data-chat-context]')).toHaveText('#layout-studio');
         await send(page, roomText); await expect(page.locator('[data-buffer]')).toContainText(roomText);
         await send(page, '/join #another-studio');
-        await expect(page.getByRole('status').filter({ hasText: 'One new room per 10 minutes.' })).toBeVisible();
+        await expect(page.locator('[data-chat-context]')).toHaveText('#another-studio');
         await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
         const geometry = await composerGeometry(page);
         await attachGeometry(testInfo, `geometry-${viewport.label}`, geometry);
@@ -377,9 +377,9 @@ test('a focused status survives its dismiss timer and dismisses after keyboard f
     try {
         await send(visitor.page, '/join #status-studio');
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#status-studio');
-        await send(visitor.page, '/join #another-studio');
+        await send(visitor.page, '/notacommand');
         const status = visitor.page.locator('[data-toast]');
-        await expect(status).toContainText('One new room per 10 minutes.');
+        await expect(status).toContainText('Unknown command /notacommand');
         await tabTo(visitor.page, status);
         // Deliberately cross the real 4s dismiss deadline; fake browser time would
         // decouple WebSocket/ACK timers from the real local relay's clock.
