@@ -114,6 +114,51 @@ for (const width of [375, 1440]) test(`landmarks, visible nickname label and mes
     } finally { await context.close(); }
 });
 
+for (const [width, height] of [[390, 844], [1440, 900]]) test(`the connection status keeps keyboard focus through manual retry at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    let firstSocket, releaseFrames;
+    const visitor = await guest(browser, baseURL, 'RetryFocusGuest', { width, height }, undefined, async page => {
+        await page.routeWebSocket(/\/sessions\/accessibility-/, socket => {
+            const server = socket.connectToServer();
+            if (!firstSocket) { firstSocket = socket; return; }
+            const pending = [];
+            let released = false;
+            releaseFrames = () => {
+                released = true;
+                for (const message of pending.splice(0)) socket.send(message);
+            };
+            server.onMessage(message => {
+                if (released) socket.send(message);
+                else pending.push(message);
+            });
+        });
+    });
+    const { page } = visitor;
+    const status = page.locator('[data-connection]');
+    const retry = page.getByRole('button', { name: 'Try again', exact: true });
+    try {
+        firstSocket.close({ code: 4400, reason: 'Fixture retry' });
+        await expect(status).toHaveText('Offline');
+        await tabTo(page, retry);
+        await page.screenshot({ path: testInfo.outputPath(`retry-focus-offline-${width}.png`) });
+
+        await page.keyboard.press('Enter');
+        await expect(retry).toBeHidden();
+        await expect(status).toHaveText('Reconnecting…');
+        await expect(status).toBeFocused();
+        await expect(status).toBeInViewport();
+        await page.screenshot({ path: testInfo.outputPath(`retry-focus-connecting-${width}.png`) });
+        await expect.poll(() => Boolean(releaseFrames)).toBe(true);
+        releaseFrames();
+
+        await expect(status).toHaveText('Connected');
+        await expect(status).toBeFocused();
+        await send(page, 'Keyboard chat after reconnect');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('Keyboard chat after reconnect');
+        await page.screenshot({ path: testInfo.outputPath(`retry-focus-recovered-${width}.png`) });
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 for (const width of [375, 390]) test(`mobile keyboard section shortcuts focus the opened pane at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const visitor = await guest(browser, baseURL, `SectionFocus${width}`, { width, height: 667 });
     const { page } = visitor;

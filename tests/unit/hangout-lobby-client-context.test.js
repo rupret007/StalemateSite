@@ -1207,6 +1207,38 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(ws.sent.filter((frame) => frame.t === 'transport-ack')).toEqual([]);
         expect(replacement.sent.filter((frame) => frame.t === 'transport-ack')).toEqual([{ t: 'transport-ack', seq: 1 }]);
     });
+    it.each([false, true])('keeps manual reconnect keyboard focus usable when the guest moves focus: %s', async (moved) => {
+        const { window, ws, sockets, welcome, join, flush } = await visitor();
+        welcome(); join();
+        const { document } = window;
+        const retry = document.querySelector('[data-reconnect]');
+        const status = document.querySelector('[data-connection]');
+        const composer = document.querySelector('[data-text]');
+        ws.close(4400);
+        expect(retry.hidden).toBe(false);
+        retry.focus();
+        retry.click();
+        expect(retry.hidden).toBe(true);
+        expect(status.textContent).toBe('Reconnecting…');
+        expect(document.activeElement).toBe(status);
+        await vi.waitFor(() => expect(sockets).toHaveLength(2));
+
+        if (moved) composer.focus();
+        flush(20000);
+        expect(retry.hidden).toBe(false);
+        expect(status.textContent).toBe('Offline');
+        expect(document.activeElement).toBe(moved ? composer : retry);
+        if (moved) return;
+
+        retry.click();
+        await vi.waitFor(() => expect(sockets).toHaveLength(3));
+        const replacement = sockets[2];
+        replacement.open();
+        replacement.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok' });
+        welcome(replacement);
+        expect(status.textContent).toBe('Connected');
+        expect(document.activeElement).toBe(status);
+    });
     it('coalesces join bursts into at most one acknowledgement per 50ms', async () => {
         const { ws, welcome, flush, advance } = await visitor(); welcome();
         for (let seq = 2; seq <= 32; seq++) ws.receive({ t: 'entry-source', transportSeq: seq });

@@ -671,12 +671,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (pendingKeep) clearKeep(pendingKeep.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools after reconnecting.' : 'Your room return was interrupted. Nothing was kept.');
         }
         const label = { offline: 'Offline', connecting: 'Connecting…', reconnecting: 'Reconnecting…', connected: 'Connected', ended: 'Session ended' }[state];
-        $('[data-connection]').textContent = label;
-        $('[data-connection]').dataset.state = state;
+        const status = $('[data-connection]');
+        const retryButton = $('[data-reconnect]');
+        const showRetry = !!app.me && (state === 'offline' || state === 'ended' && !betaShell);
+        status.textContent = label;
+        status.dataset.state = state;
+        if (!showRetry && document.activeElement === retryButton) status.focus({ preventScroll: true });
+        retryButton.hidden = !showRetry;
+        if (state === 'offline' && showRetry && document.activeElement === status) retryButton.focus({ preventScroll: true });
         $('[data-send]').disabled = state !== 'connected';
         $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting' || state === 'ended' && betaShell;
         if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline' && !gameGuestReloadOffered;
-        $('[data-reconnect]').hidden = !(state === 'offline' || state === 'ended' && !betaShell) || !app.me;
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });
         if (state === 'offline' && app.pendingChannel) {
             app.pendingChannel = '';

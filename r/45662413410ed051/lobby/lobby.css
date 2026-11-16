@@ -59,6 +59,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .connection-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; gap: 10px; align-items: center; }
 .entry-return { display: inline-flex; align-items: center; min-height: 44px; font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }
 .connection { color: var(--muted); font: 11px var(--mono); white-space: nowrap; }
+.connection:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 .connection::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 1px 0; background: var(--amber); border-radius: 50%; }
 .connection[data-state=connected]::before { background: var(--lime); box-shadow: 0 0 0 3px #d1fa7810; }
 .connection[data-state=offline]::before { background: var(--pink); }
