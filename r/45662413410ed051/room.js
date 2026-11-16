@@ -922,7 +922,7 @@
             const { source, playing, pos } = msg.body || {};
             if (!app.isHost || !isSharedMovie(source) || typeof playing !== 'boolean'
                 || !Number.isFinite(pos) || pos < 0 || pos > 86400) return;
-            if (await hostPublish(source, playing, pos)) await syncToState(true);
+            if (await hostPublish(source, playing, pos, meta.from)) await syncToState(true);
             return;
         }
         case 'av':
@@ -1406,7 +1406,9 @@
         app.lastHostSeq = Math.max(app.lastHostSeq, b.seq || 0);
         app.lastPlaybackSeq = Math.max(app.lastPlaybackSeq || 0, b.seq || 0);
         showEpisode();
-        await syncToState(true);
+        // The initiating guest has already applied this control locally and
+        // may have started a newer seek before the host's signed echo arrives.
+        if (b.watchBy !== app.myId) await syncToState(true);
     }
 
     function isPaintEpisode(source) {
@@ -1513,7 +1515,7 @@
     doc.addEventListener('visibilitychange', () => { if (!doc.hidden) void syncToState(true); });
 
     let videoPublication = null;
-    async function hostPublish(source, playing, pos) {
+    async function hostPublish(source, playing, pos, watchBy) {
         if (!app.connected || !app.isHost) return;
         // A newer video choice can retire an obsolete pending signature. Clear
         // and moderation transactions still run to completion in their order.
@@ -1527,7 +1529,8 @@
             if (publication.cancelled || videoPublication !== publication) return false;
             const seq = app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
             const t = app.clock.relayNow();
-            const activity = doc.body.dataset.sharedLayout === 'watch' ? { activity: 'watch' } : {};
+            const activity = doc.body.dataset.sharedLayout === 'watch'
+                ? { activity: 'watch', ...(watchBy ? { watchBy } : {}) } : {};
             const signed = await Promise.race([
                 signHost({ kind: 'video', seq, source, playing, pos: Math.max(0, pos), t, ...activity }), cancelled
             ]);
@@ -1572,8 +1575,9 @@
         if (event.data === 1 || event.data === 2) { player.buffering = false; playbackSample = { at: Date.now(), pos: localTime(), playing: event.data === 1 }; }
         if (event.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
         if (event.data !== 1 && event.data !== 2) return;
-        if (!app.isHost && isSharedMovie(app.state.video?.source)) {
-            onLocalChange();
+        const video = app.state.video;
+        if (!app.isHost && isSharedMovie(video?.source)) {
+            if (video.playing !== localPlaying()) onLocalChange();
             return;
         }
         clearTimeout(videoPublishTimer);
