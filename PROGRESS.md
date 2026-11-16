@@ -21,3 +21,22 @@
 - Done 6 — Watch and Paint Along use the same stage, camera strip, chat and dock. Private movie invitations carry the activity, and video selection stays with the host.
 - Evidence — Both engines pass the movie invite, shared layout, live tiles and guest control checks at both phone sizes.
 - Next — Capture the four phone screenshots and compare the full unit and e2e runs to 4ab24333.
+
+### Regression comparison
+
+- The lobby keyboard-leave test at 390px and 1280px waits for the on-screen drawing canvas as its signal that Paint Along is open. Paint Along uses live camera feeds of real canvases, so the assertion conflicts with the requested behavior. The test and its assertion stay intact.
+- The full run found that the shared layout hid drawing after loading any video in the original room. Movie mode now starts from its own action or invitation. Existing rooms keep their drawing controls and signed playback.
+- Phone screenshots use the deterministic YouTube fixture and mock cameras. Karen’s hands-on review is pending.
+- The interrupted Mini comparison reached 118 passing e2e cases and three failures. The two lobby keyboard cases above expect the drawing canvas. The background playback case added default metadata when selecting a cached video. The cache fix passed that exact test with one worker.
+- The Mini finished the earlier 2,343-case candidate unit run and the baseline’s 2,342 unit and 459 e2e cases before the swap constraint. The candidate’s full exact-branch comparison is pending on Bobserver.
+- The movie guest’s play, pause and seek actions operate within the host-selected source. Fast pause-then-seek passed three repetitions in each phone engine. The four reviewed 390×844 images are in `test-evidence/paint-focus-b433f88c/`.
+
+### Bobserver gate
+
+Run the same unit and browser commands on the pushed `codex/paint-along-focus-20261116` head and detached base `4ab24333`. Compare project, spec and test title for every failure. Keep the legacy visibility assertions and the guest pause checks in the run.
+
+```sh
+npm run test:unit
+npm run test:e2e -- '(^|/)(hangout|lobby|paint-along)[^/]*\.spec\.js$' --workers=1
+```
+- The final Mini run selected only the six phone specs in each engine. All 12 passed with one worker.
