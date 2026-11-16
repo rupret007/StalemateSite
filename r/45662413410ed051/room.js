@@ -661,6 +661,10 @@
             clearTimeout(pace.timer); pace.timer = 0;
             pace.queue = pace.queue.filter((item) => !item.socket);
             app.connected = false;
+            if (app.consent.state === 'asking' || app.consent.stream) {
+                stopConsentPreview();
+                setConsentState('idle');
+            }
             staffReportDisconnected(ws);
             // Scrollback belongs to this live connection. Retained outbound
             // envelopes and the unsent composer draft remain separate.
@@ -697,7 +701,7 @@
         clearTimeout(reconnectTimer); clearTimeout(pace.timer); clearTimeout(flushTimer);
         clearTimeout(videoPublishTimer); clearInterval(videoSyncTimer);
         pace.queue = []; pace.timer = 0; pending = []; live = null;
-        stopPreCheck(); stopAv(true); turnClient?.stop();
+        stopPreCheck(); paintConsent(); stopAv(true); turnClient?.stop();
         app.av.peers.clear(); app.av.opening.clear(); app.av.ice = null;
         app.names.clear(); app.state = H.emptyState(); app.lastVideoSigned = null;
         app.privateReports = false;
@@ -1076,7 +1080,8 @@
         }
         if (invite) {
             ui.gateTitle.textContent = 'You’re invited';
-            ui.gateCopy.textContent = 'Somebody wants to hang out. Pick a name (or don’t) and jump in.';
+            ui.gateCopy.textContent = 'Enter the name you want people in this room to see.';
+            ui.checkBtn.hidden = true;
             ui.enter.textContent = 'Jump in';
         }
         // Blank by default, remembered on this device; 🎲 fills in a fun name you can edit or reroll.
@@ -1104,7 +1109,6 @@
                 ui.enter.disabled = false;
             }
         });
-        if (invite && params.get('autojoin') === '1') ui.enter.click();
     }
 
     ui.copy.addEventListener('click', async () => {
@@ -3186,8 +3190,9 @@
      * for camera and mic together, the live preview stays on this device, and only "Join with
      * camera" sends it to the room. Lock, kick and the faces cap are checked again on join. */
     function consentWanted() {
-        return Boolean((app.bob.on || doc.body.classList.contains('shared-layout')) && app.roomId && !app.ended && !app.av.cam && !app.av.mic && !app.av.kicked
-            && !app.consent.skipped && !(app.av.locked && !(app.av.mic || app.av.cam)));
+        return Boolean(!ui.room.hidden && app.myId && !app.ended
+            && (app.bob.on || doc.body.classList.contains('shared-layout'))
+            && !app.av.cam && !app.av.mic && !app.av.kicked && !app.av.locked && !app.consent.skipped);
     }
     function stopConsentPreview() {
         const c = app.consent;
@@ -3225,7 +3230,7 @@
     }
     function paintConsent() {
         const want = consentWanted();
-        if (!want && app.consent.stream) stopConsentPreview();
+        if (!want && (app.consent.state === 'asking' || app.consent.stream)) stopConsentPreview();
         if (!want && app.consent.state !== 'idle') setConsentState('idle');
         const changed = ui.consent.hidden === want;
         ui.consent.hidden = !want;
@@ -3254,6 +3259,7 @@
         } catch (error) { /* no meter, preview still works */ }
     }
     function consentBlockedReason() {
+        if (!app.connected) return 'The room is reconnecting. Try again when you’re back in.';
         if (app.av.kicked) return 'The host took you off camera in this room. Chat and painting still work.';
         if (app.av.locked && !(app.av.mic || app.av.cam)) return 'The host locked cameras for now. Chat and painting still work.';
         if (!(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) return `Cameras are full (${V.MAX_CAMS} max). Chat and painting still work.`;
@@ -3261,6 +3267,7 @@
     }
     function requestConsent() {
         // Runs inside the tap: iOS only lets getUserMedia start from the gesture itself.
+        if (!consentWanted()) return;
         const blocked = consentBlockedReason();
         if (blocked) { setConsentState('denied', blocked); return; }
         if (needsOpenBrowserHint()) { setConsentState('denied', openBrowserHint); return; }
@@ -3300,7 +3307,7 @@
     async function joinFromConsent() {
         const c = app.consent;
         const stream = c.stream;
-        if (!stream) return;
+        if (!stream || !consentWanted()) return;
         const blocked = consentBlockedReason();
         if (blocked) { stopConsentPreview(); setConsentState('denied', blocked); return; }
         const video = stream.getVideoTracks().find((t) => t.readyState === 'live');
