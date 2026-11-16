@@ -1276,6 +1276,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 break;
             }
             if (musicOffer?.room === m.ch) endMusicInvite();
+            if (musicHandoff?.room.name === m.ch) stopMusicHandoff(false);
             const leavingGame = app.chans.get(m.ch)?.kind === 'game';
             const leavingFromButton = app.active === m.ch && document.activeElement === $('[data-leave]');
             forgetGameRoom(m.ch);
@@ -1607,10 +1608,15 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             : pending.confirmed ? 'Invitation shared.' : 'The result arrived without matching room state. Your paste is kept.';
     }
     let musicHandoff = null, musicHandoffReport = null;
+    function canHostMusicInvite(room) {
+        return app.chans.get(room.name) === room && room.names?.some(n => n.nick === app.me)
+            && amOp(room) && readyForMusicOffer();
+    }
     function drawMusicHandoff() {
         const room = currentJam();
-        const pending = musicHandoff?.room === room ? musicHandoff : null;
-        const report = musicHandoffReport?.room === room ? musicHandoffReport : null;
+        const canInvite = room && amOp(room) && readyForMusicOffer();
+        const pending = canInvite && musicHandoff?.room === room ? musicHandoff : null;
+        const report = canInvite && musicHandoffReport?.room === room ? musicHandoffReport : null;
         const status = $('[data-music-handoff-status]');
         const cancel = $('[data-music-handoff-cancel]'), manual = $('[data-music-handoff-manual]');
         const oldFocus = document.activeElement;
@@ -1620,7 +1626,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             $('[data-jam-invite-music]').focus({ preventScroll: true });
         }
         const message = pending ? pending.submitted ? 'Waiting for Hang Out to confirm delivery…'
-            : 'Confirm the invitation in WebJam. If your browser asks to open WebJam, choose Open.' : report?.message || '';
+            : 'Confirm the invitation in WebJam. If your browser asks to open WebJam, choose Open.'
+            : canInvite && musicHandoff?.submitted ? 'An invitation from another Jam room is still waiting for confirmation.' : report?.message || '';
         if (status.textContent !== message) status.textContent = message;
     }
 
@@ -1638,6 +1645,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (frame.t === 'music-invite-result') {
             const pending = musicHandoff;
             if (!pending?.submitted || frame.request !== pending.request) return;
+            if (!canHostMusicInvite(pending.room)) {
+                stopMusicHandoff(false);
+                return drawMusicHandoff();
+            }
             const sent = frame.status === 'sent';
             musicHandoffReport = { room: pending.room, request: pending.request, nick: pending.nick, manual: !sent,
                 message: sent ? `Music invitation sent to ${pending.nick}. Waiting for a reply.` : 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
@@ -1676,7 +1687,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (musicHandoff !== pending || pending.submitted || typeof data?.href !== 'string') return;
             const expires = musicInviteDeadline(data.href);
             if (expires <= Date.now() || expires > Date.now() + 600000
-                || currentJam() !== room || room.keepRef !== context.instance || !amOp(room) || !readyForMusicOffer()
+                || currentJam() !== room || room.keepRef !== context.instance || !canHostMusicInvite(room)
                 || !app.chans.get('#stalemate')?.names?.some(person => person.id === context.peer) || !send({ t: 'music-invite-offer', request, ch: room.name,
                     roomInstance: context.instance, peer: context.peer, href: data.href })) {
                 stopMusicHandoff(false);
@@ -2529,7 +2540,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const room = !isPm && c && c.kind !== 'lobby';
         if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
         $('[data-roombar]').hidden = app.sharingStopped || app.localMediaPaused || !room;
-        if (musicHandoff && (currentJam() !== musicHandoff.room || !amOp(musicHandoff.room) || !readyForMusicOffer())) stopMusicHandoff();
+        if (musicHandoff) {
+            const { room: origin, submitted } = musicHandoff;
+            if (!canHostMusicInvite(origin) || (!submitted && currentJam() !== origin)) stopMusicHandoff(false);
+        }
         drawJam();
         drawMusicInvite();
         drawGameNight();

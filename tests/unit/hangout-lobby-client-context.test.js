@@ -313,8 +313,9 @@ it('uses the shared roster and native return to send one Music invitation withou
     const { window, ws, flush } = await visitor('stalemate', { directMusicInvites: 1, personTargets: 1 }, { secureOrigin: true });
     const { document } = window;
     const request = 'c'.repeat(32), keepRef = 'd'.repeat(32);
-    const timedOutRequest = 'b'.repeat(32);
-    Object.defineProperty(window.crypto, 'randomUUID', { value: vi.fn().mockReturnValueOnce(timedOutRequest).mockReturnValue(request) });
+    const timedOutRequest = 'b'.repeat(32), leftBeforeSubmit = 'e'.repeat(32);
+    Object.defineProperty(window.crypto, 'randomUUID', { value: vi.fn().mockReturnValueOnce(timedOutRequest)
+        .mockReturnValueOnce(leftBeforeSubmit).mockReturnValue(request) });
     window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
     window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
     const launch = vi.fn();
@@ -339,6 +340,7 @@ it('uses the shared roster and native return to send one Music invitation withou
         document.querySelector('[data-invite-person-send]').click();
     };
     const status = document.querySelector('[data-music-handoff-status]');
+    const selectChannel = name => document.querySelector(`[data-channel-key="${name}"]`).click();
     const expiry = Math.floor(Date.now() / 1000) + 60;
     const href = `${window.location.origin}/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${expiry}`;
 
@@ -352,18 +354,32 @@ it('uses the shared roster and native return to send one Music invitation withou
     expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
 
     chooseGuest();
+    selectChannel('#stalemate');
+    expect(channels[1].postMessage).toHaveBeenCalledWith({ returned: false });
+    expect(channels[1].close).toHaveBeenCalledOnce();
+    channels[1].receive({ href });
+    expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
+    selectChannel('#jam-rehearsal');
+
+    chooseGuest();
     expect(launch).toHaveBeenLastCalledWith(`webjam-beta://hangout-music/${request}`);
-    expect(channels[1].name).toBe(`webjam-music-${request}`);
-    channels[1].receive({ href });
-    channels[1].receive({ href });
+    expect(channels[2].name).toBe(`webjam-music-${request}`);
+    channels[2].receive({ href });
+    channels[2].receive({ href });
     expect(ws.sent.filter(frame => frame.t === 'music-invite-offer')).toEqual([
         { t: 'music-invite-offer', request, ch: '#jam-rehearsal', roomInstance: keepRef, peer: guest.id, href },
     ]);
+    selectChannel('#stalemate');
+    expect(channels[2].close).not.toHaveBeenCalled();
     ws.receive({ t: 'music-invite-result', request, status: 'sent' });
-    expect(channels[1].postMessage).toHaveBeenCalledWith({ returned: true });
-    expect(channels[1].close).toHaveBeenCalledOnce();
+    expect(channels[2].postMessage).toHaveBeenCalledWith({ returned: true });
+    expect(channels[2].close).toHaveBeenCalledOnce();
+    selectChannel('#jam-rehearsal');
     expect(document.querySelector('[data-music-handoff-status]').textContent).toContain('sent to DrumGuest');
+    selectChannel('#stalemate');
     ws.receive({ t: 'music-invite-outcome', request, status: 'accepted' });
+    expect(status.textContent).toBe('');
+    selectChannel('#jam-rehearsal');
     expect(document.querySelector('[data-music-handoff-status]').textContent).toBe('DrumGuest accepted and joined the Jam room.');
     expect(document.querySelector('[data-jam-link]').value).toBe('');
     expect(JSON.stringify({ ...window.sessionStorage, ...window.localStorage })).not.toContain(href);

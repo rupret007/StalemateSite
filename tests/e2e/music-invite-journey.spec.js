@@ -152,12 +152,15 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await expect(accept).toBeInViewport({ ratio: 1 });
             await expect(accept).toHaveAccessibleDescription('MusicHost invited you to join Music.');
             await capture(guest, '02-guest-receives-offer');
+            await host.locator('[data-channel-key="#stalemate"]').click();
+            await expect(roomContext).toHaveText('#stalemate');
             await accept.press('Enter');
             await expect(guest.locator('[data-chat-context]')).toHaveText(room);
             const audio = panel.getByRole('button', { name: 'Open WebJam in browser', exact: true });
             await expect(audio).toBeInViewport({ ratio: 1 });
             await expect(audio).toBeFocused();
             await expect(announcement).toContainText('You’re in the Jam room.');
+            await host.locator('[data-tabs] [data-channel-key]').filter({ hasText: room }).click();
             await expect(status).toContainText('accepted and joined the Jam room');
             await expect(peer.locator('[data-music-invite]')).toBeHidden();
             await expect(peer.locator('[data-chat-context]')).toHaveText('#stalemate');
