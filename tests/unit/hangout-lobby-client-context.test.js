@@ -56,7 +56,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
         ws.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok', features });
     }
     const welcome = (socket = ws, seq = 1) => socket.receive({ t: 'welcome', nick: 'Viewer', role: 'fan', band: false, verified: false, capabilities: {}, transportSeq: seq });
-    const join = (name = '#stalemate') => ws.receive({ t: 'join', ch: { name, kind: name === '#stalemate' ? 'lobby' : 'chat', title: 'Shared chat', topic: '', count: 1, modes: {}, names: [{ nick: 'Viewer', prefix: '', entrySource: via }] } });
+    const join = (name = '#stalemate', keepRef) => ws.receive({ t: 'join', ch: { name, keepRef, kind: name === '#stalemate' ? 'lobby' : 'chat', title: 'Shared chat', topic: '', count: 1, modes: {}, names: [{ nick: 'Viewer', prefix: '', entrySource: via }] } });
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
@@ -131,7 +131,7 @@ it('keeps the original Join action when another room invitation arrives', async 
 
     action.click();
     expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: ['#first-studio'], roomInstance: first.roomInstance });
-    join('#first-studio');
+    join('#first-studio', invitationRoomInstance);
     expect(document.activeElement.dataset.channelKey).toBe('#first-studio');
     expect(panel.textContent).toContain('SecondHost invited you to #second-studio');
     expect(panel.textContent).not.toContain('more invitation');
@@ -156,6 +156,35 @@ it('limits pending room invites and clears them on disconnect', async () => {
 });
 
 describe('keyboard room invitation acceptance', () => {
+    it('keeps a join in view until confirmation and restores retry if the room does not reply', async () => {
+        const { window, ws, welcome, join, flush } = await visitor();
+        welcome(); join();
+        const room = '#invitation-studio';
+        ws.receive({ t: 'invite', ch: room, by: 'InvitationHost', roomInstance: invitationRoomInstance });
+        const panel = window.document.querySelector('[data-room-invite]');
+        const action = panel.querySelector('[data-room-invite-join]');
+        action.focus();
+        action.click();
+        expect(panel.hidden).toBe(false);
+        expect(panel.textContent).toContain('Waiting to join #invitation-studio');
+        expect(action.getAttribute('aria-disabled')).toBe('true');
+        expect(window.document.activeElement).toBe(action);
+        const attempt = ws.sent.at(-1);
+        action.click();
+        expect(ws.sent.at(-1)).toBe(attempt);
+        flush(10000);
+        expect(action.textContent).toBe('Retry join');
+        expect(action.getAttribute('aria-disabled')).toBe('false');
+        expect(panel.textContent).toContain('The room hasn’t confirmed the join');
+        action.click();
+        expect(ws.sent.at(-1).joinRequestId).not.toBe(attempt.joinRequestId);
+        ws.receive({ t: 'room-join-result', id: attempt.joinRequestId, status: 'rejected' });
+        expect(panel.hidden).toBe(false);
+        join(room, invitationRoomInstance);
+        expect(panel.hidden).toBe(true);
+        expect(window.document.activeElement.dataset.channelKey).toBe(room);
+    });
+
     it.each([false, true])('retains a meaningful focus target while joining (guest moved focus: %s)', async (moved) => {
         const { window, ws, welcome, join } = await visitor();
         const { document } = window;
@@ -167,12 +196,12 @@ describe('keyboard room invitation acceptance', () => {
         action.focus();
         action.click();
         expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room], roomInstance: invitationRoomInstance });
-        expect(document.activeElement).toBe(document.querySelector('#chat-pane'));
-        expect(notice.hidden).toBe(true);
+        expect(document.activeElement).toBe(action);
+        expect(notice.hidden).toBe(false);
         const composer = document.querySelector('[data-text]');
         if (moved) composer.focus();
 
-        join(room);
+        join(room, invitationRoomInstance);
 
         const tab = document.querySelector('[data-channel-key="#invitation-studio"]');
         expect(tab.getAttribute('aria-selected')).toBe('true');
@@ -201,7 +230,7 @@ describe('keyboard room invitation acceptance', () => {
         retry.focus();
         retry.click();
         expect(ws.sent.at(-1).roomInstance).toBe(invitationRoomInstance);
-        join('#invitation-studio');
+        join('#invitation-studio', invitationRoomInstance);
         expect(document.activeElement.dataset.channelKey).toBe('#invitation-studio');
         expect(notice.hidden).toBe(true);
     });

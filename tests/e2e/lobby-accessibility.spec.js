@@ -372,11 +372,26 @@ const invitationViewports = [
 for (const viewport of invitationViewports) test(`${viewport.label}: invitation status action remains keyboard-reachable without covering chat input`, async ({ browser, baseURL }, testInfo) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
     const host = await guest(browser, baseURL, 'InvitationHost', { width: 1280, height: 900 }, relay);
-    let visitor;
+    let visitor, holdJoin = false, releaseJoin;
+    const heldJoinFrames = [];
     try {
         await send(host.page, '/join #invitation-studio');
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#invitation-studio');
-        visitor = await guest(browser, baseURL, 'InvitationGuest', viewport, relay);
+        visitor = await guest(browser, baseURL, 'InvitationGuest', viewport, relay, viewport.label === 'phone390' ? async page => {
+            await page.routeWebSocket(/\/sessions\/accessibility-/, socket => {
+                const server = socket.connectToServer();
+                releaseJoin = () => {
+                    holdJoin = false;
+                    for (const frame of heldJoinFrames.splice(0)) socket.send(frame);
+                };
+                server.onMessage(raw => {
+                    const frame = JSON.parse(raw);
+                    if (holdJoin && ((frame.t === 'join' && frame.ch.name === '#invitation-studio') || frame.t === 'room-join-result'))
+                        heldJoinFrames.push(raw);
+                    else socket.send(raw);
+                });
+            });
+        } : undefined);
         await tabTo(visitor.page, visitor.page.getByRole('textbox', { name: 'Message', exact: true }));
         const announcement = visitor.page.getByRole('status').and(visitor.page.locator('[data-room-invite-announcement]'));
         await expect(announcement).toHaveText('');
@@ -399,7 +414,15 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
         const action = status.getByRole('button', { name: 'Join', exact: true });
         await expect(action).toHaveAccessibleDescription('InvitationHost invited you to #invitation-studio');
         await tabTo(visitor.page, action);
+        holdJoin = Boolean(releaseJoin);
         await visitor.page.keyboard.press('Enter');
+        if (holdJoin) {
+            await expect(status).toContainText('Waiting to join #invitation-studio');
+            await expect(status.getByRole('button', { name: 'Joining…', exact: true })).toBeFocused();
+            await expect.poll(() => heldJoinFrames.length).toBe(2);
+            await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-waiting-for-room.png`) });
+            releaseJoin();
+        }
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#invitation-studio');
         await expect(status).toBeHidden();
         await expect(visitor.page.getByRole('tab', { name: '#invitation-studio', selected: true })).toBeFocused();

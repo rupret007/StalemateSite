@@ -1068,8 +1068,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && typeof f.jamRequestId === 'string' && /^[a-f0-9]{32}$/.test(f.jamRequestId)
             ? { id: f.jamRequestId, status: 'rejected' } : null;
         const reportFeedback = f.t === 'report' && moderationId(f.id) ? { id: f.id, submitted: false } : null;
+        const joinFeedback = f.t === 'cmd' && f.name === 'join' && validPmRef(f.joinRequestId) && validPmRef(f.roomInstance)
+            ? { id: f.joinRequestId, status: 'rejected' } : null;
         const result = feedback ? status => { feedback.status = status; }
-            : jamFeedback ? status => { jamFeedback.status = status; } : undefined;
+            : jamFeedback ? status => { jamFeedback.status = status; }
+                : joinFeedback ? status => { joinFeedback.status = status; } : undefined;
         try {
         if (f.t !== 'cmd' && ['personContext', 'personPeer', 'personNamed', 'cohostAccount'].some(key => Object.hasOwn(f, key))) return stalePerson(c);
         if (c.safetyOnly) return safetyOnlyMessage(c, f, reportFeedback);
@@ -1127,6 +1130,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             // staged with real output and never added to connection/storage state.
             if (jamFeedback) out(c, { t: 'jam-share-result', id: jamFeedback.id, status: jamFeedback.status });
             if (reportFeedback && !reportFeedback.submitted) out(c, { t: 'report-status', ...reportFeedback });
+            if (joinFeedback) out(c, { t: 'room-join-result', ...joinFeedback });
         }
     }
 
@@ -1640,7 +1644,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return closeRoom(room, c.nick, 'registration removed by owner');
         },
         help(c) { HELP.forEach((h) => bot(c, h)); },
-        join(c, _chan, [rawName, key = '', ...titleWords], roomInstance) {
+        join(c, _chan, [rawName, key = '', ...titleWords], roomInstance, result) {
             let name = String(rawName || '');
             if (!name.startsWith('#')) name = `#${name}`;
             name = name.toLowerCase();
@@ -1649,7 +1653,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const existing = ch(name);
             if (roomInstance !== undefined && (typeof roomInstance !== 'string' || !/^[a-f0-9]{32}$/.test(roomInstance) || !existing || existing.keepRef !== roomInstance))
                 return bot(c, 'That room changed or closed. Ask the host for a new invitation or choose another room.', 'error');
-            if (existing) return enter(c, existing, { key });
+            if (existing) {
+                const joined = enter(c, existing, { key });
+                if (joined === true) result?.('joined');
+                return joined;
+            }
             return create(c, name, key, titleWords.join(' '));
         },
         gameopen(c, _chan, [request]) {

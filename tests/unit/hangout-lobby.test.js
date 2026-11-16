@@ -500,8 +500,8 @@ describe('permissions are enforced on the server (forged commands)', () => {
         const replacementHost = join('ReplacementHost');
         const outsider = join('InviteOutsider');
         const room = '#invite-studio';
-        const accept = (user, offer) => L.message(user.id, JSON.stringify({
-            t: 'cmd', name: 'join', args: [room], ch: LOBBY, roomInstance: offer.roomInstance,
+        const accept = (user, offer, joinRequestId) => L.message(user.id, JSON.stringify({
+            t: 'cmd', name: 'join', args: [room], ch: LOBBY, roomInstance: offer.roomInstance, joinRequestId,
         }));
         cmd(host, 'join', [room]);
         namedCmd(host, 'invite', [guest.nick], room);
@@ -509,8 +509,10 @@ describe('permissions are enforced on the server (forged commands)', () => {
         const originalRef = L._debug.channels.get(room).keepRef;
 
         cmd(host, 'close', [], room);
-        accept(guest, originalOffer);
+        const staleRequest = 'a'.repeat(32);
+        accept(guest, originalOffer, staleRequest);
         expect(L._debug.channels.has(room)).toBe(false);
+        expect(got(guest)).toContainEqual({ t: 'room-join-result', id: staleRequest, status: 'rejected' });
         expect(originalOffer.roomInstance).toBe(originalRef);
         expect(notices(guest)).toContain('That room changed or closed. Ask the host for a new invitation');
 
@@ -525,8 +527,14 @@ describe('permissions are enforced on the server (forged commands)', () => {
         expect(freshOffer.roomInstance).toBe(replacement.keepRef);
         accept(outsider, freshOffer);
         expect(replacement.members.has(outsider.id)).toBe(false);
-        accept(guest, freshOffer);
+        const freshRequest = 'b'.repeat(32);
+        accept(guest, freshOffer, freshRequest);
         expect(replacement.members.has(guest.id)).toBe(true);
+        const joined = got(guest).findIndex(frame => frame.t === 'join' && frame.ch.name === room);
+        const result = got(guest).findIndex(frame => frame.t === 'room-join-result' && frame.id === freshRequest && frame.status === 'joined');
+        expect(joined).toBeGreaterThanOrEqual(0);
+        expect(result).toBeGreaterThan(joined);
+        expect(got(outsider).some(frame => frame.t === 'room-join-result')).toBe(false);
     });
 
     it('keeps a stale room directory entry from creating or joining a different room', () => {
