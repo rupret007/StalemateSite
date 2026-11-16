@@ -22,6 +22,9 @@ function fixture({ firstJoinFails = false, hash = testInviteHash() } = {}) {
         runScripts: 'outside-only',
     });
     windows.push(window);
+    // The injected parser and error mapper run in Node. Match the browser's
+    // single error realm for errors raised by the app as well.
+    window.Error = Error;
     const $ = id => window.document.getElementById(id);
     const capture = vi.fn();
     const sessions = [];
@@ -111,6 +114,32 @@ it('returns to audio choices without starting capture or another session', async
     expect(window.document.activeElement).toBe($('listen'));
     expect(sessions).toHaveLength(1);
     expect(capture).not.toHaveBeenCalled();
+});
+
+it.each(['retry', 'audio-options'])('requires a fresh invite when %s is used after expiry', async (action) => {
+    const expiresAt = Math.floor(Date.now() / 1000) + 60;
+    const { $, capture, play, sessions, window } = fixture({
+        firstJoinFails: true,
+        hash: testInviteHash({ expiresAt }),
+    });
+    $('listen').focus();
+    $('listen').click();
+    await vi.waitFor(() => expect($('retry').hidden).toBe(false));
+
+    // A background tab can deliver the next click before its expiry timer runs.
+    vi.spyOn(window.Date, 'now').mockReturnValue(expiresAt * 1000);
+    $(action).focus();
+    $(action).click();
+
+    expect($('status').textContent).toBe('This browser invite has expired.');
+    expect($('error-hint').textContent).toContain('Ask your host for a new Web Join link');
+    expect(window.document.activeElement).toBe($('status'));
+    expect($('retry').hidden).toBe(true);
+    expect($('audio-options').hidden).toBe(true);
+    expect($('prejoin').hidden).toBe(true);
+    expect(sessions).toHaveLength(1);
+    expect(capture).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
 });
 
 it('resumes blocked browser playback without leaving or consuming another invite', async () => {
