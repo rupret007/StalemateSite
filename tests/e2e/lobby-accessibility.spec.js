@@ -476,10 +476,10 @@ for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewp
     } finally { await visitor?.close(); await secondHost?.close(); await firstHost.close(); }
 });
 
-for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewport.label}: a closed-room invitation leaves the guest in the lobby with recovery guidance`, async ({ browser, baseURL }, testInfo) => {
+for (const viewport of [viewports[1], invitationViewports.at(-1)]) for (const queued of [false, true]) test(`${viewport.label}: a closed-room invitation leaves the guest in the lobby with recovery guidance${queued ? ' and the next invitation' : ''}`, async ({ browser, baseURL }, testInfo) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
     const host = await guest(browser, baseURL, 'ClosingInviteHost', { width: 1280, height: 900 }, relay);
-    let visitor;
+    let visitor, nextHost;
     try {
         await send(host.page, '/join #closed-invite-studio');
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#closed-invite-studio');
@@ -487,21 +487,38 @@ for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewp
         await send(host.page, '/invite ClosingInviteGuest');
         const invitation = visitor.page.locator('[data-room-invite]');
         const action = invitation.getByRole('button', { name: 'Join', exact: true });
+        if (queued) {
+            nextHost = await guest(browser, baseURL, 'NextInviteHost', { width: 1280, height: 900 }, relay);
+            await send(nextHost.page, '/join #open-invite-studio');
+            await expect(nextHost.page.locator('[data-chat-context]')).toHaveText('#open-invite-studio');
+            await send(nextHost.page, '/invite ClosingInviteGuest');
+            await expect(invitation).toContainText('1 more invitation');
+        }
         await tabTo(visitor.page, action);
         await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-closed-invite-before-accept.png`) });
 
         await send(host.page, '/close');
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#stalemate');
         await visitor.page.keyboard.press('Enter');
-        await expect(invitation).toBeHidden();
         await expect(visitor.page.locator('[data-toast]')).toContainText('That room changed or closed. Ask the host for a new invitation');
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#stalemate');
         await expect(visitor.page.getByRole('tab', { name: '#closed-invite-studio' })).toHaveCount(0);
-        await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-closed-invite-recovery.png`) });
-        await send(visitor.page, 'Still in the lobby after that invitation.');
-        await expect(host.page.locator('[data-buffer]')).toContainText('Still in the lobby after that invitation.');
+        if (queued) {
+            await expect(action).toHaveAccessibleDescription('NextInviteHost invited you to #open-invite-studio');
+            await expect(action).toBeFocused();
+            await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-next-invite-after-rejection.png`) });
+            await visitor.page.keyboard.press('Enter');
+            await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#open-invite-studio');
+            await expect(invitation).toBeHidden();
+        } else {
+            await expect(invitation).toBeHidden();
+            await expect(visitor.page.getByRole('tab', { name: '#stalemate', selected: true })).toBeFocused();
+            await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-closed-invite-recovery.png`) });
+            await send(visitor.page, 'Still in the lobby after that invitation.');
+            await expect(host.page.locator('[data-buffer]')).toContainText('Still in the lobby after that invitation.');
+        }
         expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]);
-    } finally { await visitor?.close(); await host.close(); }
+    } finally { await visitor?.close(); await nextHost?.close(); await host.close(); }
 });
 
 for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewport.label}: chat stays keyboard-usable after a focused message is removed`, async ({ browser, baseURL }, testInfo) => {

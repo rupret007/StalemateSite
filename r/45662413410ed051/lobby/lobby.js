@@ -1835,9 +1835,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (frame.status === 'joined' && app.chans.get(invitation.room)?.keepRef !== invitation.instance) return;
         if (!['joined', 'rejected'].includes(frame.status)) return;
         if (roomJoinFocus?.instance === invitation.instance) roomJoinFocus = null;
-        const focused = roomInvitePanel.contains(document.activeElement);
         removeRoomInvite(invitation.instance);
-        if (focused) focusChannelTab(app.active);
     }
     roomInviteDismiss.addEventListener('click', () => {
         const invitation = nextRoomInvite();

@@ -233,6 +233,33 @@ describe('keyboard room invitation acceptance', () => {
         expect(focusedChannels).toEqual(moved ? [] : [room]);
     });
 
+    it.each([false, true])('keeps keyboard recovery available after a rejected room invite (another invite: %s)', async (queued) => {
+        const { window, ws, welcome, join } = await visitor();
+        const { document } = window;
+        welcome(); join();
+        const nextInstance = 'b'.repeat(32);
+        ws.receive({ t: 'invite', ch: '#closed-studio', by: 'FirstHost', roomInstance: invitationRoomInstance });
+        if (queued) ws.receive({ t: 'invite', ch: '#open-studio', by: 'SecondHost', roomInstance: nextInstance });
+        const panel = document.querySelector('[data-room-invite]');
+        const action = panel.querySelector('[data-room-invite-join]');
+        action.focus();
+        action.click();
+        const rejectedRequest = ws.sent.at(-1).joinRequestId;
+        ws.receive({ t: 'notice', kind: 'error', text: 'That room changed or closed. Ask the host for a new invitation.' });
+        ws.receive({ t: 'room-join-result', id: rejectedRequest, status: 'rejected' });
+
+        expect(document.querySelector('[data-toast]').textContent).toContain('Ask the host for a new invitation');
+        expect(window.__lobby.active).toBe('#stalemate');
+        expect(panel.hidden).toBe(!queued);
+        expect(document.activeElement).toBe(queued ? action : document.querySelector('[data-channel-key="#stalemate"]'));
+        if (queued) {
+            expect(panel.textContent).toContain('SecondHost invited you to #open-studio');
+            expect(action.getAttribute('aria-disabled')).toBe('false');
+            document.activeElement.click();
+            expect(ws.sent.at(-1)).toMatchObject({ args: ['#open-studio'], roomInstance: nextInstance });
+        }
+    });
+
     it('keeps Join available with an explanation when the invitation request could not be sent', async () => {
         const { window, ws, welcome, join } = await visitor();
         const { document } = window;
