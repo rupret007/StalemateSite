@@ -230,7 +230,7 @@ for (const width of [375, 390]) test(`mobile keyboard section shortcuts focus th
 
 for (const [width, height] of [[390, 844], [1440, 900]]) test(`a named channel request can be retried after reconnect at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const room = '#retry-channel';
-    let requests = 0;
+    let requests = 0, dropConnection;
     const visitor = await guest(browser, baseURL, 'ChannelRetryGuest', { width, height }, undefined, async page => {
         await page.routeWebSocket(/\/sessions\/accessibility-/, socket => {
             const server = socket.connectToServer();
@@ -239,7 +239,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) test(`a named channel r
                 if (frame.t === 'cmd' && frame.name === 'join' && frame.args?.[0] === room) {
                     requests += 1;
                     if (requests === 1) {
-                        socket.close({ code: 4402, reason: 'Fixture interrupted channel request' });
+                        dropConnection = () => socket.close({ code: 4402, reason: 'Fixture interrupted channel request' });
                         return;
                     }
                 }
@@ -258,6 +258,13 @@ for (const [width, height] of [[390, 844], [1440, 900]]) test(`a named channel r
         await page.keyboard.type(room);
         await page.screenshot({ path: testInfo.outputPath(`named-channel-before-reconnect-${width}.png`) });
         await page.keyboard.press('Enter');
+
+        await expect(dialog.getByRole('status')).toHaveText(
+            'Still waiting for confirmation. You can try Join / create again or choose Cancel.', { timeout: 12000 });
+        expect(requests).toBe(1);
+        await expect(name).toBeFocused();
+        await page.screenshot({ path: testInfo.outputPath(`named-channel-no-confirmation-${width}.png`) });
+        await dropConnection();
 
         await expect(dialog.getByRole('status')).toHaveText('Connected again. Choose Join / create to try this name again.');
         await expect(name).toHaveValue(room);

@@ -141,7 +141,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const recoveryContexts = new WeakMap(), recoveryDrafts = new WeakMap();
     let nextRecoveryContext = 0, recoveryBytes = 2, messageEpoch = 0, recoveryLifecycle = 0;
     let messageResultsSupported = false, copyingMessage = null;
-    let channelJoinInterrupted = false;
+    let channelJoinInterrupted = false, channelReplyTimer;
     function recoveryContext() {
         const view = store(app.active);
         if (!view) return null;
@@ -653,6 +653,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     let retry = 0;
     let retryTimer;
     let connectionAttempt = 0;
+    function clearPendingChannel() {
+        clearTimeout(channelReplyTimer);
+        app.pendingChannel = '';
+    }
     function drawInterruptedChannelRequest() {
         const message = connectionState === 'connected' ? 'Connected again. Choose Join / create to try this name again.'
             : connectionState === 'offline' ? 'Connection lost. Choose Cancel, then Try again. Your channel name stays here.'
@@ -692,7 +696,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline' && !gameGuestReloadOffered;
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });
         if ((state === 'offline' || state === 'reconnecting') && app.pendingChannel) {
-            app.pendingChannel = '';
+            clearPendingChannel();
             channelJoinInterrupted = true;
         }
         if (channelJoinInterrupted && $('[data-channel-dialog]').open) drawInterruptedChannelRequest();
@@ -892,7 +896,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         drafts.set(app.active, composer.value);
         clearGameReturn();
         arcadeReturning = null;
-        app.chans.clear(); app.pms.clear(); app.rooms = []; app.pendingChannel = '';
+        app.chans.clear(); app.pms.clear(); app.rooms = []; clearPendingChannel();
         app.band = false; app.verified = false; app.role = 'fan'; app.capabilities = {};
         ownerSession = false; removeTab('hangout-owner');
         $('[data-owner-signout]').hidden = true; $('[data-gate-guest]').hidden = true;
@@ -1239,7 +1243,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             if (gameInvites.delete(c.name) || gameOfferAccepted || returningToGame || joiningLinkedGame) drawGameOffer();
             if (app.pendingChannel === m.ch.name) {
-                app.pendingChannel = '';
+                clearPendingChannel();
                 $('[data-channel-dialog]').close();
             }
             app.chans.set(m.ch.name, c);
@@ -1346,7 +1350,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 if (pendingKeep) clearKeep();
                 if (app.pendingChannel && $('[data-channel-dialog]').open) {
                     $('[data-channel-error]').textContent = m.text;
-                    app.pendingChannel = '';
+                    clearPendingChannel();
                 } else if (!failedGameJoin) toast(m.text);
             }
             break;
@@ -2889,6 +2893,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     // Activity tiles pick a name; plain chat lets guests name their own channel.
     $$('[data-start]').forEach((b) => b.addEventListener('click', () => {
         if (b.dataset.start === 'chat') {
+            clearPendingChannel();
             channelJoinInterrupted = false;
             $('[data-channel-error]').textContent = '';
             $('[data-channel-dialog]').showModal();
@@ -2911,10 +2916,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     $('[data-channel-dialog]').addEventListener('close', () => {
         // A queued close event may belong to an earlier opening. Preserve the
         // current request if the visitor has already opened the dialog again.
-        if (!$('[data-channel-dialog]').open) app.pendingChannel = '';
+        if (!$('[data-channel-dialog]').open) clearPendingChannel();
     });
     $('[data-channel-form]').addEventListener('submit', (e) => {
         e.preventDefault();
+        clearTimeout(channelReplyTimer);
         channelJoinInterrupted = false;
         const name = `#${$('[data-channel-name]').value.trim().replace(/^#/, '').toLowerCase()}`;
         if (!/^#[a-z0-9-]{2,30}$/.test(name)) {
@@ -2940,6 +2946,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         app.pendingChannel = name;
         $('[data-channel-error]').textContent = 'Joining…';
+        channelReplyTimer = setTimeout(() => {
+            if ($('[data-channel-dialog]').open)
+                $('[data-channel-error]').textContent = 'Still waiting for confirmation. You can try Join / create again or choose Cancel.';
+        }, 8000);
         count('room-start-chat');
     });
     $('[data-private]').addEventListener('click', () => count('room-start-private'));
