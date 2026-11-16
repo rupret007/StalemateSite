@@ -11,8 +11,8 @@
     },
     "index.html": {
       "source": "web/join/index.html",
-      "sha256": "9c05d551bd47b127af190d7a62308479a6541e9bbeac82b1160742793615d6cf",
-      "adaptation": "Chess-only delta applied to the reviewed website Web Join client; retain private listen-only joining from website 9dcda1d"
+      "sha256": "de5999027e9a509e6c52d101ccf91eded03be8014ff5145181125df8efe3b859",
+      "adaptation": "Chess and private Music preview controls layered over the pinned Web Join page. Keeps the listen-only and Resume audio controls in the protected beta."
     },
     "session.js": {
       "source": "web/join/session.js",

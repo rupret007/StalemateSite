@@ -7,8 +7,8 @@
     "app.js": {
       "source": "web/join/app.js",
       "baseSha256": "ff699ff308d0e7e4d301ea30486f90bd20bc497555d206b1a08de3472c512662",
-      "sha256": "4e88df15d13b010acdcc09370a5d22216b5f4edef08330ffc825877288aae59f",
-      "adaptation": "Apply receive-only joining and retry mode to the existing pinned app for protected beta packaging only."
+      "sha256": "062be73d01b956fa2283999b969996fced73b3164031246cc0cc5e22dbcd7219",
+      "adaptation": "Private beta receive-only joining, retry mode and recovery when the browser rejects audio playback."
     }
   }
 }
