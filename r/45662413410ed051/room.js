@@ -1572,6 +1572,10 @@
         if (event.data === 1 || event.data === 2) { player.buffering = false; playbackSample = { at: Date.now(), pos: localTime(), playing: event.data === 1 }; }
         if (event.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
         if (event.data !== 1 && event.data !== 2) return;
+        if (!app.isHost && isSharedMovie(app.state.video?.source)) {
+            onLocalChange();
+            return;
+        }
         clearTimeout(videoPublishTimer);
         const instance = player.yt, key = player.readyKey;
         videoPublishTimer = win.setTimeout(() => {

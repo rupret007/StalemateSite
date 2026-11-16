@@ -146,6 +146,7 @@ function contextOptions(page) {
 
 
 async function joinWithCamera(page) {
+    await page.bringToFront();
     const consent = page.locator('[data-consent]');
     await expect(consent).toBeVisible();
     await page.locator('[data-consent-on]').click();
@@ -399,8 +400,8 @@ test('Watch a Movie Together uses the shared phone stage and keeps video selecti
         }
 
         await guest.evaluate(() => window.__ytLog[0].pauseVideo());
-        for (const page of [host, guest]) {
-            await expect(page.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
+        for (const [person, page] of [['host', host], ['guest', guest]]) {
+            await expect(page.locator('[data-fake-yt]'), `${person} receives guest pause`).toHaveAttribute('data-state', 'paused');
         }
         await guest.evaluate(() => window.__ytLog[0].seekTo(42));
         await expect.poll(() => host.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeCloseTo(42, 0);
