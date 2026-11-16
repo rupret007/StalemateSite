@@ -52,11 +52,11 @@ beforeAll(async () => {
     const callerGate = operation => { const task = gate.then(operation); gate = task.catch(() => {}); return task; };
     Object.assign(f, { storage, env, engine, authority, snapshot, callerGate, account });
 });
-// Keep actual issuance in bounded setup phases under the existing hook timeout;
-// the dataset and each native authority transaction remain unchanged.
-for (const offset of [0, 100, 200, 300, 400, 500, 600, 700, 800, 900]) beforeAll(async () => {
+// Keep each real SQLite issuance batch within the existing hook timeout.
+const issuanceBatchSize = 25;
+for (let offset = 0; offset < 1000; offset += issuanceBatchSize) beforeAll(async () => {
     const { authority, account, issued } = f;
-    for (let n = offset; n < offset + 100; n++) {
+    for (let n = offset; n < offset + issuanceBatchSize; n++) {
         const id = `capacity_${String(n).padStart(4, '0')}`, sid = `capacity-session-${String(n).padStart(4, '0')}`;
         const profile = n < 50 ? { kind: 'staff', account, role: 'owner', admin: true, expiresAt: NOW + 1000000 } : null;
         const iph = `capacity-ip-${String(n).padStart(10, '0')}`;
