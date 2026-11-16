@@ -70,12 +70,20 @@ body.bob-mode .brushes{display:flex;flex-wrap:wrap;gap:4px}
 .brush[aria-pressed=true]{border-color:var(--lime);color:var(--lime)}
 .tile--canvas,.tiles .tile.tile--canvas{border-radius:6px;width:220px;aspect-ratio:4/3}
 /* Side by side: Bob on the left, your canvas on the right, everything else below. */
-body.bob-mode .room{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-body.bob-mode .watch,body.bob-mode .draw{align-self:start}
+body.bob-mode .room{grid-template-columns:minmax(0,1fr)}
+body.bob-mode .watch{align-self:start;min-width:0}
+body.bob-mode .draw{display:none}
+body.bob-mode .watch .screen{width:100%;max-width:none}
+body.bob-mode .call{grid-column:1;min-width:0}
+body.bob-mode .call .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+body.bob-mode .call .tiles .tile{width:100%;aspect-ratio:16/9;border-radius:6px}
+body.bob-mode .bob-camera-hint{color:var(--lime)}
+body.bob-mode .bob .btn,body.bob-mode .ep{min-height:44px}
 @media (max-width:820px){
     /* Phone: Bob sticks to the top while you paint under him. */
     body.bob-mode .watch{position:sticky;top:0;z-index:5;padding:6px}
     body.bob-mode .watch h2,body.bob-mode .watch .small{display:none}
+    body.bob-mode .watch [data-video-status]{display:block}
     body.bob-mode .room{grid-template-columns:1fr}
     body.bob-mode .ep-list{max-height:180px;grid-template-columns:1fr}
 }

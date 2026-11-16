@@ -166,10 +166,10 @@ test('watch source changes wait for one player and a canceled room cannot start 
     }
 });
 
-test('bob ross room: curated episodes and custom lesson links sync beside the shared canvas', async ({ browser }) => {
+test('bob ross room: curated episodes and custom lesson links sync for real-canvas painting', async ({ browser }) => {
     const host = await fan(browser, 'BobHost');
     await host.click('[data-start="bobross"]');
-    await expect(host.locator('[data-act-canvas]')).toBeVisible();
+    await expect(host.locator('[data-act-canvas]')).toBeHidden();
     await expect(host.locator('[data-bob-picks]')).toBeVisible();
     await expect.poll(() => host.evaluate(() => window.__lobbyRoom.state.room.video?.source?.id)).toBe('mT0RNrTDHkI');
     await expect(host.locator('[data-bob-picks] button')).toHaveCount(4);
@@ -195,7 +195,7 @@ test('bob ross room: curated episodes and custom lesson links sync beside the sh
     await lesson.fill('https://youtu.be/vgbMONXc9Cs');
     await lesson.press('Enter');
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'vgbMONXc9Cs');
-    await expect(guest.locator('[data-act-canvas]')).toBeVisible();
+    await expect(guest.locator('[data-act-canvas]')).toBeHidden();
     await expect(guest.locator('[data-act-url]')).toBeHidden();
     await guest.context().close();
     await host.context().close();

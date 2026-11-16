@@ -451,13 +451,36 @@ describe('abuse caps', () => {
     it('room creation is rate-limited per device and per IP hash', () => {
         const a = join('Alpha', { iph: 'shared' });
         cmd(a, 'join', ['#watch-1']);
+        inbox.set(a.id, []);
         cmd(a, 'join', ['#watch-2']);
         expect(notices(a)).toMatch(/One new room per 10 minutes/);
+        inbox.set(a.id, []);
+        cmd(a, 'join', ['#watch-3']);
+        expect(notices(a)).not.toMatch(/One new room per 10 minutes/);
         const b = join('Bravo', { iph: 'shared' });
         const c = join('Charlie', { iph: 'shared' });
         const d = join('Delta', { iph: 'shared' });
         cmd(b, 'join', ['#watch-3']); cmd(c, 'join', ['#watch-4']); cmd(d, 'join', ['#watch-5']);
         expect(notices(d)).toMatch(/Too many new rooms/);
+    });
+    it('lets an admitted room host open another room during the device cooldown', () => {
+        const host = join('RoomHost');
+        cmd(host, 'join', ['#watch-host-first']);
+        L._debug.conns.get(host.id).betaSid = 'family-host-session';
+        const hostTab = join('RoomHostTab', { dev: 'dev-RoomHost' });
+        L._debug.conns.get(hostTab.id).betaSid = 'family-host-session';
+        cmd(hostTab, 'join', ['#watch-host-first']);
+        cmd(host, 'join', ['#watch-host-second']);
+        expect(got(host).some(frame => frame.t === 'join' && frame.ch?.name === '#watch-host-second')).toBe(true);
+        cmd(host, 'join', ['#watch-host-third']);
+        cmd(host, 'join', ['#watch-host-fourth']);
+        expect(got(host).some(frame => frame.t === 'join' && frame.ch?.name === '#watch-host-fourth')).toBe(true);
+    });
+    it('does not apply the device room cooldown to authenticated staff', () => {
+        const staff = join('ReviewMod', { role: 'moderator' });
+        cmd(staff, 'join', ['#watch-staff-first']);
+        cmd(staff, 'join', ['#watch-staff-second']);
+        expect(got(staff).some(frame => frame.t === 'join' && frame.ch?.name === '#watch-staff-second')).toBe(true);
     });
     it('budget guard: read-only at 85%, closed at 95% of the daily request share', () => {
         boot({ requestBudget: 100 });
@@ -871,7 +894,7 @@ describe('stats are aggregate only', () => {
 
 describe('open-room paint + synced video (act frames)', () => {
     const act = (u, ch, body) => L.message(u.id, JSON.stringify({ t: 'act', ch, ...body }));
-    it('relays strokes, clear-by-@ and host-only video', () => {
+    it('relays strokes, host-only Watch video and participant-controlled Paint Along video', () => {
         const host = join('Host');
         const guest = join('Guest');
         cmd(host, 'join', ['#art-sync']);
@@ -892,6 +915,13 @@ describe('open-room paint + synced video (act frames)', () => {
         expect(got(host).some((m) => m.t === 'act' && m.kind === 'video')).toBe(false);
         act(host, '#watch-sync', { kind: 'video', source: { kind: 'yt', id: 'oh5p5f5_-7A' }, playing: true, pos: 3 });
         expect(got(guest).some((m) => m.t === 'act' && m.kind === 'video')).toBe(true);
+        const bobHost = join('BobHost'), bobGuest = join('BobGuest');
+        cmd(bobHost, 'join', ['#bobross-sync']);
+        cmd(bobGuest, 'join', ['#bobross-sync']);
+        inbox.set(bobHost.id, []);
+        act(bobGuest, '#bobross-sync', { kind: 'video', source: { kind: 'yt', id: 'mT0RNrTDHkI' }, playing: false, pos: 120, rate: 1 });
+        const shared = got(bobHost).find(m => m.t === 'act' && m.kind === 'video');
+        expect(shared?.video).toMatchObject({ playing: false, pos: 120, rate: 1, seq: 1, by: 'BobGuest', updatedAt: expect.any(Number) });
     });
 });
 

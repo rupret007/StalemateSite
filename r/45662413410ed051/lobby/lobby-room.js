@@ -19,6 +19,8 @@
             yt: $('[data-act-yt]'),
             tap: $('[data-act-tap]'),
             videoStatus: $('[data-act-video-status]'),
+            cameraSwitch: $('[data-paint-camera-switch]'),
+            episodeTitle: $('[data-paint-episode-title]'),
             load: $('[data-act-load]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
@@ -27,10 +29,10 @@
         };
         const state = {
             ch: null, kind: null, clock: H.createClock(), room: H.emptyState(),
-            myId: null, names: new Map(), camOn: false, ice: null,
+            myId: null, names: new Map(), camOn: false, ice: null, cameraFacing: 'user',
             pcs: new Map(), stream: null, peers: new Set()
         };
-        const player = { yt: null, kind: null, key: '', readyKey: '', failedKey: '', loading: null, applying: 0, autoplayBlocked: false, seenPlaying: false, playPending: false };
+        const player = { yt: null, kind: null, key: '', readyKey: '', failedKey: '', loading: null, applying: 0, lastIntentAt: 0, autoplayBlocked: false, buffering: false, seenPlaying: false, playPending: false };
         const youtube = window.HangoutYouTube.create({
             getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
             onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
@@ -106,7 +108,8 @@
         }
         function currentActivity(item) {
             if (item.generation !== roomGeneration || item.channel !== state.ch || state.ch !== app.active || !state.names.has(state.myId)) return false;
-            if (item.kind === 'clear' || item.kind === 'video') return isOp();
+            if (item.kind === 'clear') return isOp();
+            if (item.kind === 'video') return state.kind === 'bobross' || isOp();
             if (item.kind !== 'rtc') return paintActive();
             if (!item.entry?.current()) return false;
             const current = item.entry.pc.localDescription;
@@ -185,6 +188,7 @@
 
         function teardown() {
             roomGeneration += 1; captureVersion += 1;
+            localSample = null;
             clearTimeout(activity.timer); activity.timer = 0; activity.queue = []; activity.bytes = 0;
             cancelStroke();
             clearTimeout(videoPublishTimer);
@@ -217,13 +221,20 @@
             state.ch = chan.name;
             state.kind = chan.kind;
             ui.stage.hidden = false;
-            const paint = chan.kind === 'art' || chan.kind === 'bobross';
+            const paint = chan.kind === 'art';
             const video = chan.kind === 'bobross' || chan.kind === 'watch';
             ui.paint.hidden = !paint;
             ui.video.hidden = !video;
             ui.load.hidden = !video;
             ui.bobPicks.hidden = chan.kind !== 'bobross';
             ui.paintStart.hidden = chan.kind !== 'bobross';
+            ui.load.hidden = !video || chan.kind === 'watch' && !isOp();
+            ui.bobPicks.classList.remove('op-only');
+            ui.load.classList.toggle('op-only', chan.kind === 'watch');
+            ui.video.classList.toggle('paint-along-player', chan.kind === 'bobross');
+            $('[data-paint-canvas-hint]').hidden = chan.kind !== 'bobross';
+            ui.cameraSwitch.hidden = chan.kind !== 'bobross' || !phone;
+            ui.episodeTitle.hidden = chan.kind !== 'bobross';
             if (paint) setupCanvas();
             if (video) setupVideoUi();
             if (act) ingestSnap(act);
@@ -232,11 +243,14 @@
                 const ep = BOB.DEFAULT_LESSON;
                 hostVideo({ kind: 'yt', id: ep.id }, true, 0);
             }
+            if (chan.kind === 'bobross' && !app.chans.get(chan.name)?.myCam) document.querySelector('[data-cam]')?.click();
         }
 
         function ingestSnap(act) {
             if (!act) return;
             H.apply(state.room, { type: 'snapshot', state: { strokes: act.strokes || [], video: act.video } });
+            if (act.video && state.room.video) Object.assign(state.room.video, { seq: act.video.seq, by: act.video.by, updatedAt: act.video.updatedAt, rate: act.video.rate || 1 });
+            paintEpisodeTitle();
             redraw();
             if (state.room.video) syncToState(true);
         }
@@ -283,13 +297,20 @@
             }
             if (m.kind === 'video' && m.video) {
                 H.apply(state.room, { type: 'video', source: m.video.source, playing: m.video.playing, pos: m.video.pos }, { t: m.video.t });
+                if (state.room.video) Object.assign(state.room.video, { seq: m.video.seq, by: m.video.by, updatedAt: m.video.updatedAt, rate: m.video.rate || 1 });
+                paintEpisodeTitle();
+                if (!m.video.playing && m.by && m.by !== app.me) {
+                    ui.videoStatus.textContent = `Paused by ${m.by}`;
+                    ui.videoStatus.hidden = false;
+                    setTimeout(() => { if (ui.videoStatus.textContent === `Paused by ${m.by}`) ui.videoStatus.hidden = true; }, 3000);
+                }
                 syncToState(true);
             }
             if (m.kind === 'rtc' && m.from) onRtc(m.from, m);
         }
 
         /* ---- canvas ---- */
-        const paintActive = () => !!state.ch && state.ch === app.active && ['art', 'bobross'].includes(state.kind);
+        const paintActive = () => !!state.ch && state.ch === app.active && state.kind === 'art';
         const currentStroke = () => live && paintActive() && live.channel === state.ch && live.generation === roomGeneration;
         function cancelStroke() {
             clearTimeout(flushTimer); flushTimer = 0; live = null; pendingPts = [];
@@ -421,6 +442,16 @@
             });
             ui.url.addEventListener('input', () => ui.url.setCustomValidity(''));
             ui.tap.addEventListener('click', () => syncToState(true, true));
+            ui.cameraSwitch.addEventListener('click', () => {
+                state.cameraFacing = state.cameraFacing === 'environment' ? 'user' : 'environment';
+                if (state.stream && state.camOn) {
+                    state.stream.getTracks().forEach(track => track.stop());
+                    state.stream = null;
+                    for (const id of [...state.pcs.keys()]) closePc(id);
+                    startCam();
+                }
+                ui.cameraSwitch.textContent = state.cameraFacing === 'environment' ? 'Use front camera' : 'Use rear camera';
+            });
         }
 
         function videoFailure(key, error) {
@@ -469,6 +500,11 @@
 
         function localTime() { return player.yt && player.yt.getCurrentTime ? player.yt.getCurrentTime() || 0 : 0; }
         function localPlaying() { return player.yt && player.yt.getPlayerState ? player.yt.getPlayerState() === 1 : false; }
+        function expectedVideoPosition(video, relayNow) {
+            if (!video) return 0;
+            return video.playing ? Math.max(0, video.pos + (relayNow - video.t) / 1000 * (video.rate || 1)) : video.pos;
+        }
+        function setLocalRate(rate) { if (player.yt?.setPlaybackRate) hold(() => player.yt.setPlaybackRate(rate)); }
         function hold(fn) { player.applying = Date.now() + 900; fn(); }
         function seekTo(s) { hold(() => { if (player.yt) player.yt.seekTo(s, true); }); }
         function playLocal() { hold(() => { if (player.yt) { player.playPending = true; player.yt.playVideo(); } }); }
@@ -483,18 +519,31 @@
             if (generation !== roomGeneration || v !== requested || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
             if (!v.playing) { player.autoplayBlocked = false; ui.tap.hidden = true; }
             else if (player.autoplayBlocked && !force) return;
-            const want = H.expectedPosition(v, state.clock.relayNow());
-            if (force || H.needsCorrection(localTime(), want)) seekTo(want);
+            const want = expectedVideoPosition(v, state.clock.relayNow()), drift = want - localTime();
+            const rates = player.yt?.getAvailablePlaybackRates?.() || [];
+            if (force || Math.abs(drift) > 1) { seekTo(want); if (rates.includes(v.rate || 1)) setLocalRate(v.rate || 1); }
+            else if (Math.abs(drift) >= 0.3 && v.playing) {
+                const nudge = drift > 0 ? 1.05 : 0.95;
+                if (rates.includes(nudge) && player.yt?.setPlaybackRate) setLocalRate(nudge);
+                else seekTo(want);
+            } else if (rates.includes(v.rate || 1)) setLocalRate(v.rate || 1);
             if (v.playing && !localPlaying()) playLocal();
             if (!v.playing && localPlaying()) pauseLocal();
         }
 
         function hostVideo(source, playing, pos) {
-            if (!isOp()) return;
-            actSend({ kind: 'video', source, playing, pos }, () => {
+            if (!canDriveVideo()) return;
+            actSend({ kind: 'video', source, playing, pos, rate: 1 }, () => {
                 H.apply(state.room, { type: 'video', source, playing, pos }, { t: state.clock.relayNow() });
+                paintEpisodeTitle();
                 syncToState(true, true);
             });
+        }
+
+        function paintEpisodeTitle() {
+            const source = state.room.video?.source;
+            if (!source || state.kind !== 'bobross') { ui.episodeTitle.textContent = ''; return; }
+            ui.episodeTitle.textContent = BOB.findEpisode(source.id)?.title || 'YouTube lesson';
         }
 
         function onYtAutoplayBlocked() {
@@ -502,40 +551,66 @@
             if (!state.ch || !player.playPending || localPlaying() || !v?.playing || v.source.kind !== 'yt' || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
             // Policy denial is local, not a request to pause everyone else.
             player.autoplayBlocked = true;
+            ui.tap.textContent = 'Tap to sync';
             ui.tap.hidden = false;
         }
         function onYtState(ev) {
             if (!state.ch || ev.target !== player.yt || ev.data !== player.yt?.getPlayerState()) return;
+            if (ev.data === 3) { player.buffering = true; localSample = { at: Date.now(), pos: localTime(), playing: false }; return; }
+            if (ev.data === 1 || ev.data === 2) { player.buffering = false; localSample = { at: Date.now(), pos: localTime(), playing: ev.data === 1 }; }
             if (ev.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
-            if (!isOp() || player.autoplayBlocked || !state.room.video || (!player.seenPlaying && state.room.video.playing)
+            if (!canDriveVideo() || player.autoplayBlocked || !state.room.video || (!player.seenPlaying && state.room.video.playing)
                 || player.readyKey !== `${state.room.video.source.kind}:${state.room.video.source.id}`) return;
             if (ev.data !== 1 && ev.data !== 2) return;
+            player.lastIntentAt = Date.now();
             clearTimeout(videoPublishTimer);
             const channel = state.ch, generation = roomGeneration, instance = player.yt, key = player.readyKey;
             videoPublishTimer = setTimeout(() => {
-                if (generation === roomGeneration && state.ch === channel && isOp() && !player.autoplayBlocked && state.room.video
+                if (generation === roomGeneration && state.ch === channel && canDriveVideo() && !player.autoplayBlocked && state.room.video
                     && player.yt === instance && player.readyKey === key && key === `${state.room.video.source.kind}:${state.room.video.source.id}`) {
                     const v = state.room.video, playing = localPlaying(), pos = localTime();
                     // Suppress the echo of our own sync, not a subsequent
                     // opposite host control within the same 900ms window.
-                    if (Date.now() < player.applying && playing === v.playing && Math.abs(pos - H.expectedPosition(v, state.clock.relayNow())) < 2) return;
-                    actSend({ kind: 'video', source: v.source, playing, pos });
+                    if (Date.now() < player.applying && playing === v.playing && Math.abs(pos - expectedVideoPosition(v, state.clock.relayNow())) < 2) return;
+                    actSend({ kind: 'video', source: v.source, playing, pos, rate: 1 });
                 }
             }, 100);
         }
+        function canDriveVideo() { return state.kind === 'bobross' || isOp(); }
         setInterval(() => {
-            if (!isOp()) return syncToState(false);
+            syncToState(false);
+        }, 5000);
+        setInterval(() => {
+            if (state.kind !== 'watch' || !isOp()) return;
             const v = state.room.video;
             if (!v || !player.yt || (!player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
-            // YouTube does not reliably emit a state change when a paused
-            // player is scrubbed. Publish the host's changed position instead
-            // of correcting the host back to the previous shared position.
             const pos = localTime(), playing = localPlaying();
-            if (playing !== v.playing || H.needsCorrection(pos, H.expectedPosition(v, state.clock.relayNow()))) {
-                actSend({ kind: 'video', source: v.source, playing, pos }, () =>
+            if (playing !== v.playing || H.needsCorrection(pos, expectedVideoPosition(v, state.clock.relayNow()))) {
+                actSend({ kind: 'video', source: v.source, playing, pos, rate: 1 }, () =>
                     H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() }));
             }
         }, 2000);
+        let localSample = null;
+        setInterval(() => {
+            const v = state.room.video;
+            if (!canDriveVideo() || !v || !player.yt || player.autoplayBlocked ||
+                player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
+            const at = Date.now(), pos = localTime(), playing = localPlaying();
+            if (player.buffering) { localSample = { at, pos, playing }; return; }
+            if (at < player.applying || at - player.lastIntentAt < 750) { localSample = { at, pos, playing }; return; }
+            if (localSample) {
+                const elapsed = (at - localSample.at) / 1000;
+                if (elapsed > 2) { localSample = { at, pos, playing }; syncToState(false); return; }
+                const natural = elapsed * (localSample.playing ? (v.rate || 1) : 0);
+                if (Math.abs((pos - localSample.pos) - natural) > 1) {
+                    player.lastIntentAt = at;
+                    actSend({ kind: 'video', source: v.source, playing, pos, rate: 1 }, () =>
+                        H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() }));
+                }
+            }
+            localSample = { at, pos, playing };
+        }, 250);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) syncToState(true); });
 
         /* ---- P2P video (cameras only) ---- */
         async function iceServers() {
@@ -576,7 +651,7 @@
                 if (state.stream || !state.camOn || generation !== roomGeneration || version !== captureVersion) return;
                 if (cameraFailureNotice && ui.relayStatus.textContent === cameraFailureNotice) activityNotice('');
                 cameraFailureNotice = '';
-                const got = await navigator.mediaDevices.getUserMedia({ video: CAM, audio: false });
+                const got = await navigator.mediaDevices.getUserMedia({ video: { ...CAM, facingMode: state.cameraFacing }, audio: false });
                 if (!state.camOn || generation !== roomGeneration || version !== captureVersion) {
                     got.getTracks().forEach((track) => track.stop()); return;
                 }

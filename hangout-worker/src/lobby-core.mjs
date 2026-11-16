@@ -50,6 +50,7 @@ export const LOBBY_LIMITS = Object.freeze({
     roomsListed: 30,
     roomPerDevice: 10 * MIN,
     roomsPerIpHour: 3,
+    roomsPerTrustedIpHour: 10,
     burst: 5,
     perSecond: 1,
     maxChars: 300,
@@ -1432,7 +1433,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 devStats.set(k, v);
             }
             for (const [k, v] of saved.ips) {
-                if (!moderationIdentity(k) || !Array.isArray(v) || v.length > L.roomsPerIpHour || !v.every(Number.isFinite)) throw new Error('invalid IP allowance');
+                if (!moderationIdentity(k) || !Array.isArray(v) || v.length > L.roomsPerTrustedIpHour || !v.every(Number.isFinite)) throw new Error('invalid IP allowance');
                 ipRooms.set(k, v);
             }
         } catch { net.lock = 'readonly'; net.lockAuto = true; roomsBroken = true; }
@@ -2035,13 +2036,22 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const listed = [...channels.values()].filter((x) => x.kind !== 'lobby' && !x.owner).length;
         if (listed >= L.roomsListed) return bot(c, 'All 30 room slots are busy. Join one from the list.', 'error');
         let allowance;
-        if (!isBand(c)) {
+        // A creator cannot qualify through their own founder @; a second admitted host peer must confirm the beta session.
+        const admittedHost = [...channels.values()].some(room => room.kind !== 'lobby' && room.members.has(c.id)
+            && (owns(c, room) || c.betaSid && membersOf(room).some(peer => peer.id !== c.id && peer.betaSid === c.betaSid && isOp(peer, room))));
+        if (!isStaff(c)) {
             if (devStats.size >= 5000 && !devStats.has(c.dev) || ipRooms.size >= 5000 && !ipRooms.has(c.iph)) return bot(c, 'Room creation is temporarily busy.', 'error');
             const st = devStats.get(c.dev) || {};
-            if (st.lastRoom && now() - st.lastRoom < L.roomPerDevice) return bot(c, 'One new room per 10 minutes.', 'error');
+            if (!admittedHost && st.lastRoom && now() - st.lastRoom < L.roomPerDevice) {
+                if (!st.roomLimitNotice || now() - st.roomLimitNotice >= L.roomPerDevice) {
+                    bot(c, 'One new room per 10 minutes.', 'error');
+                    devStats.set(c.dev, { ...st, roomLimitNotice: now() });
+                }
+                return;
+            }
             const hits = (ipRooms.get(c.iph) || []).filter((t) => t > now() - HOUR);
-            if (hits.length >= L.roomsPerIpHour) return bot(c, 'Too many new rooms from your connection this hour.', 'error');
-            hits.push(now()); allowance = { hits, device: { ...st, lastRoom: now() } };
+            if (hits.length >= (admittedHost ? L.roomsPerTrustedIpHour : L.roomsPerIpHour)) return bot(c, 'Too many new rooms from your connection this hour.', 'error');
+            hits.push(now()); allowance = { hits, device: admittedHost ? st : { ...st, lastRoom: now(), roomLimitNotice: 0 } };
         }
         const title = titleText ? checkText(titleText, net.lists) : { verdict: 'ok', text: KINDS[kind].replace(/^\S+\s/, '') };
         if (title.verdict !== 'ok') return bot(c, 'Not cool here. Pick another title.', 'error');
@@ -2145,11 +2155,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         if (f.kind === 'video') {
             if (!VIDEO_KINDS.has(chan.kind)) return undefined;
-            if (!isOp(c, chan)) return bot(c, 'Only @ drives the video in open rooms.', 'error');
+            if (chan.kind !== 'bobross' && !isOp(c, chan)) return bot(c, 'Only @ drives the video in open rooms.', 'error');
             requireParticipation(c, 'publicArtifact');
             requireParticipation(c, 'externalProvider');
             const previous = chan.act.video;
-            const video = applyVideo(chan, f, relayT);
+            const video = applyVideo(chan, f, relayT, c.nick);
             if (!video) return undefined;
             if (!roomCapacity()) { chan.act.video = previous; return bot(c, 'Room storage is full. Clear an idle canvas before adding more activity.', 'error'); }
             return castAct(chan, { t: 'act', ch: chan.name, kind: 'video', video, by: c.nick, ts: relayT });

@@ -971,46 +971,37 @@ test('crawling every public page from the homepage never reaches the room', asyn
     expect(seen.size).toBeGreaterThan(2);
 });
 
-test('Bob Ross Paint-Along: picker, palette, brushes, pause-for-everyone, catch up and nudge', async ({ browser }) => {
+test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and late sync', async ({ browser }) => {
     const { host, guest } = await hostAndGuest(browser);
     await expect(host.locator('[data-bob]')).toBeHidden();
     await host.click('[data-bob-toggle]');
+    if (await host.locator('[data-ask-no]').isVisible()) await host.click('[data-ask-no]');
     await expect(host.locator('[data-bob-episodes] .ep')).toHaveCount(12);
-    await expect(host.locator('[data-bob-palette] .swatch')).toHaveCount(12);
-    await expect(host.locator('[data-bob-palette] [aria-label="Phthalo Blue"]')).toBeVisible();
-    await expect(guest.locator('[data-bob-episodes]')).toBeHidden();
+    await expect(host.locator('.draw')).toBeHidden();
 
     // Picking an episode loads it for everyone and flips guests into Bob mode.
     await host.click('[data-bob-ep="uj5FE70BcB0"]');
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'uj5FE70BcB0');
     await expect(guest.locator('body')).toHaveClass(/bob-mode/);
+    if (await guest.locator('[data-ask-no]').isVisible()) await guest.click('[data-ask-no]');
     await expect(guest.locator('[data-bob-now]')).toContainText('Waterside Way · S8 E4');
-    await expect(guest.locator('[data-bob-hold]')).toBeHidden();
+    await expect(guest.locator('[data-bob-hold]')).toBeVisible();
     await expect(guest.locator('[data-bob-catchup]')).toBeVisible();
 
-    // Painting in Van Dyke Brown with the fan brush syncs across.
-    await guest.click('[data-bob-palette] [aria-label="Van Dyke Brown"]');
-    await guest.click('[data-bob-brushes] .brush:has-text("Fan brush")');
-    await drawLine(guest);
-    await expect.poll(() => host.evaluate(() => window.__hangout.state.strokes.map((s) => `${s.color}/${s.size}`))).toContain('#221b15/16');
+    // Any participant can pause and resume the shared player.
+    await guest.click('[data-bob-hold]');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
+    await expect(guest.locator('[data-bob-now]')).toContainText('Paused by');
+    await guest.click('[data-bob-hold]');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
 
-    // Guest nudges, host pauses for everyone, then resumes.
-    await guest.click('[data-bob-nudge]');
-    await expect(host.locator('[data-status]')).toContainText('needs a sec');
-    await host.click('[data-bob-hold]');
-    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
-    await expect(host.locator('[data-bob-hold]')).toHaveText('Back to painting');
-    await host.click('[data-bob-hold]');
-    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
-
-    // A guest who wanders off can catch up to the host in one tap.
+    // A guest's seek is shared immediately with everyone in Paint Along.
     await guest.evaluate(() => { window.__ytLog[0].seekTo(400); });
-    await guest.click('[data-bob-catchup]');
-    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(30);
+    await expect.poll(() => host.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeGreaterThan(395);
 
-    // Host rewinds 15s for everyone.
-    await host.evaluate(() => window.__ytLog[0].seekTo(100));
-    await host.click('[data-bob-rewind]');
+    // Any participant can rewind for the room.
+    await guest.evaluate(() => window.__ytLog[0].seekTo(100));
+    await guest.click('[data-bob-rewind]');
     await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(95);
 });
 

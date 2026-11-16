@@ -322,6 +322,7 @@ test('private Bob controls use current shared intent while the replacement playe
     const room = await pair(browser, baseURL, 'private',
         route => route.fulfill({ body: FAKE_SOURCE + '\n' + LOADER_FAULT_SOURCE, contentType: 'text/javascript' }), 'hold-second-ready');
     await room.host.page.click('[data-bob-toggle]');
+    if (await room.host.page.locator('[data-ask-no]').isVisible()) await room.host.page.click('[data-ask-no]');
     await room.load(VIDEO);
     await expectPlaying(room, VIDEO);
     await room.load(OTHER);
@@ -431,6 +432,7 @@ test('private guest Bob Catchup keeps failed retry visible and Retry stays local
     expect(await room.guest.page.evaluate(() => window.__hangout.isHost)).toBe(false);
     const hostSequence = await room.host.page.evaluate(() => window.__hangout.lastHostSeq);
     await room.guest.page.click('[data-bob-toggle]');
+    if (await room.guest.page.locator('[data-ask-no]').isVisible()) await room.guest.page.click('[data-ask-no]');
     await expect(room.guest.page.locator('[data-bob-catchup]')).toBeVisible();
     await room.guest.page.click('[data-bob-catchup]');
     await expect.poll(room.guest.attempts).toBe(2);
