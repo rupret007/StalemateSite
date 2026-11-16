@@ -280,6 +280,12 @@ for (const viewport of viewports) test(`${viewport.label}: long chat, error and 
             }
             contained(await composerGeometry(page));
             await page.screenshot({ path: testInfo.outputPath(`${viewport.label}-conversation-starters.png`) });
+            await starters.getByRole('button', { name: 'Find a collaborator', exact: true }).click();
+            const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+            const draft = 'Anyone up for drawing something together?';
+            await expect(composer).toBeFocused();
+            await expect(composer).toHaveValue(`${draft} `);
+            await expect(page.getByRole('log', { name: 'Conversation' })).not.toContainText(draft);
         }
         const text = 'RiffGroove'.repeat(30);
         const roomText = 'StudioGroove'.repeat(25);
