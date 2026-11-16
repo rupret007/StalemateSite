@@ -112,6 +112,48 @@ it('announces a room invitation in an existing live region and describes its Joi
     expect(announcement.textContent).toBe('');
 });
 
+it('keeps the original Join action when another room invitation arrives', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const first = { t: 'invite', ch: '#first-studio', by: 'FirstHost', roomInstance: invitationRoomInstance };
+    const second = { t: 'invite', ch: '#second-studio', by: 'SecondHost', roomInstance: 'b'.repeat(32) };
+    const panel = document.querySelector('[data-room-invite]');
+    const action = panel.querySelector('[data-room-invite-join]');
+    ws.receive(first);
+    action.focus();
+    ws.receive(second);
+    expect(document.activeElement).toBe(action);
+    expect(panel.textContent).toContain('FirstHost invited you to #first-studio');
+    ws.receive(first);
+    expect(panel.textContent).toContain('1 more invitation');
+
+    action.click();
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: ['#first-studio'], roomInstance: first.roomInstance });
+    join('#first-studio');
+    expect(document.activeElement.dataset.channelKey).toBe('#first-studio');
+    expect(panel.textContent).toContain('SecondHost invited you to #second-studio');
+    expect(panel.textContent).not.toContain('more invitation');
+    panel.querySelector('[data-room-invite-dismiss]').click();
+    expect(panel.hidden).toBe(true);
+});
+
+it('limits pending room invites and clears them on disconnect', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const panel = window.document.querySelector('[data-room-invite]');
+    const dismiss = panel.querySelector('[data-room-invite-dismiss]');
+    for (let number = 1; number <= 6; number++) {
+        ws.receive({ t: 'invite', ch: `#studio-${number}`, by: 'InvitationHost', roomInstance: String(number).repeat(32) });
+    }
+    expect(panel.textContent).toContain('#studio-1 · 4 more invitations');
+    for (let number = 1; number < 5; number++) dismiss.click();
+    expect(panel.textContent).toContain('#studio-5');
+    ws.close(4400);
+    expect(panel.hidden).toBe(true);
+    expect(panel.querySelector('[data-room-invite-status]').textContent).toBe('');
+});
+
 describe('keyboard room invitation acceptance', () => {
     it.each([false, true])('retains a meaningful focus target while joining (guest moved focus: %s)', async (moved) => {
         const { window, ws, welcome, join } = await visitor();

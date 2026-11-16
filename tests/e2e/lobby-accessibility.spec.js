@@ -410,6 +410,36 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
     } finally { await visitor?.close(); await host.close(); }
 });
 
+for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewport.label}: two room invitations keep their Join actions in order`, async ({ browser, baseURL }, testInfo) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const firstHost = await guest(browser, baseURL, 'FirstStudioHost', { width: 1280, height: 900 }, relay);
+    let secondHost, visitor;
+    try {
+        secondHost = await guest(browser, baseURL, 'SecondStudioHost', { width: 1280, height: 900 }, relay);
+        visitor = await guest(browser, baseURL, 'TwoInviteGuest', viewport, relay);
+        await send(firstHost.page, '/join #first-invite-studio');
+        await send(secondHost.page, '/join #second-invite-studio');
+        await expect(firstHost.page.locator('[data-chat-context]')).toHaveText('#first-invite-studio');
+        await expect(secondHost.page.locator('[data-chat-context]')).toHaveText('#second-invite-studio');
+        const panel = visitor.page.locator('[data-room-invite]');
+        const join = panel.getByRole('button', { name: 'Join', exact: true });
+        await send(firstHost.page, '/invite TwoInviteGuest');
+        await tabTo(visitor.page, join);
+        await send(secondHost.page, '/invite TwoInviteGuest');
+        await expect(join).toHaveAccessibleDescription(/FirstStudioHost invited you to #first-invite-studio · 1 more invitation/);
+        await expect(join).toBeFocused();
+        await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-queued-room-invites.png`) });
+        await visitor.page.keyboard.press('Enter');
+        await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#first-invite-studio');
+        await expect(join).toHaveAccessibleDescription('SecondStudioHost invited you to #second-invite-studio');
+        await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-next-room-invite.png`) });
+        await join.press('Enter');
+        await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#second-invite-studio');
+        await expect(panel).toBeHidden();
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor?.close(); await secondHost?.close(); await firstHost.close(); }
+});
+
 for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewport.label}: a closed-room invitation leaves the guest in the lobby with recovery guidance`, async ({ browser, baseURL }, testInfo) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
     const host = await guest(browser, baseURL, 'ClosingInviteHost', { width: 1280, height: 900 }, relay);

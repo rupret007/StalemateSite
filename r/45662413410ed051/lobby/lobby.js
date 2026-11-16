@@ -350,7 +350,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     // onLeave invalidates capture/room generations as well as live tracks/PCs.
     function pauseLocalMedia() {
         app.localMediaPaused = true;
-        clearRoomInvite();
+        clearRoomInvites();
         clearGameLinks();
         clearJamInvitations();
         if (roomApi) roomApi.onLeave();
@@ -646,7 +646,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         connectionState = state;
         if (state !== 'connected') {
             roomJoinFocus = null;
-            clearRoomInvite();
+            clearRoomInvites();
             if (gameOpenPending) {
                 clearTimeout(gameOpenPending.timer); gameOpenPending = null;
                 gameOpenError = 'Connection interrupted. Reconnect and try opening Game Night again.';
@@ -1190,7 +1190,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         case 'join': {
             const c = { ...m.ch, lines: [] };
-            if (roomInvite && roomInvite.room === c.name && roomInvite.instance === c.keepRef) clearRoomInvite();
+            if (roomInvites.delete(c.keepRef)) drawRoomInvite();
             let focusJoinedRoom = false;
             if (roomJoinFocus?.room === c.name) {
                 focusJoinedRoom = document.activeElement === roomJoinFocus.anchor;
@@ -1374,7 +1374,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             app.kicked = m.ch === '#stalemate';
             toast(`${m.banned ? 'Banned' : 'Kicked'} from ${m.ch} by ${m.by}: ${m.reason}`);
             if (app.kicked) {
-                clearRoomInvite();
+                clearRoomInvites();
                 clearGameLinks();
                 clearJamInvitations();
                 $('[data-gate]').hidden = false; $('[data-app]').hidden = true; gateStatus(`You got the boot (${m.reason}). Take a breather.`);
@@ -1771,7 +1771,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const roomInviteAction = $('[data-room-invite-join]');
     const roomInviteStatus = $('[data-room-invite-status]');
     const roomInviteAnnouncement = $('[data-room-invite-announcement]');
-    let roomInvite = null;
+    const roomInvites = new Map();
+    const nextRoomInvite = () => roomInvites.values().next().value;
 
     function roomInviteMessage(message) {
         if (roomInviteStatus.textContent === message) return;
@@ -1780,26 +1781,37 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     }
     function showRoomInvite(frame) {
         if (app.localMediaPaused || app.sharingStopped) return;
-        roomInvite = { room: frame.ch, instance: frame.roomInstance };
-        roomInviteAction.textContent = 'Join';
-        roomInvitePanel.hidden = false;
-        roomInviteMessage(`${frame.by} invited you to ${frame.ch}`);
+        if (app.chans.get(frame.ch)?.keepRef === frame.roomInstance || roomInvites.has(frame.roomInstance) || roomInvites.size >= 5) return;
+        roomInvites.set(frame.roomInstance, { room: frame.ch, instance: frame.roomInstance, from: frame.by, sendFailed: false });
+        drawRoomInvite();
     }
-    function clearRoomInvite() {
+    function drawRoomInvite() {
         const focused = roomInvitePanel.contains(document.activeElement);
-        roomInvite = null;
-        roomInvitePanel.hidden = true;
-        roomInviteMessage('');
-        if (focused) focusChannelTab(app.active);
+        const invitation = nextRoomInvite();
+        roomInvitePanel.hidden = !invitation;
+        roomInviteAction.textContent = invitation?.sendFailed ? 'Retry join' : 'Join';
+        const message = !invitation ? '' : invitation.sendFailed
+            ? `Couldn’t send the request to join ${invitation.room}. Check your connection and try again.` : `${invitation.from} invited you to ${invitation.room}`;
+        const waiting = roomInvites.size - 1;
+        roomInviteMessage(waiting > 0 ? `${message} · ${waiting} more invitation${waiting === 1 ? '' : 's'}` : message);
+        if (!invitation && focused) focusChannelTab(app.active);
     }
-    $('[data-room-invite-dismiss]').addEventListener('click', clearRoomInvite);
+    function clearRoomInvites() {
+        roomInvites.clear();
+        drawRoomInvite();
+    }
+    $('[data-room-invite-dismiss]').addEventListener('click', () => {
+        const invitation = nextRoomInvite();
+        if (invitation && roomInvites.delete(invitation.instance)) drawRoomInvite();
+    });
     roomInviteAction.addEventListener('click', () => {
-        if (!roomInvite) return;
-        const { room, instance } = roomInvite;
+        const invitation = nextRoomInvite();
+        if (!invitation) return;
+        const { room, instance } = invitation;
         if (!cmd('join', [room], app.active, instance)) {
             roomJoinFocus = null;
-            roomInviteAction.textContent = 'Retry join';
-            roomInviteMessage(`Couldn’t send the request to join ${room}. Check your connection and try again.`);
+            invitation.sendFailed = true;
+            drawRoomInvite();
             return;
         }
         let anchor = null;
@@ -1809,7 +1821,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (!roomInvitePanel.contains(document.activeElement)) anchor = document.activeElement;
         }
         roomJoinFocus = anchor ? { room, anchor } : null;
-        clearRoomInvite();
+        roomInvites.delete(instance);
+        drawRoomInvite();
     });
     function readGameReturn() {
         let saved = gameReturn;
