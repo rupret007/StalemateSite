@@ -4,7 +4,7 @@ Use this walkthrough with the review candidate that includes **Invite to Music**
 
 Keep the existing app and its settings available for recovery. If the candidate cannot start, close it and reopen the previous app from its known path. The old shortcut may still point there. Use the test build only after its package and URL handler are identified. Browser guests continue to use their browser.
 
-The operator handles any site restore separately using the [private deployment guide](HANGOUT_DEPLOY.md). For a failed invitation, start with the recovery steps below.
+For a site restore, give the operator the affected site version and its verified rollback receipt. For a failed invitation, start with the recovery steps below.
 
 ## Mac host
 
