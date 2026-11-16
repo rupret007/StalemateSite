@@ -59,12 +59,29 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
-it('announces a room invitation in an existing live region and describes its Join action', async () => {
+it('keeps the guest’s Join action after the notice timer and unrelated chat feedback', async () => {
     const { window, ws, welcome, join, flush } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost', roomInstance: invitationRoomInstance });
+    const invitation = document.querySelector('[data-room-invite]');
+    expect(invitation.hidden).toBe(false);
+    flush(12000);
+    expect(invitation.hidden).toBe(false);
+    ws.receive({ t: 'rate-limit', scope: 'chat', text: 'Please wait before sending another line.' });
+    expect(invitation.querySelector('button')?.textContent).toBe('Join');
+    expect(invitation.textContent).toContain('InvitationHost invited you to #invitation-studio');
+    ws.close(4400);
+    expect(invitation.hidden).toBe(true);
+    expect(document.querySelector('[data-room-invite-announcement]').textContent).toBe('');
+});
+
+it('announces a room invitation in an existing live region and describes its Join action', async () => {
+    const { window, ws, welcome, join } = await visitor();
     const { document } = window;
     welcome(); join();
-    const announcement = document.querySelector('[data-toast-announcement]');
-    const notice = document.querySelector('[data-toast]');
+    const announcement = document.querySelector('[data-room-invite-announcement]');
+    const notice = document.querySelector('[data-room-invite]');
     const composer = document.querySelector('[data-text]');
     expect(announcement?.getAttribute('role')).toBe('status');
     expect(announcement.closest('[hidden], [aria-hidden="true"]')).toBeNull();
@@ -75,7 +92,7 @@ it('announces a room invitation in an existing live region and describes its Joi
     ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost', roomInstance: invitationRoomInstance });
 
     const message = 'InvitationHost invited you to #invitation-studio';
-    expect(document.querySelector('[data-toast-announcement]')).toBe(announcement);
+    expect(document.querySelector('[data-room-invite-announcement]')).toBe(announcement);
     expect(announcement.textContent).toBe(message);
     expect(notice.hidden).toBe(false);
     expect(notice.hasAttribute('role')).toBe(false);
@@ -84,8 +101,13 @@ it('announces a room invitation in an existing live region and describes its Joi
     expect(document.getElementById(action.getAttribute('aria-describedby'))?.textContent).toBe(message);
     expect(document.activeElement).toBe(composer);
 
-    flush(12000);
+    const dismiss = notice.querySelector('[data-room-invite-dismiss]');
+    const before = ws.sent.length;
+    dismiss.focus();
+    dismiss.click();
+    expect(ws.sent).toHaveLength(before);
     expect(notice.hidden).toBe(true);
+    expect(document.activeElement.dataset.channelKey).toBe('#stalemate');
     expect(announcement.closest('[hidden], [aria-hidden="true"]')).toBeNull();
     expect(announcement.textContent).toBe('');
 });
@@ -96,7 +118,7 @@ describe('keyboard room invitation acceptance', () => {
         const { document } = window;
         welcome(); join();
         const room = '#invitation-studio';
-        const notice = document.querySelector('[data-toast]');
+        const notice = document.querySelector('[data-room-invite]');
         ws.receive({ t: 'invite', ch: room, by: 'InvitationHost', roomInstance: invitationRoomInstance });
         const action = notice.querySelector('button');
         action.focus();
@@ -119,7 +141,7 @@ describe('keyboard room invitation acceptance', () => {
         const { document } = window;
         welcome(); join();
         ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost', roomInstance: invitationRoomInstance });
-        const notice = document.querySelector('[data-toast]');
+        const notice = document.querySelector('[data-room-invite]');
         const action = notice.querySelector('button');
         const send = ws.send;
         ws.send = vi.fn(() => { throw new Error('socket closed during send'); });
@@ -130,7 +152,7 @@ describe('keyboard room invitation acceptance', () => {
         expect(notice.textContent).toContain('Couldn’t send the request to join #invitation-studio.');
         const retry = notice.querySelector('button');
         expect(retry?.textContent).toBe('Retry join');
-        expect(document.activeElement).toBe(document.querySelector('#chat-pane'));
+        expect(document.activeElement).toBe(retry);
 
         ws.send = send;
         retry.focus();

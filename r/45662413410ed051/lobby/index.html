@@ -403,8 +403,14 @@
         </aside>
 
         <div class="sr-only" data-toast-announcement role="status" aria-atomic="true"></div>
+        <div class="sr-only" data-room-invite-announcement role="status" aria-atomic="true"></div>
         <div class="sr-only" data-music-invite-announcement role="status" aria-atomic="true"></div>
         <div class="irc-notices">
+            <div class="game-offer" data-room-invite hidden>
+                <p id="room-invite-status" data-room-invite-status></p>
+                <button class="btn" type="button" data-room-invite-join aria-describedby="room-invite-status">Join</button>
+                <button class="btn btn--ghost" type="button" data-room-invite-dismiss>Dismiss</button>
+            </div>
             <div class="game-offer" data-music-invite hidden>
                 <p id="music-invite-status" data-music-invite-status></p>
                 <button class="btn" type="button" data-music-invite-action aria-describedby="music-invite-status">Accept and join</button>

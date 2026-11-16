@@ -378,13 +378,20 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#invitation-studio');
         visitor = await guest(browser, baseURL, 'InvitationGuest', viewport, relay);
         await tabTo(visitor.page, visitor.page.getByRole('textbox', { name: 'Message', exact: true }));
-        const announcement = visitor.page.getByRole('status').and(visitor.page.locator('[data-toast-announcement]'));
+        const announcement = visitor.page.getByRole('status').and(visitor.page.locator('[data-room-invite-announcement]'));
         await expect(announcement).toHaveText('');
         await send(host.page, '/invite InvitationGuest');
-        const status = visitor.page.locator('[data-toast]');
+        const status = visitor.page.locator('[data-room-invite]');
         await expect(status).toContainText('invited you to #invitation-studio');
         await expect(announcement).toHaveText('InvitationHost invited you to #invitation-studio');
         await expect(visitor.page.getByRole('textbox', { name: 'Message', exact: true })).toBeFocused();
+        if (viewport.label === 'phone375') {
+            // Cross the previous deadline while focus remains in chat.
+            await visitor.page.waitForTimeout(12200);
+            await expect(status).toBeVisible();
+        }
+        await send(visitor.page, '/unknown-fixture');
+        await expect(visitor.page.locator('[data-toast]')).toContainText('Unknown command');
         const geometry = await composerGeometry(visitor.page);
         await attachGeometry(testInfo, `invitation-geometry-${viewport.label}`, geometry);
         await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-invitation.png`), fullPage: true });
@@ -392,11 +399,6 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
         const action = status.getByRole('button', { name: 'Join', exact: true });
         await expect(action).toHaveAccessibleDescription('InvitationHost invited you to #invitation-studio');
         await tabTo(visitor.page, action);
-        if (viewport.label === 'phone375') {
-            // Cross the real actionable-notice deadline while its button holds focus.
-            await visitor.page.waitForTimeout(12200);
-            await expect(status).toBeVisible(); await expect(action).toBeFocused();
-        }
         await visitor.page.keyboard.press('Enter');
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#invitation-studio');
         await expect(status).toBeHidden();
@@ -417,15 +419,16 @@ for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewp
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#closed-invite-studio');
         visitor = await guest(browser, baseURL, 'ClosingInviteGuest', viewport, relay);
         await send(host.page, '/invite ClosingInviteGuest');
-        const status = visitor.page.locator('[data-toast]');
-        const action = status.getByRole('button', { name: 'Join', exact: true });
+        const invitation = visitor.page.locator('[data-room-invite]');
+        const action = invitation.getByRole('button', { name: 'Join', exact: true });
         await tabTo(visitor.page, action);
         await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-closed-invite-before-accept.png`) });
 
         await send(host.page, '/close');
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#stalemate');
         await visitor.page.keyboard.press('Enter');
-        await expect(status).toContainText('That room changed or closed. Ask the host for a new invitation');
+        await expect(invitation).toBeHidden();
+        await expect(visitor.page.locator('[data-toast]')).toContainText('That room changed or closed. Ask the host for a new invitation');
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#stalemate');
         await expect(visitor.page.getByRole('tab', { name: '#closed-invite-studio' })).toHaveCount(0);
         await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-closed-invite-recovery.png`) });

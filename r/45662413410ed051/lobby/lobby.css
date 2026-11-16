@@ -611,6 +611,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
    keyboard-focusable so a long notice and its actions can scroll in place. */
 .irc-notices { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
 .irc-notices:not(:has(> :not([hidden]))) { display: none; }
+.irc-notices:has(> :not([hidden]) ~ :not([hidden])) { max-height: min(38dvh, 180px); overflow: auto; }
 .toast { min-width: 0; max-width: 100%; max-height: min(20dvh, 120px); overflow: auto; overflow-wrap: anywhere; padding: 8px 16px; border-top: 1px solid var(--lime); color: var(--cream); background: var(--surface); font-size: 13px; }
 .toast .btn { margin: 4px; }
 .guest-check { position: fixed; z-index: 20; right: 16px; bottom: 80px; width: min(340px, calc(100vw - 32px)); padding: 16px; background: var(--surface); border: 1px solid var(--amber); border-radius: 4px; }
