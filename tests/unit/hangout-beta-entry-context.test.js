@@ -184,6 +184,36 @@ it.each(['chess', 'turdspades'])('moves focus from the successful %s invitation 
     }
 });
 
+it.each(['', '#invite='])('offers a fresh-link action when a guest invitation code is missing (%j)', async fragment => {
+    const pagePath = '/beta/game-night/guest';
+    const config = env({
+        HANGOUT_GAME_NIGHT_GUESTS: '1',
+        ASSETS: { fetch: vi.fn(request => new Response(readFileSync(new URL('../..' + new URL(request.url).pathname, import.meta.url), 'utf8'))) }
+    });
+    const request = path => new Request('https://beta.example.test' + path);
+    const html = await (await betaFetch(request(pagePath), config)).text();
+    const client = await (await betaFetch(request(pagePath + '.js'), config)).text();
+    const dom = new JSDOM(html, { url: request(pagePath).url + fragment, runScripts: 'outside-only' });
+    const { window } = dom;
+    try {
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE, unlockGameNightAudio: vi.fn() };
+        window.fetch = vi.fn();
+        window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
+            'const { $1 } = sharedGameNight;'));
+        const status = window.document.querySelector('[data-guest-status]');
+        const fresh = window.document.querySelector('[data-guest-fresh]');
+        expect(fresh.hidden).toBe(false);
+        expect(status.textContent).toBe('This link is missing its Game Night invitation.');
+        expect(window.document.activeElement).toBe(status);
+        expect(fresh.textContent).toBe('Ask the host for a fresh link.');
+        expect(window.document.querySelector('[data-guest-invite]').hidden).toBe(true);
+        expect(window.document.querySelector('[data-guest-retry]').hidden).toBe(true);
+        expect(window.fetch).not.toHaveBeenCalled();
+    } finally {
+        window.close();
+    }
+});
+
 it('offers a shareable fresh link when a guest invite has expired', async () => {
     const pagePath = '/beta/game-night/guest';
     const config = env({

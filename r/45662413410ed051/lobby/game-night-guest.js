@@ -85,6 +85,10 @@ async function acceptInvitation() {
 async function describe() {
     retry.hidden = true;
     if (!hasInvitation) {
+        if (!webJam) {
+            showClosedInvitation('This link is missing its Game Night invitation.');
+            return;
+        }
         status.textContent = 'Open the Game Night invitation your host sent you.';
         if (returnToRoom) returnToRoom.hidden = false;
         return;
@@ -210,8 +214,8 @@ async function shareFreshLink() {
     }
 }
 
-function showClosedInvitation() {
-    status.textContent = GAME_INVITE_UNAVAILABLE;
+function showClosedInvitation(message = GAME_INVITE_UNAVAILABLE) {
+    status.textContent = message;
     offerFreshLink();
     status.tabIndex = -1;
     status.focus({ preventScroll: true });
