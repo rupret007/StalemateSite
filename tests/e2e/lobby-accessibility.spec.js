@@ -388,6 +388,8 @@ test('a focused status survives its dismiss timer and dismisses after keyboard f
     try {
         await send(visitor.page, '/join #status-studio');
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#status-studio');
+        // Use a server error to exercise the toast's lifetime while it has
+        // keyboard focus. The room allowance has separate coverage.
         await send(visitor.page, '/notacommand');
         const status = visitor.page.locator('[data-toast]');
         await expect(status).toContainText('Unknown command /notacommand');

@@ -6,6 +6,52 @@ const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const FAKE_YT = path.join(__dirname, 'support/fake-youtube.js');
 
+// The two-camera checks still use browser media tracks and the site's WebRTC
+// connection. Generate the inputs inside WebKit so a host's fake capture
+// device cannot crash when a second participant opens the camera preview.
+function useSyntheticCapture() {
+    navigator.mediaDevices.getUserMedia = async ({ audio, video }) => {
+        const stream = new MediaStream();
+        if (video) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 320;
+            canvas.height = 240;
+            const surface = canvas.getContext('2d');
+            const paint = () => {
+                surface.fillStyle = '#252d2b';
+                surface.fillRect(0, 0, 320, 240);
+                surface.fillStyle = '#d4ad65';
+                surface.fillRect((Date.now() / 40) % 160, 60, 140, 120);
+            };
+            paint();
+            const [track] = canvas.captureStream(12).getVideoTracks();
+            const timer = setInterval(() => {
+                if (track.readyState === 'ended') clearInterval(timer);
+                else paint();
+            }, 83);
+            stream.addTrack(track);
+        }
+        if (audio) {
+            const context = new AudioContext();
+            const destination = context.createMediaStreamDestination();
+            const oscillator = context.createOscillator();
+            const level = context.createGain();
+            level.gain.value = 0.02;
+            oscillator.connect(level).connect(destination);
+            oscillator.start();
+            await context.resume();
+            const [track] = destination.stream.getAudioTracks();
+            const timer = setInterval(() => {
+                if (track.readyState !== 'ended') return;
+                clearInterval(timer);
+                void context.close();
+            }, 1000);
+            stream.addTrack(track);
+        }
+        return stream;
+    };
+}
+
 // Use phone-sized media fixtures in the standard Chromium and WebKit suites.
 const test = base.extend({
     launchOptions: [async ({ browserName, launchOptions }, use) => {
@@ -189,6 +235,8 @@ async function joinWithCamera(page) {
 }
 
 async function sharedPair(context, peerBrowser, origin, viewport, mode = 'paint') {
+    const webkit = peerBrowser.browserType().name() === 'webkit';
+    if (webkit) await context.addInitScript(useSyntheticCapture);
     const host = await openHost(context, origin);
     let invite;
     if (mode === 'paint') {
@@ -211,6 +259,7 @@ async function sharedPair(context, peerBrowser, origin, viewport, mode = 'paint'
         ...contextOptions(host), viewport, permissions: ['camera', 'microphone']
     });
     try {
+        if (webkit) await guestContext.addInitScript(useSyntheticCapture);
         await routeYouTube(guestContext);
         const guest = await guestContext.newPage();
         await guest.goto(invite.href);
