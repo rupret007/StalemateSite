@@ -1,6 +1,10 @@
 # Private WebJam band demo
 
-Use this walkthrough with the review candidate that includes **Invite to Music**. Stalemate and Rad Dad open the same private Hang Out lobby. The host supplies the private community invitation separately. Use the build ID provided by the test coordinator to identify the native Mac app.
+Use this walkthrough with the review candidate that includes **Invite to Music**. Stalemate and Rad Dad open the same private Hang Out lobby. The host supplies the private community invitation separately. Check the Mac launch window title against the 12-character build ID supplied for the rehearsal. The title reads **WebJam — Build** followed by the ID. If it differs or is missing, close that test window before sending an invitation and tell the host which ID you saw.
+
+Keep the existing app and its settings available for recovery. If the candidate cannot start, close it and reopen the previous app from its known path. The old shortcut may still point there. Use the test build only after its package and URL handler are identified. Browser guests continue to use their browser.
+
+The operator handles any site restore separately using the [private deployment guide](HANGOUT_DEPLOY.md). For a failed invitation, start with the recovery steps below.
 
 ## Mac host
 
