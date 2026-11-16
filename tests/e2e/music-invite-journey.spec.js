@@ -165,7 +165,7 @@ for (const { width, height, hostSite, guestSite } of viewports) {
                             if (stream) throw new Error('This fixture only accepts a listening guest');
                         }
                         async join() {
-                            if (++attempts === 1) throw new Error('The host did not answer in time. Ask for a new invite.');
+                            if (++attempts <= 2) throw new Error('The host did not answer in time. Ask for a new invite.');
                             this.authorized = true;
                             this.onTrack(new MediaStream());
                         }
@@ -189,11 +189,27 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await expect(retry).toBeFocused();
             await expect(listener.locator('#error-hint')).toContainText('Retry to listen with your microphone off');
             await expect(retry).toBeInViewport({ ratio: 1 });
-            await expect(listener.getByRole('button', { name: 'Back to audio options', exact: true })).toBeVisible();
+            const audioOptions = listener.getByRole('button', { name: 'Back to audio options', exact: true });
+            const checkMic = listener.getByRole('button', { name: 'Check microphone', exact: true });
+            await expect(audioOptions).toBeVisible();
             await expect(listen).toBeHidden();
-            await expect(listener.getByRole('button', { name: 'Check microphone', exact: true })).toBeHidden();
+            await expect(checkMic).toBeHidden();
             await capture(listener, '06-listen-retry');
-            await retry.press('Enter');
+
+            // WebKit on macOS uses Option-Tab to include buttons by default.
+            const tab = process.platform === 'darwin' && browser.browserType().name() === 'webkit' ? 'Alt+Tab' : 'Tab';
+            await listener.keyboard.press(tab);
+            await expect(audioOptions).toBeFocused();
+            await listener.keyboard.press('Enter');
+            await expect(listen).toBeFocused();
+            await expect(checkMic).toBeVisible();
+            await expect(retry).toBeHidden();
+            expect(await listener.evaluate(() => window.fixtureMicRequests)).toBe(0);
+            await capture(listener, '06b-audio-options-restored');
+
+            await listener.keyboard.press('Enter');
+            await expect(retry).toBeFocused();
+            await listener.keyboard.press('Enter');
             const resumeAudio = listener.getByRole('button', { name: 'Resume audio', exact: true });
             await expect(resumeAudio).toBeInViewport({ ratio: 1 });
             await expect(resumeAudio).toBeFocused();
