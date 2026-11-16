@@ -750,6 +750,34 @@ it('renders informational chat names as text and keeps live person actions avail
     expect(document.querySelector('[data-id="earlier-message"] button.flag')).toBeTruthy();
 });
 
+it('keeps a blue nickname readable in chat and on the hovered People row', async () => {
+    const { window, ws, welcome } = await visitor('stalemate', { personTargets: 1 });
+    const blueNick = 'abi';
+    welcome();
+    ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', title: 'Shared chat', count: 1,
+        modes: {}, names: [{ nick: blueNick, prefix: '' }] } });
+    ws.receive({ t: 'line', ch: '#stalemate', from: blueNick, text: 'A message from a blue nickname.' });
+
+    const { document } = window;
+    const author = document.querySelector('[data-chat-lines] .who');
+    const person = document.querySelector('[data-nicks] .nick');
+    expect(author.textContent).toBe(`<${blueNick}>`);
+    expect(person.textContent).toBe(blueNick);
+    const luminance = ([red, green, blue]) => {
+        const linear = [red, green, blue].map(byte => {
+            const value = byte / 255;
+            return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+    };
+    // Chat uses --ink. The hovered People row uses --raised.
+    for (const [element, background] of [[author, [13, 16, 17]], [person, [26, 32, 32]]]) {
+        const rgb = element.style.color.match(/\d+/g).map(Number);
+        expect(rgb).toHaveLength(3);
+        expect((luminance(rgb) + 0.05) / (luminance(background) + 0.05)).toBeGreaterThanOrEqual(4.5);
+    }
+});
+
 it('renders the guest name as roster text and preserves focus on a current peer during updates', async () => {
     const { window, ws } = await visitor('stalemate', { personTargets: 1 });
     const self = { id: 'self-peer', nick: 'Viewer', prefix: '' };
