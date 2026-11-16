@@ -397,6 +397,17 @@ test('Watch a Movie Together uses the shared phone stage and keeps video selecti
             if (size.width === 390) await saveShot(guest, 'watch-a-movie-together.png');
             await guest.locator('[data-chat-toggle]').click();
         }
+
+        await guest.evaluate(() => window.__ytLog[0].pauseVideo());
+        for (const page of [host, guest]) {
+            await expect(page.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
+        }
+        await guest.evaluate(() => window.__ytLog[0].seekTo(42));
+        await expect.poll(() => host.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeCloseTo(42, 0);
+        await guest.evaluate(() => window.__ytLog[0].playVideo());
+        for (const page of [host, guest]) {
+            await expect(page.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+        }
     } finally {
         await guestContext.close();
     }

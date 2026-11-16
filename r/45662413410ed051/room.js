@@ -918,6 +918,13 @@
         case 'playback':
             if (msg.body && typeof msg.body === 'object') acceptPlayback(msg.body, meta.t, meta.from);
             return;
+        case 'watch-playback': {
+            const { source, playing, pos } = msg.body || {};
+            if (!app.isHost || !isSharedMovie(source) || typeof playing !== 'boolean'
+                || !Number.isFinite(pos) || pos < 0 || pos > 86400) return;
+            if (await hostPublish(source, playing, pos)) await syncToState(true);
+            return;
+        }
         case 'av':
             if (meta.received > meta.peer.avReceived) {
                 meta.peer.avReceived = meta.received;
@@ -1403,6 +1410,12 @@
         return source?.kind === 'yt' && Boolean(BOB.findEpisode(source.id));
     }
 
+    function isSharedMovie(source) {
+        const selected = app.lastVideoSigned?.signed.body;
+        return Boolean(source && selected?.activity === 'watch' && doc.body.dataset.sharedLayout === 'watch'
+            && selected.source.kind === source.kind && selected.source.id === source.id);
+    }
+
     function acceptPlayback(body, t, from) {
         const receivedT = Number.isFinite(Number(t)) ? Number(t) : app.clock.relayNow();
         const previousT = app.state.video?.updatedAt || app.state.video?.t || 0;
@@ -1428,13 +1441,13 @@
         return true;
     }
 
-    let bobPlaybackSample = null, bobPlaybackIntentAt = 0;
+    let playbackSample = null, playbackIntentAt = 0;
     async function publishPlayback(source, playing, pos) {
         if (!app.connected || !app.bob.on || !isPaintEpisode(source)) return false;
         const body = { source,
             playing: Boolean(playing), pos: Math.max(0, Number(pos) || 0), rate: 1 };
         const t = app.clock.relayNow(); body.updatedAt = t;
-        bobPlaybackIntentAt = Date.now();
+        playbackIntentAt = Date.now();
         if (H.apply(app.state, { type: 'video', source, playing: body.playing, pos: body.pos }, { t }) !== 'video') return false;
         app.lastPlaybackSeq = Math.max((app.lastPlaybackSeq || 0) + 1, Math.floor(t));
         app.state.video = { ...app.state.video, rate: body.rate, seq: app.lastPlaybackSeq, by: app.name, updatedAt: t };
@@ -1474,17 +1487,19 @@
         }
     }, 2000);
     win.setInterval(() => {
-        if (!app.connected || !app.bob.on || !isPaintEpisode(app.state.video?.source) || player.autoplayBlocked || !player.readyKey) return;
+        const v = app.state.video;
+        const canDrive = app.bob.on && isPaintEpisode(v?.source) || !app.isHost && isSharedMovie(v?.source);
+        if (!app.connected || !canDrive || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         const at = Date.now(), pos = localTime(), playing = localPlaying();
-        if (player.buffering) { bobPlaybackSample = { at, pos, playing }; return; }
-        if (at < player.applying || at - bobPlaybackIntentAt < 750) { bobPlaybackSample = { at, pos, playing }; return; }
-        if (bobPlaybackSample) {
-            const elapsed = (at - bobPlaybackSample.at) / 1000;
-            if (elapsed > 2) { bobPlaybackSample = { at, pos, playing }; void syncToState(false); return; }
-            const natural = elapsed * (bobPlaybackSample.playing ? (app.state.video.rate || 1) : 0);
-            if (Math.abs((pos - bobPlaybackSample.pos) - natural) > 1) void publishPlayback(app.state.video.source, playing, pos);
+        if (player.buffering) { playbackSample = { at, pos, playing }; return; }
+        if (at < player.applying || at - playbackIntentAt < 750) { playbackSample = { at, pos, playing }; return; }
+        if (playbackSample) {
+            const elapsed = (at - playbackSample.at) / 1000;
+            if (elapsed > 2) { playbackSample = { at, pos, playing }; void syncToState(false); return; }
+            const natural = elapsed * (playbackSample.playing ? (v.rate || 1) : 0);
+            if (Math.abs((pos - playbackSample.pos) - natural) > 1) void publishVideoIntent(v.source, playing, pos);
         }
-        bobPlaybackSample = { at, pos, playing };
+        playbackSample = { at, pos, playing };
     }, 250);
     doc.addEventListener('visibilitychange', () => { if (!doc.hidden) void syncToState(true); });
 
@@ -1520,8 +1535,9 @@
     }
 
     function onLocalChange() {
-        if (!app.connected || (!app.isHost && !app.bob.on) || !app.state.video || player.autoplayBlocked || (player.kind === 'yt' && !player.seenPlaying && app.state.video.playing)) return;
         const v = app.state.video;
+        if (!app.connected || !v || (!app.isHost && !app.bob.on && !isSharedMovie(v.source))
+            || player.autoplayBlocked || (player.kind === 'yt' && !player.seenPlaying && v.playing)) return;
         if (player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         const playing = localPlaying();
         const pos = localTime();
@@ -1543,8 +1559,8 @@
     }
     function onYtState(event) {
         if (app.ended || player.kind !== 'yt' || event.target !== player.yt || event.data !== player.yt?.getPlayerState()) return;
-        if (event.data === 3) { player.buffering = true; bobPlaybackSample = { at: Date.now(), pos: localTime(), playing: false }; return; }
-        if (event.data === 1 || event.data === 2) { player.buffering = false; bobPlaybackSample = { at: Date.now(), pos: localTime(), playing: event.data === 1 }; }
+        if (event.data === 3) { player.buffering = true; playbackSample = { at: Date.now(), pos: localTime(), playing: false }; return; }
+        if (event.data === 1 || event.data === 2) { player.buffering = false; playbackSample = { at: Date.now(), pos: localTime(), playing: event.data === 1 }; }
         if (event.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
         if (event.data !== 1 && event.data !== 2) return;
         clearTimeout(videoPublishTimer);
@@ -1556,8 +1572,15 @@
     ['play', 'pause', 'seeked'].forEach((e) => ui.file.addEventListener(e, onLocalChange));
     ui.tap.addEventListener('click', () => { if (player.kind !== 'yt') ui.tap.hidden = true; syncToState(true, true); });
 
-    function publishVideoIntent(source, playing, pos) {
-        return app.bob.on && isPaintEpisode(source) ? publishPlayback(source, playing, pos) : hostPublish(source, playing, pos);
+    async function publishVideoIntent(source, playing, pos) {
+        if (app.bob.on && isPaintEpisode(source)) return publishPlayback(source, playing, pos);
+        if (app.isHost) return hostPublish(source, playing, pos);
+        if (!app.connected || !isSharedMovie(source)) return false;
+        // The creator still signs movie state. Guests can control the selected
+        // source without gaining authority to replace it.
+        playbackIntentAt = Date.now();
+        await send({ type: 'watch-playback', body: { source, playing, pos } });
+        return true;
     }
 
     async function hostLoad(source) {
@@ -3426,7 +3449,7 @@
     function setBob(on, byUser) {
         const wasOn = app.bob.on;
         app.bob.on = Boolean(on);
-        if (app.bob.on && !wasOn) { bobPlaybackSample = null; bobPlaybackIntentAt = Date.now(); }
+        if (app.bob.on && !wasOn) { playbackSample = null; playbackIntentAt = Date.now(); }
         if (byUser) app.bob.touched = true;
         doc.body.classList.toggle('bob-mode', app.bob.on);
         syncSharedLayout();
@@ -3490,6 +3513,8 @@
         url.searchParams.set('activity', 'watch');
         win.history.replaceState(null, '', url);
         syncSharedLayout();
+        const v = app.state.video;
+        if (v) void hostPublish(v.source, v.playing, H.expectedPosition(v, app.clock.relayNow()));
     });
     ui.bobToggle.addEventListener('click', () => setBob(!app.bob.on, true));
     ui.bobHold.addEventListener('click', async () => {
