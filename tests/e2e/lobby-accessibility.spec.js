@@ -419,6 +419,9 @@ test('People roster: live joins preserve focused connection identity', async ({ 
     let peer, arrival;
     try {
         peer = await guest(browser, baseURL, 'RosterPeer', viewport, relay);
+        const ownName = visitor.page.locator('[data-nicks] span.nick[data-self="true"]');
+        await expect(ownName).toHaveText('RosterNavigator');
+        await expect(ownName).toHaveCSS('opacity', '1');
         // CSS adds decoration to the accessible name; exact DOM text still
         // selects one controlled peer within semantic People buttons.
         const person = visitor.page.locator('[data-nicks]').getByRole('button').filter({ hasText: /^RosterPeer$/ });
@@ -600,6 +603,102 @@ for (const failure of ['getter', 'getItem', 'setItem']) {
     });
 }
 
+for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    for (const taken of [false, true]) test(`nickname ${taken ? 'conflict recovers' : 'entry moves focus into Chat'} at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+        const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
+        let incumbent;
+        try {
+            const page = await context.newPage();
+            await page.route(/youtube\.com|ytimg|googlevideo|goatcounter/, route => route.abort());
+            const relay = hangoutRelayWsBase(baseURL, `keyboard-entry-${randomUUID()}`);
+            if (taken) incumbent = await guest(browser, baseURL, 'FirstTimeGuest', viewport, relay);
+            const source = taken ? 'stalemate' : 'rad-dad';
+            await page.goto(`${ROOT}?preview=local-preview-key-0001&via=${source}&relay=${encodeURIComponent(relay)}`);
+            const nickname = page.getByRole('textbox', { name: 'Your nick', exact: true });
+            await tabTo(page, nickname);
+            await page.keyboard.type('FirstTimeGuest');
+            const enter = page.locator('[data-enter]');
+            await tabTo(page, enter);
+            await page.screenshot({ path: testInfo.outputPath('01-nickname-ready.png') });
+
+            await page.keyboard.press('Space');
+            if (taken) {
+                const message = 'That nick is taken right now.';
+                await expect(page.locator('[data-gate-status]')).toHaveText(message);
+                await page.screenshot({ path: testInfo.outputPath('01a-nickname-taken.png') });
+                await expect(nickname).toBeFocused();
+                await expect(nickname).toHaveAccessibleDescription(message);
+                await expect(nickname).toHaveValue('FirstTimeGuest');
+                await replaceText(page, 'AnotherGuest');
+                await tabTo(page, enter);
+                await page.keyboard.press('Space');
+            }
+            await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('Community chat');
+            await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            await page.screenshot({ path: testInfo.outputPath('02-entered-chat.png') });
+            const chat = page.getByRole('region', { name: 'Chat', exact: true });
+            await expect(chat).toBeFocused();
+            await expect(chat).toBeInViewport();
+
+            const message = 'Hello from my first Hang Out visit';
+            await send(page, message);
+            await expect(page.getByRole('log', { name: 'Conversation' })).toContainText(message);
+            await page.screenshot({ path: testInfo.outputPath('03-first-chat-message.png') });
+        } finally {
+            await context.close();
+            await incumbent?.close();
+        }
+    });
+
+    test(`room closure returns tab focus to the lobby at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+        const relay = hangoutRelayWsBase(baseURL, `channel-tab-close-${randomUUID()}`);
+        const host = await guest(browser, baseURL, 'TabClosingHost', viewport, relay);
+        let visitor;
+        try {
+            await send(host.page, '/join #temporary-room');
+            await expect(host.page.locator('[data-chat-context]')).toHaveText('#temporary-room');
+            visitor = await guest(browser, baseURL, 'TabClosingGuest', viewport, relay);
+            const { page } = visitor;
+            await send(page, '/join #temporary-room');
+            const tabs = page.getByRole('tablist', { name: 'Channels and direct messages' });
+            const roomTab = tabs.getByRole('tab', { name: '#temporary-room', exact: true });
+            const conversation = page.getByRole('log', { name: 'Conversation' });
+            await expect(conversation).toHaveAccessibleDescription('#temporary-room');
+            await tabTo(page, roomTab);
+            await expect(roomTab).toBeInViewport();
+            await page.screenshot({ path: testInfo.outputPath('01-before-room-closes.png') });
+
+            await send(host.page, '/close');
+            await expect(roomTab).toHaveCount(0);
+            await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            await page.screenshot({ path: testInfo.outputPath('02-after-room-closes.png') });
+            const lobbyTab = tabs.getByRole('tab', { name: '#stalemate', exact: true });
+            await expect(conversation).toHaveAccessibleDescription('#stalemate');
+            await expect(lobbyTab).toBeFocused();
+            await expect(lobbyTab).toBeInViewport();
+            const roomEntry = viewport.width === 390
+                ? page.getByRole('button', { name: /start a room/i })
+                : page.getByRole('complementary', { name: 'Rooms', exact: true })
+                    .getByRole('button', { name: /^start a chat channel/i });
+            await expect(roomEntry).toBeInViewport();
+            await expect(roomEntry).toBeEnabled();
+
+            const message = 'Back in the lobby after the room closed';
+            await send(page, message);
+            const sent = conversation.getByRole('listitem').filter({ hasText: message });
+            const author = sent.locator('span.who');
+            await expect(author).toHaveText('<TabClosingGuest>');
+            await expect(author).toHaveCSS('opacity', '1');
+            await page.screenshot({ path: testInfo.outputPath('03-lobby-message-sent.png') });
+            expect(visitor.errors).toEqual([]);
+            expect(host.errors).toEqual([]);
+        } finally {
+            await visitor?.close();
+            await host.close();
+        }
+    });
+}
+
 for (const width of [375, 390]) {
     test(`room directory preserves keyboard identity and current capacity through live updates at ${width}px`, async ({ browser, baseURL }) => {
         const relay = hangoutRelayWsBase(baseURL, `directory-${randomUUID()}`), viewport = { width, height: 667 };
@@ -609,6 +708,12 @@ for (const width of [375, 390]) {
         try {
             await send(host.page, '/join #directory-room');
             await expect(host.page.locator('[data-chat-context]')).toHaveText('#directory-room');
+            const actions = visitor.page.locator('[data-quick]');
+            const startRoom = actions.getByRole('button', { name: /start a room/i });
+            if (await actions.evaluate(row => row.scrollWidth > row.clientWidth)) {
+                await tabTo(visitor.page, actions.locator('[data-quick-cmd="help"]'));
+                await expect.poll(() => actions.evaluate(row => row.scrollLeft)).toBeGreaterThan(0);
+            }
             await section(visitor.page, 'rooms');
             const button = visitor.page.locator('[data-roomlist] button[data-room="#directory-room"]');
             const publicRoom = visitor.page.locator('[data-room="#directory-room"]');
@@ -628,6 +733,8 @@ for (const width of [375, 390]) {
             expect(await button.evaluate((element, before) => element === before, original)).toBe(true);
             await visitor.page.keyboard.press('Enter');
             await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#directory-room');
+            await expect.poll(() => actions.evaluate(row => row.scrollLeft)).toBe(0);
+            await expect(startRoom).toBeInViewport({ ratio: 1 });
             const composer = visitor.page.getByRole('textbox', { name: 'Message', exact: true });
             await tabTo(visitor.page, composer); await visitor.page.keyboard.type('A draft while room metadata changes');
             await send(host.page, '/mode +l 5');

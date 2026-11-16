@@ -120,7 +120,7 @@ async function describe() {
         gameTitle.textContent = game;
         status.textContent = '';
         invite.hidden = false;
-        if (document.activeElement === document.body) join.focus({ preventScroll: true });
+        if (document.activeElement === document.body || document.activeElement === retry) join.focus({ preventScroll: true });
     } catch (error) {
         status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE : 'Couldn’t check the invitation. Try again.';
         retry.hidden = error.status === 410;
@@ -244,11 +244,14 @@ async function resume() {
             } catch { /* The rejected pass cannot authorize a session. */ }
             return;
         }
-        const { next } = response.ok ? await response.json() : {};
+        if (!response.ok) throw Object.assign(new Error('Could not resume'), { status: response.status });
+        const { next } = await response.json();
         if (next !== lobbyPath) throw new Error('Could not resume');
         location.replace(gameDestination(tableId));
-    } catch {
-        status.textContent = 'Couldn’t reconnect. Try again.';
+    } catch (error) {
+        status.textContent = error?.status === 429
+            ? 'Too many reconnect attempts. Wait a minute, then try again.'
+            : 'Couldn’t reconnect. Try again.';
         retry.hidden = false;
         retry.focus({ preventScroll: true });
     }

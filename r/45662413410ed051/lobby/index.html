@@ -96,7 +96,7 @@
     <header class="titlebar"><div class="brand"><span class="brand-mark" aria-hidden="true">#</span><span><b>HANG OUT</b><span class="brand-caption">IRC / COMMUNITY</span></span><span class="title-extra">A place to hang out.</span></div><div class="connection-tools"><a class="entry-return" data-entry-return hidden></a><span class="connection" data-connection role="status" data-state="offline">Not connected</span><button type="button" data-fullscreen aria-pressed="false" hidden>Full screen</button><button type="button" data-reconnect hidden>Try again</button></div></header>
 
     <section class="session-ended" data-session-ended hidden aria-labelledby="session-ended-title">
-        <div><h2 id="session-ended-title" tabindex="-1">Session ended</h2><p data-session-reason role="status"></p><p class="small">Your current unsent message stays below for copying. Leaving this page clears unsent drafts; they are never sent automatically.</p></div>
+        <div><h2 id="session-ended-title" tabindex="-1">Session ended</h2><p data-session-reason role="status"></p><p class="small" data-session-draft hidden>Your current unsent message stays below for copying. Leaving this page clears unsent drafts; they are never sent automatically.</p></div>
         <a class="btn" data-session-reentry href="/beta/" hidden>Return to invitation</a>
         <button class="btn" type="button" data-game-guest-exit-retry hidden>Retry closing invitation</button>
     </section>
@@ -125,7 +125,7 @@
             <details class="entry-details"><summary>How session scrollback works</summary><p class="small">Chat starts when you join. Scrollback stays in this tab for your connected session.</p></details>
             <p class="small gate-disclosure" data-ai-disclosure>When AI review is enabled, public text may go to OpenAI after posting to flag messages for our moderators. PMs, invite links, invite-only/key-protected/locked rooms, cameras and encrypted private rooms are excluded. Flagged, reported or held evidence stays up to 24 hours, separate from chat scrollback.</p>
             <button class="btn btn--ghost" data-gate-guest hidden>Continue as guest</button>
-            <p class="status" data-gate-status role="status"></p>
+            <p class="status" id="gate-status" data-gate-status role="status"></p>
             <a class="btn btn--ghost" data-gate-private-entry href="/beta/" hidden>Open private entry</a>
           </div>
         </div>
@@ -184,8 +184,8 @@
             <a class="private private-invite" data-private href="../">↗ Encrypted private room</a>
         </aside>
 
-        <section class="pane chat" id="chat-pane" data-pane="chat" aria-label="Chat">
-            <nav class="tabs" data-tabs role="tablist"></nav>
+        <section class="pane chat" id="chat-pane" data-pane="chat" aria-label="Chat" tabindex="-1">
+            <nav class="tabs" data-tabs role="tablist" aria-label="Channels and direct messages"></nav>
             <div class="topic" data-topic></div>
             <p class="network-note" data-network-note role="status" hidden></p>
             <details class="network-note" data-sharing-controls hidden>
@@ -362,7 +362,7 @@
                 </div>
             </details>
             <p class="small" data-act-relay-status role="status"></p>
-            <div class="buffer" data-buffer role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-atomic="false"><ol class="buffer-lines" data-chat-lines role="list" aria-label="Messages"></ol></div>
+            <div class="buffer" data-buffer role="log" aria-label="Conversation" aria-describedby="chat-context" aria-live="polite" aria-relevant="additions" aria-atomic="false"><ol class="buffer-lines" data-chat-lines role="list" aria-label="Messages"></ol></div>
             <button class="jump-new" data-new-messages type="button" hidden>New messages ↓</button>
             <div class="pmreq" data-pmreqs></div>
             <div class="quick" data-quick>
@@ -383,7 +383,7 @@
                 <input data-text maxlength="300" autocomplete="off" placeholder="Say something (or /help)" aria-label="Message">
                 <button class="btn" data-send type="submit">Send</button>
             </form>
-            <div class="chat-status"><span data-chat-context>#stalemate</span><span title="The last 300 lines received in this channel during this session. No earlier messages are replayed.">Session scrollback · /help</span></div>
+            <div class="chat-status"><span id="chat-context" data-chat-context>#stalemate</span><span title="The last 300 lines received in this channel during this session. No earlier messages are replayed.">Session scrollback · /help</span></div>
         </section>
 
         <aside class="pane people" id="people-pane" data-pane="people" aria-label="People">

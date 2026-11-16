@@ -52,6 +52,180 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
+describe('focus after private guest entry', () => {
+    it('takes a guest to Chat when the nickname gate disappears', async () => {
+        const { window, welcome, join } = await visitor();
+        const { document } = window;
+        const nick = document.querySelector('[data-nick]');
+        nick.focus();
+        expect(document.activeElement).toBe(nick);
+
+        welcome();
+        join();
+
+        const chat = document.querySelector('[data-pane="chat"]');
+        expect(document.querySelector('[data-gate]').hidden).toBe(true);
+        expect(document.querySelector('[data-app]').hidden).toBe(false);
+        expect(document.activeElement).toBe(chat);
+    });
+
+    it('does not interrupt a guest who moved focus outside the gate while waiting', async () => {
+        const { window, welcome, join } = await visitor();
+        const { document } = window;
+        const otherControl = document.createElement('button');
+        document.body.prepend(otherControl);
+        otherControl.focus();
+
+        welcome();
+        join();
+
+        expect(document.activeElement).toBe(otherControl);
+    });
+});
+
+it('names the channel tab group and describes the conversation with the selected room', async () => {
+    const { window, welcome, join } = await visitor();
+    welcome(); join(); join('#writing-room');
+    const { document } = window;
+    const tabs = document.querySelector('[role="tablist"]');
+    const log = document.querySelector('[role="log"]');
+    const context = document.querySelector('[data-chat-context]');
+    expect(tabs.getAttribute('aria-label')).toBe('Channels and direct messages');
+    expect(document.getElementById(log.getAttribute('aria-describedby'))).toBe(context);
+    expect(context.textContent).toBe('#writing-room');
+    expect(tabs.querySelector('[aria-selected="true"]').dataset.channelKey).toBe('#writing-room');
+
+    tabs.querySelector('[data-channel-key="#stalemate"]').click();
+
+    expect(context.textContent).toBe('#stalemate');
+    expect(tabs.querySelector('[aria-selected="true"]').dataset.channelKey).toBe('#stalemate');
+    expect(log.getAttribute('aria-label')).toBe('Conversation');
+});
+
+it('renders informational chat names as text and keeps live person actions available', async () => {
+    const { window, ws, join } = await visitor('stalemate', { personTargets: 1 });
+    ws.receive({ t: 'welcome', id: 'self-peer', nick: 'Viewer', role: 'fan', capabilities: {}, transportSeq: 1 });
+    join();
+    const ch = '#stalemate';
+    const roomInstance = 'a'.repeat(32);
+    ws.receive({ t: 'line', ch, from: 'Viewer', text: 'Own message', personSelf: true, personPeer: 'self-peer', roomInstance });
+    ws.receive({ t: 'line', ch, from: 'EarlierGuest', text: 'Earlier message without a person target', id: 'earlier-message' });
+    ws.receive({ t: 'line', ch, from: 'CurrentGuest', text: 'Current message', personSelf: false, personPeer: 'current-peer', roomInstance });
+
+    const { document } = window;
+    const authors = [...document.querySelectorAll('[data-chat-lines] .who')];
+    expect(authors.map(author => [author.tagName, author.textContent])).toEqual([
+        ['SPAN', '<Viewer>'],
+        ['SPAN', '<EarlierGuest>'],
+        ['BUTTON', '<CurrentGuest>'],
+    ]);
+    expect(authors[2].disabled).toBe(false);
+    expect(document.querySelector('[data-id="earlier-message"] button.flag')).toBeTruthy();
+});
+
+it('renders the guest name as roster text and preserves focus on a current peer during updates', async () => {
+    const { window, ws } = await visitor('stalemate', { personTargets: 1 });
+    const self = { id: 'self-peer', nick: 'Viewer', prefix: '' };
+    const peer = { id: 'current-peer', nick: 'CurrentGuest', prefix: '' };
+    const channel = { name: '#stalemate', kind: 'lobby', title: 'Shared chat', keepRef: 'a'.repeat(32),
+        count: 2, modes: {}, names: [self, peer] };
+    ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', capabilities: {}, transportSeq: 1 });
+    ws.receive({ t: 'join', ch: channel });
+    const { document } = window;
+    const roster = document.querySelector('[data-nicks]');
+    const ownName = roster.querySelector('.nick[data-self="true"]');
+    const peerButton = roster.querySelector('button.nick[data-self="false"]');
+    expect(ownName.tagName).toBe('SPAN');
+    expect(ownName.textContent).toBe('Viewer');
+    peerButton.focus();
+
+    ws.receive({ t: 'chan', ch: { ...channel, names: [self, { ...peer, nick: 'RenamedGuest' }] } });
+
+    expect(roster.querySelector('button.nick[data-self="false"]')).toBe(peerButton);
+    expect(peerButton.textContent).toBe('RenamedGuest');
+    expect(document.activeElement).toBe(peerButton);
+});
+
+describe('channel tab focus after a room closes', () => {
+    it.each(['room tab', 'message composer'])('keeps keyboard focus usable from the %s', async (start) => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join(); join('#temporary');
+        const { document } = window;
+        const tab = document.querySelector('[data-channel-key="#temporary"]');
+        const composer = document.querySelector('[data-text]');
+        const focused = start === 'room tab' ? tab : composer;
+        focused.focus();
+        expect(document.activeElement).toBe(focused);
+
+        ws.receive({ t: 'closed', ch: '#temporary', reason: 'closed by the host' });
+
+        const lobby = document.querySelector('[data-channel-key="#stalemate"]');
+        expect(tab.isConnected).toBe(false);
+        expect(lobby.getAttribute('aria-selected')).toBe('true');
+        expect(document.activeElement).toBe(start === 'room tab' ? lobby : composer);
+    });
+});
+
+describe('nickname rejection recovery', () => {
+    it('returns keyboard focus to the rejected nickname and identifies its error', async () => {
+        const { window, ws } = await visitor();
+        const { document } = window;
+        const submit = document.querySelector('[data-enter]');
+        const nickname = document.querySelector('[data-nick]');
+        nickname.focus();
+        nickname.blur();
+        expect(document.activeElement).toBe(document.body);
+
+        ws.receive({ t: 'nick-error', text: 'That nick is taken right now.' });
+
+        expect(document.activeElement).toBe(nickname);
+        expect(nickname.value).toBe('Viewer');
+        const description = document.getElementById(nickname.getAttribute('aria-describedby'));
+        expect(description.textContent).toBe('That nick is taken right now.');
+        expect(submit.disabled).toBe(false);
+
+        nickname.value = 'AnotherName';
+        submit.click();
+
+        expect(nickname.hasAttribute('aria-describedby')).toBe(false);
+        expect(description.textContent).toBe('Getting you in…');
+    });
+});
+
+describe('newcomer navigation and closed sessions', () => {
+    it('reveals the first chat action on a room change without disturbing the current room', async () => {
+        const { window, welcome, join } = await visitor();
+        welcome(); join();
+        const actions = window.document.querySelector('[data-quick]');
+        actions.scrollLeft = 120;
+
+        join('#other-room');
+
+        expect(actions.scrollLeft).toBe(0);
+        actions.scrollLeft = 85;
+        window.document.querySelector('[data-channel-key="#other-room"]').click();
+        expect(actions.scrollLeft).toBe(85);
+    });
+
+    it('shows draft copy guidance only for a retained non-blank draft', async () => {
+        for (const [text, hidden] of [['   ', true], ['Keep this draft', false]]) {
+            const { window, ws, welcome, join } = await visitor();
+            welcome(); join();
+            const { document } = window;
+            const composer = document.querySelector('[data-text]');
+            composer.value = text;
+
+            ws.close(4401);
+
+            expect(document.querySelector('[data-session-ended]').hidden).toBe(false);
+            expect(document.querySelector('[data-session-ended] p.small').hidden).toBe(hidden);
+            expect(document.querySelector('[data-network-note]').hidden).toBe(hidden);
+            expect(composer.value).toBe(text);
+            expect(composer.readOnly).toBe(true);
+        }
+    });
+});
+
 describe('private entry recovery after a rejected socket admission', () => {
     it('offers normal private entry only after the same-origin access check returns 401', async () => {
         const fetch = vi.fn(async () => ({ status: 401 }));

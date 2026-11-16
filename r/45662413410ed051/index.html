@@ -56,10 +56,11 @@
         </div>
     </section>
 
-    <main class="room" data-room hidden>
+    <main class="room" data-room data-room-workspace hidden>
         <div class="bar">
             <span class="peers" data-peers>Just you</span>
             <button class="btn" data-copy type="button">Copy invite link</button>
+            <button class="btn btn--ghost" type="button" data-workspace-only data-room-controls-jump hidden>Call controls</button>
             <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">Paint along with Bob</button>
             <button class="btn btn--ghost" data-private-report type="button" hidden>Report a problem to staff</button>
             <span class="status" data-status role="status"></span>
@@ -115,12 +116,19 @@
             <p class="small" data-turn-status role="status"></p>
             <p class="small jam-note" data-jam-note hidden>🎸 Jam room: your music goes through the WebJam app (plug in Ethernet). The browser mic is just for talking between songs, so it starts off and nobody hears you twice.</p>
             <p class="hands" data-hands hidden></p>
-            <div class="tiles" data-tiles data-view="grid"></div>
+            <div class="room-stage-empty" data-workspace-only>
+                <strong>Video is off</strong>
+                <p>Start video, use your mic, or keep chatting.</p>
+                <button class="btn" type="button" data-workspace-start-video hidden>Start video</button>
+            </div>
+            <div class="tiles" data-tiles data-view="grid" role="group" aria-label="Participants"></div>
             <button class="btn faces-play" type="button" data-faces-play hidden>Tap to play and unmute</button>
             <div class="react-float" data-react-float aria-live="polite"></div>
-            <div class="tools callbar" role="toolbar" aria-label="Call controls">
-                <button class="btn" type="button" data-mic>Turn on my mic</button>
-                <button class="btn" type="button" data-cam>Turn on my camera</button>
+            <div class="tools callbar" id="room-call-controls" tabindex="-1" role="group" aria-label="Call controls">
+                <button class="btn" type="button" data-mic aria-pressed="false">Turn on my mic</button>
+                <button class="btn" type="button" data-cam aria-pressed="false">Turn on my camera</button>
+                <button class="btn btn--ghost" type="button" data-workspace-only data-room-chat-open
+                    aria-controls="room-chat" aria-expanded="true" hidden>Chat</button>
                 <button class="btn btn--ghost desk-only" type="button" data-share aria-pressed="false">Share screen</button>
                 <button class="btn btn--ghost" type="button" data-hand aria-pressed="false">Raise hand</button>
                 <span class="reacts" data-reacts role="group" aria-label="Reactions"></span>
@@ -136,8 +144,11 @@
             </div>
         </section>
 
-        <section class="panel chat" aria-label="Chat">
-            <h2>Chat</h2>
+        <section class="panel chat" id="room-chat" aria-labelledby="room-chat-title">
+            <div class="room-chat-heading">
+                <h2 id="room-chat-title" tabindex="-1">Chat</h2>
+                <button class="btn btn--ghost" type="button" data-workspace-only data-room-chat-close hidden>Close chat</button>
+            </div>
             <p class="small" data-sync-status role="status" hidden></p>
             <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>
             <ol class="log" data-log aria-live="polite"></ol>
@@ -179,9 +190,9 @@
         </form>
     </dialog>
 
-    <dialog class="ask" data-ask>
-        <h2 data-ask-title>Use your camera?</h2>
-        <p data-ask-copy></p>
+    <dialog class="ask" data-ask aria-labelledby="room-consent-title" aria-describedby="room-consent-copy">
+        <h2 id="room-consent-title" data-ask-title>Use your camera?</h2>
+        <p id="room-consent-copy" data-ask-copy></p>
         <div class="tools">
             <button class="btn" data-ask-yes type="button">OK, ask my browser</button>
             <button class="btn btn--ghost" data-ask-no type="button">Not now</button>
@@ -221,5 +232,6 @@
     <script src="bob-ross.js"></script>
     <script src="names.js"></script>
     <script src="room.js"></script>
+    <script src="room-workspace.js" defer></script>
 </body>
 </html>

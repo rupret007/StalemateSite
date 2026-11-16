@@ -803,6 +803,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (!phone) await guest.getByRole('button', { name: 'Retry closing invitation', exact: true }).click();
                 await expect.poll(async () => (await context.request.get(origin + '/beta/state?game-guest=1')).status()).toBe(401);
                 await expect(guest.locator('[data-session-reason]')).toHaveText('You left Game Night. Ask your host for a fresh invitation.');
+                await expect(guest.locator('[data-text]')).toHaveValue('');
+                await expect(guest.locator('[data-session-draft]')).toBeHidden();
+                await expect(guest.locator('[data-network-note]')).toBeHidden();
                 await expect.poll(() => guest.evaluate(() => {
                     const { acquired, released } = window.gameNightWakeLocks;
                     return acquired > 0 && acquired === released;

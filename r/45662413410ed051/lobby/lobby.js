@@ -577,7 +577,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         nickInput.focus();
     });
 
-    const gateStatus = (t) => { $(gameGuest ? '[data-game-guest-status]' : '[data-gate-status]').textContent = t; };
+    function gateStatus(text) {
+        if (!gameGuest) nickInput.removeAttribute('aria-describedby');
+        $(gameGuest ? '[data-game-guest-status]' : '[data-gate-status]').textContent = text;
+    }
     if (!previewKey) {
         $('[data-gate-copy]').textContent = 'Not open yet. The band is still building this one.';
         $('[data-enter]').hidden = true;
@@ -855,7 +858,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         clearTimeout(retryTimer); cancelTransportAck();
         // Keep the unsent text under its original channel/PM key. Never move a
         // private draft into #stalemate or persist it during re-authentication.
-        drafts.set(app.active, $('[data-text]').value);
+        const composer = $('[data-text]');
+        drafts.set(app.active, composer.value);
         clearGameReturn();
         arcadeReturning = null;
         app.chans.clear(); app.pms.clear(); app.rooms = []; app.pendingChannel = '';
@@ -874,7 +878,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         document.body.classList.remove('is-band', 'am-op');
         announcements.replace(() => $('[data-chat-lines]').replaceChildren());
         setConnection('ended'); drawTabs(); drawChan();
-        $('[data-text]').readOnly = true;
+        composer.readOnly = true;
+        $('[data-session-draft]').hidden = !composer.value.trim();
         const ended = reason === 'private-access' ? 'Your private community access needs renewal.'
             : reason === 'removed' ? 'You were removed from this session.'
             : reason === 'left' ? 'You left this chat. Your sign-in and any recorded sharing withdrawal have not been changed.' : reason === 'admission'
@@ -1104,11 +1109,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (gameOpenPending?.request === m.request) finishGameOpen(m);
             break;
         case 'entry-source': entrySharing.acknowledge(m); break;
-        case 'nick-error':
+        case 'nick-error': {
+            const focused = document.activeElement;
             setConnection('offline'); gateStatus(m.text);
             $(gameGuest ? '[data-game-guest-connecting]' : '[data-gate]').hidden = false;
             $('[data-app]').hidden = true;
+            if (!gameGuest) {
+                nickInput.setAttribute('aria-describedby', 'gate-status');
+                if (focused === document.body || focused === $('[data-enter]')) nickInput.focus();
+            }
             break;
+        }
         case 'welcome': {
             if (!app.me || app.resetSession || app.verified !== (m.verified === true)) clearMessageRecovery();
             if (sharingControls) { $('.chat').insertBefore($('[data-sharing-controls]'), $('[data-lobby-welcome]')); $('[data-sharing-leave]').disabled = false; }
@@ -1143,11 +1154,15 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             followPendingRoomJoin();
             if (app.restorePmOff) { cmd('pm', ['off']); app.restorePmOff = false; }
-            $('[data-gate]').hidden = true;
+            const gate = $('[data-gate]');
+            const focus = document.activeElement;
+            const focusChat = !wasIn && !gameGuest && (focus === document.body || gate.contains(focus));
+            gate.hidden = true;
             if (gameGuest && !gameGuestSeated) gateStatus('Connecting…');
             else {
                 $('[data-app]').hidden = false;
                 $('[data-game-guest-connecting]').hidden = true;
+                if (focusChat) $('#chat-pane').focus({ preventScroll: true });
             }
             if (!gameGuest && (!wasIn || app.resetSession)) {
                 if (!returningToSeat) {
@@ -1413,17 +1428,16 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         else if (l.notice) { li.className = `notice ${l.kind || ''}`; const b = document.createElement('b'); b.textContent = `-${l.from}-`; li.append(b, ' ', l.text); }
         else {
             if (l.from !== app.me && Discovery.isMention(l.text, app.me)) li.classList.add('mention');
-            const who = document.createElement('button');
-            who.type = 'button'; who.className = 'who'; who.style.color = colorOf(l.from);
+            const isPm = l.t === 'pm';
+            const person = isPm ? l : { ...personContext(l.personPeer, l.ch, l.roomInstance, l.from), message: l };
+            // Display names remain readable when no person action is available.
+            const actionable = isPm ? l.self === false && pmFrameValid(l) : l.personSelf === false && personContextValid(person);
+            const who = document.createElement(actionable ? 'button' : 'span');
+            who.className = 'who'; who.style.color = colorOf(l.from);
             who.textContent = l.me ? `* ${l.prefix || ''}${l.from}` : `<${l.prefix || ''}${l.from}>`;
-            if (l.t === 'pm') {
-                // Historical display names never select a new live endpoint.
-                who.disabled = l.self !== false || !pmFrameValid(l);
-                if (!who.disabled) who.addEventListener('click', () => nickSheet(l.from, l));
-            } else {
-                const context = personContext(l.personPeer, l.ch, l.roomInstance, l.from);
-                who.disabled = l.personSelf !== false || !personContextValid(context);
-                if (!who.disabled) who.addEventListener('click', () => nickSheet(l.from, { ...context, message: l }));
+            if (actionable) {
+                who.type = 'button';
+                who.addEventListener('click', () => nickSheet(l.from, person));
             }
             li.append(who);
             const entryText = entryBadge(l.entrySource, entrySites);
@@ -1483,6 +1497,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         drawTabs(); drawChan(); drawMessageRecovery();
         drawCommunity(); drawRooms();
         show('chat');
+        if (prev !== key) $('[data-quick]').scrollLeft = 0;
         const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
         const r = room();
         if (r) {
@@ -1516,7 +1531,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             } else mk(c.name, `${KIND_ICON[c.kind] === '#' ? '' : `${KIND_ICON[c.kind]} `}${c.name}`, c.unread, c.mentions);
         }
         for (const [ref, p] of app.pms) mk(`pm:${ref}`, `✉ ${p.nick}${p.open ? '' : ' (closed)'}`, p.unread, p.mentions);
-        if (focusKey) $$('[role="tab"]', nav).find((b) => b.dataset.channelKey === focusKey)?.focus({ preventScroll: true });
+        if (focusKey) {
+            const focusedTab = $$('[role="tab"]', nav).find((tab) => tab.dataset.channelKey === focusKey);
+            if (focusedTab) focusedTab.focus({ preventScroll: true });
+            else focusChannelTab(app.active, { preventScroll: false });
+        }
         document.title = `${totalUnread ? `(${totalUnread}) ` : ''}#stalemate · Hang Out`;
     }
     $('[data-tabs]').addEventListener('keydown', (e) => {
@@ -2260,20 +2279,24 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             // the button also preserves a still-present person's dialog opener.
             const id = typeof n.id === 'string' && n.id ? n.id : null;
             const li = id && previous.get(id) || document.createElement('li');
-            const b = li.querySelector('button.nick') || document.createElement('button');
-            if (id) { li.dataset.connectionId = id; b.dataset.connectionId = id; }
-            b.type = 'button'; b.className = 'nick'; b.style.color = colorOf(n.nick);
-            b.dataset.self = String(!!app.selfId && n.id === app.selfId);
-            b.textContent = `${n.prefix}${n.nick}${n.band ? ' ⭐' : n.moderator ? ' MOD' : ''}${n.cam ? ' 📷' : ''}${n.away ? ' 💤' : ''}`;
-            if (isPm) {
-                b.disabled = !privateMessagePeersSupported || !pmFrameValid({ peer: c.peer, ref: c.ref }) || id !== c.peer;
-                b.onclick = () => nickSheet(c.nick);
-            } else {
-                const context = personContext(id, c.name, c.keepRef, n.nick);
-                b.disabled = !personContextValid(context);
-                b.onclick = () => nickSheet(n.nick, context);
+            const context = isPm ? null : personContext(id, c.name, c.keepRef, n.nick);
+            const actionable = isPm
+                ? privateMessagePeersSupported && pmFrameValid({ peer: c.peer, ref: c.ref }) && id === c.peer
+                : personContextValid(context);
+            const tag = actionable ? 'button' : 'span';
+            const existing = li.querySelector('.nick');
+            const name = existing?.localName === tag ? existing : document.createElement(tag);
+            if (id) { li.dataset.connectionId = id; name.dataset.connectionId = id; }
+            name.className = 'nick'; name.style.color = colorOf(n.nick);
+            name.dataset.self = String(!!app.selfId && n.id === app.selfId);
+            name.textContent = `${n.prefix}${n.nick}${n.band ? ' ⭐' : n.moderator ? ' MOD' : ''}${n.cam ? ' 📷' : ''}${n.away ? ' 💤' : ''}`;
+            if (actionable) {
+                name.type = 'button';
+                name.onclick = () => isPm ? nickSheet(c.nick) : nickSheet(n.nick, context);
             }
-            if (!b.parentElement) li.append(b);
+            if (name !== existing) {
+                if (existing) existing.replaceWith(name); else li.append(name);
+            }
             const entryText = entryBadge(n.entrySource, entrySites);
             const entry = li.querySelector('.entry-badge');
             if (entryText) {
@@ -2396,7 +2419,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         else delete prompt.dataset.prompt;
         const paused = !app.band && (app.netLock === 'readonly' || app.budget === 'readonly');
         const note = $('[data-network-note]');
-        note.hidden = !paused && connected;
+        note.hidden = sessionEnded ? !$('[data-text]').value.trim() : !paused && connected;
         note.textContent = sessionEnded ? 'This session is closed. Your unsent message is available to copy.'
             : !connected ? 'You’re offline. Your draft stays here until you reconnect.' : 'Chat is read-only for now. Your unsent draft stays here.';
     }
