@@ -172,6 +172,26 @@ describe('real invitation-only beta boundary', () => {
         expect(lobby.headers.get('Content-Security-Policy')).not.toContain('webjam-turn-credentials');
         expect(await lobby.text()).toContain('/beta/bootstrap.js');
     });
+    it('requires private admission for both Music return assets and denies media access after entry', async () => {
+        const config = env();
+        const paths = ['/join/handoff.html', '/join/handoff.js', '/%6aoin/%68andoff.html'];
+        for (const path of paths) {
+            for (const method of ['GET', 'HEAD']) {
+                expect((await betaFetch(request(path, { method }), config, deps)).status).toBe(401);
+            }
+        }
+        expect(config.ASSETS.fetch).not.toHaveBeenCalled();
+        const cookie = await unlock(config);
+        for (const path of paths) {
+            const asset = await betaFetch(request(path, { cookie }), config, deps);
+            expect(asset.status).toBe(200);
+            expect(asset.headers.get('Content-Security-Policy')).toContain("default-src 'none'; script-src 'self'; style-src 'self'");
+            expect(asset.headers.get('Content-Security-Policy')).not.toMatch(/connect-src|media-src/);
+            expect(asset.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=()');
+            expect(asset.headers.get('Cache-Control')).toBe('no-store');
+            expect(await asset.text()).not.toContain('/beta/bootstrap.js');
+        }
+    });
     it('does not accept an operator code, role selection, forged identity or a pilot cookie', async () => {
         const config = env();
         expect((await betaFetch(request('/beta/unlock', { method: 'POST', body: { key: 'wrong', role: 'owner' } }), config, deps)).status).toBe(403);

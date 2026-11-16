@@ -27,6 +27,7 @@ const GAME_GUEST_QUERY = '?game-guest=1';
 const scopedGuestQuery = tableId => GAME_GUEST_QUERY + (tableId ? '&table=' + tableId : '');
 const CSP = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.youtube.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' wss: https://challenges.cloudflare.com https://www.youtube.com https://*.googlevideo.com; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 const WEB_JOIN_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://webjam-turn-credentials.jeffstory007.workers.dev; media-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const MUSIC_HANDOFF_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const LOBBY_ENTRANCE = `<!doctype html>
 <html lang="en">
 <head>
@@ -607,8 +608,9 @@ async function betaRequest(request, env, deps = {}) {
         // and omit the chat bootstrap; invitation admission above still applies.
         const result = new Response(asset.body, asset);
         for (const [key, value] of Object.entries(headers)) result.headers.set(key, value);
-        result.headers.set('Content-Security-Policy', WEB_JOIN_CSP);
-        result.headers.set('Permissions-Policy', 'camera=(), geolocation=(), microphone=(self)');
+        const musicHandoff = assetPath === '/join/handoff.html' || assetPath === '/join/handoff.js';
+        result.headers.set('Content-Security-Policy', musicHandoff ? MUSIC_HANDOFF_CSP : WEB_JOIN_CSP);
+        result.headers.set('Permissions-Policy', musicHandoff ? 'camera=(), geolocation=(), microphone=()' : 'camera=(), geolocation=(), microphone=(self)');
         return result;
     }
     if (!asset.headers.get('Content-Type')?.includes('text/html')) {
