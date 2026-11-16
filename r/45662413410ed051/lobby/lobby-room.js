@@ -231,9 +231,8 @@
             ui.load.hidden = !video;
             ui.bobPicks.hidden = chan.kind !== 'bobross';
             ui.paintStart.hidden = chan.kind !== 'bobross';
-            ui.load.hidden = !video || chan.kind === 'watch' && !isOp();
             ui.bobPicks.classList.remove('op-only');
-            ui.load.classList.toggle('op-only', chan.kind === 'watch');
+            ui.load.classList.add('op-only');
             ui.video.classList.toggle('paint-along-player', chan.kind === 'bobross');
             $('[data-paint-canvas-hint]').hidden = chan.kind !== 'bobross';
             ui.cameraSwitch.hidden = chan.kind !== 'bobross' || !phone;
@@ -246,7 +245,6 @@
                 const ep = BOB.DEFAULT_LESSON;
                 hostVideo({ kind: 'yt', id: ep.id }, true, 0);
             }
-            if (chan.kind === 'bobross' && !app.chans.get(chan.name)?.myCam) document.querySelector('[data-cam]')?.click();
         }
 
         function ingestSnap(act) {
@@ -442,6 +440,7 @@
             });
             ui.load.addEventListener('submit', (e) => {
                 e.preventDefault();
+                if (!isOp()) return;
                 const id = H.parseYouTubeId(ui.url.value);
                 if (!id) {
                     ui.url.setCustomValidity('Enter a YouTube video link or video ID.');
