@@ -266,6 +266,21 @@ const viewports = [
 for (const viewport of viewports) test(`${viewport.label}: long chat, error and keyboard-focused composer stay contained`, async ({ browser, baseURL }, testInfo) => {
     const visitor = await guest(browser, baseURL, 'LongNickABCDEFGHIJKL', viewport), { page } = visitor;
     try {
+        if (viewport.label.startsWith('phone')) {
+            const starters = page.getByRole('region', { name: 'Conversation starters', exact: true });
+            const row = starters.locator('.conversation-starters');
+            const labels = ['Say hello', 'What are you making?', 'Find a collaborator'];
+            await expect(starters.getByRole('button', { name: labels[2], exact: true })).toBeVisible();
+            const rowFits = await row.evaluate(element => element.scrollWidth <= element.clientWidth);
+            expect(rowFits).toBe(true);
+            for (const label of labels) {
+                const action = starters.getByRole('button', { name: label, exact: true });
+                await expect(action).toBeInViewport({ ratio: 1 });
+                await action.click({ trial: true });
+            }
+            contained(await composerGeometry(page));
+            await page.screenshot({ path: testInfo.outputPath(`${viewport.label}-conversation-starters.png`) });
+        }
         const text = 'RiffGroove'.repeat(30);
         const roomText = 'StudioGroove'.repeat(25);
         await send(page, text); await expect(page.locator('[data-buffer]')).toContainText(text);
