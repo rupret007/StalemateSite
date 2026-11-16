@@ -479,11 +479,29 @@ for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewp
 for (const viewport of [viewports[1], invitationViewports.at(-1)]) for (const queued of [false, true]) test(`${viewport.label}: a closed-room invitation leaves the guest in the lobby with recovery guidance${queued ? ' and the next invitation' : ''}`, async ({ browser, baseURL }, testInfo) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
     const host = await guest(browser, baseURL, 'ClosingInviteHost', { width: 1280, height: 900 }, relay);
-    let visitor, nextHost;
+    let visitor, nextHost, releaseRejection;
+    const delayedRejection = queued && viewport.label === 'phone390';
+    const heldRejection = [];
     try {
         await send(host.page, '/join #closed-invite-studio');
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#closed-invite-studio');
-        visitor = await guest(browser, baseURL, 'ClosingInviteGuest', viewport, relay);
+        visitor = await guest(browser, baseURL, 'ClosingInviteGuest', viewport, relay, delayedRejection ? async page => {
+            await page.routeWebSocket(/\/sessions\/accessibility-/, socket => {
+                const server = socket.connectToServer();
+                let hold = true;
+                releaseRejection = () => {
+                    hold = false;
+                    for (const raw of heldRejection.splice(0)) socket.send(raw);
+                };
+                server.onMessage(raw => {
+                    const frame = JSON.parse(raw);
+                    const rejected = frame.t === 'room-join-result' && frame.status === 'rejected';
+                    const guidance = frame.t === 'notice' && /That room changed or closed/.test(frame.text);
+                    if (hold && (rejected || guidance)) heldRejection.push(raw);
+                    else socket.send(raw);
+                });
+            });
+        } : undefined);
         await send(host.page, '/invite ClosingInviteGuest');
         const invitation = visitor.page.locator('[data-room-invite]');
         const action = invitation.getByRole('button', { name: 'Join', exact: true });
@@ -500,6 +518,14 @@ for (const viewport of [viewports[1], invitationViewports.at(-1)]) for (const qu
         await send(host.page, '/close');
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#stalemate');
         await visitor.page.keyboard.press('Enter');
+        if (delayedRejection) {
+            await expect.poll(() => heldRejection.length).toBe(2);
+            const retry = invitation.getByRole('button', { name: 'Retry join', exact: true });
+            await expect(retry).toBeVisible({ timeout: 12000 });
+            await expect(retry).toBeFocused();
+            await visitor.page.screenshot({ path: testInfo.outputPath('phone390-waiting-for-delayed-rejection.png') });
+            releaseRejection();
+        }
         await expect(visitor.page.locator('[data-toast]')).toContainText('That room changed or closed. Ask the host for a new invitation');
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#stalemate');
         await expect(visitor.page.getByRole('tab', { name: '#closed-invite-studio' })).toHaveCount(0);

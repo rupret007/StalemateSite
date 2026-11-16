@@ -1805,7 +1805,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function drawRoomInvite() {
         const focused = roomInvitePanel.contains(document.activeElement);
         const invitation = nextRoomInvite();
-        const waitingForRoom = !!invitation?.requestId;
+        const waitingForRoom = invitation?.replyTimer != null;
         roomInvitePanel.hidden = !invitation;
         roomInviteAction.setAttribute('aria-disabled', String(waitingForRoom));
         roomInviteDismiss.setAttribute('aria-disabled', String(waitingForRoom));
@@ -1839,13 +1839,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     }
     roomInviteDismiss.addEventListener('click', () => {
         const invitation = nextRoomInvite();
-        if (!invitation || invitation.requestId) return;
+        if (!invitation || invitation.replyTimer != null) return;
         if (roomJoinFocus?.instance === invitation.instance) roomJoinFocus = null;
         removeRoomInvite(invitation.instance);
     });
     roomInviteAction.addEventListener('click', () => {
         const invitation = nextRoomInvite();
-        if (!invitation || invitation.requestId) return;
+        if (!invitation || invitation.replyTimer != null) return;
         const { room, instance } = invitation;
         const requestId = [...crypto.getRandomValues(new Uint8Array(16))].map(byte => byte.toString(16).padStart(2, '0')).join('');
         if (!send({ t: 'cmd', name: 'join', args: [room], ch: app.active, roomInstance: instance, joinRequestId: requestId })) {
@@ -1857,7 +1857,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         roomJoinFocus = document.activeElement === roomInviteAction ? { room, instance, anchor: roomInviteAction } : null;
         invitation.requestId = requestId;
         invitation.replyTimer = setTimeout(() => {
-            invitation.requestId = null;
+            invitation.replyTimer = null;
             invitation.error = 'The room hasn’t confirmed the join. Try again or ask the host for a new invitation.';
             drawRoomInvite();
         }, 10000);

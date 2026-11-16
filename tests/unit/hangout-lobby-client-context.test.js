@@ -260,6 +260,27 @@ describe('keyboard room invitation acceptance', () => {
         }
     });
 
+    it('removes a stale invite when its rejection arrives after the retry button appears', async () => {
+        const { window, ws, welcome, join, flush } = await visitor();
+        const { document } = window;
+        welcome(); join();
+        ws.receive({ t: 'invite', ch: '#closed-studio', by: 'FirstHost', roomInstance: invitationRoomInstance });
+        const panel = document.querySelector('[data-room-invite]');
+        const action = panel.querySelector('[data-room-invite-join]');
+        action.focus();
+        action.click();
+        const expiredRequest = ws.sent.at(-1).joinRequestId;
+        flush(10000);
+        expect(action.textContent).toBe('Retry join');
+
+        ws.receive({ t: 'notice', kind: 'error', text: 'That room changed or closed. Ask the host for a new invitation.' });
+        ws.receive({ t: 'room-join-result', id: expiredRequest, status: 'rejected' });
+
+        expect(panel.hidden).toBe(true);
+        expect(document.activeElement.dataset.channelKey).toBe('#stalemate');
+        expect(document.querySelector('[data-toast]').textContent).toContain('Ask the host for a new invitation');
+    });
+
     it('keeps Join available with an explanation when the invitation request could not be sent', async () => {
         const { window, ws, welcome, join } = await visitor();
         const { document } = window;
