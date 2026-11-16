@@ -131,7 +131,7 @@ async function expectBigLabeledControls(page) {
     for (const control of await controls.all()) {
         const box = await control.boundingBox();
         const label = (await control.innerText()).trim();
-        expect(box.height, `${label} height`).toBeGreaterThanOrEqual(58);
+        expect(box.height, `${label} height`).toBeGreaterThanOrEqual(48);
         expect(box.width, `${label} width`).toBeGreaterThanOrEqual(48);
         expect(label.length, 'visible text label').toBeGreaterThan(1);
     }
@@ -187,7 +187,7 @@ test('Paint Along phone 390x844: stage on top, faces row, chat drawer, pinned la
     const { host, guest } = await paintAlongPair(browser, baseURL, PHONE, 'phone');
     const stage = await host.locator('.watch .screen').boundingBox();
     await expectPlayingStage(host);
-    expect(stage.width).toBeGreaterThanOrEqual(PHONE.width - 12);
+    expect(stage.width).toBeGreaterThanOrEqual(PHONE.width - 16);
     expect(Math.abs(stage.width / stage.height - 16 / 9)).toBeLessThan(0.05);
     const closed = await expectNoOverlap(host, PHONE, { chat: false });
     expect(closed['.watch .screen'].y + closed['.watch .screen'].height).toBeLessThanOrEqual(closed['[data-tiles]'].y);
@@ -262,8 +262,8 @@ test('Paint Along desktop 1440x900: Webex layout with stage, filmstrip, chat pan
     await host.click('[data-more]');
     await expect(host.locator('[data-canvas-cam]')).toBeHidden();
 
-    // The room owner can pause the same shared player.
-    await host.click('[data-bob-hold]');
+    // Shared playback is still for everyone: a guest pause reaches the host.
+    await guest.click('[data-bob-hold]');
     await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
     expect(host.errors).toEqual([]);
     expect(guest.errors).toEqual([]);

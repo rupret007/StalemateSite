@@ -198,8 +198,8 @@ body.bob-mode.faces-on .call{grid-column:auto}
 .callbar-main,.callbar-more{display:contents}
 body:not(.bob-mode) [data-more],body:not(.bob-mode) [data-chat-toggle]{display:none}
 .leave-room{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;min-height:48px}
-.soundtrack-btn[aria-pressed=true]{background:#285b78;border-color:#4b9ac2;color:#fff}
-.soundtrack-btn[aria-pressed=false]{background:#343b40;border-color:#68757d;color:#fff}
+.soundtrack-btn[aria-pressed=true]{background:var(--on);border-color:var(--on);color:#fff}
+.soundtrack-btn[aria-pressed=false]{background:var(--off);border-color:var(--off);color:#fff}
 .soundtrack-pop{position:absolute;z-index:50;bottom:calc(100% + 8px);left:0;width:min(320px,calc(100vw - 24px));display:grid;gap:10px;padding:14px;background:var(--raised);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px #000a}
 .soundtrack-pop .small{margin:0}
 .soundtrack-pop label{display:grid;gap:6px;font-weight:700}
@@ -305,8 +305,8 @@ body.bob-mode .react-float{bottom:calc(var(--bar-h) + 16px)}
     body.bob-mode.faces-on .room>.bar .btn--bob{display:inline-block}
     body.bob-mode .room>.bar .peers{font-size:1rem}
     body.bob-mode .room>.bar .status{flex:1 1 100%;margin:0;font-size:.85rem}
-    body.bob-mode .watch,body.bob-mode.faces-on .watch{flex:0 1 auto;padding:0;gap:6px;background:none;border:0;border-radius:0}
-    body.bob-mode .watch .screen{width:100%;min-width:0;border-radius:8px}
+    body.bob-mode .watch,body.bob-mode.faces-on .watch{flex:0 0 auto;align-self:stretch;width:100%;min-width:0;padding:0;gap:6px;background:none;border:0;border-radius:0}
+    body.bob-mode .watch .screen{flex:none;width:100%;min-width:0;margin:0;border-radius:8px}
     body.bob-mode .bob{min-height:0;overflow:auto}
     body.bob-mode .bob-now{font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     body.bob-mode .bob .tools{flex-wrap:nowrap}
@@ -323,8 +323,8 @@ body.bob-mode .react-float{bottom:calc(var(--bar-h) + 16px)}
     body.bob-mode .consent-placeholder{font-size:.75rem;padding:4px}
     body.bob-mode .consent-actions{grid-template-columns:1fr 1fr}
     body.bob-mode .consent-actions .btn{font-size:.95rem;padding:6px 8px;white-space:normal}
-    body.bob-mode .call .tiles,body.bob-mode.faces-on .call .tiles{display:flex;flex-wrap:nowrap;gap:6px;overflow:visible}
-    body.bob-mode .call .tiles .tile{flex:1 1 0;min-width:0;height:118px;aspect-ratio:auto!important}
+    body.bob-mode .call .tiles,body.bob-mode.faces-on .call .tiles{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory}
+    body.bob-mode .call .tiles .tile{flex:1 1 0;min-width:0;height:118px;aspect-ratio:auto!important;scroll-snap-align:start}
     body.bob-mode .call .tiles .tile[data-tile="me"]{flex:1 1 0}
     body.bob-mode .call .tiles .tile .more{width:44px;height:44px}
     body.bob-mode .call .tiles .tile-start-video{font-size:.9rem;padding:8px 12px}
@@ -339,5 +339,5 @@ body.bob-mode .react-float{bottom:calc(var(--bar-h) + 16px)}
     body.bob-mode .callbar .callbar-more .btn{white-space:normal}
 }
 @media (max-width:820px) and (orientation:landscape){
-    body.bob-mode .watch .screen{width:100%;margin:0}
+    body.bob-mode .watch .screen{width:min(100%,calc((100dvh - var(--bar-h) - 60px) * 16 / 9));margin:0 auto}
 }
