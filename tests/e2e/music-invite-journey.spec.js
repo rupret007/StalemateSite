@@ -1,6 +1,7 @@
 // Real application pages and a loopback lobby engine. Entry sites and the
 // native WebJam return are fixtures, and this walkthrough never starts audio.
 const { randomUUID } = require('node:crypto');
+const { resolve } = require('node:path');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
@@ -125,6 +126,43 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             expect(await guest.evaluate(() => window.fixtureMicRequests)).toBe(0);
             expect(await guest.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain(href);
             await expect(host.locator('[data-jam-link]')).toBeEmpty();
+
+            const listener = await guest.context().newPage();
+            // Serve the protected overlays used by package:beta. Only the
+            // media transport is simulated. No relay or actual mic is used.
+            await listener.route(url => url.origin === baseURL && url.pathname === '/join/', route =>
+                route.fulfill({ path: resolve(__dirname, '../../hangout-worker/web-join-chess/index.html'), contentType: 'text/html' }));
+            await listener.route(url => url.origin === baseURL && url.pathname === '/join/app.js', route =>
+                route.fulfill({ path: resolve(__dirname, '../../hangout-worker/web-join-music/app.js'), contentType: 'text/javascript' }));
+            await listener.route(url => url.origin === baseURL && url.pathname === '/join/session.js', route =>
+                route.fulfill({ contentType: 'text/javascript', body: `
+                    let attempts = 0;
+                    export class WebJoinSession {
+                        constructor({ stream }) {
+                            if (stream) throw new Error('This fixture only accepts a listening guest');
+                        }
+                        async join() {
+                            if (++attempts === 1) throw new Error('The host did not answer in time. Ask for a new invite.');
+                            this.authorized = true;
+                        }
+                        close() {}
+                    }` }));
+            const opened = new URL(await guest.evaluate(() => window.fixtureOpens[0][0]));
+            await listener.goto(opened.pathname + opened.hash);
+            const listen = listener.getByRole('button', { name: 'Join to listen', exact: true });
+            await expect(listen).toBeInViewport({ ratio: 1 });
+            await capture(listener, '05-listening-choice');
+            await listen.press('Enter');
+            const retry = listener.getByRole('button', { name: 'Retry', exact: true });
+            await expect(retry).toBeFocused();
+            await expect(listener.locator('#error-hint')).toContainText('Retry to listen with your microphone off');
+            await capture(listener, '06-listen-retry');
+            await retry.press('Enter');
+            await expect(listener.locator('#status')).toContainText('listening with your microphone off');
+            await capture(listener, '07-listening');
+            await listener.getByRole('button', { name: 'Leave session', exact: true }).click();
+            await expect(listener.locator('#status')).toContainText('You left the session');
+            expect(await listener.evaluate(() => window.fixtureMicRequests)).toBe(0);
         } finally {
             await Promise.all(contexts.map(context => context.close()));
         }
