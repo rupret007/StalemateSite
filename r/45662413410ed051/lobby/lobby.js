@@ -1538,8 +1538,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     }
 
     function drawNewMessages() {
-        const b = $('[data-new-messages]'); b.hidden = belowFold === 0;
-        b.textContent = `${belowFold} new message${belowFold === 1 ? '' : 's'} ↓`;
+        const button = $('[data-new-messages]');
+        if (belowFold === 0 && document.activeElement === button) $('[data-buffer]').focus({ preventScroll: true });
+        button.hidden = belowFold === 0;
+        button.textContent = `${belowFold} new message${belowFold === 1 ? '' : 's'} ↓`;
     }
     $('[data-new-messages]').addEventListener('click', () => {
         const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;

@@ -159,6 +159,49 @@ for (const [width, height] of [[390, 844], [1440, 900]]) test(`the connection st
     } finally { await visitor.close(); }
 });
 
+for (const [width, height] of [[390, 844], [1440, 900]]) test(`keyboard new-message jump keeps the conversation readable at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    let guestSocket;
+    const visitor = await guest(browser, baseURL, 'ScrollbackGuest', { width, height }, undefined, async page => {
+        await page.routeWebSocket(/\/sessions\/accessibility-/, socket => {
+            guestSocket = socket;
+            socket.connectToServer();
+        });
+    });
+    const { page } = visitor;
+    const conversation = page.getByRole('log', { name: 'Conversation' });
+    const line = (text) => guestSocket.send(JSON.stringify({ t: 'line', ch: '#stalemate', from: 'FixtureGuest', text }));
+    const scrollTop = () => conversation.evaluate(element => element.scrollTop);
+    try {
+        await expect(conversation).toBeVisible();
+        await tabTo(page, conversation);
+        for (let i = 1; i <= 40; i += 1) line(`Scrollback line ${i}. Earlier chat stays readable while new messages arrive in this session.`);
+        await expect(conversation).toContainText('Scrollback line 40.');
+        await expect.poll(scrollTop).toBeGreaterThan(100);
+        await page.keyboard.press('Home');
+        await expect.poll(scrollTop).toBe(0);
+
+        line('Fresh message below the fold');
+        const jump = page.getByRole('button', { name: '1 new message ↓' });
+        await expect(jump).toBeVisible();
+        await expect(conversation).toBeFocused();
+        await page.keyboard.press(tabKey(page));
+        await expect(jump).toBeFocused();
+        await expect(jump).toBeInViewport();
+        await page.screenshot({ path: testInfo.outputPath(`scrollback-before-jump-${width}.png`) });
+
+        await page.keyboard.press('Enter');
+        await expect(jump).toBeHidden();
+        await expect(conversation).toBeFocused();
+        await expect(conversation).toBeInViewport();
+        await expect(conversation.getByText('Fresh message below the fold')).toBeInViewport();
+        await page.screenshot({ path: testInfo.outputPath(`scrollback-after-jump-${width}.png`) });
+        const bottom = await scrollTop();
+        await page.keyboard.press('PageUp');
+        await expect.poll(scrollTop).toBeLessThan(bottom);
+        expect(visitor.errors).toEqual([]);
+    } finally { await visitor.close(); }
+});
+
 for (const width of [375, 390]) test(`mobile keyboard section shortcuts focus the opened pane at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const visitor = await guest(browser, baseURL, `SectionFocus${width}`, { width, height: 667 });
     const { page } = visitor;

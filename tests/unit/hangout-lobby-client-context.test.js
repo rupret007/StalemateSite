@@ -60,6 +60,32 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
+it('returns keyboard focus to the transcript when jumping to new chat messages', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const transcript = document.querySelector('[data-buffer]');
+    const jump = document.querySelector('[data-new-messages]');
+    const composer = document.querySelector('[data-text]');
+    Object.defineProperties(transcript, {
+        scrollHeight: { value: 1000 },
+        clientHeight: { value: 300 },
+    });
+    composer.focus();
+    ws.receive({ t: 'line', ch: '#stalemate', from: 'Friend', text: 'New line below the fold' });
+    expect(jump.hidden).toBe(false);
+    expect(document.activeElement).toBe(composer);
+
+    jump.focus();
+    jump.click();
+
+    expect(jump.hidden).toBe(true);
+    expect(document.activeElement).toBe(transcript);
+    expect(transcript.getAttribute('tabindex')).toBe('0');
+    expect(transcript.scrollTop).toBe(transcript.scrollHeight);
+    expect(transcript.textContent).toContain('New line below the fold');
+});
+
 it('keeps the guest’s Join action after the notice timer and unrelated chat feedback', async () => {
     const { window, ws, welcome, join, flush } = await visitor();
     welcome(); join();
