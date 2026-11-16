@@ -14,7 +14,13 @@ async function entrySite(href, label) {
     return { url: `http://127.0.0.1:${server.address().port}/`, close: () => new Promise((resolve) => { server.closeIdleConnections(); server.close(resolve); }) };
 }
 
-for (const width of [375, 390]) test(`three website entrances share chat, source choices and creative rooms at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+const viewports = [
+    { width: 375, height: 844, mobile: true },
+    { width: 390, height: 844, mobile: true },
+    { width: 1440, height: 900, mobile: false },
+];
+
+for (const { width, height, mobile } of viewports) test(`three website entrances share chat, source choices and creative rooms at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const { communityIntegration, communityJoinLink } = await import('../../hangout-worker/src/community-integration.mjs');
     const integration = communityIntegration({ version: 1, communityAddress: `${baseURL}/r/45662413410ed051/lobby/`, sites: [
         { id: 'stalemate', label: 'Stalemate', origins: ['https://stalemate.band'], returnUrl: 'https://stalemate.band/', permissions: ['link', 'badge', 'return'], enabled: true, domainVerified: true },
@@ -29,7 +35,7 @@ for (const width of [375, 390]) test(`three website entrances share chat, source
             target.searchParams.set('preview', 'local-preview-key-0001');
             target.searchParams.set('relay', relay);
             const website = await entrySite(target.href, site.label); websites.push(website);
-            const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: 'reduce' }); contexts.push(context);
+            const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' }); contexts.push(context);
             await context.addInitScript(() => { window.HangoutEntrySites = [{ id: 'makers', label: 'Makers & Friends' }]; });
             const page = await context.newPage(); pages.push(page);
             page.on('pageerror', (error) => errors.push(error.message));
@@ -37,6 +43,9 @@ for (const width of [375, 390]) test(`three website entrances share chat, source
             await page.goto(website.url);
             await page.getByRole('link', { name: 'Hang Out', exact: true }).click();
             await expect(page.locator('[data-entry-label]').first()).toHaveText(`via ${site.label}`);
+            if (!mobile && index < 2) {
+                await page.screenshot({ path: testInfo.outputPath(`entry-${site.id}-${width}.png`) });
+            }
             if (index === 1) await page.locator('[data-entry-share]').first().uncheck();
             await page.fill('[data-nick]', ['StaleVisitor', 'RadVisitor', 'MakerVisitor'][index]);
             await page.click('[data-enter]');
@@ -63,31 +72,39 @@ for (const width of [375, 390]) test(`three website entrances share chat, source
         await pages[2].fill('[data-text]', 'A third website is here too'); await pages[2].press('[data-text]', 'Enter');
         await expect(pages[0].locator('[data-buffer] li').filter({ hasText: 'A third website is here too' })).toContainText('via Makers & Friends');
         await pages[0].screenshot({ path: testInfo.outputPath(`shared-chat-badges-${width}.png`), fullPage: true });
-        await pages[0].click('nav [data-show="people"]');
+        if (mobile) await pages[0].click('nav [data-show="people"]');
         const people = pages[0].locator('[data-pane="people"]');
         await expect(people.locator('.entry-badge')).toHaveText(['via Makers & Friends', 'via Stalemate']);
         await expect(people).not.toContainText('via Rad Dad');
-        await pages[1].click('nav [data-show="people"]');
+        if (mobile) await pages[1].click('nav [data-show="people"]');
         await pages[1].locator('[data-pane="people"] [data-entry-share]').check();
         await expect(people).toContainText('via Rad Dad');
+        if (!mobile) {
+            await pages[0].screenshot({ path: testInfo.outputPath(`shared-people-badges-enabled-${width}.png`) });
+        }
         await pages[1].locator('[data-pane="people"] [data-entry-share]').uncheck();
         await expect(people).not.toContainText('via Rad Dad');
         await pages[0].locator('[data-chat-announcements]').uncheck();
         await pages[0].screenshot({ path: testInfo.outputPath(`shared-people-badges-${width}.png`), fullPage: true });
-        await pages[0].click('nav [data-show="chat"]');
+        if (mobile) await pages[0].click('nav [data-show="chat"]');
         await expect(pages[0].locator('[data-buffer]')).toHaveAttribute('aria-live', 'off');
-        await pages[0].click('[data-show="rooms"].startroom');
+        if (mobile) await pages[0].click('[data-show="rooms"].startroom');
         await pages[0].click('[data-start="art"]');
         await expect(pages[0].locator('[data-act-canvas]')).toBeVisible();
-        const room = await pages[0].evaluate(() => __lobby.active);
+        const room = await pages[0].locator('[data-chat-context]').textContent();
+        expect(room).toMatch(/^#art-/);
         for (const page of pages.slice(1)) {
-            await page.evaluate((name) => __lobby.cmd('join', [name]), room);
+            if (mobile) await page.click('nav [data-show="rooms"]');
+            const roomButton = page.locator(`[data-roomlist] button[data-room="${room}"]`);
+            await expect(roomButton).toBeEnabled();
+            await roomButton.click();
             await expect(page.locator('[data-act-canvas]')).toBeVisible();
             await expect(page.locator('[data-chat-context]')).toHaveText(room);
         }
         const renderedBefore = await pages[2].locator('[data-act-canvas]').evaluate((canvas) => canvas.toDataURL());
-        const canvas = await pages[1].locator('[data-act-canvas]').boundingBox();
-        await pages[1].click('nav [data-show="chat"]');
+        const guestCanvas = pages[1].locator('[data-act-canvas]');
+        await guestCanvas.scrollIntoViewIfNeeded();
+        const canvas = await guestCanvas.boundingBox();
         await pages[1].mouse.move(canvas.x + canvas.width / 3, canvas.y + canvas.height / 3);
         await pages[1].mouse.down();
         await pages[1].mouse.move(canvas.x + canvas.width * 2 / 3, canvas.y + canvas.height * 2 / 3, { steps: 5 });
@@ -100,7 +117,8 @@ for (const width of [375, 390]) test(`three website entrances share chat, source
                 fontSize: getComputedStyle(input).fontSize };
         });
         expect(geometry.page).toBeLessThanOrEqual(geometry.viewport);
-        expect(geometry.input).toBeLessThanOrEqual(width); expect(geometry.send).toBeLessThanOrEqual(width); expect(geometry.fontSize).toBe('16px');
+        expect(geometry.input).toBeLessThanOrEqual(width); expect(geometry.send).toBeLessThanOrEqual(width);
+        if (mobile) expect(geometry.fontSize).toBe('16px');
         await pages[1].screenshot({ path: testInfo.outputPath(`shared-community-${width}.png`), fullPage: true });
         expect(errors).toEqual([]);
     } finally {
