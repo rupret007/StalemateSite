@@ -1569,19 +1569,33 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function drawTabs() {
         const nav = $('[data-tabs]');
         const focusKey = nav.contains(document.activeElement) ? document.activeElement.dataset.channelKey : null;
-        nav.replaceChildren();
+        const tabs = new Map();
+        for (const tab of [...nav.children]) {
+            const key = tab.dataset.channelKey;
+            if (store(key)) tabs.set(key, tab);
+            else tab.remove();
+        }
+        let next = nav.firstElementChild;
         let totalUnread = 0;
-        const mk = (key, label, unread, mentions, title) => {
-            const b = document.createElement('button');
-            b.type = 'button'; b.role = 'tab'; b.textContent = unread ? `${label} (${unread}${mentions ? ' · @you' : ''})` : label;
-            b.dataset.channelKey = key;
-            if (title) b.title = title;
-            b.setAttribute('aria-selected', String(app.active === key));
-            b.tabIndex = app.active === key ? 0 : -1;
+        const mk = (key, label, unread, mentions, title = '') => {
+            let b = tabs.get(key);
+            if (!b) {
+                b = document.createElement('button');
+                b.type = 'button'; b.role = 'tab'; b.dataset.channelKey = key;
+                b.addEventListener('click', () => switchTo(key));
+                tabs.set(key, b);
+            }
+            const text = unread ? `${label} (${unread}${mentions ? ' · @you' : ''})` : label;
+            if (b.textContent !== text) b.textContent = text;
+            if (b.title !== title) b.title = title;
+            const selected = app.active === key;
+            if (b.getAttribute('aria-selected') !== String(selected)) b.setAttribute('aria-selected', String(selected));
+            const tabIndex = selected ? 0 : -1;
+            if (b.tabIndex !== tabIndex) b.tabIndex = tabIndex;
             b.classList.toggle('has-mention', !!mentions);
             totalUnread += unread || 0;
-            b.addEventListener('click', () => switchTo(key));
-            nav.append(b);
+            if (b !== next) nav.insertBefore(b, next);
+            next = b.nextElementSibling;
         };
         const gameRooms = [...app.chans.values()].filter(c => c.kind === 'game');
         for (const c of app.chans.values()) {
@@ -1592,9 +1606,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         for (const [ref, p] of app.pms) mk(`pm:${ref}`, `✉ ${p.nick}${p.open ? '' : ' (closed)'}`, p.unread, p.mentions);
         if (focusKey) {
-            const focusedTab = $$('[role="tab"]', nav).find((tab) => tab.dataset.channelKey === focusKey);
-            if (focusedTab) focusedTab.focus({ preventScroll: true });
-            else focusChannelTab(app.active, { preventScroll: false });
+            const focusedTab = tabs.get(focusKey);
+            if (!focusedTab) focusChannelTab(app.active, { preventScroll: false });
+            else if (document.activeElement !== focusedTab) focusedTab.focus({ preventScroll: true });
         }
         document.title = `${totalUnread ? `(${totalUnread}) ` : ''}#stalemate · Hang Out`;
     }

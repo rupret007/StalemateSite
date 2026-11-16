@@ -873,8 +873,15 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
             await expect(conversation).toHaveAccessibleDescription('#temporary-room');
             await tabTo(page, roomTab);
             await expect(roomTab).toBeInViewport();
+            await roomTab.evaluate(tab => { window.fixtureOriginalRoomTab = tab; });
+            await host.page.getByRole('tab', { name: '#stalemate', exact: true }).click();
+            await send(host.page, 'A new message in the background lobby.');
+            await expect(tabs.getByRole('tab', { name: /^#stalemate \(1\)$/ })).toBeVisible();
+            expect(await roomTab.evaluate(tab => tab === window.fixtureOriginalRoomTab)).toBe(true);
+            await expect(roomTab).toBeFocused();
             await page.screenshot({ path: testInfo.outputPath('01-before-room-closes.png') });
 
+            await host.page.getByRole('tab', { name: '#temporary-room', exact: true }).click();
             await send(host.page, '/close');
             await expect(roomTab).toHaveCount(0);
             await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');

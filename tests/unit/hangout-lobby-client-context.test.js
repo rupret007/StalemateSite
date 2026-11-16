@@ -773,23 +773,46 @@ it('renders the guest name as roster text and preserves focus on a current peer 
     expect(document.activeElement).toBe(peerButton);
 });
 
-describe('channel tab focus after a room closes', () => {
+describe('channel tab focus during live updates', () => {
+    it('updates the unread count without replacing or refocusing the active room tab', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join(); join('#temporary');
+        const { document } = window;
+        const lobby = document.querySelector('[data-channel-key="#stalemate"]');
+        const room = document.querySelector('[data-channel-key="#temporary"]');
+        room.focus();
+        const refocus = vi.fn();
+        document.addEventListener('focusin', refocus);
+
+        ws.receive({ t: 'line', ch: '#stalemate', from: 'CurrentGuest', text: 'New lobby message' });
+
+        expect(document.querySelector('[data-channel-key="#stalemate"]')).toBe(lobby);
+        expect(lobby.textContent).toBe('#stalemate (1)');
+        expect(document.activeElement).toBe(room);
+        expect(refocus).not.toHaveBeenCalled();
+    });
+
+
     it.each(['room tab', 'message composer'])('keeps keyboard focus usable from the %s', async (start) => {
         const { window, ws, welcome, join } = await visitor();
         welcome(); join(); join('#temporary');
         const { document } = window;
         const tab = document.querySelector('[data-channel-key="#temporary"]');
+        const lobby = document.querySelector('[data-channel-key="#stalemate"]');
         const composer = document.querySelector('[data-text]');
         const focused = start === 'room tab' ? tab : composer;
         focused.focus();
         expect(document.activeElement).toBe(focused);
+        const refocus = vi.fn();
+        document.addEventListener('focusin', refocus);
 
         ws.receive({ t: 'closed', ch: '#temporary', reason: 'closed by the host' });
 
-        const lobby = document.querySelector('[data-channel-key="#stalemate"]');
+        expect(document.querySelector('[data-channel-key="#stalemate"]')).toBe(lobby);
         expect(tab.isConnected).toBe(false);
         expect(lobby.getAttribute('aria-selected')).toBe('true');
         expect(document.activeElement).toBe(start === 'room tab' ? lobby : composer);
+        expect(refocus).toHaveBeenCalledTimes(start === 'room tab' ? 1 : 0);
     });
 });
 
