@@ -135,23 +135,29 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await expect(status).toContainText('couldn’t be sent');
             await expect(host.getByRole('button', { name: 'Share a link instead' })).toBeVisible();
 
+            const announcement = guest.getByRole('status').and(guest.locator('[data-music-invite-announcement]'));
+            await expect(announcement).toHaveText('');
             expect(await invite(3)).toBe(true);
             await expect(status).toContainText('sent to ChosenGuest');
             await expect(panel).toContainText('MusicHost invited you');
+            await expect(announcement).toHaveText('MusicHost invited you to join Music.');
             await expect(peer.locator('[data-music-invite]')).toBeHidden();
             await panel.getByRole('button', { name: 'Not now' }).click();
             await expect(status).toContainText('declined the Music invitation');
+            await expect(announcement).toHaveText('');
             await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
 
             expect(await invite(4)).toBe(true);
             const accept = panel.getByRole('button', { name: 'Accept and join', exact: true });
             await expect(accept).toBeInViewport({ ratio: 1 });
+            await expect(accept).toHaveAccessibleDescription('MusicHost invited you to join Music.');
             await capture(guest, '02-guest-receives-offer');
             await accept.press('Enter');
             await expect(guest.locator('[data-chat-context]')).toHaveText(room);
             const audio = panel.getByRole('button', { name: 'Open WebJam in browser', exact: true });
             await expect(audio).toBeInViewport({ ratio: 1 });
             await expect(audio).toBeFocused();
+            await expect(announcement).toContainText('You’re in the Jam room.');
             await expect(status).toContainText('accepted and joined the Jam room');
             await expect(peer.locator('[data-music-invite]')).toBeHidden();
             await expect(peer.locator('[data-chat-context]')).toHaveText('#stalemate');

@@ -1912,6 +1912,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const musicAction = $('[data-music-invite-action]');
     const musicDismiss = $('[data-music-invite-dismiss]');
     const musicStatus = $('[data-music-invite-status]');
+    const musicAnnouncement = $('[data-music-invite-announcement]');
     const readyForMusicOffer = () => directMusicInvitesSupported && !gameGuest && connectionState === 'connected'
         && !sessionEnded && !shieldActive && (!app.netLock || app.netLock === 'off') && !app.localMediaPaused && !app.sharingStopped;
 
@@ -1980,7 +1981,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             : joining ? 'Waiting for the room to confirm you joined.'
             : musicOffer.sendFailed ? 'Your reply didn’t send. Check your connection and try again.'
             : `${musicOffer.from} invited you to join Music.`;
-        if (musicStatus.textContent !== message) musicStatus.textContent = message;
+        if (musicStatus.textContent !== message) {
+            musicStatus.textContent = message;
+            musicAnnouncement.textContent = message;
+        }
         if (musicPanel.hidden) {
             if (hadFocus) focusChannelTab(app.active);
             return;

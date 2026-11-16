@@ -265,6 +265,37 @@ describe('targeted Music invitation', () => {
         expect(action.hidden).toBe(false);
     });
 
+    it('announces Music invite updates without revealing the private browser link', async () => {
+        const { window, ws, offer, accepted, href, joinJam, panel, action, dismiss } = await setup();
+        const { document } = window;
+        const live = document.querySelector('[data-music-invite-announcement]');
+        const composer = document.querySelector('[data-text]');
+        expect(panel.hidden).toBe(true);
+        expect(live?.getAttribute('role')).toBe('status');
+        expect(live.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+        expect(live.textContent).toBe('');
+        composer.focus();
+
+        ws.receive(offer);
+        expect(live.textContent).toBe('GuitarHost invited you to join Music.');
+        expect(document.activeElement).toBe(composer);
+        action.focus();
+        action.click();
+        expect(live.textContent).toBe('Waiting for the room to confirm you joined.');
+        joinJam();
+        ws.receive(accepted);
+        expect(live.textContent).toContain('You’re in the Jam room.');
+        expect(document.body.innerHTML).not.toContain(href);
+
+        ws.receive({ t: 'music-invite-ended', id: offer.id });
+        expect(live.textContent).toBe('This Music invitation ended. Ask the host for a new one.');
+        expect(document.activeElement).toBe(dismiss);
+        dismiss.click();
+        expect(panel.hidden).toBe(true);
+        expect(live.textContent).toBe('');
+        expect(live.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+    });
+
     it('ignores offers without the negotiated capability and declines without opening audio', async () => {
         const old = await setup({});
         old.ws.receive(old.offer);
