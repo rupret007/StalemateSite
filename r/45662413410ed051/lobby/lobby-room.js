@@ -252,10 +252,17 @@
         function ingestSnap(act) {
             if (!act) return;
             H.apply(state.room, { type: 'snapshot', state: { strokes: act.strokes || [], video: act.video } });
-            if (act.video && state.room.video) Object.assign(state.room.video, { seq: act.video.seq, by: act.video.by, updatedAt: act.video.updatedAt, rate: act.video.rate || 1 });
+            if (act.video) applyVideoMetadata(act.video);
             paintEpisodeTitle();
             redraw();
             if (state.room.video) syncToState(true);
+        }
+
+        function applyVideoMetadata(video) {
+            if (!state.room.video) return;
+            for (const key of ['seq', 'by', 'updatedAt', 'rate']) {
+                if (Object.hasOwn(video, key)) state.room.video[key] = video[key];
+            }
         }
 
         function syncNames(chan) {
@@ -299,8 +306,9 @@
                 redraw();
             }
             if (m.kind === 'video' && m.video) {
-                H.apply(state.room, { type: 'video', source: m.video.source, playing: m.video.playing, pos: m.video.pos }, { t: m.video.t });
-                if (state.room.video) Object.assign(state.room.video, { seq: m.video.seq, by: m.video.by, updatedAt: m.video.updatedAt, rate: m.video.rate || 1 });
+                const applied = H.apply(state.room, { type: 'video', source: m.video.source, playing: m.video.playing, pos: m.video.pos }, { t: m.video.t });
+                if (applied !== 'video') return;
+                applyVideoMetadata(m.video);
                 paintEpisodeTitle();
                 if (!m.video.playing && m.by && m.by !== app.me) {
                     ui.videoStatus.textContent = `Paused by ${m.by}`;
