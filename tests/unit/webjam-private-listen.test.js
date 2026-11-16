@@ -2,6 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { JOIN_SIGNAL, applyJoinFailure, clearJoinFailure, mapJoinError } from '../../join/errors.js';
 
 const read = (path) => readFileSync(new URL('../../' + path, import.meta.url), 'utf8');
@@ -66,4 +67,47 @@ it('keeps a listener’s Retry focused on listening after a host timeout', async
     expect(sessions).toHaveLength(2);
     expect(sessions.every(session => session.options.stream === undefined)).toBe(true);
     expect(capture).not.toHaveBeenCalled();
+});
+
+it.each([false, true])('sets the audio answer direction with microphone present = %s', async (withMic) => {
+    const source = read('hangout-worker/web-join-chess/session.js')
+        .replace(/^import .*;\n/gm, '')
+        .replace(/^export /gm, '');
+    const stopBeforeSignaling = new Error('Fixture stops before signaling');
+    const video = { receiver: { track: { kind: 'video' } }, direction: 'sendrecv' };
+    const audio = { receiver: { track: { kind: 'audio' } }, direction: 'sendrecv' };
+    const track = { enabled: true };
+    const stream = withMic ? { getAudioTracks: () => [track] } : undefined;
+    const addTrack = vi.fn();
+    const createAnswer = vi.fn(() => { throw stopBeforeSignaling; });
+    class Peer {
+        static async generateCertificate() { return {}; }
+        addEventListener() {}
+        async setRemoteDescription() {}
+        getTransceivers() { return [video, audio]; }
+        addTrack(...args) { addTrack(...args); }
+        createAnswer() { return createAnswer(); }
+    }
+    const Session = runInNewContext(`${source}\nWebJoinSession;`, {
+        AbortController, RTCPeerConnection: Peer, SESSION_BYTES: 2048,
+        Mailbox: class {
+            async receive() { return {}; }
+            async credentials() { return { expiresAt: Date.now() + 60000, quotaBytes: 2048, iceServers: [] }; }
+        },
+        open: async (_, payload) => payload,
+        validateOffer: () => ({ sdp: 'fixture offer' }),
+        policySdp: sdp => sdp,
+    });
+    const session = new Session({ stream });
+    await expect(session.join()).rejects.toBe(stopBeforeSignaling);
+    expect(createAnswer).toHaveBeenCalledOnce();
+    expect(video.direction).toBe('sendrecv');
+    if (withMic) {
+        expect(track.enabled).toBe(false);
+        expect(addTrack).toHaveBeenCalledExactlyOnceWith(track, stream);
+        expect(audio.direction).toBe('sendrecv');
+    } else {
+        expect(addTrack).not.toHaveBeenCalled();
+        expect(audio.direction).toBe('recvonly');
+    }
 });
