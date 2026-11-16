@@ -410,6 +410,7 @@ test('faces that never connect stop rebuilding after three tries; "Try faces aga
     await expect.poll(async () => { await noticeFailure(); return stuck.isVisible(); }, { timeout: 20000 }).toBe(true);
     await expect(stuck).toContainText('Faces with Jeff aren’t connecting');
     await expect(stuck).toContainText('Chat and draw still work');
+    await expect(stuck).toContainText('same Wi-Fi');
     await expect(guest.locator('[data-faces-retry]')).toHaveText('Try faces again');
 
     // Three fresh connections, then nothing: no timer is pending and more failure events build nothing.
