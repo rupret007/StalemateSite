@@ -1052,6 +1052,8 @@
         stopPreCheck();
         ui.gate.hidden = true;
         ui.room.hidden = false;
+        win.SharedRoomLayout?.set('watch', true);
+        paintConsent();
         if (mq('(max-width: 820px)')) {
             doc.querySelector('.room-description').open = false;
             doc.querySelector('[data-chat-details]').open = false;
@@ -2375,7 +2377,7 @@
         for (const id of app.av.peers) if (!app.av.hidden.has(id)) ids.push(id);
         // You go last, like every call app. Paint Along always shows your own tile (with a
         // Start video prompt while your camera is off) once the join choice is made.
-        if (app.av.cam || app.av.mic || (app.bob.on && ui.consent.hidden && !app.av.kicked)) ids.push('me');
+        if (app.av.cam || app.av.mic || ((app.bob.on || doc.body.classList.contains('shared-layout')) && ui.consent.hidden && !app.av.kicked)) ids.push('me');
         return ids;
     }
     function layout() {
@@ -3184,7 +3186,7 @@
      * for camera and mic together, the live preview stays on this device, and only "Join with
      * camera" sends it to the room. Lock, kick and the faces cap are checked again on join. */
     function consentWanted() {
-        return Boolean(app.bob.on && app.roomId && !app.ended && !app.av.cam && !app.av.mic && !app.av.kicked
+        return Boolean((app.bob.on || doc.body.classList.contains('shared-layout')) && app.roomId && !app.ended && !app.av.cam && !app.av.mic && !app.av.kicked
             && !app.consent.skipped && !(app.av.locked && !(app.av.mic || app.av.cam)));
     }
     function stopConsentPreview() {
@@ -3365,6 +3367,7 @@
         if (app.bob.on && !wasOn) { bobPlaybackSample = null; bobPlaybackIntentAt = Date.now(); }
         if (byUser) app.bob.touched = true;
         doc.body.classList.toggle('bob-mode', app.bob.on);
+        win.SharedRoomLayout?.set(app.bob.on ? 'paint' : 'watch', true);
         ui.modePill.hidden = !app.bob.on;
         if (app.bob.on && !wasOn) setChatOpen(!(win.matchMedia && win.matchMedia('(max-width: 820px)').matches));
         if (!app.bob.on && wasOn) { setChatOpen(true); setMore(false); setSoundtrackPop(false); }
