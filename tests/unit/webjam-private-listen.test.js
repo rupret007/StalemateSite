@@ -29,6 +29,8 @@ function fixture({ firstJoinFails = false } = {}) {
         close() {}
     }
     window.AudioContext = class { async resume() {} };
+    const play = vi.fn().mockResolvedValue(undefined);
+    window.HTMLMediaElement.prototype.play = play;
     window.HTMLMediaElement.prototype.pause = () => {};
     window.fixture = {
         readInvite: () => ({ expiresAt: Math.floor(Date.now() / 1000) + 60 }),
@@ -39,7 +41,7 @@ function fixture({ firstJoinFails = false } = {}) {
     const bindings = Object.keys(window.fixture).join(',');
     const source = app.replace(/^import[\s\S]*?from "[^"]+";\n/gm, '');
     window.eval(`const {${bindings}} = window.fixture;\n${source}`);
-    return { $, capture, sessions, window };
+    return { $, capture, play, sessions, window };
 }
 
 it('joins to listen on an explicit action without acquiring a microphone stream', async () => {
@@ -66,6 +68,28 @@ it('keeps a listener’s Retry focused on listening after a host timeout', async
     await vi.waitFor(() => expect($('status').textContent).toContain('microphone off'));
     expect(sessions).toHaveLength(2);
     expect(sessions.every(session => session.options.stream === undefined)).toBe(true);
+    expect(capture).not.toHaveBeenCalled();
+});
+
+it('resumes blocked browser playback without leaving or consuming another invite', async () => {
+    const { $, capture, play, sessions, window } = fixture();
+    $('listen').focus();
+    $('listen').click();
+    await vi.waitFor(() => expect($('status').textContent).toContain('microphone off'));
+    play.mockRejectedValueOnce(new window.DOMException('User gesture needed', 'NotAllowedError'));
+    const remote = {};
+    sessions[0].options.onTrack(remote);
+    await vi.waitFor(() => expect($('status').textContent).toContain('Resume audio'));
+    expect($('host-audio').srcObject).toBe(remote);
+    expect($('leave').hidden).toBe(false);
+    expect(window.document.activeElement).toBe($('resume-audio'));
+
+    $('resume-audio').click();
+    await vi.waitFor(() => expect($('resume-audio').hidden).toBe(true));
+    expect($('status').textContent).toContain('microphone off');
+    expect(window.document.activeElement).toBe($('leave'));
+    expect(play).toHaveBeenCalledTimes(2);
+    expect(sessions).toHaveLength(1);
     expect(capture).not.toHaveBeenCalled();
 });
 

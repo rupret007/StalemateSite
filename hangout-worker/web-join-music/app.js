@@ -10,6 +10,8 @@ import { JOIN_SIGNAL, applyJoinFailure, clearJoinFailure, mapJoinError } from ".
 
 const $ = (id) => document.getElementById(id);
 const listen = $("listen");
+const resumeAudio = $("resume-audio");
+const hostAudio = $("host-audio");
 const failureElements = () => ({
   status: $("status"),
   hint: $("error-hint"),
@@ -286,17 +288,41 @@ $("skip-check").addEventListener("click", (event) => {
   if (continueCheck) focusNextAudioCheckControl();
 });
 
+async function playHostAudio(attempt) {
+  const remote = hostAudio.srcObject;
+  if (!remote) return;
+  const isCurrent = () => activeAttempt === attempt && !attempt.signal.aborted && hostAudio.srcObject === remote;
+  try {
+    await hostAudio.play();
+  } catch {
+    if (!isCurrent()) return;
+    resumeAudio.hidden = false;
+    $("status").textContent = "Audio didn’t start. Select Resume audio to try again.";
+    if (document.activeElement === $("leave")) resumeAudio.focus();
+    return;
+  }
+  if (!isCurrent() || resumeAudio.hidden) return;
+  const restoreFocus = document.activeElement === resumeAudio;
+  resumeAudio.hidden = true;
+  $("status").textContent = starting ? "Connecting…" : retryListening
+    ? "Connected. You’re listening with your microphone off."
+    : "Connected. Audio is playing.";
+  if (restoreFocus) $("leave").focus();
+}
+
 function leave(message = "You left the session.", error) {
   const elements = failureElements();
-  const restoreFocus = document.activeElement === elements.leave || (retryListening && document.activeElement === listen);
+  const restoreFocus = document.activeElement === elements.leave || document.activeElement === resumeAudio
+    || (retryListening && document.activeElement === listen);
   clearAccessTime();
   activeAttempt?.abort();
   activeAttempt = null;
   session?.close();
   session = null;
   starting = false;
-  $("host-audio").pause();
-  $("host-audio").srcObject = null;
+  hostAudio.pause();
+  hostAudio.srcObject = null;
+  resumeAudio.hidden = true;
   stopMicMonitoring(false);
   void closeAudioContext(context);
   context = null;
@@ -382,8 +408,7 @@ async function startJoin(listenOnly = false) {
       stream,
       audioContext: context,
       onStatus: (message) => {
-        if (!isCurrent()) return;
-        $("status").textContent = message;
+        if (isCurrent() && resumeAudio.hidden) $("status").textContent = message;
       },
       onLatency: (milliseconds) => {
         if (!isCurrent()) return;
@@ -400,12 +425,8 @@ async function startJoin(listenOnly = false) {
       },
       onTrack: (remote) => {
         if (!isCurrent()) return;
-        $("host-audio").srcObject = remote;
-        $("host-audio").play().catch(() => {
-          if (isCurrent()) {
-            leave("Playback could not start. Tap Join again.");
-          }
-        });
+        hostAudio.srcObject = remote;
+        void playHostAudio(attempt);
       },
       onError: (error) => {
         if (isCurrent()) leave(undefined, error);
@@ -416,10 +437,10 @@ async function startJoin(listenOnly = false) {
     await joinedSession.join();
     if (!isCurrent()) return;
     showAccessTime(joinedSession.accessExpiresAt, isCurrent);
-    if (listenOnly) $("status").textContent = "Connected. You’re listening with your microphone off.";
+    if (listenOnly && resumeAudio.hidden) $("status").textContent = "Connected. You’re listening with your microphone off.";
     clearJoinFailure(failureElements(), $("status").textContent);
     $("join").hidden = true;
-    $("leave").focus({ preventScroll: true });
+    if (resumeAudio.hidden) $("leave").focus({ preventScroll: true });
     starting = false;
     refresh();
   } catch (error) {
@@ -452,6 +473,9 @@ listen.addEventListener("click", () => {
 });
 $("retry").addEventListener("click", () => {
   void startJoin(retryListening);
+});
+resumeAudio.addEventListener("click", () => {
+  if (activeAttempt) void playHostAudio(activeAttempt);
 });
 $("leave").addEventListener("click", () => leave());
 window.addEventListener("hashchange", () => window.location.reload());

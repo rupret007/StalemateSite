@@ -129,6 +129,14 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await expect(host.locator('[data-jam-link]')).toBeEmpty();
 
             const listener = await guest.context().newPage();
+            await listener.addInitScript(() => {
+                window.fixturePlaybackAttempts = 0;
+                HTMLMediaElement.prototype.play = async () => {
+                    if (++window.fixturePlaybackAttempts === 1) {
+                        throw new DOMException('A playback gesture is needed', 'NotAllowedError');
+                    }
+                };
+            });
             // Serve the protected overlays used by package:beta. Only the
             // media transport is simulated. No relay or actual mic is used.
             await listener.route(url => url.origin === baseURL && url.pathname === '/join/', route =>
@@ -139,12 +147,14 @@ for (const { width, height, hostSite, guestSite } of viewports) {
                 route.fulfill({ contentType: 'text/javascript', body: `
                     let attempts = 0;
                     export class WebJoinSession {
-                        constructor({ stream }) {
+                        constructor({ stream, onTrack }) {
+                            this.onTrack = onTrack;
                             if (stream) throw new Error('This fixture only accepts a listening guest');
                         }
                         async join() {
                             if (++attempts === 1) throw new Error('The host did not answer in time. Ask for a new invite.');
                             this.authorized = true;
+                            this.onTrack(new MediaStream());
                         }
                         close() {}
                     }` }));
@@ -159,8 +169,15 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await expect(listener.locator('#error-hint')).toContainText('Retry to listen with your microphone off');
             await capture(listener, '06-listen-retry');
             await retry.press('Enter');
+            const resumeAudio = listener.getByRole('button', { name: 'Resume audio', exact: true });
+            await expect(resumeAudio).toBeInViewport({ ratio: 1 });
+            await expect(resumeAudio).toBeFocused();
+            await capture(listener, '07-resume-audio');
+            await resumeAudio.press('Enter');
+            await expect(resumeAudio).toBeHidden();
             await expect(listener.locator('#status')).toContainText('listening with your microphone off');
-            await capture(listener, '07-listening');
+            expect(await listener.evaluate(() => window.fixturePlaybackAttempts)).toBe(2);
+            await capture(listener, '08-listening');
             await listener.getByRole('button', { name: 'Leave session', exact: true }).click();
             await expect(listener.locator('#status')).toContainText('You left the session');
             expect(await listener.evaluate(() => window.fixtureMicRequests)).toBe(0);
