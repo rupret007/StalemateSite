@@ -220,12 +220,17 @@ describe('keyboard room invitation acceptance', () => {
         expect(notice.hidden).toBe(false);
         const composer = document.querySelector('[data-text]');
         if (moved) composer.focus();
+        const focusedChannels = [];
+        document.addEventListener('focusin', event => {
+            if (event.target.dataset.channelKey) focusedChannels.push(event.target.dataset.channelKey);
+        });
 
         join(room, invitationRoomInstance);
 
         const tab = document.querySelector('[data-channel-key="#invitation-studio"]');
         expect(tab.getAttribute('aria-selected')).toBe('true');
         expect(document.activeElement).toBe(moved ? composer : tab);
+        expect(focusedChannels).toEqual(moved ? [] : [room]);
     });
 
     it('keeps Join available with an explanation when the invitation request could not be sent', async () => {

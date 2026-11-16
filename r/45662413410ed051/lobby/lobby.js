@@ -1211,7 +1211,6 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 focusJoinedRoom = document.activeElement === roomJoinFocus.anchor;
                 roomJoinFocus = null;
             }
-            removeRoomInvite(c.keepRef);
             const gameOfferAccepted = joiningGameRoom === c.name;
             const invite = gameOfferAccepted ? joiningArcadeOffer : null;
             const returningToGame = gameReturnOffered && gameReturn?.room === c.name;
@@ -1249,6 +1248,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             if (gameOfferAccepted && !arcadeInvitation && !returningGame) focusChannelTab(c.name);
             if (focusJoinedRoom) focusChannelTab(c.name, { preventScroll: false });
+            removeRoomInvite(c.keepRef);
             followPendingRoomJoin();
             break;
         }

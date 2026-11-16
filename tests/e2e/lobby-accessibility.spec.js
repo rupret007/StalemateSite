@@ -414,6 +414,13 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
         const action = status.getByRole('button', { name: 'Join', exact: true });
         await expect(action).toHaveAccessibleDescription('InvitationHost invited you to #invitation-studio');
         await tabTo(visitor.page, action);
+        await visitor.page.evaluate(() => {
+            const focusedChannels = [];
+            document.addEventListener('focusin', event => {
+                if (event.target.matches('[data-tabs] [data-channel-key]')) focusedChannels.push(event.target.dataset.channelKey);
+            });
+            window.fixtureFocusedChannels = focusedChannels;
+        });
         holdJoin = Boolean(dropFirstConfirmation);
         await visitor.page.keyboard.press('Enter');
         if (holdJoin) {
@@ -431,6 +438,7 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
         await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#invitation-studio');
         await expect(status).toBeHidden();
         await expect(visitor.page.getByRole('tab', { name: '#invitation-studio', selected: true })).toBeFocused();
+        expect(await visitor.page.evaluate(() => window.fixtureFocusedChannels)).toEqual(['#invitation-studio']);
         await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-invitation-joined.png`) });
         await send(visitor.page, 'I found the invited room.');
         await expect(host.page.locator('[data-buffer]')).toContainText('I found the invited room.');
