@@ -154,6 +154,38 @@ describe('keyboard room invitation acceptance', () => {
     });
 });
 
+it('keeps unrelated moderation reports pending until each selected message gets its own result', async () => {
+    const { window, ws, welcome, join, flush } = await visitor();
+    window.requestAnimationFrame = (callback) => window.setTimeout(callback, 16);
+    welcome(); join();
+    const { document } = window;
+    for (const id of ['mfirst', 'msecond']) {
+        ws.receive({ t: 'line', ch: '#stalemate', id, from: 'EarlierGuest', text: 'Synthetic report fixture' });
+    }
+    const first = document.querySelector('[data-id=mfirst] .flag');
+    const second = document.querySelector('[data-id=msecond] .flag');
+    first.click();
+    second.focus();
+    second.click();
+    ws.receive({ t: 'notice', from: 'StaleBot', kind: 'error', text: 'An unrelated command failed.' });
+    ws.receive({ t: 'rate-limit', scope: 'chat', text: 'Please wait before sending another message.' });
+    expect(first.getAttribute('aria-disabled')).toBe('true');
+    expect(second.getAttribute('aria-disabled')).toBe('true');
+
+    ws.receive({ t: 'notice', from: 'StaleBot', kind: 'error', text: 'That message is gone already.' });
+    ws.receive({ t: 'report-status', id: 'msecond', submitted: false });
+    expect(first.getAttribute('aria-disabled')).toBe('true');
+    expect(second.getAttribute('aria-disabled')).toBeNull();
+    expect(second.textContent).toBe('🚩');
+    expect(document.activeElement).toBe(second);
+    expect(document.querySelector('[data-toast]').textContent).toContain('That message is gone already.');
+
+    ws.receive({ t: 'report-status', id: 'mfirst', submitted: true });
+    flush(10000);
+    expect(first.textContent).toBe('✓');
+    expect(document.querySelector('[data-toast]').textContent).toContain('That message is gone already.');
+});
+
 describe('targeted Music invitation', () => {
     async function setup(features = { directMusicInvites: 1 }) {
         const { window, ws, welcome, join, flush } = await visitor('rad-dad', features);

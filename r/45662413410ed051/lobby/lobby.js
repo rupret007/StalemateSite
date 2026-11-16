@@ -857,6 +857,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             : endedPmLabel?.key === app.active ? endedPmLabel : null;
         clearMessageRecovery(); messageResultsSupported = false;
         sessionEnded = true; connectionAttempt++;
+        resetPendingReports();
         cancelEntryCheck();
         clearTimeout(retryTimer); cancelTransportAck();
         // Keep the unsent text under its original channel/PM key. Never move a
@@ -1039,11 +1040,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         case 'rate-limit':
             if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Try again when the connection is ready.'); }
             if (pendingKeep) clearKeep('The Keep request was not confirmed. Choose the current room and try again later.');
-            resetPendingReports();
             if (connectionState !== 'connected') { setConnection('offline'); gateStatus(m.text); app.ws?.close(1000); }
             else toast(m.text);
             break;
-        case 'report-status': if (m.submitted === true) finishReport(m.id, true); break;
+        case 'report-status':
+            if (m.submitted === true) finishReport(m.id, true);
+            else if (m.submitted === false && pendingReports.has(m.id)) finishReport(m.id, false);
+            break;
         case 'message-result': messageResult(m); break;
         case 'jam-share-result': jamShareResult(m); break;
         case 'ownership': { const c = store(m.ch); if (c) c.cohosts = m.cohosts; refreshPaletteCohosts(); break; }
@@ -1300,7 +1303,6 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 }
                 if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); }
                 if (pendingKeep) clearKeep();
-                resetPendingReports();
                 if (app.pendingChannel && $('[data-channel-dialog]').open) {
                     $('[data-channel-error]').textContent = m.text;
                     app.pendingChannel = '';

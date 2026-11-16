@@ -1065,11 +1065,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && ['invitation', 'web'].includes(f.args[0]) && typeof f.ch === 'string' && /^#[a-z0-9-]{2,30}$/i.test(f.ch)
             && typeof f.jamRequestId === 'string' && /^[a-f0-9]{32}$/.test(f.jamRequestId)
             ? { id: f.jamRequestId, status: 'rejected' } : null;
+        const reportFeedback = f.t === 'report' && moderationId(f.id) ? { id: f.id, submitted: false } : null;
         const result = feedback ? status => { feedback.status = status; }
             : jamFeedback ? status => { jamFeedback.status = status; } : undefined;
         try {
         if (f.t !== 'cmd' && ['personContext', 'personPeer', 'personNamed', 'cohostAccount'].some(key => Object.hasOwn(f, key))) return stalePerson(c);
-        if (c.safetyOnly) return safetyOnlyMessage(c, f);
+        if (c.safetyOnly) return safetyOnlyMessage(c, f, reportFeedback);
         if (!c.nick && f.t !== 'hello') return bot(c, 'Pick a nickname first.', 'error');
         if (c.gameGuest && !['hello', 'report'].includes(f.t) && (f.ch !== c.gameGuest.room || !['say', 'cmd'].includes(f.t))) {
             return bot(c, 'This invitation is for your Game Night room.', 'error');
@@ -1110,7 +1111,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 : Array.isArray(f.args) ? f.args.slice(0, 8).map((a) => String(a).slice(0, 300)) : [];
             return command(c, f.ch, name, args, Object.hasOwn(f, 'roomInstance') ? f.roomInstance : undefined, result, f);
         }
-        case 'report': return report(c, String(f.id || ''), f.text);
+        case 'report': return report(c, String(f.id || ''), f.text, reportFeedback);
         case 'cam': return cam(c, f.ch, !!f.on, f.adult18 === true);
         case 'act': return roomAct(c, f);
         case 'admin-refresh': if (isStaff(c) && c.admin) out(c, { t: 'admin', state: { ...adminState(), capabilities: capabilities(c) } }); return undefined;
@@ -1123,12 +1124,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             // Request feedback carries no room capability or authority. It is
             // staged with real output and never added to connection/storage state.
             if (jamFeedback) out(c, { t: 'jam-share-result', id: jamFeedback.id, status: jamFeedback.status });
+            if (reportFeedback && !reportFeedback.submitted) out(c, { t: 'report-status', ...reportFeedback });
         }
     }
 
-    function safetyOnlyMessage(c, frame) {
+    function safetyOnlyMessage(c, frame, reportFeedback) {
         if (!limited(c, 'command', 10, 1, true)) return;
-        if (frame.t === 'report') return report(c, String(frame.id || ''), frame.text);
+        if (frame.t === 'report') return report(c, String(frame.id || ''), frame.text, reportFeedback);
         if (frame.t === 'cam' && frame.on === false) return bot(c, 'Your camera and sharing are off.');
         if (frame.t === 'entry-source' && frame.source === '') return out(c, { t: 'entry-source', source: '', accepted: true });
         let name, args;
@@ -2499,7 +2501,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return undefined;
     }
 
-    function report(c, id, text) {
+    function report(c, id, text, feedback) {
         if (!limited(c, 'report', 5, 5 / 60)) return;
         let l = lines.get(id);
         let meta = lineMeta.get(id);
@@ -2539,6 +2541,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             // A previous write may have failed after updating memory. A retry is
             // acknowledged only after storing the evidence again, without a vote.
             saveModerationQueue();
+            if (feedback) feedback.submitted = true;
             out(c, { t: 'report-status', id, submitted: true });
             return bot(c, REPORT_ALREADY_QUEUED_NOTICE);
         }
@@ -2558,6 +2561,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         saveModerationQueue();
         pushAdmin();
+        if (feedback) feedback.submitted = true;
         out(c, { t: 'report-status', id, submitted: true });
         return bot(c, REPORT_QUEUED_NOTICE);
     }

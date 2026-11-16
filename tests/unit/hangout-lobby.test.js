@@ -711,6 +711,21 @@ describe('band moderation', () => {
 });
 
 describe('reports', () => {
+    it('sends a denied report result only to its sender and binds it to the requested message', () => {
+        const author = join('ReportAuthor');
+        const guest = join('ReportGuest');
+        say(author, 'Existing message for the report fixture');
+        const line = got(guest).find(frame => frame.t === 'line');
+        L.message(guest.id, JSON.stringify({ t: 'report', id: 'mmissingreport' }));
+        expect(got(guest)).toContainEqual({ t: 'report-status', id: 'mmissingreport', submitted: false });
+        expect(notices(guest)).toContain('That message is gone already.');
+        expect(got(author).some(frame => frame.t === 'report-status')).toBe(false);
+
+        L.message(guest.id, JSON.stringify({ t: 'report', id: line.id }));
+        expect(got(guest).filter(frame => frame.t === 'report-status' && frame.id === line.id))
+            .toEqual([{ t: 'report-status', id: line.id, submitted: true }]);
+    });
+
     it('auto-hides at 3 distinct devices; same device or same IP hash counts once', () => {
         const bad = join('Bad');
         const r1 = join('Rep1', { iph: 'a' });
