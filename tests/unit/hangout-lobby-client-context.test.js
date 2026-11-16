@@ -14,6 +14,8 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     const dom = new JSDOM(html, { url: `http://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
     windows.push(dom);
     const { window } = dom, timers = new Map(), sockets = []; let timerId = 0, elapsed = 0;
+    let socketCreated;
+    const firstSocket = new Promise(resolve => { socketCreated = resolve; });
     Object.defineProperty(window.performance, 'now', { value: () => elapsed });
     window.setTimeout = (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; };
     window.clearTimeout = (id) => timers.delete(id);
@@ -27,7 +29,11 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     const flush = (delay) => { for (const [id, task] of [...timers]) if (task.delay === delay) { timers.delete(id); task.fn(); } };
     window.WebSocket = class {
         readyState = 0; sent = [];
-        constructor(url) { this.url = url; sockets.push(this); }
+        constructor(url) {
+            this.url = url;
+            sockets.push(this);
+            if (sockets.length === 1) socketCreated(this);
+        }
         send(text) { this.sent.push(JSON.parse(text)); }
         open() { this.readyState = 1; this.onopen?.(); }
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
@@ -41,8 +47,8 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     window.document.querySelector('[data-nick]').value = 'Viewer';
     window.document.querySelector('[data-enter]').click();
-    await vi.waitFor(() => expect(sockets.length).toBe(1));
-    const ws = sockets[0];
+    const ws = await firstSocket;
+    expect(sockets).toHaveLength(1);
     if (options.open !== false) {
         ws.open();
         ws.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok', features });
@@ -207,22 +213,23 @@ describe('newcomer navigation and closed sessions', () => {
         expect(actions.scrollLeft).toBe(85);
     });
 
-    it('shows draft copy guidance only for a retained non-blank draft', async () => {
-        for (const [text, hidden] of [['   ', true], ['Keep this draft', false]]) {
-            const { window, ws, welcome, join } = await visitor();
-            welcome(); join();
-            const { document } = window;
-            const composer = document.querySelector('[data-text]');
-            composer.value = text;
+    it.each([
+        ['hides', '   ', true],
+        ['shows', 'Keep this draft', false],
+    ])('%s draft copy guidance after a session ends', async (_label, text, hidden) => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        const { document } = window;
+        const composer = document.querySelector('[data-text]');
+        composer.value = text;
 
-            ws.close(4401);
+        ws.close(4401);
 
-            expect(document.querySelector('[data-session-ended]').hidden).toBe(false);
-            expect(document.querySelector('[data-session-ended] p.small').hidden).toBe(hidden);
-            expect(document.querySelector('[data-network-note]').hidden).toBe(hidden);
-            expect(composer.value).toBe(text);
-            expect(composer.readOnly).toBe(true);
-        }
+        expect(document.querySelector('[data-session-ended]').hidden).toBe(false);
+        expect(document.querySelector('[data-session-ended] p.small').hidden).toBe(hidden);
+        expect(document.querySelector('[data-network-note]').hidden).toBe(hidden);
+        expect(composer.value).toBe(text);
+        expect(composer.readOnly).toBe(true);
     });
 });
 
@@ -569,11 +576,12 @@ describe('browser client privacy and bounded delivery wiring', () => {
         const log = window.document.querySelector('[data-buffer]');
         const messages = log.querySelector('[role="list"][aria-label="Messages"]');
         expect(messages).not.toBeNull();
-        for (let index = 0; index < 305; index++)
-            ws.receive({ t: 'line', id: `bounded-${index}`, ch: '#stalemate', from: 'Friend', text: `Bounded line ${index}` });
+        // Cross the production limit once. These fixture lines do not need report controls.
+        for (let index = 0; index <= 300; index++)
+            ws.receive({ t: 'line', ch: '#stalemate', from: 'Friend', text: `Bounded line ${index}` });
         expect(messages.children).toHaveLength(300);
-        expect(messages.firstElementChild.textContent).toContain('Bounded line 5');
-        expect(messages.lastElementChild.textContent).toContain('Bounded line 304');
+        expect(messages.firstElementChild.textContent).toMatch(/Bounded line 1$/);
+        expect(messages.lastElementChild.textContent).toContain('Bounded line 300');
         expect([...messages.children].every(item => item.tagName === 'LI')).toBe(true);
         window.document.querySelector('[data-chat-announcements]').click();
         join('#another-room'); paint(); paint();
