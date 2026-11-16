@@ -11,35 +11,48 @@ async function enter(page, name) {
     await expect(page.locator('[data-room]')).toBeVisible();
 }
 
-async function paintInvite(context, origin) {
+async function routeYouTube(context) {
     await context.route(/youtube\.com|ytimg|googlevideo/, route => route.abort());
     await context.route('https://www.youtube.com/iframe_api', route => route.fulfill({
         path: FAKE_YT, contentType: 'text/javascript'
     }));
+}
+
+async function paintInvite(context, origin, { selectEpisode = true } = {}) {
+    await routeYouTube(context);
     const host = await context.newPage();
     const relay = hangoutRelayWsBase(origin, `paint-focus-${randomUUID()}`);
     await host.goto(`/r/45662413410ed051/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
     await enter(host, 'Host');
-    await host.locator('[data-consent-skip]').click();
     await host.locator('[data-bob-toggle]').click();
-    await host.locator('[data-bob] details summary').click();
-    await host.locator('[data-bob-ep="uj5FE70BcB0"]').click();
+    if (selectEpisode) await chooseEpisode(host);
     return host;
+}
+
+async function chooseEpisode(host) {
+    const details = host.locator('[data-bob] details.episodes');
+    if (!(await details.evaluate(element => element.open))) await details.locator('summary').click();
+    await host.locator('[data-bob-ep="uj5FE70BcB0"]').click();
+    await details.locator('summary').click();
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+}
+
+function inviteFor(host) {
+    const invite = new URL(host.url());
+    invite.searchParams.delete('preview');
+    return invite;
 }
 
 test('invite, name, room, then media consent with denial, reconnect and rejoin', async ({ page, context, baseURL }) => {
     const host = await paintInvite(context, baseURL);
-    const invite = new URL(host.url());
-    invite.searchParams.delete('preview');
+    const invite = inviteFor(host);
     // Use a separate browser context to exercise the guest's private admission and history.
     const guestContext = await context.browser().newContext({
         ...contextOptions(page),
         permissions: ['camera', 'microphone']
     });
     try {
-        await guestContext.route('https://www.youtube.com/iframe_api', route => route.fulfill({
-            path: FAKE_YT, contentType: 'text/javascript'
-        }));
+        await routeYouTube(guestContext);
         await guestContext.addInitScript(() => {
             window.captureAttempts = 0;
             window.denyCapture = true;
@@ -115,3 +128,81 @@ test('invite, name, room, then media consent with denial, reconnect and rejoin',
 function contextOptions(page) {
     return { viewport: page.viewportSize(), hasTouch: true, isMobile: true, deviceScaleFactor: 1 };
 }
+
+
+async function joinWithCamera(page) {
+    const consent = page.locator('[data-consent]');
+    await expect(consent).toBeVisible();
+    await page.locator('[data-consent-on]').click();
+    await expect(consent).toHaveAttribute('data-state', 'preview');
+    await page.locator('[data-consent-on]').click();
+    await expect(consent).toBeHidden();
+}
+
+async function paintPair(context, origin, viewport) {
+    const host = await paintInvite(context, origin, { selectEpisode: false });
+    const guestContext = await context.browser().newContext({
+        ...contextOptions(host), viewport, permissions: ['camera', 'microphone']
+    });
+    try {
+        await routeYouTube(guestContext);
+        const guest = await guestContext.newPage();
+        await guest.goto(inviteFor(host).href);
+        await enter(guest, 'Guest');
+        await expect.poll(() => guest.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
+        await chooseEpisode(host);
+        await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+        return { host, guest, guestContext };
+    } catch (error) {
+        await guestContext.close();
+        throw error;
+    }
+}
+
+async function expectPhoneStage(page) {
+    const viewport = page.viewportSize();
+    const stage = page.locator('.watch .screen');
+    const otherSurfaces = page.locator('[data-tiles], .chat:visible, .callbar');
+    await expect(stage.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+    const box = await stage.boundingBox();
+    expect(box.width).toBeGreaterThanOrEqual(viewport.width - 16);
+    expect(Math.abs(box.width / box.height - 16 / 9)).toBeLessThan(0.05);
+    await expect(stage).toBeInViewport({ ratio: 1 });
+    for (const surface of await otherSurfaces.all()) {
+        const other = await surface.boundingBox();
+        expect(other.y).toBeGreaterThanOrEqual(box.y + box.height);
+        expect(box.width * box.height).toBeGreaterThan(other.width * other.height);
+    }
+    const unobstructed = await stage.evaluate(element => {
+        const { x, y, width, height } = element.getBoundingClientRect();
+        return [[0.1, 0.1], [0.9, 0.1], [0.5, 0.5], [0.1, 0.9], [0.9, 0.9]]
+            .every(([left, top]) => element.contains(document.elementFromPoint(x + width * left, y + height * top)));
+    });
+    expect(unobstructed).toBe(true);
+}
+
+test('the Paint Along stage stays fully visible above two live tiles and open chat at both phone sizes', async ({ context, baseURL, viewport }) => {
+    test.setTimeout(60000);
+    const { host, guest, guestContext } = await paintPair(context, baseURL, viewport);
+    try {
+        await joinWithCamera(host);
+        await joinWithCamera(guest);
+        for (const page of [host, guest]) {
+            const tiles = page.locator('[data-tiles] .tile');
+            await expect(tiles).toHaveCount(2);
+            await expect.poll(() => tiles.locator('video').evaluateAll(videos =>
+                videos.filter(video => video.videoWidth > 0).length
+            ), { timeout: 20000 }).toBe(2);
+        }
+        for (const size of [viewport, { width: 375, height: 667 }]) {
+            await host.setViewportSize(size);
+            await expectPhoneStage(host);
+            await host.locator('[data-chat-toggle]').click();
+            await expect(host.locator('.chat')).toBeVisible();
+            await expectPhoneStage(host);
+            await host.locator('[data-chat-toggle]').click();
+        }
+    } finally {
+        await guestContext.close();
+    }
+});
