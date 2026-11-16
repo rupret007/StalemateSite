@@ -29,7 +29,7 @@
 - Phone screenshots use the deterministic YouTube fixture and mock cameras. Karen’s hands-on review is pending.
 - The interrupted Mini comparison reached 118 passing e2e cases and three failures. The two lobby keyboard cases above expect the drawing canvas. The background playback case added default metadata when selecting a cached video. The cache fix passed that exact test with one worker.
 - The Mini finished the earlier 2,343-case candidate unit run and the baseline’s 2,342 unit and 459 e2e cases before the swap constraint. The candidate’s full exact-branch comparison is pending on Bobserver.
-- The movie guest’s play, pause and seek actions operate within the host-selected source. Fast pause-then-seek passed three repetitions in each phone engine. The four reviewed 390×844 images are in `test-evidence/paint-focus-b433f88c/`.
+- The movie guest’s play, pause and seek actions operate within the host-selected source. Fast pause-then-seek passed three repetitions in each phone engine. Refreshed 390×844 images for the follow-up are linked below.
 
 ### Bobserver gate
 
@@ -40,3 +40,14 @@ npm run test:unit
 npm run test:e2e -- '(^|/)(hangout|lobby|paint-along)[^/]*\.spec\.js$' --workers=1
 ```
 - The final Mini run selected only the six phone specs in each engine. All 12 passed with one worker.
+
+### Hosted comparison follow-up
+
+Hosted run [43885398784](https://github.com/rupret007/StalemateSite/actions/runs/43885398784) on `809773a4` reported 1,026 passed, 13 failed, two flaky, and five skipped in its main browser suite. The comparable hosted run [43787445092](https://github.com/rupret007/StalemateSite/actions/runs/43787445092) on base `4ab24333` reported 1,022 passed. The three-person Paint Along spec was added after the base.
+
+- Legacy private playback failed the signed timestamp, guest drift, paused seek and phone-layout transition checks. Its host-driven sync test also retried. The room now keeps one host-signed playback state. Guests can send controls in a host-selected Paint Along or movie session, and an initiating guest keeps its newer scrub when the host echoes a control. The phone call header keeps the Paint Along action.
+- Lobby Paint Along failed the lesson-link check and the four starter/material checks across both engines. The camera permission dialog now opens from the camera action so painters can use the room while camera access is off. Custom lesson links stay with the host. The three-person lobby spec now waits for the host player to start before reading the room.
+- The two older lobby keyboard cases at 390px and 1280px failed in Chromium and WebKit. They use visibility of the on-screen drawing surface to confirm the room opened. Paint Along keeps that surface hidden for real-canvas painting. All four failing executions retain the original assertion.
+- Done — Restored signed playback and lobby lesson controls after the hosted comparison.
+- Evidence — All 24 focused checks passed with one worker, including 12 phone checks in Chromium and WebKit. The rapid guest seek checks passed twice in each selected test. Four 390×844 screenshots are in `test-evidence/paint-focus-5e536127/`.
+- Next — Bobserver compares the updated branch with `4ab24333`. Karen’s hands-on verdict is still pending.
