@@ -609,7 +609,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const visibleRoom = (viewer, room) => publicChannel(room) || isStaff(viewer) || !!viewer && (hosts(viewer, room) || room.members.has(viewer.id));
     const directory = (viewer) => [...channels.values()].filter((r) => r.kind !== 'lobby' && visibleRoom(viewer, r)
         && (!viewer?.gameGuest || r.name === viewer.gameGuest.room && r.keepRef === viewer.gameGuest.ref))
-        .map((r) => ({ name: r.name, kind: roomKind(r), title: r.title, count: r.members.size, max: r.modes.l, locked: r.modes.locked || r.modes.i, key: !!r.modes.k, cams: r.modes.C, persistent: !!r.owner, mine: !!viewer && owns(viewer, r), hostPresent: membersOf(r).some((m) => hosts(m, r)) }));
+        .map((r) => ({ name: r.name, roomInstance: r.keepRef, kind: roomKind(r), title: r.title, count: r.members.size, max: r.modes.l,
+            locked: r.modes.locked || r.modes.i, key: !!r.modes.k, cams: r.modes.C, persistent: !!r.owner,
+            mine: !!viewer && owns(viewer, r), hostPresent: membersOf(r).some((m) => hosts(m, r)) }));
     const pushList = ({ presence = false } = {}) => {
         if (presence && typeof deferPresence === 'function') queuePresence({ directory: true });
         else for (const c of conns.values()) if (c.nick) out(c, { t: 'list', rooms: directory(c) });

@@ -528,6 +528,34 @@ describe('permissions are enforced on the server (forged commands)', () => {
         accept(guest, freshOffer);
         expect(replacement.members.has(guest.id)).toBe(true);
     });
+
+    it('keeps a stale room directory entry from creating or joining a different room', () => {
+        const host = join('DirectoryHost');
+        const guest = join('DirectoryGuest');
+        const replacementHost = join('DirectoryReplacement');
+        const room = '#directory-studio';
+        const item = user => got(user).filter(frame => frame.t === 'list').at(-1).rooms.find(row => row.name === room);
+        const open = (user, row) => L.message(user.id, JSON.stringify({
+            t: 'cmd', name: 'join', args: [row.name], ch: LOBBY, roomInstance: row.roomInstance,
+        }));
+        cmd(host, 'join', [room]);
+        const original = item(guest);
+        cmd(host, 'close', [], room);
+        open(guest, original);
+        expect(L._debug.channels.has(room)).toBe(false);
+
+        cmd(replacementHost, 'join', [room]);
+        const replacement = L._debug.channels.get(room);
+        const updated = item(guest);
+        expect(original.roomInstance).not.toBe(updated.roomInstance);
+        expect(updated.roomInstance).toBe(replacement.keepRef);
+        open(guest, original);
+        expect(replacement.members.has(guest.id)).toBe(false);
+        open(guest, updated);
+        expect(replacement.members.has(guest.id)).toBe(true);
+        cmd(replacementHost, 'mode', ['+i'], room);
+        expect(item(host)).toBeUndefined();
+    });
 });
 
 describe('PMs are accept-first, blockable, switchable and need lobby time', () => {

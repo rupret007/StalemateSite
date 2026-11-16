@@ -38,6 +38,7 @@
             seen.add(nameKey);
             const room = {
                 name: source.name,
+                ...(typeof source.roomInstance === 'string' && /^[a-f0-9]{32}$/.test(source.roomInstance) ? { roomInstance: source.roomInstance } : {}),
                 kind: source.kind,
                 title: typeof source.title === 'string' && source.title.trim() ? source.title : ACTIVITY[source.kind].label,
                 count: source.count,

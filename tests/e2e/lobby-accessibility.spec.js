@@ -846,11 +846,22 @@ for (const width of [375, 390, 1440]) {
 
 }
 
-for (const width of [375, 390]) {
-    test(`a removed focused room returns to the visible directory filter at ${width}px`, async ({ browser, baseURL }) => {
-        const relay = hangoutRelayWsBase(baseURL, `directory-removal-${randomUUID()}`), viewport = { width, height: 667 };
+for (const width of [375, 390, 1440]) {
+    test(`a removed focused room returns to the visible directory filter at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        const relay = hangoutRelayWsBase(baseURL, `directory-removal-${randomUUID()}`), viewport = { width, height: { 375: 667, 390: 844, 1440: 900 }[width] };
         const host = await guest(browser, baseURL, 'ClosingHost', viewport, relay);
-        const visitor = await guest(browser, baseURL, 'DirectoryGuest', viewport, relay);
+        let holdDirectory = false, releaseDirectory;
+        const visitor = await guest(browser, baseURL, 'DirectoryGuest', viewport, relay, async page => {
+            await page.routeWebSocket(/\/sessions\/directory-removal-/, socket => {
+                const server = socket.connectToServer();
+                server.onMessage(message => {
+                    if (holdDirectory && JSON.parse(message).t === 'list') {
+                        // Hold just this directory update to reproduce a stale row.
+                        releaseDirectory = () => socket.send(message);
+                    } else socket.send(message);
+                });
+            });
+        });
         try {
             await send(host.page, '/join #vanishing-room');
             await expect(host.page.locator('[data-chat-context]')).toHaveText('#vanishing-room');
@@ -868,13 +879,22 @@ for (const width of [375, 390]) {
             await expect(button).toBeEnabled(); await expect(fallback).toBeFocused();
             await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
             await tabTo(visitor.page, button);
+            holdDirectory = true;
             await send(host.page, '/close');
+            await expect(host.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            await expect.poll(() => Boolean(releaseDirectory)).toBe(true);
+            await visitor.page.screenshot({ path: testInfo.outputPath(`stale-directory-before-join-${width}x${viewport.height}.png`) });
+            await visitor.page.keyboard.press('Enter');
+            await expect(visitor.page.locator('[data-toast]')).toContainText('That room changed or closed.');
+            holdDirectory = false;
+            releaseDirectory();
             await expect(button).toHaveCount(0);
             await expect(publicRoom).toHaveCount(0);
             await expect(fallback).toBeFocused(); await expect(fallback).toBeInViewport();
             await expect(fallback).toHaveValue('active');
             await expect(visitor.page.locator('dialog[open]')).toHaveCount(0);
             await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            await visitor.page.screenshot({ path: testInfo.outputPath(`stale-directory-recovered-${width}x${viewport.height}.png`) });
             expect(visitor.errors).toEqual([]); expect(host.errors).toEqual([]);
         } finally { await visitor.close(); await host.close(); }
     });

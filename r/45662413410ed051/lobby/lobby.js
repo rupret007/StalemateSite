@@ -2654,7 +2654,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 }
                 const key = r.key ? prompt(`${r.name} has a key. Type it:`) : '';
                 if (key === null) return;
-                if (cmd('join', r.key ? [r.name, key] : [r.name])) {
+                if (cmd('join', r.key ? [r.name, key] : [r.name], app.active, r.roomInstance)) {
                     roomJoinFocus = focused ? { room: r.name, anchor: b } : null;
                 } else {
                     toast(`Couldn’t send the request to join ${r.name}. Check your connection and try again.`);

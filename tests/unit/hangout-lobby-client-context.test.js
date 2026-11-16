@@ -208,10 +208,11 @@ it.each([false, true])('keeps focus usable when moderation removes a message (fl
 
 describe('opening a room from the directory', () => {
     const room = '#directory-room';
-    async function directory({ key = false } = {}) {
+    const instance = 'd'.repeat(32);
+    async function directory({ key = false, roomInstance = instance } = {}) {
         const { window, ws, welcome, join } = await visitor();
         welcome(); join();
-        ws.receive({ t: 'list', rooms: [{ name: room, title: 'Directory Room', kind: 'chat', count: 1, max: 8, key, locked: false }] });
+        ws.receive({ t: 'list', rooms: [{ name: room, title: 'Directory Room', kind: 'chat', count: 1, max: 8, key, locked: false, roomInstance }] });
         const button = window.document.querySelector(`[data-room="${room}"]`);
         button.focus();
         return { window, ws, join, button };
@@ -221,7 +222,7 @@ describe('opening a room from the directory', () => {
         const { window, ws, join, button } = await directory();
         const { document } = window;
         button.click();
-        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room] });
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room], roomInstance: instance });
         const input = document.querySelector('[data-text]');
         if (moved) input.focus();
         join(room);
@@ -243,6 +244,12 @@ describe('opening a room from the directory', () => {
         expect(window.prompt).toHaveBeenCalledOnce();
         expect(ws.sent).toHaveLength(before);
         expect(window.document.activeElement).toBe(button);
+    });
+
+    it('keeps legacy rows usable when a relay sends no room reference', async () => {
+        const { ws, button } = await directory({ roomInstance: null });
+        button.click();
+        expect(ws.sent.at(-1)).toEqual({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
     });
 });
 
