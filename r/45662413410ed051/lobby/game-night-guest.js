@@ -201,14 +201,15 @@ function offerFreshLink() {
 }
 
 async function shareFreshLink() {
-    const payload = { title: 'Game Night', text: FRESH_LINK };
+    const message = 'Could you send me a fresh Game Night link?';
+    const payload = { title: 'Game Night', text: message };
     if (typeof navigator.share === 'function') {
         try { await navigator.share(payload); return; }
         catch (error) { if (error?.name === 'AbortError') return; }
     }
     if (typeof navigator.clipboard?.writeText === 'function') {
         try {
-            await navigator.clipboard.writeText(FRESH_LINK);
+            await navigator.clipboard.writeText(message);
             if (askHost) askHost.textContent = 'Copied. Send it to your host.';
         } catch { /* The button still shows the line to send. */ }
     }
