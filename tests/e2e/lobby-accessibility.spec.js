@@ -794,9 +794,9 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
     });
 }
 
-for (const width of [375, 390]) {
-    test(`room directory preserves keyboard identity and current capacity through live updates at ${width}px`, async ({ browser, baseURL }) => {
-        const relay = hangoutRelayWsBase(baseURL, `directory-${randomUUID()}`), viewport = { width, height: 667 };
+for (const width of [375, 390, 1440]) {
+    test(`room directory preserves keyboard identity and current capacity through live updates at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        const relay = hangoutRelayWsBase(baseURL, `directory-${randomUUID()}`), viewport = { width, height: { 375: 667, 390: 844, 1440: 900 }[width] };
         const host = await guest(browser, baseURL, 'DirectoryHost', viewport, relay);
         const visitor = await guest(browser, baseURL, 'DirectoryReader', viewport, relay);
         let arrival;
@@ -826,8 +826,11 @@ for (const width of [375, 390]) {
             await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
             await expect(button).toBeFocused();
             expect(await button.evaluate((element, before) => element === before, original)).toBe(true);
+            await visitor.page.screenshot({ path: testInfo.outputPath(`directory-before-join-${width}x${viewport.height}.png`) });
             await visitor.page.keyboard.press('Enter');
             await expect(visitor.page.locator('[data-chat-context]')).toHaveText('#directory-room');
+            await expect(visitor.page.getByRole('tab', { name: '#directory-room', selected: true })).toBeFocused();
+            await visitor.page.screenshot({ path: testInfo.outputPath(`directory-after-join-${width}x${viewport.height}.png`) });
             await expect.poll(() => actions.evaluate(row => row.scrollLeft)).toBe(0);
             await expect(startRoom).toBeInViewport({ ratio: 1 });
             const composer = visitor.page.getByRole('textbox', { name: 'Message', exact: true });
@@ -841,6 +844,9 @@ for (const width of [375, 390]) {
         } finally { await arrival?.close(); await visitor.close(); await host.close(); }
     });
 
+}
+
+for (const width of [375, 390]) {
     test(`a removed focused room returns to the visible directory filter at ${width}px`, async ({ browser, baseURL }) => {
         const relay = hangoutRelayWsBase(baseURL, `directory-removal-${randomUUID()}`), viewport = { width, height: 667 };
         const host = await guest(browser, baseURL, 'ClosingHost', viewport, relay);

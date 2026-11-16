@@ -206,6 +206,46 @@ it.each([false, true])('keeps focus usable when moderation removes a message (fl
     expect(composer.value).toBe('Keep this draft');
 });
 
+describe('opening a room from the directory', () => {
+    const room = '#directory-room';
+    async function directory({ key = false } = {}) {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        ws.receive({ t: 'list', rooms: [{ name: room, title: 'Directory Room', kind: 'chat', count: 1, max: 8, key, locked: false }] });
+        const button = window.document.querySelector(`[data-room="${room}"]`);
+        button.focus();
+        return { window, ws, join, button };
+    }
+
+    it.each([false, true])('moves from the directory to the confirmed room tab unless focus moved (%s)', async (moved) => {
+        const { window, ws, join, button } = await directory();
+        const { document } = window;
+        button.click();
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room] });
+        const input = document.querySelector('[data-text]');
+        if (moved) input.focus();
+        join(room);
+        expect(document.activeElement).toBe(moved ? input : document.querySelector(`[data-channel-key="${room}"]`));
+
+        document.querySelector('[data-channel-key="#stalemate"]').click();
+        button.focus();
+        const before = ws.sent.length;
+        button.click();
+        expect(ws.sent).toHaveLength(before);
+        expect(document.activeElement.dataset.channelKey).toBe(room);
+    });
+
+    it('leaves focus in Rooms and sends nothing when the room key prompt is canceled', async () => {
+        const { window, ws, button } = await directory({ key: true });
+        window.prompt = vi.fn(() => null);
+        const before = ws.sent.length;
+        button.click();
+        expect(window.prompt).toHaveBeenCalledOnce();
+        expect(ws.sent).toHaveLength(before);
+        expect(window.document.activeElement).toBe(button);
+    });
+});
+
 describe('targeted Music invitation', () => {
     async function setup(features = { directMusicInvites: 1 }) {
         const { window, ws, welcome, join, flush } = await visitor('rad-dad', features);
