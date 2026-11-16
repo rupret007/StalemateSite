@@ -73,6 +73,11 @@ for (const viewport of sizes) {
         expect(stageBox.width).toBeGreaterThan(tileBox.width * 2);
         expect(tileBox.y).toBeGreaterThan(stageBox.y + stageBox.height);
         const call = await checkControls(page);
+        if (viewport.width > 820) {
+            const toolbar = page.getByRole('group', { name: 'Call controls' });
+            await expect(toolbar.getByRole('button', { name: 'Show my real canvas', exact: true })).toBeInViewport({ ratio: 1 });
+            expect(await toolbar.evaluate(bar => bar.scrollWidth)).toBeLessThanOrEqual(call.viewportWidth);
+        }
         expect(tileBox.y + tileBox.height).toBeLessThanOrEqual(call.top);
         if (viewport.width <= 820) expect(call.height).toBeLessThanOrEqual(call.viewportHeight + 2);
         await page.screenshot({ path: testInfo.outputPath('03-speaker-stage-and-filmstrip.png') });

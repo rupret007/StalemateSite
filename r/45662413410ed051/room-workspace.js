@@ -47,7 +47,17 @@
         event.preventDefault();
         showChat(false);
     });
-    phone.addEventListener('change', syncChat);
+    function reserveDesktopControls() {
+        const height = Math.ceil(controls.getBoundingClientRect().height);
+        if (phone.matches || document.body.classList.contains('bob-mode') || !height) {
+            room.style.removeProperty('--workspace-controls');
+        } else {
+            room.style.setProperty('--workspace-controls', `${height}px`);
+        }
+    }
+
+    phone.addEventListener('change', () => { syncChat(); reserveDesktopControls(); });
     new MutationObserver(syncChat).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    if (typeof ResizeObserver === 'function') new ResizeObserver(reserveDesktopControls).observe(controls);
     syncChat();
 })();
