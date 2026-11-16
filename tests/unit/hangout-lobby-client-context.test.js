@@ -131,10 +131,11 @@ describe('targeted Music invitation', () => {
 });
 
 it('uses the shared roster and native return to send one Music invitation without pasting', async () => {
-    const { window, ws } = await visitor('stalemate', { directMusicInvites: 1, personTargets: 1 }, { secureOrigin: true });
+    const { window, ws, flush } = await visitor('stalemate', { directMusicInvites: 1, personTargets: 1 }, { secureOrigin: true });
     const { document } = window;
     const request = 'c'.repeat(32), keepRef = 'd'.repeat(32);
-    Object.defineProperty(window.crypto, 'randomUUID', { value: () => request });
+    const timedOutRequest = 'b'.repeat(32);
+    Object.defineProperty(window.crypto, 'randomUUID', { value: vi.fn().mockReturnValueOnce(timedOutRequest).mockReturnValue(request) });
     window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
     window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
     const launch = vi.fn();
@@ -151,24 +152,37 @@ it('uses the shared roster and native return to send one Music invitation withou
     ws.receive({ t: 'join', ch: { name: '#jam-rehearsal', kind: 'jam', keepRef, modes: { i: true }, names: [self] } });
     const invite = document.querySelector('[data-jam-invite-music]');
     expect(invite.hidden).toBe(false);
-    invite.click();
-    const people = document.querySelector('[data-invite-options]');
-    expect([...people.options].map(option => option.value)).toEqual(['', guest.id]);
-    people.value = guest.id;
-    document.querySelector('[data-invite-person-send]').click();
-    expect(launch).toHaveBeenCalledWith(`webjam-beta://hangout-music/${request}`);
-    expect(channels[0].name).toBe(`webjam-music-${request}`);
-
+    const chooseGuest = () => {
+        invite.click();
+        const people = document.querySelector('[data-invite-options]');
+        expect([...people.options].map(option => option.value)).toEqual(['', guest.id]);
+        people.value = guest.id;
+        document.querySelector('[data-invite-person-send]').click();
+    };
+    const status = document.querySelector('[data-music-handoff-status]');
     const expiry = Math.floor(Date.now() / 1000) + 60;
     const href = `${window.location.origin}/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${expiry}`;
+
+    chooseGuest();
+    expect(launch).toHaveBeenLastCalledWith(`webjam-beta://hangout-music/${timedOutRequest}`);
+    flush(90000);
+    expect(status.textContent).toContain('Check that your private rehearsal build is open and hosting Music');
+    expect(document.querySelector('[data-music-handoff-manual]').hidden).toBe(false);
+    expect(channels[0].close).toHaveBeenCalledOnce();
     channels[0].receive({ href });
-    channels[0].receive({ href });
+    expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
+
+    chooseGuest();
+    expect(launch).toHaveBeenLastCalledWith(`webjam-beta://hangout-music/${request}`);
+    expect(channels[1].name).toBe(`webjam-music-${request}`);
+    channels[1].receive({ href });
+    channels[1].receive({ href });
     expect(ws.sent.filter(frame => frame.t === 'music-invite-offer')).toEqual([
         { t: 'music-invite-offer', request, ch: '#jam-rehearsal', roomInstance: keepRef, peer: guest.id, href },
     ]);
     ws.receive({ t: 'music-invite-result', request, status: 'sent' });
-    expect(channels[0].postMessage).toHaveBeenCalledWith({ returned: true });
-    expect(channels[0].close).toHaveBeenCalledOnce();
+    expect(channels[1].postMessage).toHaveBeenCalledWith({ returned: true });
+    expect(channels[1].close).toHaveBeenCalledOnce();
     expect(document.querySelector('[data-music-handoff-status]').textContent).toContain('sent to DrumGuest');
     ws.receive({ t: 'music-invite-outcome', request, status: 'accepted' });
     expect(document.querySelector('[data-music-handoff-status]').textContent).toBe('DrumGuest accepted and joined the Jam room.');
