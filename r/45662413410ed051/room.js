@@ -43,7 +43,7 @@
         reportStatus: $('[data-report-status]'), reportAvailability: $('[data-report-availability]'), reportSend: $('[data-report-send]'),
         reportRetry: $('[data-report-retry]'), reportNew: $('[data-report-new]'), reportClose: $('[data-report-close]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
-        chatToggle: $('[data-chat-toggle]'), more: $('[data-more]'), modePill: $('[data-mode-pill]'),
+        chatToggle: $('[data-chat-toggle]'), more: $('[data-more]'), modePill: $('[data-mode-pill]'), watchTitle: $('[data-watch-title]'),
         soundtrack: $('[data-soundtrack]'), soundtrackPop: $('[data-soundtrack-pop]'), soundtrackVol: $('[data-soundtrack-vol]'), soundtrackMute: $('[data-soundtrack-mute]'),
         consent: $('[data-consent]'), consentTitle: $('[data-consent-title]'), consentVideo: $('[data-consent-video]'), consentPlaceholder: $('[data-consent-placeholder]'),
         consentMeterWrap: $('[data-consent-meter-wrap]'), consentMeter: $('[data-consent-meter]'), consentCopy: $('[data-consent-copy]'),
@@ -1091,6 +1091,7 @@
             return;
         }
         if (invite) {
+            doc.body.classList.add('invite-entry');
             ui.gateTitle.textContent = 'You’re invited';
             ui.gateCopy.textContent = 'Enter the name you want people in this room to see.';
             ui.checkBtn.hidden = true;
@@ -3404,6 +3405,7 @@
         win.SharedRoomLayout?.set(mode, Boolean(mode));
         ui.modePill.hidden = !mode;
         ui.modePill.textContent = mode === 'paint' ? 'Paint Along' : 'Watch a Movie Together';
+        ui.watchTitle.textContent = mode === 'watch' ? 'Watch a Movie Together' : 'Watch';
         ui.canvasCam.hidden = mode === 'watch';
         setChatOpen(!mode || !mq('(max-width: 820px)'));
         setMore(false);
