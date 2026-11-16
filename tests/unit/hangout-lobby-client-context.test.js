@@ -58,6 +58,78 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
+describe('targeted Music invitation', () => {
+    async function setup(features = { directMusicInvites: 1 }) {
+        const { window, ws, welcome, join, flush } = await visitor('rad-dad', features);
+        const { document } = window;
+        window.open = vi.fn();
+        welcome(); join();
+        const room = '#jam-rehearsal', instance = 'a'.repeat(32);
+        const expires = (Math.floor(Date.now() / 1000) + 60) * 1000;
+        const offer = { t: 'music-invite', id: 'b'.repeat(32), ch: room, roomInstance: instance, by: 'GuitarHost', expires };
+        const href = `https://music.example.test/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${expires / 1000}`;
+        const accepted = { ...offer, t: 'music-invite-accepted', href };
+        const joinJam = () => ws.receive({ t: 'join', ch: {
+            name: room, keepRef: instance, kind: 'jam', title: 'Rehearsal', topic: '', modes: { i: true }, count: 1,
+            names: [{ nick: 'Viewer', prefix: '', entrySource: 'rad-dad' }],
+        } });
+        return { window, ws, flush, offer, accepted, href, joinJam,
+            panel: document.querySelector('[data-music-invite]'),
+            action: document.querySelector('[data-music-invite-action]'),
+            status: document.querySelector('[data-music-invite-status]'),
+            dismiss: document.querySelector('[data-music-invite-dismiss]'),
+        };
+    }
+
+    it('accepts into the Jam room, then opens Web Join only on a second user gesture', async () => {
+        const { window, ws, offer, accepted, href, joinJam, panel, action } = await setup();
+        ws.receive(offer);
+        expect(panel.hidden).toBe(false);
+        expect(action.textContent).toBe('Accept and join');
+        action.focus();
+        action.click();
+        expect(ws.sent.at(-1)).toEqual({ t: 'music-invite-accept', ch: offer.ch, roomInstance: offer.roomInstance, id: offer.id });
+        expect(action.getAttribute('aria-disabled')).toBe('true');
+        joinJam();
+        ws.receive(accepted);
+        expect(window.__lobby.active).toBe(offer.ch);
+        expect(action.textContent).toBe('Open WebJam in browser');
+        expect(window.open).not.toHaveBeenCalled();
+        action.click();
+        expect(window.open).toHaveBeenCalledWith(href, '_blank', 'noopener,noreferrer');
+        expect(JSON.stringify({ ...window.sessionStorage, ...window.localStorage })).not.toContain(href);
+        ws.receive({ t: 'part', ch: offer.ch });
+        expect(action.hidden).toBe(true);
+        action.click();
+        expect(window.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('explains an unconfirmed response and still accepts a delayed confirmation', async () => {
+        const { ws, offer, accepted, joinJam, action, status, flush } = await setup();
+        ws.receive(offer);
+        action.click();
+        flush(10000);
+        expect(action.hidden).toBe(true);
+        expect(status.textContent).toMatch(/hasn’t confirmed/);
+        joinJam();
+        ws.receive(accepted);
+        expect(action.textContent).toBe('Open WebJam in browser');
+        expect(action.hidden).toBe(false);
+    });
+
+    it('ignores offers without the negotiated capability and declines without opening audio', async () => {
+        const old = await setup({});
+        old.ws.receive(old.offer);
+        expect(old.panel.hidden).toBe(true);
+        const { window, ws, offer, panel, dismiss } = await setup();
+        ws.receive(offer);
+        dismiss.click();
+        expect(panel.hidden).toBe(true);
+        expect(ws.sent.at(-1)).toEqual({ t: 'music-invite-decline', ch: offer.ch, roomInstance: offer.roomInstance, id: offer.id });
+        expect(window.open).not.toHaveBeenCalled();
+    });
+});
+
 describe('focus after private guest entry', () => {
     it('takes a guest to Chat when the nickname gate disappears', async () => {
         const { window, welcome, join } = await visitor();
