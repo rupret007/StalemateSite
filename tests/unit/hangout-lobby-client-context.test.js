@@ -11,7 +11,7 @@ const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 
 async function visitor(via = 'stalemate', features = { entrySources: 1 }, options = {}) {
-    const dom = new JSDOM(html, { url: `http://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
+    const dom = new JSDOM(html, { url: `${options.secureOrigin ? 'https' : 'http'}://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
     windows.push(dom);
     const { window } = dom, timers = new Map(), sockets = []; let timerId = 0, elapsed = 0;
     let socketCreated;
@@ -128,6 +128,52 @@ describe('targeted Music invitation', () => {
         expect(ws.sent.at(-1)).toEqual({ t: 'music-invite-decline', ch: offer.ch, roomInstance: offer.roomInstance, id: offer.id });
         expect(window.open).not.toHaveBeenCalled();
     });
+});
+
+it('uses the shared roster and native return to send one Music invitation without pasting', async () => {
+    const { window, ws } = await visitor('stalemate', { directMusicInvites: 1, personTargets: 1 }, { secureOrigin: true });
+    const { document } = window;
+    const request = 'c'.repeat(32), keepRef = 'd'.repeat(32);
+    Object.defineProperty(window.crypto, 'randomUUID', { value: () => request });
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+    const launch = vi.fn();
+    window.HTMLAnchorElement.prototype.click = function () { launch(this.href); };
+    const channels = [];
+    window.BroadcastChannel = class {
+        constructor(name) { this.name = name; this.postMessage = vi.fn(); this.close = vi.fn(); channels.push(this); }
+        receive(data) { this.onmessage({ data }); }
+    };
+    const self = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
+    const guest = { id: 'rad-dad-peer', nick: 'DrumGuest', prefix: '', entrySource: 'rad-dad' };
+    ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', capabilities: {} });
+    ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', modes: {}, names: [self, guest] } });
+    ws.receive({ t: 'join', ch: { name: '#jam-rehearsal', kind: 'jam', keepRef, modes: { i: true }, names: [self] } });
+    const invite = document.querySelector('[data-jam-invite-music]');
+    expect(invite.hidden).toBe(false);
+    invite.click();
+    const people = document.querySelector('[data-invite-options]');
+    expect([...people.options].map(option => option.value)).toEqual(['', guest.id]);
+    people.value = guest.id;
+    document.querySelector('[data-invite-person-send]').click();
+    expect(launch).toHaveBeenCalledWith(`webjam-beta://hangout-music/${request}`);
+    expect(channels[0].name).toBe(`webjam-music-${request}`);
+
+    const expiry = Math.floor(Date.now() / 1000) + 60;
+    const href = `${window.location.origin}/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${expiry}`;
+    channels[0].receive({ href });
+    channels[0].receive({ href });
+    expect(ws.sent.filter(frame => frame.t === 'music-invite-offer')).toEqual([
+        { t: 'music-invite-offer', request, ch: '#jam-rehearsal', roomInstance: keepRef, peer: guest.id, href },
+    ]);
+    ws.receive({ t: 'music-invite-result', request, status: 'sent' });
+    expect(channels[0].postMessage).toHaveBeenCalledWith({ returned: true });
+    expect(channels[0].close).toHaveBeenCalledOnce();
+    expect(document.querySelector('[data-music-handoff-status]').textContent).toContain('sent to DrumGuest');
+    ws.receive({ t: 'music-invite-outcome', request, status: 'accepted' });
+    expect(document.querySelector('[data-music-handoff-status]').textContent).toBe('DrumGuest accepted and joined the Jam room.');
+    expect(document.querySelector('[data-jam-link]').value).toBe('');
+    expect(JSON.stringify({ ...window.sessionStorage, ...window.localStorage })).not.toContain(href);
 });
 
 describe('focus after private guest entry', () => {

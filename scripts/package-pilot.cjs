@@ -13,6 +13,10 @@ if (target === 'beta') {
     for (const file of ['index.html', 'session.js', 'game-offer.js']) {
         fs.copyFileSync(path.join(chessJoin, file), path.join(out, 'join', file));
     }
+    const musicJoin = path.join(root, 'hangout-worker', 'web-join-music');
+    for (const file of ['handoff.html', 'handoff.js']) {
+        fs.copyFileSync(path.join(musicJoin, file), path.join(out, 'join', file));
+    }
     const play = path.join(root, 'play');
     fs.mkdirSync(path.join(out, 'play/assets'), { recursive: true });
     fs.copyFileSync(path.join(play, 'assets/suite-sound.js'), path.join(out, 'play/assets/suite-sound.js'));
