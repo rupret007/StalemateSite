@@ -15,6 +15,27 @@ function env(extra = {}) {
         ASSETS: { fetch: vi.fn(async () => new Response(readFileSync(new URL('../../r/45662413410ed051/entry-sites.mjs', import.meta.url), 'utf8'))) },
         LOBBY: {}, QUOTA: {}, ROOMS: {}, BETA_SESSIONS: {}, ...extra };
 }
+
+it('puts one Game Night join action before the optional invitation details', async () => {
+    const response = await betaFetch(new Request('https://beta.example/beta/game-night/guest'),
+        env({ HANGOUT_GAME_NIGHT_GUESTS: '1' }));
+    const { window } = new JSDOM(await response.text());
+    try {
+        expect(response.status).toBe(200);
+        const section = window.document.querySelector('[data-guest-invite]');
+        const join = section.querySelector('[data-guest-join]');
+        expect([...section.querySelectorAll('button')]).toEqual([join]);
+        expect(join.textContent).toBe('Join game');
+        expect(join.getAttribute('aria-describedby')).toBe('guest-agreement');
+        expect(join.previousElementSibling.id).toBe('guest-agreement');
+        expect(join.previousElementSibling.textContent).toContain('13+');
+        expect(section.lastElementChild.matches('[data-guest-expiry]')).toBe(true);
+        expect(section.querySelector('a[href="/beta/privacy"]').textContent).toBe('House rules');
+    } finally {
+        window.close();
+    }
+});
+
 it('explains an invalid Game Night link before loading the lobby', async () => {
     const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });
     const response = await betaFetch(new Request('https://beta.example' + root + 'lobby/?game-guest=1&table=invalid'), config);
