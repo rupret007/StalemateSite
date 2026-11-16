@@ -1496,7 +1496,7 @@
     function paintFacesRetry() {
         const ids = stuckFaces();
         ui.facesRetry.hidden = !ids.length;
-        if (ids.length) ui.facesRetryText.textContent = `Faces with ${ids.map(peerName).join(', ')} aren’t connecting, so we stopped trying. Chat and draw still work.`;
+        if (ids.length) ui.facesRetryText.textContent = `Faces with ${ids.map(peerName).join(', ')} aren’t connecting, so we stopped trying. Chat and draw still work.${turnStatus === 'ready' ? '' : ' If anyone is on cellular data, everyone should join the same Wi-Fi, then tap “Try faces again”.'}`;
     }
     ui.facesRetryBtn.addEventListener('click', () => {
         for (const id of stuckFaces()) {
@@ -1581,11 +1581,14 @@
     }
 
     let turnClient;
+    let turnStatus = '';
     async function iceServers() {
         if (!turnClient) turnClient = win.HangoutTurn.createTurnClient({
             url: turnUrl, preview: relayAdmission(readInvite()), room: app.roomId,
             getDevice: () => { try { return localStorage.getItem('hangout-dev'); } catch (_) { return ''; } },
             onStatus: (status) => {
+                turnStatus = status;
+                paintFacesRetry();
                 ui.turnStatus.textContent = status === 'ready' ? 'Video relay available for connections that need it.'
                     : status === 'device-required' ? 'Direct connections only. Join the lobby once on this browser to enable relay access.'
                         : 'Video relay unavailable for now. Direct connections, chat and drawing remain available.';
@@ -1602,7 +1605,7 @@
     }
     win.addEventListener('pagehide', () => turnClient?.stop());
     win.addEventListener('pageshow', (event) => {
-        if (event.persisted && app.roomId) { turnClient = null; iceServers(); }
+        if (event.persisted && app.roomId) { turnClient = null; turnStatus = ''; iceServers(); }
     });
 
     function prefs() {
@@ -1898,6 +1901,14 @@
         }
     }
 
+    let echoTipShown = false;
+    function maybeShowEchoTip(entry) {
+        if (echoTipShown || app.av.music || entry.pc.connectionState !== 'connected') return;
+        if (!entry.stream.getTracks().some((track) => track.readyState === 'live' && !track.muted)) return;
+        echoTipShown = true;
+        say("Same room? Use headphones, or keep only one phone's mic on, to avoid echo.");
+    }
+
     async function openPc(id) {
         const peer = relayPeers.get(id);
         if (!peer?.live || app.av.pcs.has(id) || app.av.removed.has(id)) return;
@@ -1971,9 +1982,10 @@
                     pruneStreamTracks(entry.stream);
                     layout();
                 };
-                e.track.addEventListener('unmute', () => { if (current()) resumeRemotePlayback(); });
+                e.track.addEventListener('unmute', () => { if (current()) { resumeRemotePlayback(); maybeShowEchoTip(entry); } });
                 pruneStreamTracks(entry.stream);
                 if (e.track.kind === 'audio') watchLevel(id, entry.stream);
+                maybeShowEchoTip(entry);
                 layout();
             };
             pc.onconnectionstatechange = () => {
@@ -1990,7 +2002,7 @@
                         entry.steadyTimer = 0;
                         if (current() && pc.connectionState === 'connected') peer.rebuilds = 0;
                     }, REBUILD_STEADY_MS);
-                    checkRelay(id, entry); layout();
+                    checkRelay(id, entry); layout(); maybeShowEchoTip(entry);
                 }
                 if (s === 'disconnected') win.setTimeout(() => { if (pc.connectionState === 'disconnected') restartIce(id, entry); }, 3000);
                 if (s === 'failed') restartIce(id, entry);
