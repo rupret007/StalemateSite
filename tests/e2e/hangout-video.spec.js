@@ -816,6 +816,21 @@ test('camera blocked: one tap joins with voice only and the others see an audio 
     await expect.poll(() => host.evaluate(() => [...window.__hangout.av.pcs.values()][0].pc.connectionState), { timeout: 15000 }).toBe('connected');
 });
 
+test('busy mic asks for a reload while chat stays available', async ({ browser }) => {
+    const page = await openBrowser(browser);
+    await page.addInitScript(() => {
+        const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getUserMedia = (constraints) => constraints && constraints.audio
+            ? Promise.reject(new DOMException('Microphone is in use', 'NotReadableError'))
+            : real(constraints);
+    });
+    await join(page, roomUrl(), 'Karen');
+    await page.click('[data-mic]');
+    await page.click('[data-ask-yes]');
+    await expect(page.locator('[data-status]')).toHaveText('Your mic is busy or stuck. End any FaceTime or phone call, then reload this page. Chat and games still work.');
+    await expect(page.locator('[data-text]')).toBeEnabled();
+});
+
 test('host camera-off targets only that peer; other cameras stay on', async ({ browser }) => {
     const host = await openBrowser(browser);
     await join(host, roomUrl(), 'Jeff');

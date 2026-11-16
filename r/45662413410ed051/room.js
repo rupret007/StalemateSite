@@ -1721,8 +1721,9 @@
                 ensureAudioCtx();
             } catch (error) {
                 if (version !== captureVersion[mediaKind]) return;
+                if (captureBusyOrStuck(error)) { say(captureBusyMessage(kind)); return; }
                 if (kind === 'cam' && !app.av.mic && !app.av.jam) {
-                    // No camera (blocked, missing or busy)? Don't strand them: offer voice only.
+                    // No camera (blocked or missing)? Don't strand them: offer voice only.
                     const voiceConstraints = { audio: V.micConstraints(app.av.music, prefs().mic) };
                     const voice = await ask('Camera’s not available', 'Join with just your voice? You can add the camera later.', {
                         onYes: () => { primedCapture = startCapture(voiceConstraints); }
@@ -1769,6 +1770,7 @@
             app.av.canvas = true;
         } catch (error) {
             if (version !== captureVersion.video) return;
+            if (captureBusyOrStuck(error)) { say(captureBusyMessage('cam')); return; }
             say('Camera’s blocked. Tap the lock or “aA” icon by the address bar, allow Camera, then try again.');
             return;
         }
@@ -2597,6 +2599,13 @@
     function captureDenied(error) {
         return Boolean(error) && (error.name === 'NotAllowedError' || error.name === 'SecurityError' || error.name === 'NotFoundError');
     }
+    function captureBusyOrStuck(error) {
+        return Boolean(error) && (['NotReadableError', 'AbortError', 'TrackStartError'].includes(error.name)
+            || (error.name === 'NotAllowedError' && /AVAudioSession/i.test(error.message || '')));
+    }
+    function captureBusyMessage(kind) {
+        return `Your ${kind === 'cam' ? 'camera' : 'mic'} is busy or stuck. End any FaceTime or phone call, then reload this page. Chat and games still work.`;
+    }
     async function restartCam(gesture) {
         if (app.ended || app.av.kicked || !app.av.cam || app.av.screen) return false;
         const canvas = app.av.canvas;
@@ -2607,6 +2616,11 @@
             got = await startCapture({ video: canvas ? CANVAS_CAM : camConstraints() });
         } catch (error) {
             if (version !== captureVersion.video || !app.av.cam || doc.visibilityState === 'hidden') return false;
+            if (captureBusyOrStuck(error)) {
+                captureNeedsTap('video', false);
+                say(captureBusyMessage('cam'));
+                return 'busy';
+            }
             // After a screen lock or app switch iOS refuses the camera outside a tap. That is not
             // the person turning it off: keep it on and ask for one tap instead.
             if (!gesture || !captureDenied(error)) { captureNeedsTap('video', true); return false; }
@@ -2687,13 +2701,18 @@
         const camJob = plan.video ? restartCam(gesture) : null;
         const micPrimed = plan.audio && app.av.mic ? primeMic() : null;
         const playJob = gesture ? resumeRemotePlayback() : null;
-        if (camJob) await camJob;
+        const busyCam = camJob && (await camJob) === 'busy';
+        let busyMic = false;
         if (micPrimed) {
             try {
                 await restartMic(micPrimed);
             } catch (error) {
                 if (!app.ended && app.av.mic && doc.visibilityState === 'visible' && micPrimed.version === captureVersion.audio) {
-                    if (!gesture || !captureDenied(error)) {
+                    if (captureBusyOrStuck(error)) {
+                        captureNeedsTap('audio', false);
+                        say(captureBusyMessage('mic'));
+                        busyMic = true;
+                    } else if (!gesture || !captureDenied(error)) {
                         // Refused outside a tap: the mic stays on as far as the person is concerned.
                         captureNeedsTap('audio', true);
                     } else {
@@ -2708,7 +2727,7 @@
         }
         if (playJob) await playJob;
         else if (doc.visibilityState === 'visible') await resumeRemotePlayback();
-        if (avResumeWhy.video || avResumeWhy.audio) say('Tap “Tap to resume video” to bring your camera and mic back.');
+        if (!busyCam && !busyMic && (avResumeWhy.video || avResumeWhy.audio)) say('Tap “Tap to resume video” to bring your camera and mic back.');
         layout();
     }
     async function resumeRemotePlayback() {
