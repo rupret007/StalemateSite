@@ -224,6 +224,9 @@
             const paint = chan.kind === 'art';
             const video = chan.kind === 'bobross' || chan.kind === 'watch';
             ui.paint.hidden = !paint;
+            // Paint Along uses the lesson video and camera tiles; reserve the
+            // drawing surface for art rooms so it is absent from the UI itself.
+            ui.canvas.hidden = chan.kind !== 'art';
             ui.video.hidden = !video;
             ui.load.hidden = !video;
             ui.bobPicks.hidden = chan.kind !== 'bobross';
@@ -521,7 +524,7 @@
             else if (player.autoplayBlocked && !force) return;
             const want = expectedVideoPosition(v, state.clock.relayNow()), drift = want - localTime();
             const rates = player.yt?.getAvailablePlaybackRates?.() || [];
-            if (force || Math.abs(drift) > 1) { seekTo(want); if (rates.includes(v.rate || 1)) setLocalRate(v.rate || 1); }
+            if (force || H.needsCorrection(localTime(), want)) { seekTo(want); if (rates.includes(v.rate || 1)) setLocalRate(v.rate || 1); }
             else if (Math.abs(drift) >= 0.3 && v.playing) {
                 const nudge = drift > 0 ? 1.05 : 0.95;
                 if (rates.includes(nudge) && player.yt?.setPlaybackRate) setLocalRate(nudge);
@@ -579,7 +582,7 @@
         function canDriveVideo() { return state.kind === 'bobross' || isOp(); }
         setInterval(() => {
             syncToState(false);
-        }, 5000);
+        }, 2000);
         setInterval(() => {
             if (state.kind !== 'watch' || !isOp()) return;
             const v = state.room.video;

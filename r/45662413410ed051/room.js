@@ -1374,7 +1374,9 @@
         if (receivedT <= previousT && app.state.video?.source.id === body.source.id
             && app.state.video.playing === Boolean(body.playing) && app.state.video.pos === Number(body.pos)) return false;
         const relayT = Math.max(receivedT, previousT + 1);
-        if (!app.bob.on) setBob(true);
+        // Playback updates must not undo a participant's explicit choice to
+        // leave Bob mode. They still receive and sync the shared video state.
+        if (!app.bob.on && !app.bob.touched) setBob(true);
         if (H.apply(app.state, { type: 'video', source: body.source, playing: body.playing, pos: body.pos }, { t: relayT }) !== 'video') return false;
         app.lastPlaybackSeq = Math.max((app.lastPlaybackSeq || 0) + 1, Math.floor(relayT));
         app.state.video = { ...app.state.video, rate: Number.isFinite(Number(body.rate)) ? Math.min(2, Math.max(0.25, Number(body.rate))) : 1,
@@ -1413,7 +1415,7 @@
         else if (player.autoplayBlocked && !force) return;
         const want = H.expectedPosition(v, app.clock.relayNow());
         const drift = want - localTime();
-        if (force || Math.abs(drift) > 1) seekTo(want);
+        if (force || H.needsCorrection(localTime(), want)) seekTo(want);
         else if (Math.abs(drift) >= 0.3 && v.playing) {
             const rate = drift > 0 ? 1.05 : 0.95;
             const rates = player.yt?.getAvailablePlaybackRates?.() || [];
@@ -1434,7 +1436,7 @@
         if (localPlaying() !== v.playing || H.needsCorrection(localTime(), H.expectedPosition(v, app.clock.relayNow()))) {
             hostPublish(v.source, localPlaying(), localTime());
         }
-    }, 5000);
+    }, 2000);
     win.setInterval(() => {
         if (!app.connected || !app.bob.on || !app.state.video || player.autoplayBlocked || !player.readyKey) return;
         const at = Date.now(), pos = localTime(), playing = localPlaying();
