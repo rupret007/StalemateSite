@@ -85,7 +85,8 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await expect.poll(() => host.evaluate(() =>
                 window.__lobby.chans.get('#stalemate')?.names.map(person => person.nick) ?? [])).toContain('ChosenGuest');
             const expiry = Math.floor(Date.now() / 1000) + 70;
-            const href = `https://webjam.example/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${expiry}`;
+            const capability = Buffer.alloc(32, 1).toString('base64url');
+            const href = `https://webjam.example/join/#k=${capability}&s=${'1'.repeat(64)}&g=1&e=${expiry}`;
             async function invite(sequence, link = href) {
                 await inviteButton.click();
                 const roster = dialog.getByRole('combobox', { name: 'Online guests' });
@@ -171,8 +172,16 @@ for (const { width, height, hostSite, guestSite } of viewports) {
                         close() {}
                     }` }));
             const opened = new URL(await guest.evaluate(() => window.fixtureOpens[0][0]));
-            await listener.goto(opened.pathname + opened.hash);
             const listen = listener.getByRole('button', { name: 'Join to listen', exact: true });
+            const invalidInvite = new URL(opened);
+            invalidInvite.hash = invalidInvite.hash.replace(capability, 'A'.repeat(43));
+            await listener.goto(invalidInvite.pathname + '?fixture=invalid' + invalidInvite.hash);
+            await expect(listener.locator('#status')).toHaveText('This invite link is no longer valid.');
+            await expect(listener.locator('#error-hint')).toContainText('Ask your host for a new browser invite');
+            await expect(listen).toBeHidden();
+
+            await listener.goto(opened.pathname + opened.hash);
+            await expect(listen).toBeEnabled();
             await expect(listen).toBeInViewport({ ratio: 1 });
             await capture(listener, '05-listening-choice');
             await listen.press('Enter');

@@ -17,9 +17,11 @@
     <div class="join-card">
       <p id="status" role="status" tabindex="-1" aria-describedby="error-hint">Open the invite link from your host.</p>
       <p id="error-hint" class="error-hint" hidden></p>
-      <div class="actions" id="listen-actions" hidden>
-        <button type="button" id="listen" aria-describedby="listen-guidance" disabled>Join to listen</button>
-        <p id="listen-guidance">Your microphone stays off.</p>
+      <div id="listen-actions" hidden>
+        <div class="actions">
+          <button type="button" id="listen" aria-describedby="listen-guidance" disabled>Join to listen</button>
+          <p id="listen-guidance">Your microphone stays off.</p>
+        </div>
       </div>
       <section id="prejoin" hidden aria-labelledby="prejoin-heading">
         <h2 id="prejoin-heading">Check your audio</h2>
