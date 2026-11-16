@@ -16,7 +16,13 @@ Use this walkthrough with the review candidate that includes **Invite to Music**
 3. Choose **Join to listen** to keep your microphone off. To play or speak, run **Check microphone**, confirm you're wearing headphones, and choose **Join with microphone**. If the browser blocks playback, choose **Resume audio**.
 4. Select **Leave session** to stop browser audio. Return to Hang Out if you want to keep chatting.
 
-If the invitation expires, ask the host to send a fresh one in Hang Out. If WebJam fails to return an invitation, the host can check that the Music session is running and try again. The **Share a link instead** fallback is available on the host's screen if the app handoff fails. Share private invitations directly with the intended guest.
+## If joining gets interrupted
+
+- **Retry** repeats the listening attempt with your microphone off. If the page says it cannot reach the host, first check that the host still has the Music session open.
+- **Back to audio options** lets you choose listening or microphone again. Microphone setup starts when you choose **Check microphone**.
+- If the invitation expired or the host ended the session, ask for a fresh invitation in Hang Out.
+
+If the native app handoff fails before sending, the host can confirm the Music session is running and try again. **Share a link instead** is available as a fallback. Send any private link directly to the intended guest.
 
 These steps describe a review candidate. The phone and desktop automated walkthrough uses the real Hang Out UI with a simulated native handoff and media transport. The [live-music acceptance checks](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md) cover actual Mac-to-Windows audio, a second network, Shared Track, and Webex. Keep rehearsals parked until Jeff gives the go.
 
