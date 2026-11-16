@@ -435,6 +435,38 @@ for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewp
     } finally { await visitor?.close(); await host.close(); }
 });
 
+for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewport.label}: chat stays keyboard-usable after a focused message is removed`, async ({ browser, baseURL }, testInfo) => {
+    const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+    const speaker = await guest(browser, baseURL, 'RemovalSpeaker', { width: 1280, height: 900 }, relay);
+    let visitor, removeMessage;
+    try {
+        visitor = await guest(browser, baseURL, 'RemovalGuest', viewport, relay, async page => {
+            await page.routeWebSocket(/\/sessions\/accessibility-/, socket => {
+                socket.connectToServer();
+                // Deliver a moderation event without creating reports or changing
+                // the relay's thresholds. Ordinary chat still uses the real relay.
+                removeMessage = id => socket.send(JSON.stringify({ t: 'delete', ids: [id] }));
+            });
+        });
+        const { page } = visitor;
+        await send(speaker.page, 'A synthetic message that will be removed.');
+        const flag = page.getByRole('button', { name: 'Report this message from RemovalSpeaker' });
+        await tabTo(page, flag);
+        await page.screenshot({ path: testInfo.outputPath(`${viewport.label}-message-focused.png`) });
+        removeMessage(await flag.evaluate(button => button.closest('li').dataset.id));
+        await expect(flag).toHaveCount(0);
+        const composer = page.getByRole('form', { name: 'Message composer' });
+        await expect(composer).toBeFocused();
+        await expect(composer).toBeInViewport();
+        await page.screenshot({ path: testInfo.outputPath(`${viewport.label}-focus-after-removal.png`) });
+        await page.keyboard.press(tabKey(page));
+        await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeFocused();
+        await send(page, 'Keyboard chat is still available.');
+        await expect(speaker.page.locator('[data-buffer]')).toContainText('Keyboard chat is still available.');
+        expect(visitor.errors).toEqual([]); expect(speaker.errors).toEqual([]);
+    } finally { await visitor?.close(); await speaker.close(); }
+});
+
 test('a focused status survives its dismiss timer and dismisses after keyboard focus leaves', async ({ browser, baseURL }) => {
     const visitor = await guest(browser, baseURL, 'StatusKeyboardGuest', viewports[0]);
     try {

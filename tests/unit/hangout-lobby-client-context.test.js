@@ -186,6 +186,26 @@ it('keeps unrelated moderation reports pending until each selected message gets 
     expect(document.querySelector('[data-toast]').textContent).toContain('That message is gone already.');
 });
 
+it.each([false, true])('keeps focus usable when moderation removes a message (flag focused: %s)', async (focusedFlag) => {
+    const { window, ws, welcome, join } = await visitor();
+    window.requestAnimationFrame = (callback) => window.setTimeout(callback, 16);
+    welcome(); join();
+    const { document } = window;
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'mremoved', from: 'EarlierGuest', text: 'Synthetic removed message' });
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'mretained', from: 'EarlierGuest', text: 'Synthetic retained message' });
+    const flag = document.querySelector('[data-id=mremoved] .flag');
+    const retained = document.querySelector('[data-id=mretained] .flag');
+    const composer = document.querySelector('[data-text]');
+    composer.value = 'Keep this draft';
+    (focusedFlag ? flag : retained).focus();
+
+    ws.receive({ t: 'delete', ids: ['mremoved'] });
+
+    expect(flag.isConnected).toBe(false);
+    expect(document.activeElement).toBe(focusedFlag ? document.querySelector('[data-say]') : retained);
+    expect(composer.value).toBe('Keep this draft');
+});
+
 describe('targeted Music invitation', () => {
     async function setup(features = { directMusicInvites: 1 }) {
         const { window, ws, welcome, join, flush } = await visitor('rad-dad', features);
@@ -864,13 +884,18 @@ describe('browser client privacy and bounded delivery wiring', () => {
     });
     it('bounds and clears messages without removing their list or the live-region preference', async () => {
         const { window, ws, welcome, join, paint } = await visitor(); welcome(); join(); paint(); paint();
+        window.requestAnimationFrame = (callback) => window.setTimeout(callback, 16);
         const log = window.document.querySelector('[data-buffer]');
         const messages = log.querySelector('[role="list"][aria-label="Messages"]');
         expect(messages).not.toBeNull();
-        // Cross the production limit once. These fixture lines do not need report controls.
-        for (let index = 0; index <= 300; index++)
+        ws.receive({ t: 'line', ch: '#stalemate', id: 'moldest', from: 'Friend', text: 'Bounded line 0' });
+        const oldest = messages.querySelector('[data-id=moldest] .flag');
+        oldest.focus();
+        for (let index = 1; index <= 300; index++)
             ws.receive({ t: 'line', ch: '#stalemate', from: 'Friend', text: `Bounded line ${index}` });
         expect(messages.children).toHaveLength(300);
+        expect(oldest.isConnected).toBe(false);
+        expect(window.document.activeElement).toBe(window.document.querySelector('[data-say]'));
         expect(messages.firstElementChild.textContent).toMatch(/Bounded line 1$/);
         expect(messages.lastElementChild.textContent).toContain('Bounded line 300');
         expect([...messages.children].every(item => item.tagName === 'LI')).toBe(true);

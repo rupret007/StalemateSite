@@ -1311,7 +1311,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             break;
         case 'denied': if (personPreferencePending) { personPreferencePending = null; personSheetStatus('That preference was not confirmed. Check the current person and try again.'); } if (pendingKeep) clearKeep(); line(app.active, { notice: true, from: 'StaleBot', text: m.text, kind: 'error' }); break;
         case 'list': app.rooms = m.rooms; drawRooms(); if (m.show) show('rooms'); break;
-        case 'delete': for (const c of [...app.chans.values(), ...app.pms.values()]) c.lines = c.lines.filter((l) => !m.ids.includes(l.id)); $$('[data-id]').forEach((li) => { if (m.ids.includes(li.dataset.id)) li.remove(); }); break;
+        case 'delete':
+            for (const c of [...app.chans.values(), ...app.pms.values()]) c.lines = c.lines.filter((l) => !m.ids.includes(l.id));
+            $$('[data-chat-lines] [data-id]').forEach((row) => { if (m.ids.includes(row.dataset.id)) removeChatRow(row); });
+            break;
         case 'pm-request': pmRequest(m); break;
         case 'pm-request-ended': clearPmRequest(m); if (m.reason) toast(m.reason); break;
         case 'pm-open': openPm(m, true); break;
@@ -1446,6 +1449,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
     }
     function resetPendingReports() { for (const id of [...pendingReports.keys()]) finishReport(id, false); }
+    function removeChatRow(row) {
+        const hadFocus = row.contains(document.activeElement);
+        row.remove();
+        if (hadFocus) $('[data-say]').focus();
+    }
     function appendLine(l) {
         const buf = $('[data-buffer]');
         const lines = $('[data-chat-lines]');
@@ -1491,7 +1499,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         const stick = buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
         lines.append(li);
-        while (lines.children.length > 300) lines.firstChild.remove();
+        while (lines.children.length > 300) removeChatRow(lines.firstChild);
         if (stick) buf.scrollTop = buf.scrollHeight;
         else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
     }
