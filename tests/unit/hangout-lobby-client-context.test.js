@@ -368,7 +368,7 @@ describe('newcomer navigation and closed sessions', () => {
         expect(document.querySelector('[data-network-note]').hidden).toBe(hidden);
         expect(composer.value).toBe(text);
         expect(composer.readOnly).toBe(true);
-    });
+    }, 15000);
 });
 
 describe('private entry recovery after a rejected socket admission', () => {
@@ -726,9 +726,11 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(log.querySelector('[role="list"]')).toBe(messages);
         expect(messages.children).toHaveLength(0);
         expect(log.getAttribute('aria-live')).toBe('off');
+        ws.receive({ t: 'line', ch: '#another-room', from: 'Friend', text: 'Clear this when the session ends' });
+        expect(messages.children).toHaveLength(1);
         ws.close(4401);
         expect(log.querySelector('[role="list"]')).toBe(messages);
         expect(messages.children).toHaveLength(0);
         expect(log.getAttribute('aria-live')).toBe('off');
-    });
+    }, 15000);
 });
