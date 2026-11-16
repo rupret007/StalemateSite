@@ -173,7 +173,7 @@ body.bob-mode.faces-on .call{grid-column:auto}
     body.faces-on .hang-head,body.faces-on .watch,body.faces-on .draw,body.faces-on .chat{display:none}
     body.faces-on .room{padding:8px;gap:6px;height:calc(100dvh - env(safe-area-inset-top,0px));max-height:100dvh;overflow:hidden;grid-template-rows:auto minmax(0,1fr)}
     body.faces-on .room>.bar{gap:6px;padding:0;margin:0}
-    body.faces-on .room>.bar .btn--bob,body.faces-on .room>.bar .host-only,body.faces-on .room>.bar [data-private-report]{display:none}
+    body.faces-on .room>.bar .host-only,body.faces-on .room>.bar [data-private-report]{display:none}
     body.faces-on .call{padding:6px 0 calc(72px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;min-height:0;overflow:hidden}
     body.faces-on .call>h2{font-size:1.05rem;margin:0 0 4px}
     body.faces-on .call>.small,body.faces-on .call>[data-turn-status],body.faces-on .call>[data-hands],body.faces-on .call>.host-call{display:none}

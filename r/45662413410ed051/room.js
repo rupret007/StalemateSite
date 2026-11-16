@@ -65,10 +65,10 @@
 
     const app = {
         state: H.emptyState(), clock: H.createClock(), ws: null, myId: null, key: null, roomId: null,
-        hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastPlaybackSeq: 0, lastHostSigned: null, lastVideoSigned: null,
+        hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastHostSigned: null, lastVideoSigned: null,
         lastClearSigned: null, drawingEpoch: 0, snapshotRequest: null, snapshotFresh: false, knownHostId: null,
         names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false, ended: false, retries: 0, privateReports: false,
-        bob: { on: false, touched: false, lastNudge: 0 },
+        bob: { on: false, explicit: invitedActivity === 'paint', touched: false, lastNudge: 0 },
         watchLayout: invitedActivity === 'watch',
         consent: { state: 'idle', stream: null, ac: null, frame: 0, version: 0, skipped: false },
         soundtrack: { volume: 80, muted: false },
@@ -361,8 +361,7 @@
     }
     async function send(obj) {
         const socket = app.ws;
-        // Paint Along playback stays inside the existing end-to-end sealed room envelope.
-        const roomScoped = ['chat', 'stroke', 'host', 'playback'].includes(obj.type);
+        const roomScoped = ['chat', 'stroke', 'host'].includes(obj.type);
         if (app.ended || !socket || socket.readyState !== 1 && !roomScoped) return;
         // Keep the drawing operation before native encryption yields. A fresh
         // connection can finish recovering while that encryption is pending.
@@ -515,9 +514,7 @@
             ? await signHost({ kind: 'hello', from: id, request }) : undefined;
         if (app.ended || app.ws !== socket || !app.connected || app.myId !== id || app.snapshotRequest !== request) return;
         await send({ type: 'hello', ...(to ? { to } : {}), ...(reply ? { reply: true } : {}),
-            name: app.name, av: avFlags(), protocol: 2, snapshotRequest: request, hostHello,
-            playback: app.state.video ? { seq: app.lastPlaybackSeq || 0, source: app.state.video.source, playing: app.state.video.playing,
-                pos: app.state.video.pos, rate: app.state.video.rate || 1, updatedAt: app.state.video.t } : null });
+            name: app.name, av: avFlags(), protocol: 2, snapshotRequest: request, hostHello });
     }
     async function confirmedHostHello(msg, meta) {
         const signed = msg.hostHello;
@@ -582,10 +579,6 @@
         if (ranges.pendingPoints) { context.pendingSnapshot = pending; return; }
         if (ranges.conflicted || ranges.exhausted) { failRecovery(context); return; }
         context.pendingSnapshot = null;
-        // A signed drawing snapshot doesn't carry participants' Paint Along
-        // transport updates. Retain a newer update already received in this room.
-        const playback = app.state.video;
-        if (playback?.updatedAt > (next.state.video?.t ?? -Infinity)) next.state.video = playback;
         app.state = next.state;
         app.lastHostSeq = next.lastHostSeq;
         app.lastVideoSigned = next.lastVideoSigned;
@@ -820,7 +813,6 @@
                 app.names.set(meta.from, String(msg.name || 'Someone').slice(0, 24));
             }
             showPeers(app.names.size + 1);
-            if (msg.playback?.source) acceptPlayback(msg.playback, msg.playback.updatedAt, meta.from);
             if (meta.received > meta.peer.avReceived) {
                 meta.peer.avReceived = meta.received;
                 noteAv(meta.from, msg.av);
@@ -915,14 +907,12 @@
             if (V.HOST_KINDS.includes(msg.body.kind)) applyHostAction(msg.body, msg, false);
             recordHost(msg, meta.t);
             return;
-        case 'playback':
-            if (msg.body && typeof msg.body === 'object') acceptPlayback(msg.body, meta.t, meta.from);
-            return;
         case 'watch-playback': {
-            const { source, playing, pos } = msg.body || {};
-            if (!app.isHost || !isSharedMovie(source) || typeof playing !== 'boolean'
-                || !Number.isFinite(pos) || pos < 0 || pos > 86400) return;
-            if (await hostPublish(source, playing, pos, meta.from)) await syncToState(true);
+            const { source, playing, pos, localApplied } = msg.body || {};
+            if (!app.isHost || typeof playing !== 'boolean' || !Number.isFinite(pos) || pos < 0 || pos > 86400
+                || !canSharePlayback(source, { chooseEpisode: playing && pos === 0 })) return;
+            const control = { by: meta.from, localApplied: localApplied === true };
+            if (await hostPublish(source, playing, pos, control)) await syncToState(true);
             return;
         }
         case 'av':
@@ -1382,7 +1372,7 @@
     function hold(fn) {
         player.applying = Date.now() + 900;
         fn();
-        if (!app.isHost && isSharedMovie(app.state.video?.source)) {
+        if (!app.isHost && canSharePlayback(app.state.video?.source)) {
             playbackSample = { at: Date.now(), pos: localTime(), playing: localPlaying() };
         }
     }
@@ -1404,63 +1394,24 @@
         if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t: relayT }) !== 'video') return;
         app.lastVideoSigned = { signed, t: relayT };
         app.lastHostSeq = Math.max(app.lastHostSeq, b.seq || 0);
-        app.lastPlaybackSeq = Math.max(app.lastPlaybackSeq || 0, b.seq || 0);
         showEpisode();
-        // The initiating guest has already applied this control locally and
-        // may have started a newer seek before the host's signed echo arrives.
-        if (b.watchBy !== app.myId) await syncToState(true);
+        // Native player controls already played on the initiating guest. The
+        // signed reply must not overwrite a subsequent local seek.
+        if (b.control?.by !== app.myId || !b.control.localApplied) await syncToState(true);
     }
 
     function isPaintEpisode(source) {
         return source?.kind === 'yt' && Boolean(BOB.findEpisode(source.id));
     }
 
-    function isSharedMovie(source) {
+    function canSharePlayback(source, { chooseEpisode = false } = {}) {
         const selected = app.lastVideoSigned?.signed.body;
-        return Boolean(source && selected?.activity === 'watch' && doc.body.dataset.sharedLayout === 'watch'
-            && selected.source.kind === source.kind && selected.source.id === source.id);
-    }
-
-    function acceptPlayback(body, t, from) {
-        const receivedT = Number.isFinite(Number(t)) ? Number(t) : app.clock.relayNow();
-        const previousT = app.state.video?.updatedAt || app.state.video?.t || 0;
-        if (!isPaintEpisode(body?.source)
-            || receivedT < previousT - 1000 || receivedT > Date.now() + 5_000) return false;
-        if (receivedT <= previousT && app.state.video?.source.id === body.source.id
-            && app.state.video.playing === Boolean(body.playing) && app.state.video.pos === Number(body.pos)) return false;
-        const relayT = Math.max(receivedT, previousT + 1);
-        // Playback updates must not undo a participant's explicit choice to
-        // leave Bob mode. They still receive and sync the shared video state.
-        if (!app.bob.on && !app.bob.touched) setBob(true);
-        if (H.apply(app.state, { type: 'video', source: body.source, playing: body.playing, pos: body.pos }, { t: relayT }) !== 'video') return false;
-        app.lastPlaybackSeq = Math.max((app.lastPlaybackSeq || 0) + 1, Math.floor(relayT));
-        app.state.video = { ...app.state.video, rate: Number.isFinite(Number(body.rate)) ? Math.min(2, Math.max(0.25, Number(body.rate))) : 1,
-            seq: app.lastPlaybackSeq, by: app.names.get(from) || app.name, updatedAt: relayT };
-        showEpisode();
-        if (!body.playing && from !== app.myId) {
-            ui.videoStatus.textContent = `Paused by ${app.state.video.by}`;
-            ui.videoStatus.hidden = false;
-            win.setTimeout(() => { if (ui.videoStatus.textContent === `Paused by ${app.state.video.by}`) ui.videoStatus.hidden = true; }, 3000);
-        }
-        void syncToState(true);
-        return true;
+        if (!source || (selected?.activity !== 'paint' && selected?.activity !== 'watch')) return false;
+        if (selected.source.kind === source.kind && selected.source.id === source.id) return true;
+        return chooseEpisode && selected.activity === 'paint' && isPaintEpisode(source);
     }
 
     let playbackSample = null, playbackIntentAt = 0;
-    async function publishPlayback(source, playing, pos) {
-        if (!app.connected || !app.bob.on || !isPaintEpisode(source)) return false;
-        const body = { source,
-            playing: Boolean(playing), pos: Math.max(0, Number(pos) || 0), rate: 1 };
-        const t = app.clock.relayNow(); body.updatedAt = t;
-        playbackIntentAt = Date.now();
-        if (H.apply(app.state, { type: 'video', source, playing: body.playing, pos: body.pos }, { t }) !== 'video') return false;
-        app.lastPlaybackSeq = Math.max((app.lastPlaybackSeq || 0) + 1, Math.floor(t));
-        app.state.video = { ...app.state.video, rate: body.rate, seq: app.lastPlaybackSeq, by: app.name, updatedAt: t };
-        showEpisode();
-        await send({ type: 'playback', body });
-        return true;
-    }
-
     async function syncToState(force, retry = false) {
         const v = app.state.video;
         if (!v) return;
@@ -1482,8 +1433,8 @@
     }
     const videoSyncTimer = win.setInterval(() => {
         if (!app.connected) return;
-        if (!app.isHost && isSharedMovie(app.state.video?.source) && Date.now() - playbackIntentAt < 750) return;
-        if (!app.isHost || app.bob.on && isPaintEpisode(app.state.video?.source)) return syncToState(false);
+        if (!app.isHost && canSharePlayback(app.state.video?.source) && Date.now() - playbackIntentAt < 750) return;
+        if (!app.isHost) return syncToState(false);
         const v = app.state.video;
         if (!v || !player.kind || (player.kind === 'yt' && !player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
         // Paused YouTube scrubs can omit onStateChange. Host authority still
@@ -1494,28 +1445,24 @@
     }, 2000);
     win.setInterval(() => {
         const v = app.state.video;
-        const movieGuest = !app.isHost && isSharedMovie(v?.source);
-        const canDrive = app.bob.on && isPaintEpisode(v?.source) || movieGuest;
-        if (!app.connected || !canDrive || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
+        if (!app.connected || app.isHost || !canSharePlayback(v?.source) || player.autoplayBlocked
+            || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         const at = Date.now(), pos = localTime(), playing = localPlaying();
         if (player.buffering) { playbackSample = { at, pos, playing }; return; }
-        if (!movieGuest && (at < player.applying || at - playbackIntentAt < 750)) {
-            playbackSample = { at, pos, playing }; return;
-        }
         if (playbackSample) {
             const elapsed = (at - playbackSample.at) / 1000;
             if (elapsed > 2) { playbackSample = { at, pos, playing }; void syncToState(false); return; }
             const natural = elapsed * (playbackSample.playing ? (v.rate || 1) : 0);
             const jumped = Math.abs((pos - playbackSample.pos) - natural) > 1;
-            const matchesShared = movieGuest && Math.abs(pos - H.expectedPosition(v, app.clock.relayNow())) < 1;
-            if (jumped && !matchesShared) void publishVideoIntent(v.source, playing, pos);
+            const matchesShared = Math.abs(pos - H.expectedPosition(v, app.clock.relayNow())) < 1;
+            if (jumped && !matchesShared) void publishVideoIntent(v.source, playing, pos, { localApplied: true });
         }
         playbackSample = { at, pos, playing };
     }, 250);
     doc.addEventListener('visibilitychange', () => { if (!doc.hidden) void syncToState(true); });
 
     let videoPublication = null;
-    async function hostPublish(source, playing, pos, watchBy) {
+    async function hostPublish(source, playing, pos, control) {
         if (!app.connected || !app.isHost) return;
         // A newer video choice can retire an obsolete pending signature. Clear
         // and moderation transactions still run to completion in their order.
@@ -1529,8 +1476,9 @@
             if (publication.cancelled || videoPublication !== publication) return false;
             const seq = app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
             const t = app.clock.relayNow();
-            const activity = doc.body.dataset.sharedLayout === 'watch'
-                ? { activity: 'watch', ...(watchBy ? { watchBy } : {}) } : {};
+            const mode = control ? app.lastVideoSigned?.signed.body.activity
+                : app.bob.explicit ? 'paint' : app.watchLayout ? 'watch' : '';
+            const activity = mode ? { activity: mode, ...(control && { control }) } : {};
             const signed = await Promise.race([
                 signHost({ kind: 'video', seq, source, playing, pos: Math.max(0, pos), t, ...activity }), cancelled
             ]);
@@ -1548,7 +1496,7 @@
 
     function onLocalChange() {
         const v = app.state.video;
-        if (!app.connected || !v || (!app.isHost && !app.bob.on && !isSharedMovie(v.source))
+        if (!app.connected || !v || (!app.isHost && !canSharePlayback(v.source))
             || player.autoplayBlocked || (player.kind === 'yt' && !player.seenPlaying && v.playing)) return;
         if (player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         const playing = localPlaying();
@@ -1557,7 +1505,7 @@
             const want = v.playing ? H.expectedPosition(v, app.clock.relayNow()) : v.pos;
             if (playing === v.playing && Math.abs(pos - want) < 2) return;
         }
-        void publishVideoIntent(v.source, playing, pos);
+        void publishVideoIntent(v.source, playing, pos, { localApplied: true });
     }
     function onYtAutoplayBlocked() {
         const v = app.state.video;
@@ -1576,7 +1524,7 @@
         if (event.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
         if (event.data !== 1 && event.data !== 2) return;
         const video = app.state.video;
-        if (!app.isHost && isSharedMovie(video?.source)) {
+        if (!app.isHost && canSharePlayback(video?.source)) {
             if (video.playing !== localPlaying()) onLocalChange();
             return;
         }
@@ -1589,23 +1537,23 @@
     ['play', 'pause', 'seeked'].forEach((e) => ui.file.addEventListener(e, onLocalChange));
     ui.tap.addEventListener('click', () => { if (player.kind !== 'yt') ui.tap.hidden = true; syncToState(true, true); });
 
-    async function publishVideoIntent(source, playing, pos) {
-        if (app.bob.on && isPaintEpisode(source)) return publishPlayback(source, playing, pos);
+    async function publishVideoIntent(source, playing, pos, { localApplied = false, chooseEpisode = false } = {}) {
         if (app.isHost) return hostPublish(source, playing, pos);
-        if (!app.connected || !isSharedMovie(source)) return false;
-        // The creator still signs movie state. Guests can control the selected
-        // source without gaining authority to replace it.
+        if (!app.connected || !canSharePlayback(source, { chooseEpisode })) return false;
+        // Guests send an intent. The host signs the result for playback and
+        // late-join snapshots in the same authority stream.
         playbackIntentAt = Date.now();
-        await send({ type: 'watch-playback', body: { source, playing, pos } });
+        playbackSample = { at: playbackIntentAt, pos: localTime(), playing: localPlaying() };
+        await send({ type: 'watch-playback', body: { source, playing, pos, localApplied } });
         return true;
     }
 
     async function hostLoad(source) {
-        if (!app.isHost && !(app.bob.on && isPaintEpisode(source))) { say('Only the room host changes this video.'); return; }
-        player.readyKey = ''; // Stop old player events while the new intent is signed.
+        if (!app.isHost && !canSharePlayback(source, { chooseEpisode: true })) { say('Only the room host changes this video.'); return; }
+        if (app.isHost) player.readyKey = ''; // Ignore old player events while the new selection is signed.
         // Choosing a video is an explicit host action. Loading failures remain
         // local and cannot later replace a newer shared selection.
-        if (await publishVideoIntent(source, true, 0)) await syncToState(true, true);
+        if (await publishVideoIntent(source, true, 0, { chooseEpisode: true }) && app.isHost) await syncToState(true, true);
     }
     ui.load.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -3467,7 +3415,7 @@
         const wasOn = app.bob.on;
         app.bob.on = Boolean(on);
         if (app.bob.on && !wasOn) { playbackSample = null; playbackIntentAt = Date.now(); }
-        if (byUser) app.bob.touched = true;
+        if (byUser) { app.bob.touched = true; app.bob.explicit = app.bob.on; }
         doc.body.classList.toggle('bob-mode', app.bob.on);
         syncSharedLayout();
         ui.bob.hidden = !app.bob.on;
@@ -3497,7 +3445,9 @@
         if (ep && !app.bob.on && !app.bob.touched) setBob(true);
         else syncSharedLayout();
         const video = app.state.video;
-        const pausedBy = video && !video.playing && video.by ? ` · Paused by ${video.by}` : '';
+        const by = app.lastVideoSigned?.signed.body.control?.by;
+        const author = by === app.myId ? app.name : app.names.get(by);
+        const pausedBy = video && !video.playing && author ? ` · Paused by ${author}` : '';
         ui.bobNow.textContent = ep ? `Now painting: ${ep.title} · ${BOB.label(ep)}${pausedBy}`
             : 'No happy accidents yet. The host picks an episode.';
         ui.bobEpisodes.querySelectorAll('.ep').forEach((b) => b.setAttribute('aria-current', String(Boolean(ep) && b.dataset.bobEp === ep.id)));
@@ -3539,7 +3489,7 @@
         if ((!app.isHost && !app.bob.on) || !v) return;
         const pos = player.readyKey === `${v.source.kind}:${v.source.id}` ? localTime() : H.expectedPosition(v, app.clock.relayNow());
         if (await publishVideoIntent(v.source, !v.playing, pos)) {
-            await syncToState(true);
+            if (app.isHost) await syncToState(true);
             say(v.playing ? 'Paused for everyone. Beat the devil out of that brush.' : 'Back to painting.');
         }
     });
@@ -3548,7 +3498,7 @@
         if ((!app.isHost && !app.bob.on) || !v) return;
         const current = player.readyKey === `${v.source.kind}:${v.source.id}` ? localTime() : H.expectedPosition(v, app.clock.relayNow());
         if (await publishVideoIntent(v.source, v.playing, Math.max(0, current - 15))) {
-            await syncToState(true);
+            if (app.isHost) await syncToState(true);
             say('Rewound 15 seconds for everyone.');
         }
     });
