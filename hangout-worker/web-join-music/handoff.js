@@ -19,7 +19,7 @@ if (!request || location.protocol !== 'https:' || typeof BroadcastChannel !== 'f
     }, 8000);
     // The Jam room can still confirm the offer after the waiting message.
     const deadline = setTimeout(() => {
-        finish('Hang Out couldn’t confirm delivery. Check with your bandmate before sending another invite. If they didn’t get it, end the browser invite in WebJam and retry from your Jam room in this browser profile.');
+        finish('This tab stopped waiting for delivery. Check your Jam room for the latest status. If delivery is still unclear, check with your bandmate before sending another invitation.');
     }, 90000);
     channel.onmessage = ({ data }) => {
         if (typeof data?.returned !== 'boolean') return;

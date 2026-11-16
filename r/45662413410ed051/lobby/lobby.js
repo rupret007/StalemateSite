@@ -1643,16 +1643,19 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
 
     function receiveMusicHandoffStatus(frame) {
         if (frame.t === 'music-invite-result') {
-            const pending = musicHandoff;
-            if (!pending?.submitted || frame.request !== pending.request) return;
-            if (!canHostMusicInvite(pending.room)) {
-                stopMusicHandoff(false);
+            const pending = musicHandoff?.submitted && musicHandoff.request === frame.request ? musicHandoff : null;
+            const report = musicHandoffReport;
+            const attempt = pending || (report?.awaitingReceipt && report.request === frame.request ? report : null);
+            if (!attempt) return;
+            if (!canHostMusicInvite(attempt.room)) {
+                if (pending) stopMusicHandoff(false);
+                else musicHandoffReport = null;
                 return drawMusicHandoff();
             }
             const sent = frame.status === 'sent';
-            musicHandoffReport = { room: pending.room, request: pending.request, nick: pending.nick, manual: !sent,
-                message: sent ? `Music invitation sent to ${pending.nick}. Waiting for a reply.` : 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
-            stopMusicHandoff(sent);
+            musicHandoffReport = { room: attempt.room, request: attempt.request, nick: attempt.nick, manual: !sent,
+                message: sent ? `Music invitation sent to ${attempt.nick}. Waiting for a reply.` : 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
+            if (pending) stopMusicHandoff(sent);
         } else {
             const report = musicHandoffReport;
             if (!report || frame.request !== report.request) return;
@@ -1663,6 +1666,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 unavailable: `The Music invitation to ${report.nick} ended. You can send a new one.`,
             }[frame.status];
             if (typeof message !== 'string') return;
+            report.awaitingReceipt = false;
             report.message = message;
         }
         drawMusicHandoff();
@@ -1675,9 +1679,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const pending = { room, channel, request, nick: context.label, submitted: false, timer: setTimeout(() => {
             if (musicHandoff !== pending) return;
             stopMusicHandoff();
-            musicHandoffReport = { room, manual: !pending.submitted, message: pending.submitted
-                ? 'Hang Out did not confirm delivery. Check with your bandmate before sending again.'
-                : 'WebJam didn’t return an invitation. Check that your private rehearsal build is open and hosting Music. Then retry or share a link instead.' };
+            musicHandoffReport = pending.submitted
+                ? { room, request, nick: pending.nick, awaitingReceipt: true,
+                    message: 'Hang Out did not confirm delivery. Check with your bandmate before sending again.' }
+                : { room, manual: true,
+                    message: 'WebJam didn’t return an invitation. Check that your private rehearsal build is open and hosting Music. Then retry or share a link instead.' };
             drawMusicHandoff();
         }, 90000) };
         musicHandoff = pending;

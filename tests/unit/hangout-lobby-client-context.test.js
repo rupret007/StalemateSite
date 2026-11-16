@@ -309,7 +309,7 @@ describe('targeted Music invitation', () => {
     });
 });
 
-it('uses the shared roster and native return to send one Music invitation without pasting', async () => {
+it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])('uses the shared roster and native return without pasting (%s)', async (receipt) => {
     const { window, ws, flush } = await visitor('stalemate', { directMusicInvites: 1, personTargets: 1 }, { secureOrigin: true });
     const { document } = window;
     const request = 'c'.repeat(32), keepRef = 'd'.repeat(32);
@@ -371,11 +371,28 @@ it('uses the shared roster and native return to send one Music invitation withou
     ]);
     selectChannel('#stalemate');
     expect(channels[2].close).not.toHaveBeenCalled();
-    ws.receive({ t: 'music-invite-result', request, status: 'sent' });
-    expect(channels[2].postMessage).toHaveBeenCalledWith({ returned: true });
+    const late = receipt !== 'on time';
+    if (late) {
+        flush(90000);
+        selectChannel('#jam-rehearsal');
+        expect(status.textContent).toContain('Hang Out did not confirm delivery');
+        ws.receive({ t: 'music-invite-result', request: timedOutRequest, status: 'sent' });
+        expect(status.textContent).toContain('Hang Out did not confirm delivery');
+        selectChannel('#stalemate');
+    }
+    if (receipt === 'outcome before receipt') ws.receive({ t: 'music-invite-outcome', request, status: 'accepted' });
+    ws.receive({ t: 'music-invite-result', request, status: receipt === 'late rejection' ? 'unavailable' : 'sent' });
+    if (late) expect(channels[2].postMessage).not.toHaveBeenCalled();
+    else expect(channels[2].postMessage).toHaveBeenCalledWith({ returned: true });
     expect(channels[2].close).toHaveBeenCalledOnce();
     selectChannel('#jam-rehearsal');
-    expect(document.querySelector('[data-music-handoff-status]').textContent).toContain('sent to DrumGuest');
+    if (receipt === 'late rejection') {
+        expect(status.textContent).toContain('couldn’t be sent');
+        expect(document.querySelector('[data-music-handoff-manual]').hidden).toBe(false);
+        return;
+    }
+    if (receipt === 'outcome before receipt') expect(status.textContent).toBe('DrumGuest accepted and joined the Jam room.');
+    else expect(status.textContent).toContain('sent to DrumGuest');
     selectChannel('#stalemate');
     ws.receive({ t: 'music-invite-outcome', request, status: 'accepted' });
     expect(status.textContent).toBe('');
