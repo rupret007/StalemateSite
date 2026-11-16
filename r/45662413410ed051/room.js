@@ -580,6 +580,10 @@
         if (ranges.pendingPoints) { context.pendingSnapshot = pending; return; }
         if (ranges.conflicted || ranges.exhausted) { failRecovery(context); return; }
         context.pendingSnapshot = null;
+        // A signed drawing snapshot doesn't carry participants' Paint Along
+        // transport updates. Retain a newer update already received in this room.
+        const playback = app.state.video;
+        if (playback?.updatedAt > (next.state.video?.t ?? -Infinity)) next.state.video = playback;
         app.state = next.state;
         app.lastHostSeq = next.lastHostSeq;
         app.lastVideoSigned = next.lastVideoSigned;
@@ -1416,7 +1420,7 @@
         bobPlaybackIntentAt = Date.now();
         if (H.apply(app.state, { type: 'video', source, playing: body.playing, pos: body.pos }, { t }) !== 'video') return false;
         app.lastPlaybackSeq = Math.max((app.lastPlaybackSeq || 0) + 1, Math.floor(t));
-        app.state.video = { ...app.state.video, rate: body.rate, seq: body.seq, by: app.name, updatedAt: t };
+        app.state.video = { ...app.state.video, rate: body.rate, seq: app.lastPlaybackSeq, by: app.name, updatedAt: t };
         showEpisode();
         await send({ type: 'playback', body });
         return true;
@@ -3403,7 +3407,10 @@
     function showEpisode() {
         const ep = currentEpisode();
         if (ep && !app.bob.on && !app.bob.touched) setBob(true);
-        ui.bobNow.textContent = ep ? `Now painting: ${ep.title} · ${BOB.label(ep)}` : 'No happy accidents yet. The host picks an episode.';
+        const video = app.state.video;
+        const pausedBy = video && !video.playing && video.by ? ` · Paused by ${video.by}` : '';
+        ui.bobNow.textContent = ep ? `Now painting: ${ep.title} · ${BOB.label(ep)}${pausedBy}`
+            : 'No happy accidents yet. The host picks an episode.';
         ui.bobEpisodes.querySelectorAll('.ep').forEach((b) => b.setAttribute('aria-current', String(Boolean(ep) && b.dataset.bobEp === ep.id)));
         const playing = !app.state.video || Boolean(app.state.video.playing);
         ui.bobHold.setAttribute('aria-pressed', String(!playing));

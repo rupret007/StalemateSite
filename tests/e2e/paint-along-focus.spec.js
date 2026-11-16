@@ -206,3 +206,35 @@ test('the Paint Along stage stays fully visible above two live tiles and open ch
         await guestContext.close();
     }
 });
+
+test('a guest pauses, plays and seeks for everyone, including a late join', async ({ context, baseURL, viewport }) => {
+    const { host, guest, guestContext } = await paintPair(context, baseURL, viewport);
+    try {
+        const pages = [host, guest];
+        const expectPlayback = async (state, participants = pages) => {
+            for (const page of participants) {
+                await expect(page.locator('[data-fake-yt]')).toHaveAttribute('data-state', state);
+            }
+        };
+        await expectPlayback('playing');
+        await guest.locator('[data-bob-hold]').click();
+        await expectPlayback('paused');
+        await guest.evaluate(() => window.__ytLog[0].seekTo(120));
+        for (const page of pages) {
+            await expect.poll(() => page.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeCloseTo(120, 0);
+        }
+        await guest.locator('[data-bob-hold]').click();
+        await expectPlayback('playing');
+
+        const late = await guestContext.newPage();
+        await late.goto(inviteFor(host).href);
+        await enter(late, 'Late painter');
+        await expect.poll(() => late.evaluate(() => window.__hangout.snapshotDone)).toBe(true);
+        await expectPlayback('playing', [host, guest, late]);
+        await expect.poll(() => late.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeGreaterThanOrEqual(120);
+        await guest.locator('[data-bob-hold]').click();
+        await expectPlayback('paused', [host, guest, late]);
+    } finally {
+        await guestContext.close();
+    }
+});
