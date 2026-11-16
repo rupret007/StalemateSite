@@ -73,16 +73,6 @@ beforeAll(async () => {
         await engine.message(binding.id, JSON.stringify({ t: 'hello', nick: `CapacityUser${n}`, age13: true }));
         expect(engine._debug.conns.get(binding.id).nick).toBe(`CapacityUser${n}`);
     };
-    await accept(0);
-    // Produce the actual engine's full retained moderation log before fan-out
-    // grows. No manually invented log or session records enter the fixture.
-    for (let n = 0; n < 2000; n++) await engine.message(issued[0].id, JSON.stringify({ t: 'cmd', ch: '#stalemate', name: 'lobby', args: ['unlock'] }));
-    await engine.message(issued[0].id, JSON.stringify({ t: 'cmd', ch: '#stalemate', name: 'join', args: ['#art-capacity'] }));
-    await engine.message(issued[0].id, JSON.stringify({ t: 'cmd', ch: '#art-capacity', name: 'register', args: [] }));
-    const pts = Array.from({ length: 400 }, (_, n) => [(n % 100) / 100, ((n + 1) % 100) / 100]);
-    for (let n = 0; n < 24; n++) await engine.message(issued[0].id, JSON.stringify({ t: 'act', kind: 'stroke', ch: '#art-capacity',
-        stroke: { id: `capacity-stroke-${n}`, color: '#009ee8', size: 8, pts } }));
-    for (let n = 50; n < 199; n++) await accept(n);
     const persistSnapshot = async (withLogs = false) => {
         const state = snapshot();
         await authority.records.transaction(tx => writeLobbyEffects({ tx, now: NOW, effects: [['net', state.net], ['rooms', state.rooms], ['abuse', state.abuse],
@@ -91,8 +81,31 @@ beforeAll(async () => {
             await authority.records.transaction(tx => writeLobbyEffects({ tx, now: NOW, effects: state.modlog.slice(offset, offset + 100).map(entry => ['modlog', entry]) }));
         }
     };
-    Object.assign(f, { accept, persistSnapshot }); await persistSnapshot(true);
+    Object.assign(f, { accept, persistSnapshot });
+    await accept(0);
 });
+beforeAll(async () => {
+    const { engine, issued } = f;
+    // Produce the actual engine's full retained moderation log before fan-out
+    // grows. No manually invented log or session records enter the fixture.
+    for (let n = 0; n < 2000; n++) await engine.message(issued[0].id, JSON.stringify({ t: 'cmd', ch: '#stalemate', name: 'lobby', args: ['unlock'] }));
+    await engine.message(issued[0].id, JSON.stringify({ t: 'cmd', ch: '#stalemate', name: 'join', args: ['#art-capacity'] }));
+    await engine.message(issued[0].id, JSON.stringify({ t: 'cmd', ch: '#art-capacity', name: 'register', args: [] }));
+    const pts = Array.from({ length: 400 }, (_, n) => [(n % 100) / 100, ((n + 1) % 100) / 100]);
+    for (let n = 0; n < 24; n++) await engine.message(issued[0].id, JSON.stringify({ t: 'act', kind: 'stroke', ch: '#art-capacity',
+        stroke: { id: `capacity-stroke-${n}`, color: '#009ee8', size: 8, pts } }));
+});
+function queueAdmissionHooks(first, end) {
+    const admissionBatchSize = 10;
+    for (let offset = first; offset < end; offset += admissionBatchSize) {
+        beforeAll(async () => {
+            const batchEnd = Math.min(offset + admissionBatchSize, end);
+            for (let n = offset; n < batchEnd; n++) await f.accept(n);
+        });
+    }
+}
+queueAdmissionHooks(50, 199);
+beforeAll(async () => { await f.persistSnapshot(true); });
 afterAll(async () => { if (f) { await f.driver.close(); await rm(f.directory, { recursive: true, force: true }); } });
 
 describe('bounded recovery of the existing maximum session and connection allowances', () => {
@@ -116,8 +129,12 @@ describe('bounded recovery of the existing maximum session and connection allowa
     it('restores 1000 real issued sessions, 150 admitted connections, 2000 actual log entries and a multi-chunk canvas', async () => {
         expect(f.bound.size).toBe(150); await verify(150);
     });
-    it('restores the same 1000 issued sessions with the full 200 admitted connections within every native transaction budget', async () => {
-        await f.accept(199); for (let n = 1; n < 50; n++) await f.accept(n); await f.persistSnapshot();
-        expect(f.bound.size).toBe(200); await verify(200);
+    describe('at the full connection allowance', () => {
+        beforeAll(async () => { await f.accept(199); });
+        queueAdmissionHooks(1, 50);
+        beforeAll(async () => { await f.persistSnapshot(); });
+        it('restores the same 1000 issued sessions with the full 200 admitted connections within every native transaction budget', async () => {
+            expect(f.bound.size).toBe(200); await verify(200);
+        });
     });
 });
