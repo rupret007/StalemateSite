@@ -58,6 +58,37 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
+it('announces a room invitation in an existing live region and describes its Join action', async () => {
+    const { window, ws, welcome, join, flush } = await visitor();
+    const { document } = window;
+    welcome(); join();
+    const announcement = document.querySelector('[data-toast-announcement]');
+    const notice = document.querySelector('[data-toast]');
+    const composer = document.querySelector('[data-text]');
+    expect(announcement?.getAttribute('role')).toBe('status');
+    expect(announcement.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+    expect(announcement.textContent).toBe('');
+    expect(notice.hidden).toBe(true);
+    composer.focus();
+
+    ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost' });
+
+    const message = 'InvitationHost invited you to #invitation-studio';
+    expect(document.querySelector('[data-toast-announcement]')).toBe(announcement);
+    expect(announcement.textContent).toBe(message);
+    expect(notice.hidden).toBe(false);
+    expect(notice.hasAttribute('role')).toBe(false);
+    const action = notice.querySelector('button');
+    expect(action.textContent).toBe('Join');
+    expect(document.getElementById(action.getAttribute('aria-describedby'))?.textContent).toBe(message);
+    expect(document.activeElement).toBe(composer);
+
+    flush(12000);
+    expect(notice.hidden).toBe(true);
+    expect(announcement.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+    expect(announcement.textContent).toBe('');
+});
+
 describe('targeted Music invitation', () => {
     async function setup(features = { directMusicInvites: 1 }) {
         const { window, ws, welcome, join, flush } = await visitor('rad-dad', features);

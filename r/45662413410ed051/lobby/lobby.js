@@ -871,7 +871,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-room-filter] option[value=mine]').disabled = true;
         if ($('[data-room-filter]').value === 'mine') $('[data-room-filter]').value = 'active';
         app.ignores.clear(); app.peerIgnores.clear(); app.selfId = ''; personPreferencePending = null; $('[data-pmreqs]').replaceChildren();
-        clearTimeout(toastTimer); toastRegion.replaceChildren(); toastRegion.hidden = true;
+        dismissToast();
         for (const dialog of $$('dialog')) if (dialog.open) dialog.close();
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
         $('[data-sheet-buttons]').replaceChildren(); $('[data-palette-buttons]').replaceChildren();
@@ -3433,6 +3433,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
 
     let toastTimer, toastDuration = 4000;
     const toastRegion = $('[data-toast]');
+    const toastAnnouncement = $('[data-toast-announcement]');
     if (gameGuest) {
         $('[data-gate]').hidden = true;
         $('[data-game-guest-exit-retry]').addEventListener('click', () => void closeGameGuestAccess());
@@ -3464,20 +3465,40 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (nickInput.value.trim()) $('[data-enter]').click();
         }
     }
+    function dismissToast() {
+        clearTimeout(toastTimer);
+        toastRegion.hidden = true;
+        toastRegion.replaceChildren();
+        toastAnnouncement.replaceChildren();
+    }
     function scheduleToastDismiss() {
         clearTimeout(toastTimer);
         if (toastRegion.hidden || toastRegion.contains(document.activeElement)) return;
         toastTimer = setTimeout(() => {
-            if (!toastRegion.contains(document.activeElement)) toastRegion.hidden = true;
+            if (!toastRegion.contains(document.activeElement)) dismissToast();
         }, toastDuration);
     }
     toastRegion.addEventListener('focusin', () => clearTimeout(toastTimer));
     toastRegion.addEventListener('focusout', () => queueMicrotask(scheduleToastDismiss));
     function toast(text, actions = []) {
-        const t = $('[data-toast]');
-        t.replaceChildren(text);
-        for (const [label, fn] of actions) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label; b.addEventListener('click', () => { fn(); t.hidden = true; }); t.append(' ', b); }
-        t.hidden = false;
+        const message = document.createElement('span');
+        message.id = 'toast-message';
+        message.textContent = text;
+        toastRegion.replaceChildren(message);
+        for (const [label, fn] of actions) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn--small';
+            button.textContent = label;
+            button.setAttribute('aria-describedby', message.id);
+            button.addEventListener('click', () => {
+                fn();
+                if (toastRegion.contains(button)) dismissToast();
+            });
+            toastRegion.append(' ', button);
+        }
+        toastRegion.hidden = false;
+        toastAnnouncement.replaceChildren(text);
         toastDuration = actions.length ? 12000 : 4000;
         scheduleToastDismiss();
     }

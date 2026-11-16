@@ -366,7 +366,10 @@ for (const viewport of [{ width: 300, height: 299 }, { width: 320, height: 256 }
     } finally { await visitor.close(); }
 });
 
-for (const viewport of [viewports[0], viewports[3]]) test(`${viewport.label}: invitation status action remains keyboard-reachable without covering chat input`, async ({ browser, baseURL }, testInfo) => {
+const invitationViewports = [
+    viewports[0], viewports[1], viewports[3], { label: 'desktop1440', width: 1440, height: 900 },
+];
+for (const viewport of invitationViewports) test(`${viewport.label}: invitation status action remains keyboard-reachable without covering chat input`, async ({ browser, baseURL }, testInfo) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
     const host = await guest(browser, baseURL, 'InvitationHost', { width: 1280, height: 900 }, relay);
     let visitor;
@@ -375,14 +378,19 @@ for (const viewport of [viewports[0], viewports[3]]) test(`${viewport.label}: in
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#invitation-studio');
         visitor = await guest(browser, baseURL, 'InvitationGuest', viewport, relay);
         await tabTo(visitor.page, visitor.page.getByRole('textbox', { name: 'Message', exact: true }));
+        const announcement = visitor.page.getByRole('status').and(visitor.page.locator('[data-toast-announcement]'));
+        await expect(announcement).toHaveText('');
         await send(host.page, '/invite InvitationGuest');
         const status = visitor.page.locator('[data-toast]');
         await expect(status).toContainText('invited you to #invitation-studio');
+        await expect(announcement).toHaveText('InvitationHost invited you to #invitation-studio');
+        await expect(visitor.page.getByRole('textbox', { name: 'Message', exact: true })).toBeFocused();
         const geometry = await composerGeometry(visitor.page);
         await attachGeometry(testInfo, `invitation-geometry-${viewport.label}`, geometry);
         await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-invitation.png`), fullPage: true });
         contained(geometry);
         const action = status.getByRole('button', { name: 'Join', exact: true });
+        await expect(action).toHaveAccessibleDescription('InvitationHost invited you to #invitation-studio');
         await tabTo(visitor.page, action);
         if (viewport.label === 'phone375') {
             // Cross the real actionable-notice deadline while its button holds focus.
