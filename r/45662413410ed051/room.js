@@ -1052,6 +1052,9 @@
         stopPreCheck();
         ui.gate.hidden = true;
         ui.room.hidden = false;
+        // Watch Together is the default video use case. Paint Along opts into the
+        // same frame below; the layout module only changes presentation state.
+        win.SharedRoomLayout?.set('watch', true);
         if (mq('(max-width: 820px)')) {
             doc.querySelector('.room-description').open = false;
             doc.querySelector('[data-chat-details]').open = false;
@@ -3365,6 +3368,7 @@
         if (app.bob.on && !wasOn) { bobPlaybackSample = null; bobPlaybackIntentAt = Date.now(); }
         if (byUser) app.bob.touched = true;
         doc.body.classList.toggle('bob-mode', app.bob.on);
+        win.SharedRoomLayout?.set(app.bob.on ? 'paint' : 'watch', true);
         ui.modePill.hidden = !app.bob.on;
         if (app.bob.on && !wasOn) setChatOpen(!(win.matchMedia && win.matchMedia('(max-width: 820px)').matches));
         if (!app.bob.on && wasOn) { setChatOpen(true); setMore(false); setSoundtrackPop(false); }

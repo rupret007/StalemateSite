@@ -261,6 +261,56 @@ test('Paint Along desktop 1440x900: Webex layout with stage, filmstrip, chat pan
     expect(guest.errors).toEqual([]);
 });
 
+test('Watch Together phone 390x844: stage, filmstrip and pinned controls', async ({ browser, baseURL }) => {
+    test.setTimeout(120000);
+    await fs.mkdir(SHOTS, { recursive: true });
+    const host = await openPage(browser, PHONE);
+    await enter(host, roomUrl(baseURL), 'Host');
+    await host.click('[data-pick-yt="BtnyqIHTDMM"]');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'BtnyqIHTDMM');
+    const guest = await openPage(browser, PHONE);
+    await enter(guest, host.url(), 'Guest');
+    await expect(host.locator('[data-peers]')).toContainText('2 here');
+    await joinWithCamera(host);
+    await joinWithCamera(guest);
+    await expect.poll(() => remoteWidth(host), { timeout: 20000 }).toBeGreaterThan(0);
+    await expect(host.locator('body')).toHaveClass(/shared-layout/);
+    const b = await expectNoOverlap(host, PHONE, { chat: false });
+    expect(b['.watch .screen'].width).toBeGreaterThanOrEqual(PHONE.width - 16);
+    expect(b['.watch .screen'].y + b['.watch .screen'].height).toBeLessThanOrEqual(b['[data-tiles]'].y);
+    expect(b['[data-tiles]'].y + b['[data-tiles]'].height).toBeLessThanOrEqual(b['.callbar'].y);
+    await expectBigLabeledControls(host);
+    await host.screenshot({ path: path.join(SHOTS, 'watch-phone-stage.png') });
+    await host.click('[data-chat-toggle]');
+    const open = await expectNoOverlap(host, PHONE, { chat: true });
+    expect(open['.chat'].y + open['.chat'].height).toBeLessThanOrEqual(open['.callbar'].y);
+    expect(host.errors).toEqual([]);
+    expect(guest.errors).toEqual([]);
+});
+
+test('Watch Together desktop 1440x900: Webex stage, filmstrip, chat and control bar', async ({ browser, baseURL }) => {
+    test.setTimeout(120000);
+    await fs.mkdir(SHOTS, { recursive: true });
+    const host = await openPage(browser, DESKTOP);
+    await enter(host, roomUrl(baseURL), 'Host');
+    await host.click('[data-pick-yt="BtnyqIHTDMM"]');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'BtnyqIHTDMM');
+    const guest = await openPage(browser, DESKTOP);
+    await enter(guest, host.url(), 'Guest');
+    await expect(host.locator('[data-peers]')).toContainText('2 here');
+    await joinWithCamera(host);
+    await joinWithCamera(guest);
+    await expect.poll(() => remoteWidth(host), { timeout: 20000 }).toBeGreaterThan(0);
+    const b = await expectNoOverlap(host, DESKTOP, { chat: true });
+    expect(b['.watch .screen'].width).toBeGreaterThanOrEqual(DESKTOP.width * 0.6);
+    expect(b['.watch .screen'].x + b['.watch .screen'].width).toBeLessThanOrEqual(b['[data-tiles]'].x);
+    expect(b['[data-tiles]'].y + b['[data-tiles]'].height).toBeLessThanOrEqual(b['.chat'].y);
+    await expectBigLabeledControls(host);
+    await host.screenshot({ path: path.join(SHOTS, 'watch-desktop.png') });
+    expect(host.errors).toEqual([]);
+    expect(guest.errors).toEqual([]);
+});
+
 test('Paint Along consent: denial shows how to retry, retry works, join without camera, rejoin asks again', async ({ browser, baseURL }) => {
     test.setTimeout(90000);
     const page = await openPage(browser, PHONE);
