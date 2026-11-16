@@ -856,7 +856,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   body:has(.game-night:not([hidden])) :is(.tabs button, .roombar .btn, .game-actions .btn, .connection-tools [data-fullscreen], .say .btn,
     .arcade-card-table summary, [data-game-editor] summary, .arcade-brick-race [data-brick-serve]) { min-height: 44px !important; }
   body:has(.game-night:not([hidden])) :is(.connection-tools [data-fullscreen], .slash, .roombar .btn) { min-width: 44px !important; }
-  .game-night :is(.brick-race-actions, .tris-actions, .mania-actions, .rush-race-actions) .btn { min-width: 44px; min-height: 44px; }
+  .game-night :is(.arcade-chess, .brick-race-actions, .tris-actions, .mania-actions, .rush-race-actions) .btn { min-width: 44px; min-height: 44px; }
   /* The 44px room chrome eats the card panel. Keep a short transcript and return
      the rest so phone boards and hands clear the clip. Eights sets its own floor. */
   .chat:has(.arcade-card-table[open] [data-card-table]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 28px; }
