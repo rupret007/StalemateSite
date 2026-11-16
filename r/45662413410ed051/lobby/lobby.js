@@ -1312,7 +1312,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         case 'line': pushLine(m.ch, m); break;
         case 'event': pushLine(m.ch, { ...m, event: true }); break;
         case 'notice':
-            line(app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
+            if (m.ch !== undefined) {
+                const channel = app.chans.get(m.ch);
+                if (!channel || channel.keepRef !== m.roomInstance) break;
+            }
+            line(m.ch ?? app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
             if (m.kind === 'error') {
                 if (!roomJoinFocus?.instance) roomJoinFocus = null;
                 const failedGameJoin = !!joiningGameRoom;

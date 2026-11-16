@@ -534,6 +534,9 @@ describe('permissions are enforced on the server (forged commands)', () => {
         const result = got(guest).findIndex(frame => frame.t === 'room-join-result' && frame.id === freshRequest && frame.status === 'joined');
         expect(joined).toBeGreaterThanOrEqual(0);
         expect(result).toBeGreaterThan(joined);
+        expect(got(guest).slice(joined + 1, result)).toContainEqual(expect.objectContaining({
+            t: 'notice', ch: room, roomInstance: replacement.keepRef, text: expect.stringContaining(`welcome to ${room}`),
+        }));
         expect(got(outsider).some(frame => frame.t === 'room-join-result')).toBe(false);
 
         const retry = 'c'.repeat(32);

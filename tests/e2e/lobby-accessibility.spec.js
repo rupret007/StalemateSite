@@ -432,6 +432,7 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
             const retry = status.getByRole('button', { name: 'Retry join', exact: true });
             await expect(retry).toBeVisible({ timeout: 12000 });
             await expect(retry).toBeFocused();
+            await expect(visitor.page.locator('[data-buffer]')).not.toContainText('welcome to #invitation-studio');
             await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-retry-room-join.png`) });
             await retry.press('Enter');
         }

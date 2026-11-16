@@ -492,7 +492,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const byNick = (nick) => [...conns.values()].find((c) => c.nick && lc(c.nick) === lc(String(nick || '').replace(/^[@+]/, '')));
     const isOp = (c, chan) => isStaff(c) || hosts(c, chan);
     const prefix = (c, chan) => (isOp(c, chan) ? '@' : chan && chan.voice.has(c.dev) ? '+' : '');
-    const bot = (c, text, kind = 'info') => out(c, { t: 'notice', from: BOT, text, kind, ts: now() });
+    const bot = (c, text, kind = 'info', room) => out(c, {
+        t: 'notice', from: BOT, text, kind, ts: now(),
+        ...(room ? { ch: room.name, roomInstance: room.keepRef } : {}),
+    });
     const log = (by, action, target = '', reason = '', where = '') => {
         const e = { at: now(), by, action, target, reason, ch: where };
         bump(net.stats.mod, action === 'filter-block' || action === 'pm-filter' ? `filter:${String(reason).split(':')[0]}` : action);
@@ -963,11 +966,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         c.channels.add(chan.name);
         sendRoomEntry(c, chan);
         event(chan, `${nickOf(c)} has joined ${chan.name}`);
-        if (chan.kind === 'lobby') bot(c, `welcome to #stalemate, ${c.nick}. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.`);
-        else if (chan.kind === 'jam') bot(c, `welcome to ${chan.name}. Music runs in the WebJam desktop app using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.`);
-        else if (roomKind(chan) === 'game') bot(c, 'Chat starts when you join. Use the flag beside a message to report it.');
-        else if (chan.kind === 'chat') bot(c, `welcome to ${chan.name}. The room host runs this conversation; site moderators handle abuse. Chat starts when you join. Start an activity room to draw, watch or use optional cameras.`);
-        else bot(c, `welcome to ${chan.name}. The room host runs this activity; site moderators handle abuse. Cameras stay off unless you turn yours on (18+).`);
+        const welcome = text => bot(c, text, 'info', chan);
+        if (chan.kind === 'lobby') welcome(`welcome to #stalemate, ${c.nick}. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.`);
+        else if (chan.kind === 'jam') welcome(`welcome to ${chan.name}. Music runs in the WebJam desktop app using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.`);
+        else if (roomKind(chan) === 'game') welcome('Chat starts when you join. Use the flag beside a message to report it.');
+        else if (chan.kind === 'chat') welcome(`welcome to ${chan.name}. The room host runs this conversation; site moderators handle abuse. Chat starts when you join. Start an activity room to draw, watch or use optional cameras.`);
+        else welcome(`welcome to ${chan.name}. The room host runs this activity; site moderators handle abuse. Cameras stay off unless you turn yours on (18+).`);
         sendChan(chan, { presence: true });
         pushList({ presence: true });
         return true;

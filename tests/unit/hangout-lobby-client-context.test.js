@@ -185,6 +185,25 @@ describe('keyboard room invitation acceptance', () => {
         expect(window.document.activeElement.dataset.channelKey).toBe(room);
     });
 
+    it('keeps room-scoped welcome notices out of the lobby during a delayed join', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        const room = '#invitation-studio';
+        const notice = { t: 'notice', ch: room, roomInstance: invitationRoomInstance, from: 'StaleBot',
+            kind: 'info', text: 'Welcome to the invitation studio.' };
+        const buffer = window.document.querySelector('[data-buffer]');
+        ws.receive(notice);
+        expect(buffer.textContent).not.toContain(notice.text);
+
+        join(room, invitationRoomInstance);
+        ws.receive(notice);
+        expect(buffer.textContent).toContain(notice.text);
+
+        const wrongRoom = { ...notice, roomInstance: 'b'.repeat(32), text: 'Welcome to a replaced room.' };
+        ws.receive(wrongRoom);
+        expect(buffer.textContent).not.toContain(wrongRoom.text);
+    });
+
     it('recovers a missed room confirmation and preserves active chat on a repeated receipt', async () => {
         const { window, ws, welcome, join, flush } = await visitor();
         welcome(); join();
