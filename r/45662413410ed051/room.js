@@ -42,7 +42,12 @@
         reportStatus: $('[data-report-status]'), reportAvailability: $('[data-report-availability]'), reportSend: $('[data-report-send]'),
         reportRetry: $('[data-report-retry]'), reportNew: $('[data-report-new]'), reportClose: $('[data-report-close]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
-        chatToggle: $('[data-chat-toggle]'),
+        chatToggle: $('[data-chat-toggle]'), more: $('[data-more]'), modePill: $('[data-mode-pill]'),
+        soundtrack: $('[data-soundtrack]'), soundtrackPop: $('[data-soundtrack-pop]'), soundtrackVol: $('[data-soundtrack-vol]'), soundtrackMute: $('[data-soundtrack-mute]'),
+        consent: $('[data-consent]'), consentTitle: $('[data-consent-title]'), consentVideo: $('[data-consent-video]'), consentPlaceholder: $('[data-consent-placeholder]'),
+        consentMeterWrap: $('[data-consent-meter-wrap]'), consentMeter: $('[data-consent-meter]'), consentCopy: $('[data-consent-copy]'),
+        consentMicWrap: $('[data-consent-mic-wrap]'), consentMic: $('[data-consent-mic]'), consentError: $('[data-consent-error]'),
+        consentOn: $('[data-consent-on]'), consentSkip: $('[data-consent-skip]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
         yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), facesPlay: $('[data-faces-play]'), videoStatus: $('[data-video-status]'),
         bobToggle: $('[data-bob-toggle]'), bob: $('[data-bob]'), bobNow: $('[data-bob-now]'), bobHold: $('[data-bob-hold]'),
@@ -63,6 +68,8 @@
         lastClearSigned: null, drawingEpoch: 0, snapshotRequest: null, snapshotFresh: false, knownHostId: null,
         names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false, ended: false, retries: 0, privateReports: false,
         bob: { on: false, touched: false, lastNudge: 0 },
+        consent: { state: 'idle', stream: null, ac: null, frame: 0, version: 0, skipped: false },
+        soundtrack: { volume: 80, muted: false },
         av: {
             stream: null, rawCam: null, mic: false, cam: false, canvas: false, screen: null, hand: null, away: false, music: false,
             jam: params.get('kind') === 'jam', asked: {}, view: 'grid', pin: null, spot: null, locked: false, kicked: false,
@@ -874,7 +881,7 @@
             acceptStroke(msg);
             return;
         case 'chat':
-            if (H.apply(app.state, msg, meta) === 'chat') receivedChatOrigins.set(app.state.chat[app.state.chat.length - 1], { peer: meta.from });
+            if (H.apply(app.state, msg, meta) === 'chat') { receivedChatOrigins.set(app.state.chat[app.state.chat.length - 1], { peer: meta.from }); noteUnreadChat(); }
             renderChat();
             return;
         case 'host':
@@ -1308,6 +1315,7 @@
             ui.yt.hidden = true;
             ui.file.hidden = false;
             ui.file.src = H.FILE_SOURCES[source.id].src;
+            applySoundtrack();
             player.readyKey = key;
             return true;
         }
@@ -1321,6 +1329,7 @@
                 const instance = await youtube.select(source.id);
                 if (!instance || app.ended || player.currentKey !== key) return false;
                 player.yt = instance; player.readyKey = key;
+                applySoundtrack();
                 ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
                 return true;
             } catch (error) { videoFailure(key, error); return false; }
@@ -1911,7 +1920,7 @@
         ui.canvasCam.textContent = app.av.canvas ? 'Stop showing my canvas' : 'Show my real canvas';
         ui.mic.setAttribute('aria-pressed', String(app.av.mic));
         ui.cam.setAttribute('aria-pressed', String(app.av.cam && !app.av.screen));
-        ui.mic.textContent = app.av.mic ? 'Mute mic' : (app.av.jam ? 'Unmute mic' : 'Unmute mic');
+        ui.mic.textContent = app.av.mic ? 'Mute mic' : (app.av.jam ? 'Talk (browser mic)' : 'Unmute mic');
         ui.cam.textContent = app.av.cam && !app.av.screen ? 'Stop video' : 'Start video';
         ui.cam.disabled = app.av.canvas;
         ui.share.setAttribute('aria-pressed', String(Boolean(app.av.screen)));
@@ -1920,6 +1929,7 @@
         ui.hand.textContent = Number.isFinite(app.av.hand) ? 'Lower hand' : 'Raise hand';
         ui.hangup.hidden = !(app.av.mic || app.av.cam);
         paintControls();
+        paintConsent();
         doc.body.classList.toggle('faces-on', Boolean(app.av.mic || app.av.cam || app.av.peers.size));
         if (app.av.mic || app.av.cam) wakeLock(true); else wakeLock(false);
         await send({ type: 'av', av: avFlags() });
@@ -1934,8 +1944,8 @@
         paintAvResume();
         // Phones show big icons with a one-word caption; the full words stay for screen readers and desktops.
         const ico = (el, i, short) => { el.dataset.ico = i; el.dataset.short = short; };
-        ico(ui.mic, app.av.mic ? '🎤' : '🔇', app.av.mic ? 'Mute' : (app.av.jam ? 'Talk' : 'Mic'));
-        ico(ui.cam, app.av.cam && !app.av.screen ? '📷' : '🚫', app.av.cam && !app.av.screen ? 'Cam off' : 'Camera');
+        ico(ui.mic, app.av.mic ? '🎙️' : '🔇', app.av.mic ? 'Mute' : (app.av.jam ? 'Talk' : 'Mic'));
+        ico(ui.cam, app.av.cam && !app.av.screen ? '📹' : '📷', app.av.cam && !app.av.screen ? 'Cam off' : 'Camera');
         ico(ui.hand, '✋', Number.isFinite(app.av.hand) ? 'Lower' : 'Hand');
         ico(ui.settings, '⚙️', 'Setup');
         ico(ui.pip, '⧉', 'Pop out');
@@ -2363,10 +2373,14 @@
     function presentIds() {
         const ids = [];
         for (const id of app.av.peers) if (!app.av.hidden.has(id)) ids.push(id);
-        if (app.av.cam || app.av.mic) ids.push('me'); // you go last, like every call app
+        // You go last, like every call app. Paint Along always shows your own tile (with a
+        // Start video prompt while your camera is off) once the join choice is made.
+        if (app.av.cam || app.av.mic || (app.bob.on && ui.consent.hidden && !app.av.kicked)) ids.push('me');
         return ids;
     }
     function layout() {
+        // Lock, kick, leaving Bob mode or turning a camera on elsewhere retires the consent card.
+        if (ui.consent.hidden === consentWanted()) { paintConsent(); return; }
         const ids = presentIds();
         const screenId = app.av.screen ? 'me' : Array.from(app.av.screenPeers).find((id) => app.av.peers.has(id)) || null;
         const auto = app.av.view === 'speaker' || Boolean(screenId) || Boolean(app.av.spot) || Boolean(app.av.pin);
@@ -2465,8 +2479,9 @@
             const startVideo = doc.createElement('button');
             startVideo.type = 'button';
             startVideo.className = 'tile-start-video';
-            startVideo.textContent = 'Start video';
-            startVideo.addEventListener('click', (event) => { event.stopPropagation(); ui.cam.click(); });
+            startVideo.textContent = '📷 Start video';
+            startVideo.setAttribute('aria-label', 'Start video');
+            startVideo.addEventListener('click', (event) => { event.stopPropagation(); startVideoPrompt(); });
             tile.append(v, cap, badge, more, react, ...(id === 'me' ? [startVideo] : []));
             ui.tiles.append(tile);
             if (id !== 'me' && app.av.sink && v.setSinkId) v.setSinkId(app.av.sink).catch(() => {});
@@ -3064,11 +3079,7 @@
     ui.devMic.addEventListener('change', () => switchDevice('mic', ui.devMic.value));
     ui.devSpk.addEventListener('change', () => switchDevice('spk', ui.devSpk.value));
     ui.music.addEventListener('change', () => setMusic(ui.music.checked));
-    ui.chatToggle.addEventListener('click', () => {
-        const open = !doc.body.classList.contains('chat-closed');
-        doc.body.classList.toggle('chat-closed', open);
-        ui.chatToggle.setAttribute('aria-expanded', String(!open));
-    });
+    ui.chatToggle.addEventListener('click', () => setChatOpen(doc.body.classList.contains('chat-closed')));
     ui.bgPicks.addEventListener('click', (e) => { const b = e.target.closest('button[data-bg]'); if (b && !app.av.bg.loading) setBackground(b.dataset.bg); });
     ui.lock.addEventListener('click', () => hostAct({ kind: 'lock', on: !app.av.locked }));
     ui.allCamsOff.addEventListener('click', () => hostAct({ kind: 'camoff', target: '*' }));
@@ -3083,6 +3094,270 @@
     ui.bgSupport.textContent = deviceStrength() === 'no' ? 'This device can’t do backgrounds.' : '';
 
 
+    /* ---------------- Webex-style call chrome: chat drawer, More, Music ---------------- */
+    function setChatOpen(open) {
+        doc.body.classList.toggle('chat-closed', !open);
+        ui.chatToggle.setAttribute('aria-expanded', String(Boolean(open)));
+        ui.chatToggle.setAttribute('aria-pressed', String(Boolean(open)));
+        if (open) {
+            const details = doc.querySelector('[data-chat-details]');
+            if (details) details.open = true;
+            delete ui.chatToggle.dataset.unread;
+            ui.chatToggle.textContent = 'Chat';
+            ui.log.scrollTop = ui.log.scrollHeight;
+            setMore(false);
+        }
+    }
+    function noteUnreadChat() {
+        if (!doc.body.classList.contains('chat-closed')) return;
+        const n = Math.min(99, Number(ui.chatToggle.dataset.unread || 0) + 1);
+        ui.chatToggle.dataset.unread = String(n);
+        ui.chatToggle.textContent = `Chat (${n} new)`;
+    }
+    function setMore(open) {
+        doc.body.classList.toggle('more-open', Boolean(open));
+        ui.more.setAttribute('aria-expanded', String(Boolean(open)));
+        if (open) setSoundtrackPop(false);
+    }
+    ui.more.addEventListener('click', () => setMore(!doc.body.classList.contains('more-open')));
+    // Picking something under More closes the sheet so it never sits over the stage.
+    doc.querySelector('[data-callbar-more]').addEventListener('click', (event) => {
+        if (event.target.closest('button') && doc.body.classList.contains('more-open')) setMore(false);
+    });
+
+    /* Music = the shared video's soundtrack only. It never touches anyone's mic, the
+     * mic's Music mode (echo processing) or game sound effects. */
+    try {
+        const saved = JSON.parse(localStorage.getItem('hangout-soundtrack') || 'null');
+        if (saved && Number.isFinite(Number(saved.volume))) app.soundtrack.volume = Math.max(0, Math.min(100, Number(saved.volume)));
+        if (saved) app.soundtrack.muted = Boolean(saved.muted);
+    } catch (error) { /* private mode */ }
+    function applySoundtrack() {
+        const s = app.soundtrack;
+        const vol = Math.max(0, Math.min(100, Math.round(s.volume)));
+        try { ui.file.volume = vol / 100; } catch (error) { /* read-only volume (iOS) */ }
+        if (s.muted) { ui.file.muted = true; ui.file.__soundtrackMuted = true; }
+        else if (ui.file.__soundtrackMuted) { ui.file.muted = false; ui.file.__soundtrackMuted = false; }
+        const yt = player.yt;
+        if (yt) {
+            try {
+                if (typeof yt.setVolume === 'function') yt.setVolume(vol);
+                if (s.muted && typeof yt.mute === 'function') { yt.mute(); yt.__soundtrackMuted = true; }
+                else if (!s.muted && yt.__soundtrackMuted && typeof yt.unMute === 'function') { yt.unMute(); yt.__soundtrackMuted = false; }
+            } catch (error) { /* player not ready */ }
+        }
+        paintSoundtrack();
+    }
+    function paintSoundtrack() {
+        const s = app.soundtrack;
+        const silent = s.muted || s.volume <= 0;
+        ui.soundtrack.textContent = silent ? 'Music muted' : `Music ${Math.round(s.volume)}%`;
+        ui.soundtrack.dataset.ico = silent ? '🔕' : '🎵';
+        ui.soundtrack.dataset.short = silent ? 'Muted' : 'Music';
+        ui.soundtrack.setAttribute('aria-pressed', String(!silent));
+        ui.soundtrack.setAttribute('aria-label', `${silent ? 'Music muted' : `Music volume ${Math.round(s.volume)}%`}. Shared video sound only; mics are not affected.`);
+        ui.soundtrackMute.textContent = s.muted ? 'Unmute music' : 'Mute music';
+        ui.soundtrackMute.setAttribute('aria-pressed', String(s.muted));
+        ui.soundtrackVol.value = String(Math.round(s.volume));
+    }
+    function setSoundtrack(patch) {
+        Object.assign(app.soundtrack, patch);
+        try { localStorage.setItem('hangout-soundtrack', JSON.stringify(app.soundtrack)); } catch (error) { /* private mode */ }
+        applySoundtrack();
+    }
+    function setSoundtrackPop(open) {
+        ui.soundtrackPop.hidden = !open;
+        ui.soundtrack.setAttribute('aria-expanded', String(Boolean(open)));
+        if (open) setMore(false);
+    }
+    ui.soundtrack.addEventListener('click', () => setSoundtrackPop(ui.soundtrackPop.hidden));
+    ui.soundtrackVol.addEventListener('input', () => setSoundtrack({ volume: Number(ui.soundtrackVol.value), muted: Number(ui.soundtrackVol.value) > 0 ? false : app.soundtrack.muted }));
+    ui.soundtrackMute.addEventListener('click', () => setSoundtrack({ muted: !app.soundtrack.muted }));
+    doc.addEventListener('keydown', (event) => { if (event.key === 'Escape') { setSoundtrackPop(false); setMore(false); } });
+    doc.addEventListener('click', (event) => {
+        if (!ui.soundtrackPop.hidden && !event.target.closest('[data-soundtrack-pop],[data-soundtrack]')) setSoundtrackPop(false);
+    });
+    paintSoundtrack();
+
+    /* ---------------- one combined camera + mic consent step (Paint Along) ----------------
+     * Nothing is captured until the person taps "Turn on camera". One getUserMedia call asks
+     * for camera and mic together, the live preview stays on this device, and only "Join with
+     * camera" sends it to the room. Lock, kick and the faces cap are checked again on join. */
+    function consentWanted() {
+        return Boolean(app.bob.on && app.roomId && !app.ended && !app.av.cam && !app.av.mic && !app.av.kicked
+            && !app.consent.skipped && !(app.av.locked && !(app.av.mic || app.av.cam)));
+    }
+    function stopConsentPreview() {
+        const c = app.consent;
+        c.version += 1;
+        if (c.stream) c.stream.getTracks().forEach(stopTrack);
+        c.stream = null;
+        win.cancelAnimationFrame(c.frame);
+        if (c.ac) { c.ac.close().catch(() => {}); c.ac = null; }
+        ui.consentVideo.srcObject = null;
+        ui.consentMeter.value = 0;
+    }
+    function setConsentState(state, error) {
+        app.consent.state = state;
+        ui.consent.dataset.state = state;
+        const previewing = state === 'preview' || state === 'voice';
+        const ageText = app.av.adult18 ? '' : 'I’m 18+ · ';
+        ui.consentPlaceholder.hidden = state === 'preview';
+        ui.consentMeterWrap.hidden = !previewing;
+        ui.consentMicWrap.hidden = state !== 'preview';
+        ui.consentError.hidden = !error;
+        ui.consentError.textContent = error || '';
+        ui.consentOn.disabled = state === 'asking';
+        ui.consentTitle.textContent = state === 'preview' ? 'Looking good? Join when ready'
+            : state === 'voice' ? 'No camera found' : state === 'denied' ? 'Camera and mic are blocked' : 'Join with camera and mic';
+        ui.consentOn.textContent = state === 'asking' ? 'Waiting for your browser…'
+            : state === 'preview' ? 'Join with camera'
+                : state === 'voice' ? 'Join with just my mic'
+                    : state === 'denied' ? 'Try again' : `${ageText}Turn on camera`;
+        ui.consentCopy.textContent = state === 'preview' ? 'Only you can see this preview. Tap Join to share it with this room.'
+            : state === 'voice' ? 'Your mic works. You can add the camera later with Start video.'
+                : state === 'asking' ? 'Tap Allow on the pop-up so the room can see and hear you.'
+                    : 'One tap asks your browser for camera and mic together. Cameras are for adults 18+. Only people in this room see and hear you.';
+        if (state === 'voice') ui.consentPlaceholder.textContent = '🎙️ Mic only: no camera was found.';
+        else ui.consentPlaceholder.textContent = '📷 Your preview shows here. Nothing turns on until you tap the button.';
+    }
+    function paintConsent() {
+        const want = consentWanted();
+        if (!want && app.consent.stream) stopConsentPreview();
+        if (!want && app.consent.state !== 'idle') setConsentState('idle');
+        const changed = ui.consent.hidden === want;
+        ui.consent.hidden = !want;
+        if (changed && app.consent.state === 'idle') setConsentState('idle');
+        if (changed) layout();
+    }
+    function meterConsent(stream) {
+        const c = app.consent;
+        const track = stream.getAudioTracks()[0];
+        if (!track || !(win.AudioContext || win.webkitAudioContext)) return;
+        try {
+            const ac = new (win.AudioContext || win.webkitAudioContext)();
+            c.ac = ac;
+            const an = ac.createAnalyser();
+            ac.createMediaStreamSource(new MediaStream([track])).connect(an);
+            const buf = new Float32Array(an.fftSize);
+            const tick = () => {
+                if (c.stream !== stream) return;
+                an.getFloatTimeDomainData(buf);
+                let peak = 0;
+                for (let i = 0; i < buf.length; i += 1) peak = Math.max(peak, Math.abs(buf[i]));
+                ui.consentMeter.value = Math.min(1, peak * 3);
+                c.frame = win.requestAnimationFrame(tick);
+            };
+            tick();
+        } catch (error) { /* no meter, preview still works */ }
+    }
+    function consentBlockedReason() {
+        if (app.av.kicked) return 'The host took you off camera in this room. Chat and painting still work.';
+        if (app.av.locked && !(app.av.mic || app.av.cam)) return 'The host locked cameras for now. Chat and painting still work.';
+        if (!(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) return `Cameras are full (${V.MAX_CAMS} max). Chat and painting still work.`;
+        return '';
+    }
+    function requestConsent() {
+        // Runs inside the tap: iOS only lets getUserMedia start from the gesture itself.
+        const blocked = consentBlockedReason();
+        if (blocked) { setConsentState('denied', blocked); return; }
+        if (needsOpenBrowserHint()) { setConsentState('denied', openBrowserHint); return; }
+        stopConsentPreview();
+        app.av.adult18 = true;
+        const version = app.consent.version;
+        const audio = V.micConstraints(app.av.music, prefs().mic);
+        setConsentState('asking');
+        startCapture({ video: camConstraints(), audio }).then((stream) => {
+            if (version !== app.consent.version || !consentWanted()) { stream.getTracks().forEach(stopTrack); return; }
+            app.consent.stream = stream;
+            ui.consentVideo.srcObject = stream;
+            ui.consentMic.checked = !app.av.jam;
+            setConsentState('preview');
+            meterConsent(stream);
+        }).catch(async (error) => {
+            if (version !== app.consent.version) return;
+            if (needsOpenBrowserHint(error)) { setConsentState('denied', openBrowserHint); return; }
+            const name = error && error.name;
+            // A missing or busy camera should not strand someone who has a working mic.
+            if (name === 'NotFoundError' || name === 'OverconstrainedError' || captureBusyOrStuck(error)) {
+                try {
+                    const voice = await startCapture({ audio });
+                    if (version !== app.consent.version || !consentWanted()) { voice.getTracks().forEach(stopTrack); return; }
+                    app.consent.stream = voice;
+                    setConsentState('voice');
+                    meterConsent(voice);
+                    return;
+                } catch (voiceError) { /* fall through to the blocked message */ }
+                if (version !== app.consent.version) return;
+            }
+            setConsentState('denied', captureBusyOrStuck(error)
+                ? 'Another app or tab is using your camera. Close it, then tap Try again.'
+                : 'Your browser blocked the camera and mic. Tap the lock or “aA” icon by the address bar, allow Camera and Microphone, then tap Try again. Or join without camera: chat and painting still work.');
+        });
+    }
+    async function joinFromConsent() {
+        const c = app.consent;
+        const stream = c.stream;
+        if (!stream) return;
+        const blocked = consentBlockedReason();
+        if (blocked) { stopConsentPreview(); setConsentState('denied', blocked); return; }
+        const video = stream.getVideoTracks().find((t) => t.readyState === 'live');
+        const audio = stream.getAudioTracks().find((t) => t.readyState === 'live');
+        const wantMic = c.state === 'voice' || ui.consentMic.checked;
+        // Hand the tracks to the call; the preview no longer owns them.
+        c.stream = null;
+        c.version += 1;
+        win.cancelAnimationFrame(c.frame);
+        if (c.ac) { c.ac.close().catch(() => {}); c.ac = null; }
+        ui.consentVideo.srcObject = null;
+        if (video) {
+            stopRaw('video');
+            app.av.rawCam = video;
+            app.av.canvas = false;
+            adoptLocalTrack('video', video);
+            setTrack('video', video);
+            app.av.asked.cam = true;
+            app.av.cam = true;
+            if (app.av.bg.choice && app.av.bg.choice !== 'none') setBackground(app.av.bg.choice, true);
+        }
+        if (audio && wantMic) {
+            stopRaw('audio');
+            setTrack('audio', audio);
+            app.av.asked.mic = true;
+            app.av.mic = true;
+        } else if (audio) {
+            stopTrack(audio);
+            app.av.asked.mic = true; // permission granted; Unmute later needs no second explainer
+        }
+        ensureAudioCtx();
+        setConsentState('idle');
+        await refreshAv();
+        say(app.av.cam ? 'You’re on camera. Stop video or Mute mic any time from the bar.' : 'You’re in with your mic. Tap Start video to add your camera.');
+    }
+    function skipConsent() {
+        stopConsentPreview();
+        app.consent.skipped = true;
+        setConsentState('idle');
+        paintConsent();
+        say('You’re in without camera. Tap Start video on your tile or the bar whenever you like.');
+    }
+    function startVideoPrompt() {
+        if (app.av.cam) return;
+        if (app.bob.on && !app.av.asked.cam && !app.av.mic) {
+            app.consent.skipped = false;
+            paintConsent();
+            if (!ui.consent.hidden) { ui.consent.scrollIntoView({ block: 'nearest' }); ui.consentOn.focus(); return; }
+        }
+        toggle('cam');
+    }
+    ui.consentOn.addEventListener('click', () => {
+        const s = app.consent.state;
+        if (s === 'preview' || s === 'voice') joinFromConsent();
+        else if (s !== 'asking') requestConsent();
+    });
+    ui.consentSkip.addEventListener('click', skipConsent);
+    win.addEventListener('pagehide', stopConsentPreview);
+
     /* ---------------- Bob Ross Paint-Along ---------------- */
     function setBob(on, byUser) {
         const wasOn = app.bob.on;
@@ -3090,16 +3365,22 @@
         if (app.bob.on && !wasOn) { bobPlaybackSample = null; bobPlaybackIntentAt = Date.now(); }
         if (byUser) app.bob.touched = true;
         doc.body.classList.toggle('bob-mode', app.bob.on);
+        ui.modePill.hidden = !app.bob.on;
+        if (app.bob.on && !wasOn) setChatOpen(!(win.matchMedia && win.matchMedia('(max-width: 820px)').matches));
+        if (!app.bob.on && wasOn) { setChatOpen(true); setMore(false); setSoundtrackPop(false); }
         ui.bob.hidden = !app.bob.on;
         ui.bobToggle.setAttribute('aria-pressed', String(app.bob.on));
-        ui.bobToggle.textContent = app.bob.on ? 'Leave Bob mode' : 'Paint along with Bob';
+        ui.bobToggle.textContent = app.bob.on ? 'Exit Paint Along' : '🎨 Paint along with Bob';
         ui.bobHold.classList.toggle('host-only', !app.bob.on);
         ui.bobRewind.classList.toggle('host-only', !app.bob.on);
         ui.bobEpisodes.closest('details')?.classList.toggle('host-only', !app.bob.on);
         ui.hostNote.textContent = app.bob.on ? 'Everyone can play, pause, seek and choose a Bob Ross episode.'
             : app.isHost ? 'You started this room, so you drive the video and the wipe.' : 'The person who started the room drives the video.';
+        // No camera prompt pops up on its own (remote playback can switch Bob mode on): the inline
+        // camera+mic consent card waits for the person's tap. "Show my real canvas" stays under More.
+        paintConsent();
+        layout();
         if (app.bob.on) {
-            if (!wasOn && !app.av.cam && !app.av.canvas && !app.av.asked.cam) void toggleCanvasCam();
             if (!BOB.PALETTE.some((p) => p.hex === color)) pickColor(BOB.PALETTE[1].hex);
             const details = ui.bob.querySelector('details');
             if (details && win.matchMedia && win.matchMedia('(max-width: 820px)').matches) details.open = false;

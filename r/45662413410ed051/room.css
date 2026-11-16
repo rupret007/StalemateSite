@@ -73,43 +73,6 @@ body.bob-mode .brushes{display:flex;flex-wrap:wrap;gap:4px}
 .brush{background:var(--raised);color:var(--cream);border:2px solid var(--muted);padding:6px 9px;min-height:40px;cursor:pointer;font:inherit;font-size:.85rem}
 .brush[aria-pressed=true]{border-color:var(--lime);color:var(--lime)}
 .tile--canvas,.tiles .tile.tile--canvas{border-radius:6px;width:220px;aspect-ratio:4/3}
-/* Side by side: Bob on the left, your canvas on the right, everything else below. */
-body.bob-mode .room{grid-template-columns:minmax(0,1fr)}
-body.bob-mode .watch{align-self:start;min-width:0}
-body.bob-mode .draw{display:none}
-body.bob-mode .watch .screen{width:100%;max-width:none}
-body.bob-mode .call{grid-column:1;min-width:0}
-body.bob-mode .call .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-body.bob-mode .call .tiles .tile{width:100%;aspect-ratio:16/9;border-radius:6px}
-body.bob-mode .bob-camera-hint{color:var(--lime)}
-body.bob-mode .bob .btn,body.bob-mode .ep{min-height:44px}
-@media (max-width:820px){
-    /* Keep the player in document flow so scrolling chat and camera tiles can never sit beneath it. */
-    body.bob-mode .watch{position:relative;z-index:1;padding:8px}
-    body.bob-mode .watch h2,body.bob-mode .watch .small{display:none}
-    body.bob-mode .watch [data-video-status]{display:block}
-    body.bob-mode .room{grid-template-columns:1fr}
-    body.bob-mode .ep-list{max-height:180px;grid-template-columns:1fr}
-}
-@media (min-width:1024px){
-    body.bob-mode .room{grid-template-columns:minmax(0,7fr) minmax(260px,3fr);align-items:start}
-    body.bob-mode .watch{grid-column:1;grid-row:2}
-    body.bob-mode .call{grid-column:2;grid-row:2}
-    body.bob-mode .chat{grid-column:1/-1}
-}
-@media (max-width:820px){
-    body.bob-mode .hang-head .room-description:not([open])>p{display:none}
-    body.bob-mode .room-description{max-width:14rem}
-    body.bob-mode .bob-now{font-size:1rem}
-    body.bob-mode .call .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
-    body.bob-mode .call .tiles .tile{aspect-ratio:16/9}
-    body.bob-mode .call .tiles .tile[data-tile="me"]{width:min(34vw,120px);aspect-ratio:4/3;justify-self:end;grid-column:2;grid-row:2;z-index:2}
-    body.bob-mode .chat .log{height:160px;max-height:30vh}
-    body.bob-mode .watch .load,body.bob-mode .watch .picks{display:none}
-    body.bob-mode .bob{margin-top:6px;padding-top:4px}
-    body.bob-mode .bob .tools{margin-top:4px;gap:6px}
-    body.bob-mode .bob .btn{padding:8px 10px;font-size:.95rem}
-}
 .namebox{display:flex;gap:6px}.namebox input{flex:1}.dice{min-height:44px;white-space:nowrap}@media (max-width:420px){.namebox{flex-wrap:wrap}.namebox input{flex:1 1 100%}.dice{flex:1}}
 .lobby-link{background:var(--raised);color:var(--blue)}
 /* ---------- Faces & voices: Webex-style call ---------- */
@@ -224,70 +187,157 @@ body.bob-mode.faces-on .call{grid-column:auto}
     body.faces-on{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
 }
 
-/* Paint Along keeps Bob and the physical canvases visible together, even after cameras start. */
-@media (max-width:820px){
-    body.bob-mode.faces-on{height:auto;max-height:none;min-height:100dvh;overflow-x:hidden;overflow-y:auto;padding-bottom:0}
-    body.bob-mode.faces-on .hang-head{display:flex}
-    body.bob-mode.faces-on .watch{display:block;position:relative;top:auto;order:-2}
-    body.bob-mode.faces-on .call{display:flex;order:-1;overflow:visible;padding:8px;min-height:0}
-    body.bob-mode.faces-on .callbar{position:relative;left:auto;right:auto;bottom:auto;overflow:visible;flex-wrap:wrap;box-shadow:none;padding:8px 0}
-    body.bob-mode.faces-on .chat{display:block;order:0}
-    body.bob-mode.faces-on .room{height:auto;max-height:none;overflow:visible;grid-template-rows:auto;}
-    body.bob-mode.faces-on .tiles{flex:none;min-height:0}
-    body.bob-mode.faces-on .tiles .tile{aspect-ratio:16/9}
-    body.bob-mode.faces-on .tiles .tile[data-tile="me"]{width:min(34vw,120px);aspect-ratio:4/3;grid-column:2;grid-row:2;justify-self:end}
-}
 
 /* Match the lobby chrome without changing call or canvas geometry. */
 .btn:hover,.show-link:hover,.pick:hover,.ep:hover{filter:brightness(1.1)}
 .btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
 
-/* Paint Along workspace: shared video is the primary surface, with faces and chat beside it. */
-body.bob-mode .room{grid-template-columns:minmax(0,7fr) minmax(250px,2.6fr) minmax(280px,3fr);grid-template-rows:auto minmax(0,1fr);align-items:stretch;gap:12px}
-body.bob-mode .room>.bar{grid-column:1/-1;grid-row:1}
-body.bob-mode .watch{grid-column:1;grid-row:2;min-width:0}
-body.bob-mode .call{grid-column:2;grid-row:2;min-width:0;display:flex;flex-direction:column}
-body.bob-mode .chat{grid-column:3;grid-row:2;min-width:0}
-body.bob-mode .screen{width:100%;aspect-ratio:16/9}
-body.bob-mode .call .tiles{display:flex;flex-direction:column;flex:1;min-height:0;gap:10px}
-body.bob-mode .call .tiles .tile{width:100%;min-height:110px;aspect-ratio:16/9;border-radius:8px}
-body.bob-mode .callbar{margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
-body.bob-mode .callbar .btn{min-height:48px}
-body.bob-mode .chat .log{height:min(55vh,520px)}
-body.bob-mode .callbar [data-chat-toggle]{display:inline-flex}
-body.bob-mode .callbar [data-ico]{font-size:inherit;display:inline-flex;min-width:0;min-height:48px;line-height:normal}
-body.bob-mode .callbar [data-ico]::before,body.bob-mode .callbar [data-ico]::after{display:none}
-body.bob-mode .callbar [data-cam][aria-pressed=false]{background:#a92b36;border-color:#a92b36;color:white}
-body.bob-mode .callbar [data-cam][aria-pressed=true],body.bob-mode .callbar [data-mic][aria-pressed=true]{background:#247a49;border-color:#247a49;color:white}
-body.bob-mode .callbar [data-mic][aria-pressed=false]{background:#a92b36;border-color:#a92b36;color:white}
-body.bob-mode .callbar [data-hangup]{background:#a92b36;border-color:#a92b36;color:white}
+/* ---------- Call chrome shared by every room: grouped bar, Music popover, Leave ---------- */
+:root{--on:#1f7a45;--off:#b3261e;--danger:#c62828}
+.callbar{position:relative}
+.callbar-main,.callbar-more{display:contents}
+body:not(.bob-mode) [data-more],body:not(.bob-mode) [data-chat-toggle]{display:none}
 .leave-room{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;min-height:48px}
+.soundtrack-btn[aria-pressed=true]{background:var(--on);border-color:var(--on);color:#fff}
+.soundtrack-btn[aria-pressed=false]{background:var(--off);border-color:var(--off);color:#fff}
+.soundtrack-pop{position:absolute;z-index:50;bottom:calc(100% + 8px);left:0;width:min(320px,calc(100vw - 24px));display:grid;gap:10px;padding:14px;background:var(--raised);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px #000a}
+.soundtrack-pop .small{margin:0}
+.soundtrack-pop label{display:grid;gap:6px;font-weight:700}
+.soundtrack-pop input[type=range]{width:100%;min-height:44px;accent-color:var(--lime)}
+.soundtrack-pop .btn{min-height:48px}
+.mode-pill{display:inline-block;vertical-align:middle;margin-left:8px;padding:3px 10px;border-radius:999px;background:var(--blue);color:var(--ink);font-size:.9rem;letter-spacing:0;font-weight:800}
 .tile-start-video{display:none}
-.tile--nocam[data-tile="me"] .tile-start-video{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;z-index:3;min-height:48px;padding:10px 14px;background:#247a49;color:white;border:2px solid white;border-radius:8px;font:700 1rem var(--body);white-space:nowrap;cursor:pointer}
+.tile--nocam[data-tile="me"] .tile-start-video{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;z-index:3;min-height:48px;padding:10px 16px;background:var(--on);color:#fff;border:2px solid #fff;border-radius:999px;font:800 1rem var(--body);white-space:nowrap;cursor:pointer;box-shadow:0 6px 18px #000a}
+@media (max-width:820px){body.faces-on:not(.bob-mode) .callbar [data-soundtrack]{display:none}}
+
+/* ---------- Combined camera + mic consent card (Paint Along) ---------- */
+.consent{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--raised)}
+body:not(.bob-mode) .consent{display:none}
+.consent h3{margin:0;font-family:var(--display);font-size:1.05rem;color:var(--cream)}
+.consent-preview{position:relative;aspect-ratio:16/9;background:#050707;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:grid;place-items:center}
+.consent-preview video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:none}
+.consent[data-state=preview] .consent-preview video{display:block}
+.consent-placeholder{position:relative;margin:0;padding:10px;text-align:center;color:var(--muted);font-size:.9rem}
+.consent-copy{margin:0}
+.consent-meter{display:flex;gap:8px;align-items:center;font-size:.85rem;font-weight:700}
+.consent-meter meter{flex:1;height:12px}
+.consent-mic{display:flex;gap:10px;align-items:center;min-height:44px;font-weight:700}
+.consent-mic input{width:22px;height:22px;accent-color:var(--on)}
+.consent-error{margin:0;padding:8px 10px;border-radius:8px;background:#3a1416;color:#ffd7d4;border:1px solid var(--off);font-size:.9rem;line-height:1.35}
+.consent-actions{display:grid;gap:8px}
+.consent-actions .btn{min-height:52px;border-radius:10px;width:100%}
+.consent-go{background:var(--on);border-color:var(--on);color:#fff;font-size:1.15rem}
+.consent-go:disabled{opacity:.75;cursor:progress}
+
+/* ---------- Paint Along: Webex-style meeting layout ----------
+ * One fixed-height shell: the shared video stage is the largest surface, the camera
+ * filmstrip and chat sit beside it (desktop) or below it (phone), and the control bar is
+ * pinned at the bottom with the room ending above it, so nothing ever sits on the stage. */
+body.bob-mode,body.bob-mode.faces-on{--bar-h:84px;height:100vh;height:100dvh;max-height:100dvh;overflow:hidden;display:flex;flex-direction:column;padding-bottom:0}
+body.bob-mode .hang-head{flex:none;padding:8px 16px;gap:12px}
+body.bob-mode .hang-head img{width:28px;height:28px}
+body.bob-mode .hang-head h1{font-size:1.35rem}
+body.bob-mode .hang-head .room-description,body.bob-mode .hang-head [data-next-show]{display:none}
+body.bob-mode .hang-head .show-link{font-size:.95rem;padding:6px 10px}
+body.bob-mode .room,body.bob-mode.faces-on .room{flex:1 1 auto;min-height:0;height:auto;max-height:none;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:auto minmax(0,max-content) minmax(180px,1fr);gap:10px 12px;padding:10px 14px calc(var(--bar-h) + env(safe-area-inset-bottom,0px) + 10px)}
+body.bob-mode .room>.bar,body.bob-mode.faces-on .room>.bar{grid-column:1/-1;grid-row:1;order:0;gap:8px;padding:0;margin:0;flex-wrap:wrap}
+body.bob-mode .room>.bar .btn{min-height:44px;padding:7px 12px;font-size:.95rem}
+body.bob-mode .room>.bar .status{margin-left:auto}
+body.bob-mode .room>.bar .status:empty{display:none}
+body.bob-mode .draw{display:none}
+body.bob-mode .watch,body.bob-mode.faces-on .watch{display:flex;flex-direction:column;gap:8px;grid-column:1;grid-row:2/4;min-width:0;min-height:0;overflow:auto;padding:10px;position:static;order:0;background:#090c0d;border-radius:12px}
+body.bob-mode .watch>h2,body.bob-mode .watch [data-host-note],body.bob-mode .watch .load,body.bob-mode .watch .picks{display:none}
+body.bob-mode .watch .screen{flex:none;width:min(100%,calc((100dvh - var(--bar-h) - 230px) * 16 / 9));min-width:min(100%,320px);aspect-ratio:16/9;margin:0 auto;border-radius:10px;overflow:hidden}
+body.bob-mode .watch [data-video-status]{margin:0}
+body.bob-mode .tap{margin:0;align-self:center;min-height:48px}
+body.bob-mode .bob{margin:0;padding:0;border:0;display:grid;gap:6px}
+body.bob-mode .bob-now{font-size:1rem;letter-spacing:.02em}
+body.bob-mode .bob .tools{margin:0;gap:8px}
+body.bob-mode .bob .btn,body.bob-mode .ep{min-height:48px}
+body.bob-mode .call,body.bob-mode.faces-on .call{grid-column:2;grid-row:2;order:0;display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0;max-height:100%;overflow:auto;padding:10px;border-radius:12px}
+body.bob-mode .call>h2,body.bob-mode .call>.small,body.bob-mode .call>[data-turn-status],body.bob-mode .call>.jam-note{display:none}
+body.bob-mode .call>.host-call{margin:0;padding-top:6px}
+body.bob-mode .call .tiles,body.bob-mode.faces-on .call .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:auto;gap:8px;flex:none;min-height:0;position:static}
+body.bob-mode .call .tiles .tile{width:auto!important;height:auto;aspect-ratio:16/9!important;grid-column:span 2!important;grid-row:auto!important;justify-self:stretch!important;align-self:start!important;z-index:auto!important;border-radius:10px;border-width:3px;box-shadow:none!important}
+body.bob-mode .call .tiles .tile[data-tile="me"]{grid-column:2/3!important;border-color:var(--line)}
+body.bob-mode .call .tiles .tile[data-tile="me"].is-talking{border-color:var(--lime)}
+body.bob-mode .call .tiles .tile[data-tile="me"]:only-child{grid-column:span 2!important}
+body.bob-mode .call .tiles:has(.tile:nth-child(4)) .tile:not([data-tile="me"]){grid-column:span 1!important}
+body.bob-mode .call .tiles .tile .nm{font-size:.85rem}
+body.bob-mode.chat-closed .call{grid-row:2/4}
+body.bob-mode .chat,body.bob-mode.faces-on .chat{grid-column:2;grid-row:3;order:0;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:auto;padding:10px 12px;border-radius:12px}
 body.bob-mode.chat-closed .chat{display:none}
-body.bob-mode.chat-closed .room{grid-template-columns:minmax(0,7fr) minmax(250px,2.6fr)}
-body.bob-mode.chat-closed .watch{grid-column:1}
-body.bob-mode.chat-closed .call{grid-column:2}
-@media (min-width:821px){body.bob-mode .room{min-height:calc(100vh - 100px)}}
+body.bob-mode .chat details[open]{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+body.bob-mode .chat .log{flex:1 1 0;height:auto;min-height:48px}
+body.bob-mode .chat .say input{min-height:44px;min-width:0}
+body.bob-mode .chat .say .btn{min-height:44px}
+
+/* The control bar: big labeled buttons, icon over text, green = on, red = off/muted. */
+body.bob-mode .callbar,body.bob-mode.faces-on .callbar{position:fixed;left:0;right:0;bottom:0;z-index:35;margin:0;min-height:calc(var(--bar-h) + env(safe-area-inset-bottom,0px));display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:nowrap;overflow:visible;padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));background:#0b0e0f;border-top:1px solid var(--line);box-shadow:0 -6px 20px #0009}
+body.bob-mode .callbar .callbar-main{display:flex;gap:10px;align-items:stretch}
+body.bob-mode .callbar .callbar-main .btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:96px;min-height:64px;padding:6px 14px;border-radius:12px;font-size:.9rem;font-weight:800;line-height:1.1;white-space:nowrap;text-decoration:none;letter-spacing:0}
+body.bob-mode .callbar .callbar-main .btn::before{content:attr(data-ico);display:block;font-size:1.4rem;line-height:1}
+body.bob-mode .callbar .callbar-main .btn::after{content:none;display:none}
+body.bob-mode .callbar [data-mic][aria-pressed=true],body.bob-mode .callbar [data-cam][aria-pressed=true]{background:var(--on);border-color:var(--on);color:#fff}
+body.bob-mode .callbar [data-mic][aria-pressed=false],body.bob-mode .callbar [data-cam][aria-pressed=false]{background:var(--off);border-color:var(--off);color:#fff}
+body.bob-mode .callbar [data-cam]:disabled{opacity:.6;cursor:not-allowed}
+body.bob-mode .callbar [data-chat-toggle][aria-pressed=true]{background:#24302a;border-color:var(--lime);color:var(--cream)}
+body.bob-mode .callbar [data-chat-toggle][data-unread]{border-color:var(--amber);color:var(--amber)}
+body.bob-mode .callbar .leave-room{background:var(--danger);border-color:var(--danger);color:#fff}
+body.bob-mode .callbar .callbar-more{display:none}
+body.bob-mode.more-open .callbar .callbar-more{display:flex;flex-direction:column;align-items:stretch;gap:8px;position:absolute;z-index:50;right:16px;bottom:calc(100% + 8px);width:min(300px,calc(100vw - 16px));padding:12px;background:var(--raised);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px #000a}
+body.bob-mode.more-open .callbar .callbar-more .btn{min-height:48px;text-align:left;width:100%;font-size:1rem}
+body.bob-mode.more-open .callbar .callbar-more :is([data-hand],[data-settings],[data-canvas-cam]){display:block}
+body.bob-mode.more-open .callbar .callbar-more .reacts{display:flex;flex-wrap:wrap;gap:6px}
+body.bob-mode.more-open .callbar .callbar-more .reacts button{width:48px;height:48px}
+body.bob-mode .callbar [data-hangup]{display:none}
+body.bob-mode .callbar .soundtrack-pop{left:50%;transform:translateX(-50%)}
+body.bob-mode .faces-play{bottom:calc(var(--bar-h) + 8px + env(safe-area-inset-bottom,0px))}
+body.bob-mode .react-float{bottom:calc(var(--bar-h) + 16px)}
+
+/* Phone portrait: stage on top, faces in a row, chat as a drawer, bar in thumb reach. */
 @media (max-width:820px){
-    body.bob-mode .room{display:flex;flex-direction:column;padding:8px;gap:8px;min-width:0}
-    body.bob-mode .room>.bar{order:0}
-    body.bob-mode .watch{order:1;padding:8px;flex:none}
-    body.bob-mode .watch .screen{width:100%;aspect-ratio:16/9}
-    body.bob-mode .call{order:2;padding:8px;flex:none;min-height:0}
-    body.bob-mode .call .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:none;gap:6px}
-    body.bob-mode .call .tiles .tile{width:100%;min-height:0;aspect-ratio:16/9}
-    body.bob-mode .call .tiles .tile[data-tile="me"]{width:100%;aspect-ratio:16/9;grid-column:auto;grid-row:auto}
-    body.bob-mode .callbar{position:fixed;z-index:35;left:0;right:0;bottom:0;margin:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:var(--surface);box-shadow:0 -5px 18px #0008;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
-    body.bob-mode .callbar .btn{min-width:0;min-height:52px;padding:5px 3px;font-size:.75rem;white-space:normal}
-    body.bob-mode .callbar .leave-room{font-size:.75rem;padding:5px 3px}
-    body.bob-mode .callbar [data-hand],body.bob-mode .callbar [data-settings],body.bob-mode .callbar [data-canvas-cam],body.bob-mode .callbar [data-view-toggle],body.bob-mode .callbar [data-pip],body.bob-mode .callbar [data-reacts],body.bob-mode .callbar .host-only{display:none}
-    body.bob-mode .callbar [data-ico]{display:grid;min-width:0;min-height:52px;font-size:.75rem}
-    body.bob-mode .callbar [data-ico]::before{font-size:1.2rem}
-    body.bob-mode .callbar [data-ico]::after{font-size:.7rem}
-    body.bob-mode .chat{order:3;display:block;margin-bottom:68px}
-    body.bob-mode .chat .log{height:160px;max-height:25vh}
-    body.bob-mode.chat-closed .chat{display:none}
-    body.bob-mode .watch .load,body.bob-mode .watch .picks{display:none}
-    body.bob-mode .call .small,body.bob-mode .call>[data-turn-status],body.bob-mode .call>[data-hands]{display:none}
+    body.bob-mode,body.bob-mode.faces-on{--bar-h:72px}
+    body.bob-mode .hang-head,body.bob-mode.faces-on .hang-head{display:none}
+    body.bob-mode .room,body.bob-mode.faces-on .room{display:flex;flex-direction:column;gap:6px;padding:6px 6px calc(var(--bar-h) + env(safe-area-inset-bottom,0px) + 6px)}
+    body.bob-mode .room>.bar,body.bob-mode.faces-on .room>.bar{flex:none;gap:6px}
+    body.bob-mode .room>.bar .btn{min-height:44px;padding:6px 10px;font-size:.85rem}
+    body.bob-mode.faces-on .room>.bar .btn--bob{display:inline-block}
+    body.bob-mode .room>.bar .peers{font-size:1rem}
+    body.bob-mode .room>.bar .status{flex:1 1 100%;margin:0;font-size:.85rem}
+    body.bob-mode .watch,body.bob-mode.faces-on .watch{flex:0 1 auto;padding:0;gap:6px;background:none;border:0;border-radius:0}
+    body.bob-mode .watch .screen{width:100%;min-width:0;border-radius:8px}
+    body.bob-mode .bob{min-height:0;overflow:auto}
+    body.bob-mode .bob-now{font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    body.bob-mode .bob .tools{flex-wrap:nowrap}
+    body.bob-mode .bob .tools .btn{flex:1 1 0;min-width:0;padding:6px 8px;font-size:.85rem;white-space:normal}
+    body.bob-mode .ep-list{max-height:30vh;grid-template-columns:1fr}
+    body.bob-mode .call,body.bob-mode.faces-on .call{flex:none;padding:0;gap:6px;background:none;border:0;overflow:visible;max-height:none}
+    body.bob-mode .call>.host-call{display:none}
+    body.bob-mode .consent{grid-template-columns:minmax(0,42%) minmax(0,1fr);align-items:start;padding:8px;gap:6px 8px}
+    body.bob-mode .consent h3{grid-column:1/-1;grid-row:1}
+    body.bob-mode .consent-preview{grid-column:1;grid-row:2}
+    body.bob-mode .consent-copy{grid-column:2;grid-row:2;align-self:center}
+    body.bob-mode .consent-meter,body.bob-mode .consent-mic,body.bob-mode .consent-error,body.bob-mode .consent-actions{grid-column:1/-1}
+    body.bob-mode .consent-copy{font-size:.8rem}
+    body.bob-mode .consent-placeholder{font-size:.75rem;padding:4px}
+    body.bob-mode .consent-actions{grid-template-columns:1fr 1fr}
+    body.bob-mode .consent-actions .btn{font-size:.95rem;padding:6px 8px;white-space:normal}
+    body.bob-mode .call .tiles,body.bob-mode.faces-on .call .tiles{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory}
+    body.bob-mode .call .tiles .tile{flex:0 0 calc(58% - 3px);height:118px;aspect-ratio:auto!important;scroll-snap-align:start}
+    body.bob-mode .call .tiles .tile[data-tile="me"]{flex:0 0 calc(42% - 3px)}
+    body.bob-mode .call .tiles .tile .more{width:44px;height:44px}
+    body.bob-mode .call .tiles .tile-start-video{font-size:.9rem;padding:8px 12px}
+    body.bob-mode .chat,body.bob-mode.faces-on .chat{flex:1 1 0;min-height:0;padding:8px 10px;border-radius:14px 14px 8px 8px;border-top:2px solid var(--lime)}
+    body.bob-mode .callbar,body.bob-mode.faces-on .callbar{padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));gap:0}
+    body.bob-mode .callbar .callbar-main{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;width:100%}
+    body.bob-mode .callbar .callbar-main .btn{min-width:0;min-height:58px;padding:4px 2px;font-size:.68rem;white-space:normal;text-align:center;border-radius:10px}
+    body.bob-mode .callbar .callbar-main .btn::before{font-size:1.25rem}
+    body.bob-mode.more-open .callbar .callbar-more,body.bob-mode .callbar .soundtrack-pop{position:fixed;left:8px;right:8px;width:auto;transform:none;bottom:calc(var(--bar-h) + env(safe-area-inset-bottom,0px) + 6px)}
+    body.bob-mode.more-open .callbar .callbar-more{display:grid;grid-template-columns:1fr 1fr}
+    body.bob-mode.more-open .callbar .callbar-more .reacts{grid-column:1/-1}
+    body.bob-mode .callbar .callbar-more .btn{white-space:normal}
+}
+@media (max-width:820px) and (orientation:landscape){
+    body.bob-mode .watch .screen{width:min(100%,calc((100dvh - var(--bar-h) - 60px) * 16 / 9));margin:0 auto}
 }

@@ -74,7 +74,7 @@ test('turning on the camera during screen share replaces the display track', asy
     await page.click('[data-share]');
     await expect(page.locator('[data-share]')).toHaveText('Stop sharing');
     await enable(page, 'cam');
-    await expect(page.locator('[data-cam]')).toHaveText('Turn off my camera');
+    await expect(page.locator('[data-cam]')).toHaveText('Stop video');
     await expect(page.locator('[data-share]')).toHaveText('Share screen');
     expect(await page.evaluate(() => window.testDisplayStream.getVideoTracks()[0].readyState)).toBe('ended');
     expect(await page.evaluate(() => window.__hangout.av.rawCam.readyState)).toBe('live');

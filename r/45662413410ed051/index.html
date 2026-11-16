@@ -32,7 +32,7 @@
     <header class="hang-head">
         <img src="../../assets/mark.svg" alt="" width="40" height="40">
         <div>
-            <h1>Hang Out</h1>
+            <h1>Hang Out <span class="mode-pill" data-mode-pill hidden>🎨 Paint Along</span></h1>
             <details class="room-description" open><summary class="tag">Room details</summary><p class="tag">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p></details>
         </div>
         <a class="show-link lobby-link" href="lobby/">← #stalemate lobby</a>
@@ -60,7 +60,7 @@
         <div class="bar">
             <span class="peers" data-peers>Just you</span>
             <button class="btn" data-copy type="button">Copy invite link</button>
-            <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">Paint along with Bob</button>
+            <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">🎨 Paint along with Bob</button>
             <button class="btn btn--ghost" data-private-report type="button" hidden>Report a problem to staff</button>
             <span class="status" data-status role="status"></span>
         </div>
@@ -116,22 +116,48 @@
             <p class="small" data-turn-status role="status"></p>
             <p class="small jam-note" data-jam-note hidden>🎸 Jam room: your music goes through the WebJam app (plug in Ethernet). The browser mic is just for talking between songs, so it starts off and nobody hears you twice.</p>
             <p class="hands" data-hands hidden></p>
+            <section class="consent" data-consent data-state="idle" aria-labelledby="consent-title" hidden>
+                <h3 id="consent-title" data-consent-title>Join with camera and mic</h3>
+                <div class="consent-preview">
+                    <video data-consent-video autoplay playsinline muted></video>
+                    <p class="consent-placeholder" data-consent-placeholder>📷 Your preview shows here. Nothing turns on until you tap the button.</p>
+                </div>
+                <label class="consent-meter" data-consent-meter-wrap hidden>Mic <meter data-consent-meter min="0" max="1" low="0.1" high="0.8" optimum="0.5" value="0"></meter></label>
+                <p class="small consent-copy" data-consent-copy>One tap asks your browser for camera and mic together. Cameras are for adults 18+. Only people in this room see and hear you.</p>
+                <label class="consent-mic" data-consent-mic-wrap hidden><input type="checkbox" data-consent-mic checked> Join with my mic on</label>
+                <p class="consent-error" data-consent-error role="alert" hidden></p>
+                <div class="consent-actions">
+                    <button class="btn consent-go" data-consent-on type="button">Turn on camera</button>
+                    <button class="btn btn--ghost" data-consent-skip type="button">Join without camera</button>
+                </div>
+            </section>
             <div class="tiles" data-tiles data-view="grid"></div>
             <button class="btn faces-play" type="button" data-faces-play hidden>Tap to play and unmute</button>
             <div class="react-float" data-react-float aria-live="polite"></div>
             <div class="tools callbar" role="toolbar" aria-label="Call controls">
-                <button class="btn" type="button" data-mic>Unmute mic</button>
-                <button class="btn" type="button" data-cam>Start video</button>
-                <button class="btn btn--ghost" type="button" data-chat-toggle aria-expanded="true" aria-controls="room-chat">Chat</button>
-                <a class="btn btn--ghost leave-room" href="lobby/">Leave</a>
-                <button class="btn btn--ghost desk-only" type="button" data-share aria-pressed="false">Share screen</button>
-                <button class="btn btn--ghost" type="button" data-hand aria-pressed="false">Raise hand</button>
-                <span class="reacts" data-reacts role="group" aria-label="Reactions"></span>
-                <button class="btn btn--ghost" type="button" data-view-toggle hidden>Speaker view</button>
-                <button class="btn btn--ghost" type="button" data-pip hidden>Pop out</button>
-                <button class="btn btn--ghost" type="button" data-settings>⚙ Camera &amp; background</button>
-                <button class="btn btn--bob" type="button" data-canvas-cam aria-pressed="false">Show my real canvas</button>
-                <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
+                <div class="callbar-main">
+                    <button class="btn" type="button" data-mic>Unmute mic</button>
+                    <button class="btn" type="button" data-cam>Start video</button>
+                    <button class="btn soundtrack-btn" type="button" data-soundtrack aria-expanded="false" aria-controls="soundtrack-pop" aria-pressed="true" title="Volume of the shared video only. People’s mics are not affected.">Music</button>
+                    <button class="btn btn--ghost" type="button" data-chat-toggle aria-expanded="true" aria-controls="room-chat" data-ico="💬" data-short="Chat">Chat</button>
+                    <button class="btn btn--ghost more-btn" type="button" data-more aria-expanded="false" aria-controls="callbar-more" data-ico="⋯" data-short="More">More</button>
+                    <a class="btn btn--ghost leave-room" href="lobby/" data-ico="🚪" data-short="Leave">Leave</a>
+                </div>
+                <div class="soundtrack-pop" id="soundtrack-pop" data-soundtrack-pop role="group" aria-label="Music (shared video sound)" hidden>
+                    <p class="small">Music is the shared video’s sound. It never mutes anyone’s mic.</p>
+                    <label>Music volume <input type="range" min="0" max="100" step="5" value="80" data-soundtrack-vol></label>
+                    <button class="btn" type="button" data-soundtrack-mute aria-pressed="false">Mute music</button>
+                </div>
+                <div class="callbar-more" id="callbar-more" data-callbar-more>
+                    <button class="btn btn--ghost desk-only" type="button" data-share aria-pressed="false">Share screen</button>
+                    <button class="btn btn--ghost" type="button" data-hand aria-pressed="false">Raise hand</button>
+                    <span class="reacts" data-reacts role="group" aria-label="Reactions"></span>
+                    <button class="btn btn--ghost" type="button" data-view-toggle hidden>Speaker view</button>
+                    <button class="btn btn--ghost" type="button" data-pip hidden>Pop out</button>
+                    <button class="btn btn--ghost" type="button" data-settings>⚙ Camera &amp; background</button>
+                    <button class="btn btn--bob" type="button" data-canvas-cam aria-pressed="false">Show my real canvas</button>
+                    <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
+                </div>
             </div>
             <div class="tools host-only host-call">
                 <button class="btn btn--ghost" type="button" data-lock aria-pressed="false">Lock faces</button>

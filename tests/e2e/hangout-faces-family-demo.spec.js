@@ -143,7 +143,7 @@ async function turnCamera(page) {
     await expect(yes).toBeVisible();
     taps.push(scrub(await yes.innerText()));
     await yes.click();
-    await expect(page.locator('[data-cam]')).toHaveText('Turn off my camera');
+    await expect(page.locator('[data-cam]')).toHaveText('Stop video');
     const id = await page.evaluate(() => window.__hangout.myId);
     return { taps, started, id };
 }
@@ -442,7 +442,7 @@ test('four people in one private Hang Out room can see each other', async ({ bro
         const voiceYes = eden.locator('[data-ask-yes]');
         voiceTaps.push(scrub(await voiceYes.innerText()));
         await voiceYes.click();
-        await expect(eden.locator('[data-mic]')).toHaveText('Mute my mic');
+        await expect(eden.locator('[data-mic]')).toHaveText('Mute mic');
         await expect(eden.locator('[data-status]')).toContainText('voice only');
         await expect.poll(async () => {
             const tiles = await Promise.all(people.map(async (person) => {
@@ -467,10 +467,10 @@ test('four people in one private Hang Out room can see each other', async ({ bro
         const blairTile = host.locator('[data-tiles] .tile', { hasText: 'Blair' });
         await blairTile.locator('.more').click();
         await host.locator('[data-tile-menu] button', { hasText: 'Turn their camera off' }).click();
-        await expect(guests[0].page.locator('[data-cam]')).toHaveText('Turn on my camera');
-        await expect(guests[1].page.locator('[data-cam]')).toHaveText('Turn off my camera');
-        await expect(drew.page.locator('[data-cam]')).toHaveText('Turn off my camera');
-        await expect(host.locator('[data-cam]')).toHaveText('Turn off my camera');
+        await expect(guests[0].page.locator('[data-cam]')).toHaveText('Start video');
+        await expect(guests[1].page.locator('[data-cam]')).toHaveText('Stop video');
+        await expect(drew.page.locator('[data-cam]')).toHaveText('Stop video');
+        await expect(host.locator('[data-cam]')).toHaveText('Stop video');
         await expect.poll(async () => {
             const rows = await remoteWidths(host);
             const casey = rows.find((row) => row.name.includes('Casey'));
@@ -701,7 +701,7 @@ async function releaseRooms() {
 async function turnMic(page) {
     await page.locator('[data-mic]').click();
     await page.locator('[data-ask-yes]').click();
-    await expect(page.locator('[data-mic]')).toHaveText('Mute my mic');
+    await expect(page.locator('[data-mic]')).toHaveText('Mute mic');
 }
 async function meshSnapshot(pages) {
     return Promise.all(pages.map((page) => page.evaluate(async () => {
@@ -799,7 +799,7 @@ test('camera-denied guest is heard, still sees faces, and Leave stays visible', 
     await guest.locator('[data-ask-yes]').click();
     await expect(guest.locator('[data-ask-title]')).toHaveText('Camera’s not available');
     await guest.locator('[data-ask-yes]').click();
-    await expect(guest.locator('[data-mic]')).toHaveText('Mute my mic');
+    await expect(guest.locator('[data-mic]')).toHaveText('Mute mic');
     await expect(guest.locator('[data-status]')).toContainText('voice only');
     const leave = await layoutAudit(guest);
     expect(leave.controls.hangup.onScreen && leave.controls.hangup.short === 'Leave' && !leave.controls.hangup.hidden).toBe(true);

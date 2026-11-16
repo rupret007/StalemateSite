@@ -756,7 +756,7 @@ test('mic-only peer attaches an active media element so remote audio plays', asy
 
     await guest.click('[data-mic]');
     await guest.click('[data-ask-yes]');
-    await expect(host.locator('[data-mic]')).toHaveText('Turn on my mic');
+    await expect(host.locator('[data-mic]')).toHaveText('Unmute mic');
 
     await expect.poll(() => host.evaluate(() => {
         const v = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
@@ -833,7 +833,7 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
 
     await host.click('[data-cam]');
     await host.click('[data-ask-yes]');
-    await expect(host.locator('[data-cam]')).toHaveText('Turn off my camera');
+    await expect(host.locator('[data-cam]')).toHaveText('Stop video');
     const settings = await host.evaluate(() => window.__hangout.av.stream.getVideoTracks()[0].getSettings());
     expect(settings.width).toBeLessThanOrEqual(640);
     expect(settings.frameRate).toBeLessThanOrEqual(24);
