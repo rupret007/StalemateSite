@@ -43,6 +43,9 @@ test('participants share pause, play, seek and late-join state; responsive three
     const c = await participant(browser, 'SyncPainterC', { width: 390, height: 844 });
     try {
         await a.click('[data-start="bobross"]');
+        // Room creation is asynchronous. Wait for the host's real player before
+        // reading the current room and inviting the other two participants.
+        await expect(a.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
         const room = await a.evaluate(() => window.__lobby.active);
         await b.evaluate(channel => window.__lobby.cmd('join', [channel]), room);
         if (await b.locator('[data-cam-no]').isVisible()) await b.click('[data-cam-no]');

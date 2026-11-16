@@ -908,7 +908,8 @@
             recordHost(msg, meta.t);
             return;
         case 'watch-playback': {
-            const { source, playing, pos, localApplied } = msg.body || {};
+            const { source: requested, playing, pos, localApplied } = msg.body || {};
+            const source = H.cleanSource(requested);
             if (!app.isHost || typeof playing !== 'boolean' || !Number.isFinite(pos) || pos < 0 || pos > 86400
                 || !canSharePlayback(source, { chooseEpisode: playing && pos === 0 })) return;
             const control = { by: meta.from, localApplied: localApplied === true };
@@ -3442,7 +3443,9 @@
     }
     function showEpisode() {
         const ep = currentEpisode();
-        if (ep && !app.bob.on && !app.bob.touched) setBob(true);
+        const activity = app.lastVideoSigned?.signed.body.activity;
+        const paintSelected = activity === 'paint' || (activity !== 'watch' && ep);
+        if (paintSelected && !app.bob.on && !app.bob.touched) setBob(true);
         else syncSharedLayout();
         const video = app.state.video;
         const by = app.lastVideoSigned?.signed.body.control?.by;
