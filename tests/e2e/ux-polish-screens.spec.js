@@ -1,7 +1,7 @@
 // Paint Along, Webex-style: big shared stage, camera filmstrip, chat panel/drawer and a
 // labeled bottom control bar, at phone (390x844) and desktop (1440x900) sizes, with two
 // people on fake media. Also covers the single camera+mic consent step (preview, denial,
-// retry, join without camera, rejoin) and that Music never touches the mic.
+// retry, join without camera, rejoin) and that video sound never touches the mic.
 // Screenshots: test-results/ux-screens/{phone-stage,phone-join-consent,phone-chat-drawer,desktop-webex,desktop-join-consent}.png
 const path = require('node:path');
 const fs = require('node:fs/promises');
@@ -140,7 +140,7 @@ async function expectBigLabeledControls(page) {
         expect((await button.innerText()).trim()).not.toBe('');
     }
     for (const text of ['Stop video', 'Mute mic', 'Chat', 'Leave']) await expect(page.locator('.callbar .callbar-main').getByText(text, { exact: true })).toBeVisible();
-    await expect(page.locator('[data-soundtrack]')).toContainText('Music');
+    await expect(page.locator('[data-soundtrack]')).toContainText('Video sound');
     // Green = on (camera and mic are on now).
     const bg = (sel) => page.locator(sel).evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(await bg('[data-cam]')).toBe('rgb(31, 122, 69)');
@@ -211,11 +211,11 @@ test('Paint Along phone 390x844: stage on top, faces row, chat drawer, pinned la
     await host.click('[data-chat-toggle]');
     await expect(host.locator('.chat')).toBeHidden();
 
-    // Music is the shared video's sound only: muting it leaves the conversation alone.
+    // Muting the shared video leaves the conversation alone.
     await host.click('[data-soundtrack]');
     await expect(host.locator('[data-soundtrack-pop]')).toBeVisible();
     await host.click('[data-soundtrack-mute]');
-    await expect(host.locator('[data-soundtrack]')).toContainText('Music muted');
+    await expect(host.locator('[data-soundtrack]')).toContainText('Video muted');
     await expect(host.locator('[data-mic]')).toHaveText('Mute mic');
     expect(await host.evaluate(() => window.__hangout.av.mic && window.__hangout.av.stream.getAudioTracks().some((t) => t.enabled && t.readyState === 'live'))).toBe(true);
     await host.keyboard.press('Escape');

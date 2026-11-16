@@ -238,3 +238,49 @@ test('a guest pauses, plays and seeks for everyone, including a late join', asyn
         await guestContext.close();
     }
 });
+
+test('music, video sound, game effects and live microphone remain independent', async ({ context, baseURL, viewport }) => {
+    const { host, guest, guestContext } = await paintPair(context, baseURL, viewport);
+    try {
+        await joinWithCamera(host);
+        await joinWithCamera(guest);
+        const videoSound = host.locator('[data-soundtrack]');
+        const music = host.locator('[data-music-toggle]');
+        const micState = () => host.evaluate(() => window.__hangout.av.stream.getAudioTracks()
+            .some(track => track.enabled && track.readyState === 'live'));
+        const remoteMic = () => guest.locator('[data-tiles] .tile:not([data-tile="me"]) video').evaluate(video =>
+            video.srcObject?.getAudioTracks().some(track => track.enabled && track.readyState === 'live'));
+        await expect.poll(remoteMic).toBe(true);
+        const videoIsMuted = () => host.evaluate(() => window.__ytLog[0].isMuted());
+        await host.evaluate(() => localStorage.setItem('turdsuite_muted', '1'));
+        await host.locator('[data-more]').click();
+        await expect(music).toHaveText('Music on');
+        await expect(music).toHaveAttribute('aria-pressed', 'true');
+        await expect(music).toHaveCSS('background-color', 'rgb(31, 122, 69)');
+        await music.click();
+        await host.locator('[data-more]').click();
+        await expect(music).toHaveText('Music off');
+        await expect(music).toHaveAttribute('aria-pressed', 'false');
+        await expect(music).toHaveCSS('background-color', 'rgb(179, 38, 30)');
+        expect(await videoIsMuted()).toBe(false);
+        expect(await micState()).toBe(true);
+        expect(await remoteMic()).toBe(true);
+
+        await videoSound.click();
+        await host.locator('[data-soundtrack-mute]').click();
+        await expect(videoSound).toHaveText('Video muted');
+        await expect(videoSound).toHaveAttribute('aria-pressed', 'false');
+        await expect.poll(videoIsMuted).toBe(true);
+        expect(await guest.evaluate(() => window.__ytLog[0].isMuted())).toBe(false);
+        expect(await micState()).toBe(true);
+        expect(await remoteMic()).toBe(true);
+
+        await host.locator('[data-soundtrack-mute]').click();
+        await expect.poll(videoIsMuted).toBe(false);
+        await expect(videoSound).toHaveAttribute('aria-pressed', 'true');
+        expect(await host.evaluate(() => localStorage.getItem('stalemate.music'))).toBe('off');
+        expect(await host.evaluate(() => localStorage.getItem('turdsuite_muted'))).toBe('1');
+    } finally {
+        await guestContext.close();
+    }
+});

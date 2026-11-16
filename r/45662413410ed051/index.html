@@ -138,15 +138,14 @@
                 <div class="callbar-main">
                     <button class="btn" type="button" data-mic>Unmute mic</button>
                     <button class="btn" type="button" data-cam>Start video</button>
-                    <button class="btn soundtrack-btn" type="button" data-soundtrack aria-expanded="false" aria-controls="soundtrack-pop" aria-pressed="true" title="Volume of the shared video only. People’s mics are not affected.">Music</button>
+                    <button class="btn soundtrack-btn" type="button" data-soundtrack aria-expanded="false" aria-controls="soundtrack-pop" aria-pressed="true" title="Volume of the shared video">Video sound</button>
                     <button class="btn btn--ghost" type="button" data-chat-toggle aria-expanded="true" aria-controls="room-chat" data-ico="💬" data-short="Chat">Chat</button>
                     <button class="btn btn--ghost more-btn" type="button" data-more aria-expanded="false" aria-controls="callbar-more" data-ico="⋯" data-short="More">More</button>
                     <a class="btn btn--ghost leave-room" href="lobby/" data-ico="🚪" data-short="Leave">Leave</a>
                 </div>
-                <div class="soundtrack-pop" id="soundtrack-pop" data-soundtrack-pop role="group" aria-label="Music (shared video sound)" hidden>
-                    <p class="small">Music is the shared video’s sound. It never mutes anyone’s mic.</p>
-                    <label>Music volume <input type="range" min="0" max="100" step="5" value="80" data-soundtrack-vol></label>
-                    <button class="btn" type="button" data-soundtrack-mute aria-pressed="false">Mute music</button>
+                <div class="soundtrack-pop" id="soundtrack-pop" data-soundtrack-pop role="group" aria-label="Video sound" hidden>
+                    <label>Video volume <input type="range" min="0" max="100" step="5" value="80" data-soundtrack-vol></label>
+                    <button class="btn" type="button" data-soundtrack-mute aria-pressed="false">Mute video</button>
                 </div>
                 <div class="callbar-more" id="callbar-more" data-callbar-more>
                     <button class="btn btn--ghost desk-only" type="button" data-share aria-pressed="false">Share screen</button>
@@ -154,6 +153,7 @@
                     <span class="reacts" data-reacts role="group" aria-label="Reactions"></span>
                     <button class="btn btn--ghost" type="button" data-view-toggle hidden>Speaker view</button>
                     <button class="btn btn--ghost" type="button" data-pip hidden>Pop out</button>
+                    <button class="btn soundtrack-btn" type="button" data-music-toggle>Music</button>
                     <button class="btn btn--ghost" type="button" data-settings>⚙ Camera &amp; background</button>
                     <button class="btn btn--bob" type="button" data-canvas-cam aria-pressed="false">Show my real canvas</button>
                     <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
@@ -242,6 +242,7 @@
     <dialog class="ask tile-menu" data-tile-menu></dialog>
 
     <script src="../../countdown.js" defer></script>
+    <script src="../../js/music-preference.js"></script>
     <script src="sync-core.js"></script>
     <script src="private-snapshot.js"></script>
     <script src="private-recovery.js"></script>

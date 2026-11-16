@@ -5,3 +5,7 @@
 - Done 2 — Checked the full-width 16:9 stage with two live camera tiles and chat both closed and open.
 - Evidence — Both engines pass viewport, area, stacking and hit-testing assertions at 390×844 and 375×667.
 - Next — Fix the late guest’s paused player and verify guest playback controls.
+
+- Done 4 — Retained the newest accepted Paint Along playback when a drawing snapshot arrives.
+- Evidence — The guest pauses, plays and seeks for both players, and a late guest inherits the playback position. Both phone projects and the existing Hang Out guest-control test pass.
+- Next — Separate local music, video sound and mic controls and verify game sound preferences stay independent.

@@ -3135,8 +3135,7 @@
         if (event.target.closest('button') && doc.body.classList.contains('more-open')) setMore(false);
     });
 
-    /* Music = the shared video's soundtrack only. It never touches anyone's mic, the
-     * mic's Music mode (echo processing) or game sound effects. */
+    /* Local video volume is independent of the site music preference and call audio. */
     try {
         const saved = JSON.parse(localStorage.getItem('hangout-soundtrack') || 'null');
         if (saved && Number.isFinite(Number(saved.volume))) app.soundtrack.volume = Math.max(0, Math.min(100, Number(saved.volume)));
@@ -3145,15 +3144,16 @@
     function applySoundtrack() {
         const s = app.soundtrack;
         const vol = Math.max(0, Math.min(100, Math.round(s.volume)));
+        const silent = s.muted || vol === 0;
         try { ui.file.volume = vol / 100; } catch (error) { /* read-only volume (iOS) */ }
-        if (s.muted) { ui.file.muted = true; ui.file.__soundtrackMuted = true; }
+        if (silent) { ui.file.muted = true; ui.file.__soundtrackMuted = true; }
         else if (ui.file.__soundtrackMuted) { ui.file.muted = false; ui.file.__soundtrackMuted = false; }
         const yt = player.yt;
         if (yt) {
             try {
                 if (typeof yt.setVolume === 'function') yt.setVolume(vol);
-                if (s.muted && typeof yt.mute === 'function') { yt.mute(); yt.__soundtrackMuted = true; }
-                else if (!s.muted && yt.__soundtrackMuted && typeof yt.unMute === 'function') { yt.unMute(); yt.__soundtrackMuted = false; }
+                if (silent && typeof yt.mute === 'function') { yt.mute(); yt.__soundtrackMuted = true; }
+                else if (!silent && yt.__soundtrackMuted && typeof yt.unMute === 'function') { yt.unMute(); yt.__soundtrackMuted = false; }
             } catch (error) { /* player not ready */ }
         }
         paintSoundtrack();
@@ -3161,12 +3161,12 @@
     function paintSoundtrack() {
         const s = app.soundtrack;
         const silent = s.muted || s.volume <= 0;
-        ui.soundtrack.textContent = silent ? 'Music muted' : `Music ${Math.round(s.volume)}%`;
-        ui.soundtrack.dataset.ico = silent ? '🔕' : '🎵';
-        ui.soundtrack.dataset.short = silent ? 'Muted' : 'Music';
+        ui.soundtrack.textContent = silent ? 'Video muted' : 'Video sound';
+        ui.soundtrack.dataset.ico = silent ? '🔇' : '🔊';
+        ui.soundtrack.dataset.short = silent ? 'Muted' : 'Video';
         ui.soundtrack.setAttribute('aria-pressed', String(!silent));
-        ui.soundtrack.setAttribute('aria-label', `${silent ? 'Music muted' : `Music volume ${Math.round(s.volume)}%`}. Shared video sound only; mics are not affected.`);
-        ui.soundtrackMute.textContent = s.muted ? 'Unmute music' : 'Mute music';
+        ui.soundtrack.setAttribute('aria-label', silent ? 'Video muted' : `Video sound ${Math.round(s.volume)}%`);
+        ui.soundtrackMute.textContent = s.muted ? 'Unmute video' : 'Mute video';
         ui.soundtrackMute.setAttribute('aria-pressed', String(s.muted));
         ui.soundtrackVol.value = String(Math.round(s.volume));
     }
