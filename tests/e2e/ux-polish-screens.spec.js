@@ -272,6 +272,7 @@ test('Paint Along desktop 1440x900: Webex layout with stage, filmstrip, chat pan
 async function watchTogetherPair(browser, origin, viewport) {
     const host = await openPage(browser, viewport);
     await enter(host, roomUrl(origin), 'Host');
+    await host.click('[data-watch-toggle]');
     await host.click('[data-pick-yt="BtnyqIHTDMM"]');
     await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'BtnyqIHTDMM');
     const guest = await openPage(browser, viewport);

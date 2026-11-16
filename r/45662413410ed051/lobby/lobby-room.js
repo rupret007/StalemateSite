@@ -581,10 +581,7 @@
         }
         function canDriveVideo() { return state.kind === 'bobross' || isOp(); }
         setInterval(() => {
-            syncToState(false);
-        }, 2000);
-        setInterval(() => {
-            if (state.kind !== 'watch' || !isOp()) return;
+            if (state.kind !== 'watch' || !isOp()) return syncToState(false);
             const v = state.room.video;
             if (!v || !player.yt || (!player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
             const pos = localTime(), playing = localPlaying();

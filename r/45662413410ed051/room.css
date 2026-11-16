@@ -55,6 +55,7 @@ body:not(.is-host) .host-only{display:none}
 [hidden]{display:none!important}
 .tiles .tile{margin:0;width:96px}
 /* ---------- Bob Ross Paint-Along ---------- */
+.watch-room-toggle{min-height:48px}
 .btn--bob{background:var(--blue);border-color:var(--blue);color:var(--ink)}
 .btn--bob[aria-pressed=true]{background:var(--pink);border-color:var(--pink);color:var(--ink)}
 body.is-host .guest-only{display:none}
@@ -375,4 +376,8 @@ body.shared-layout .consent[hidden]{display:none}
     body.shared-layout.is-host:not(.bob-mode) .watch .load{display:grid;grid-template-columns:minmax(0,1fr) auto;margin:0}
     body.shared-layout.is-host:not(.bob-mode) .watch .picks{flex-wrap:nowrap;overflow-x:auto;margin:0}
     body.shared-layout.is-host:not(.bob-mode) .watch .picks .pick{flex:none}
+}
+
+@media (min-width:821px){
+    body.bob-mode.is-host .watch :is(.load,.picks){display:flex}
 }

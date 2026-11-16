@@ -161,6 +161,7 @@ async function sharedPair(context, origin, viewport, mode = 'paint') {
         await host.locator('[data-bob-toggle]').click();
         invite = inviteFor(host);
     } else {
+        await host.locator('[data-watch-toggle]').click();
         await host.locator('[data-pick-yt="BtnyqIHTDMM"]').click();
         await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
         await host.evaluate(() => {
