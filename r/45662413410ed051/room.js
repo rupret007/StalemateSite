@@ -1731,9 +1731,10 @@
             } catch (error) {
                 if (version !== captureVersion[mediaKind]) return;
                 if (needsOpenBrowserHint(error)) { say(openBrowserHint); return; }
-                if (captureBusyOrStuck(error)) { say(captureBusyMessage(kind)); return; }
+                // Busy camera still gets the voice-only offer below; a busy mic just gets the reload hint.
+                if (captureBusyOrStuck(error)) { say(captureBusyMessage(kind)); if (!(kind === 'cam' && !app.av.mic && !app.av.jam)) return; }
                 if (kind === 'cam' && !app.av.mic && !app.av.jam) {
-                    // No camera (blocked or missing)? Don't strand them: offer voice only.
+                    // No camera (blocked, missing or busy)? Don't strand them: offer voice only.
                     const voiceConstraints = { audio: V.micConstraints(app.av.music, prefs().mic) };
                     const voice = await ask('Camera’s not available', 'Join with just your voice? You can add the camera later.', {
                         onYes: () => { primedCapture = startCapture(voiceConstraints); }
