@@ -87,16 +87,20 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             const expiry = Math.floor(Date.now() / 1000) + 70;
             const capability = Buffer.alloc(32, 1).toString('base64url');
             const href = `https://webjam.example/join/#k=${capability}&s=${'1'.repeat(64)}&g=1&e=${expiry}`;
-            async function invite(sequence, link = href) {
+            async function requestInvite(sequence) {
                 await inviteButton.click();
                 const roster = dialog.getByRole('combobox', { name: 'Online guests' });
                 await expect(roster).toBeFocused();
                 await roster.selectOption({ label: 'ChosenGuest' });
-                if (sequence === 2) await capture(host, '01-host-chooses-guest');
+                if (sequence === 3) await capture(host, '01-host-chooses-guest');
                 await dialog.getByRole('button', { name: 'Continue in WebJam' }).click();
                 await expect.poll(() => host.evaluate(() => window.fixtureLaunches.length)).toBe(sequence);
                 const request = await host.evaluate(() => window.fixtureLaunches.at(-1));
                 expect(request).toMatch(/^[a-f0-9]{32}$/);
+                return request;
+            }
+            async function invite(sequence, link = href) {
+                const request = await requestInvite(sequence);
                 return callback.evaluate(({ request, href }) => new Promise(resolve => {
                     const channel = new BroadcastChannel(`webjam-music-${request}`);
                     const finish = result => { clearTimeout(timer); channel.close(); resolve(result); };
@@ -107,12 +111,31 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             }
             const panel = guest.locator('[data-music-invite]');
             const status = host.locator('[data-music-handoff-status]');
-            expect(await invite(1, href.replace('webjam.example', 'other-audio.example.test'))).toBe(false);
+            // Shorten only the first native handoff timer so chat, relay and invitation expiry use real time.
+            await host.evaluate(() => {
+                const schedule = window.setTimeout;
+                window.setTimeout = (handler, delay, ...args) => {
+                    if (delay !== 90000) return schedule.call(window, handler, delay, ...args);
+                    window.setTimeout = schedule;
+                    return schedule.call(window, handler, 0, ...args);
+                };
+            });
+            await requestInvite(1);
+            await expect(status).toContainText('Check that your private rehearsal build is open and hosting Music');
+            await expect(panel).toBeHidden();
+            const manual = host.getByRole('button', { name: 'Share a link instead' });
+            await expect(manual).toBeInViewport({ ratio: 1 });
+            await capture(host, '00b-native-handoff-timeout');
+            await manual.press('Enter');
+            await expect(host.locator('[data-jam-link]')).toBeFocused();
+            await expect(host.locator('[data-jam-link]')).toBeEmpty();
+
+            expect(await invite(2, href.replace('webjam.example', 'other-audio.example.test'))).toBe(false);
             await expect(panel).toBeHidden();
             await expect(status).toContainText('couldn’t be sent');
             await expect(host.getByRole('button', { name: 'Share a link instead' })).toBeVisible();
 
-            expect(await invite(2)).toBe(true);
+            expect(await invite(3)).toBe(true);
             await expect(status).toContainText('sent to ChosenGuest');
             await expect(panel).toContainText('MusicHost invited you');
             await expect(peer.locator('[data-music-invite]')).toBeHidden();
@@ -120,7 +143,7 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await expect(status).toContainText('declined the Music invitation');
             await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
 
-            expect(await invite(3)).toBe(true);
+            expect(await invite(4)).toBe(true);
             const accept = panel.getByRole('button', { name: 'Accept and join', exact: true });
             await expect(accept).toBeInViewport({ ratio: 1 });
             await capture(guest, '02-guest-receives-offer');
