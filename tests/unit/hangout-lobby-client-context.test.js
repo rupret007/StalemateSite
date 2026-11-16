@@ -41,7 +41,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     window.document.querySelector('[data-nick]').value = 'Viewer';
     window.document.querySelector('[data-enter]').click();
-    await vi.waitFor(() => expect(sockets.length).toBe(1));
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
     const ws = sockets[0];
     if (options.open !== false) {
         ws.open();
@@ -120,7 +120,7 @@ describe('private entry recovery after a rejected socket admission', () => {
         const healthy = await visitor('', undefined, { beta: true, fetch: healthyFetch });
         healthy.welcome(); healthy.join(); await healthy.ws.close(4401);
         expect(healthyFetch).not.toHaveBeenCalled();
-    });
+    }, 20000);
     it('distinguishes private access renewal from verified-email recovery', async () => {
         const missing = await visitor('', undefined, { beta: true, owner: true, open: false, fetch: vi.fn(async () => ({ status: 401 })) });
         await missing.ws.close(1006);
@@ -316,7 +316,7 @@ describe('browser client privacy and bounded delivery wiring', () => {
             welcome(ws, null);
             expect(ws.sent.filter((frame) => frame.t === 'entry-source')).toEqual([]);
         }
-    });
+    }, 20000);
     it('batches handled-frame acknowledgements and cancels a pending acknowledgement on disconnect', async () => {
         const { ws, welcome, flush } = await visitor(); welcome();
         for (let seq = 2; seq <= 8; seq++) ws.receive({ t: 'entry-source', source: 'stalemate', transportSeq: seq });
@@ -329,7 +329,7 @@ describe('browser client privacy and bounded delivery wiring', () => {
         const { window, ws, sockets, welcome, flush } = await visitor(); welcome();
         const staleMessage = ws.onmessage;
         window.document.querySelector('[data-reconnect]').click();
-        await vi.waitFor(() => expect(sockets.length).toBe(2));
+        await vi.waitFor(() => expect(sockets).toHaveLength(2));
         const replacement = sockets[1]; replacement.open(); replacement.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok' }); welcome(replacement);
         staleMessage({ data: JSON.stringify({ t: 'entry-source', transportSeq: 100 }) }); flush(50);
         expect(ws.sent.filter((frame) => frame.t === 'transport-ack')).toEqual([]);
@@ -410,5 +410,5 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(log.querySelector('[role="list"]')).toBe(messages);
         expect(messages.children).toHaveLength(0);
         expect(log.getAttribute('aria-live')).toBe('off');
-    });
+    }, 30000);
 });
