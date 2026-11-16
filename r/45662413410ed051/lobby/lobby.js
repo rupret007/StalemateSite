@@ -1476,7 +1476,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function removeChatRow(row) {
         const hadFocus = row.contains(document.activeElement);
         row.remove();
-        if (hadFocus) $('[data-say]').focus();
+        if (hadFocus) $('[data-text]').focus();
     }
     function appendLine(l) {
         const buf = $('[data-buffer]');

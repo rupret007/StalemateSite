@@ -790,6 +790,8 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
      the conversation/composer below fixed workspace rows. */
   body { overflow-y: auto; }
   .irc { min-height: 252px; flex-shrink: 0; }
+  /* The invitation takes a grid row at deep zoom. Keep one chat line above the composer. */
+  .irc:has([data-room-invite]:not([hidden])) { min-height: 280px; }
   /* Recovery/jump rows can exceed the short pane. Keep them and the composer
      reachable by vertical scrolling, including when keyboard focus moves. */
   .chat { overflow-y: auto; }
@@ -810,6 +812,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
+  :where(.irc:has([data-room-invite]:not([hidden]))) .buffer { min-height: calc(1lh + 2px); }
   .buffer:has(:focus-visible) { min-height: 64px; flex-shrink: 0; }
   .buffer li { padding-block: 0; }
   .buffer .flag { scroll-margin-block: 4px; }

@@ -567,13 +567,12 @@ for (const viewport of [viewports[1], invitationViewports.at(-1)]) test(`${viewp
         await page.screenshot({ path: testInfo.outputPath(`${viewport.label}-message-focused.png`) });
         removeMessage(await flag.evaluate(button => button.closest('li').dataset.id));
         await expect(flag).toHaveCount(0);
-        const composer = page.getByRole('form', { name: 'Message composer' });
-        await expect(composer).toBeFocused();
-        await expect(composer).toBeInViewport();
+        const message = page.getByRole('textbox', { name: 'Message', exact: true });
+        await expect(message).toBeFocused();
+        await expect(message).toBeInViewport();
         await page.screenshot({ path: testInfo.outputPath(`${viewport.label}-focus-after-removal.png`) });
-        await page.keyboard.press(tabKey(page));
-        await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeFocused();
-        await send(page, 'Keyboard chat is still available.');
+        await page.keyboard.type('Keyboard chat is still available.');
+        await page.keyboard.press('Enter');
         await expect(speaker.page.locator('[data-buffer]')).toContainText('Keyboard chat is still available.');
         expect(visitor.errors).toEqual([]); expect(speaker.errors).toEqual([]);
     } finally { await visitor?.close(); await speaker.close(); }
@@ -923,7 +922,10 @@ for (const width of [375, 390, 1440]) {
             await send(host.page, '/join #directory-room');
             await expect(host.page.locator('[data-chat-context]')).toHaveText('#directory-room');
             const actions = visitor.page.locator('[data-quick]');
-            const startRoom = actions.getByRole('button', { name: /start a room/i });
+            const startRoom = width < 901
+                ? actions.getByRole('button', { name: /start a room/i })
+                : visitor.page.getByRole('complementary', { name: 'Rooms', exact: true })
+                    .getByRole('button', { name: /^start a chat channel/i });
             if (await actions.evaluate(row => row.scrollWidth > row.clientWidth)) {
                 await tabTo(visitor.page, actions.locator('[data-quick-cmd="help"]'));
                 await expect.poll(() => actions.evaluate(row => row.scrollLeft)).toBeGreaterThan(0);

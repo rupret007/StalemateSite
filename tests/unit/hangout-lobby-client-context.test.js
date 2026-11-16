@@ -369,7 +369,7 @@ it.each([false, true])('keeps focus usable when moderation removes a message (fl
     ws.receive({ t: 'delete', ids: ['mremoved'] });
 
     expect(flag.isConnected).toBe(false);
-    expect(document.activeElement).toBe(focusedFlag ? document.querySelector('[data-say]') : retained);
+    expect(document.activeElement).toBe(focusedFlag ? composer : retained);
     expect(composer.value).toBe('Keep this draft');
 });
 
@@ -1256,7 +1256,7 @@ describe('browser client privacy and bounded delivery wiring', () => {
             ws.receive({ t: 'line', ch: '#stalemate', from: 'Friend', text: `Bounded line ${index}` });
         expect(messages.children).toHaveLength(300);
         expect(oldest.isConnected).toBe(false);
-        expect(window.document.activeElement).toBe(window.document.querySelector('[data-say]'));
+        expect(window.document.activeElement).toBe(window.document.querySelector('[data-text]'));
         expect(messages.firstElementChild.textContent).toMatch(/Bounded line 1$/);
         expect(messages.lastElementChild.textContent).toContain('Bounded line 300');
         expect([...messages.children].every(item => item.tagName === 'LI')).toBe(true);
