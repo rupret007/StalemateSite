@@ -299,12 +299,17 @@ body:not(.bob-mode) [data-room-workspace] .callbar [data-reacts]{display:inline-
     body:not(.bob-mode) [data-room-workspace] .callbar [data-room-chat-open]{
         padding-inline:6px;min-width:44px;font-size:.8rem;
     }
-    body:not(.bob-mode) [data-room-workspace] .callbar .btn[data-ico]{
+    /* Only the primary call buttons need condensed labels to stay in view. */
+    body:not(.bob-mode) [data-room-workspace] .callbar .btn[data-ico]:is([data-mic],[data-cam],[data-hangup]){
         display:grid;align-content:center;justify-items:center;gap:2px;
         font-size:0;line-height:1;min-width:58px;padding:4px 6px;
     }
-    body:not(.bob-mode) [data-room-workspace] .callbar .btn[data-ico]::before{content:attr(data-ico);font-size:1.2rem}
-    body:not(.bob-mode) [data-room-workspace] .callbar .btn[data-ico]::after{content:attr(data-short);font-size:.72rem}
+    body:not(.bob-mode) [data-room-workspace] .callbar .btn[data-ico]:is([data-mic],[data-cam],[data-hangup])::before{
+        content:attr(data-ico);content:attr(data-ico) / "";font-size:1.2rem;
+    }
+    body:not(.bob-mode) [data-room-workspace] .callbar .btn[data-ico]:is([data-mic],[data-cam],[data-hangup])::after{
+        content:attr(data-short);content:attr(data-short) / "";font-size:.72rem;
+    }
     body.faces-on:not(.bob-mode) [data-room-workspace] .callbar .btn[data-hand]{display:none}
     body:not(.bob-mode) [data-room-workspace] .callbar [data-hangup]{order:-1}
     body:not(.bob-mode) [data-room-workspace] .chat .log{height:13rem;flex:auto}

@@ -42,6 +42,8 @@ for (const viewport of sizes) {
         const start = page.getByRole('button', { name: 'Start video', exact: true });
         await expect(start).toBeVisible();
         await checkControls(page);
+        await expect(page.locator('[data-mic]')).toHaveAccessibleName('Turn on my mic');
+        await expect(page.locator('[data-cam]')).toHaveAccessibleName('Turn on my camera');
         await page.screenshot({ path: testInfo.outputPath('01-idle-stage.png') });
 
         await start.click();
