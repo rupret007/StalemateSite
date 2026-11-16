@@ -36,7 +36,7 @@ module.exports = defineConfig({
     projects: [
         {
             name: 'chromium',
-            testIgnore: /(?:phones|paint-along-focus)\.spec\.js/,
+            testIgnore: [/phones\.spec\.js/, /paint-along-focus\.spec\.js$/],
             use: { browserName: 'chromium' }
         },
         {
