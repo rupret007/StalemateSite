@@ -1395,6 +1395,7 @@
         if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t: relayT }) !== 'video') return;
         app.lastVideoSigned = { signed, t: relayT };
         app.lastHostSeq = Math.max(app.lastHostSeq, b.seq || 0);
+        if (b.control?.by !== app.myId) guestPlaybackTarget = null;
         showEpisode();
         // Native player controls already played on the initiating guest. The
         // signed reply must not overwrite a subsequent local seek.
@@ -1412,7 +1413,11 @@
         return chooseEpisode && selected.activity === 'paint' && isPaintEpisode(source);
     }
 
-    let playbackSample = null, playbackIntentAt = 0;
+    let playbackSample = null, playbackIntentAt = 0, guestPlaybackTarget = null;
+    function expectedGuestPlaying(video) {
+        return guestPlaybackTarget !== null && Date.now() - playbackIntentAt < 750 ? guestPlaybackTarget : video.playing;
+    }
+
     async function syncToState(force, retry = false) {
         const v = app.state.video;
         if (!v) return;
@@ -1504,7 +1509,8 @@
         const pos = localTime();
         if (Date.now() < player.applying) {
             const want = v.playing ? H.expectedPosition(v, app.clock.relayNow()) : v.pos;
-            if (playing === v.playing && Math.abs(pos - want) < 2) return;
+            const expectedPlaying = app.isHost ? v.playing : expectedGuestPlaying(v);
+            if (playing === expectedPlaying && Math.abs(pos - want) < 2) return;
         }
         void publishVideoIntent(v.source, playing, pos, { localApplied: true });
     }
@@ -1526,7 +1532,7 @@
         if (event.data !== 1 && event.data !== 2) return;
         const video = app.state.video;
         if (!app.isHost && canSharePlayback(video?.source)) {
-            if (video.playing !== localPlaying()) onLocalChange();
+            if (expectedGuestPlaying(video) !== localPlaying()) onLocalChange();
             return;
         }
         clearTimeout(videoPublishTimer);
@@ -1544,7 +1550,14 @@
         // Guests send an intent. The host signs the result for playback and
         // late-join snapshots in the same authority stream.
         playbackIntentAt = Date.now();
-        playbackSample = { at: playbackIntentAt, pos: localTime(), playing: localPlaying() };
+        guestPlaybackTarget = playing;
+        if (!localApplied && !chooseEpisode && player.readyKey === `${source.kind}:${source.id}`) {
+            seekTo(pos);
+            if (playing && !localPlaying()) playLocal();
+            else if (!playing && localPlaying()) pauseLocal();
+            localApplied = true;
+        }
+        playbackSample = { at: Date.now(), pos: localTime(), playing: localPlaying() };
         await send({ type: 'watch-playback', body: { source, playing, pos, localApplied } });
         return true;
     }
