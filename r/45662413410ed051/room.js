@@ -28,6 +28,7 @@
     const relayBase = (isLocal && params.get('relay')) || ($('meta[name="hangout-relay"]').content || '');
     const turnUrl = (isLocal && params.get('turn')) || ($('meta[name="hangout-turn"]').content || '');
     const previewKey = params.get('preview') || '';
+    const invitedActivity = params.get('activity');
 
     const ui = {
         gate: $('[data-gate]'), gateTitle: $('[data-gate-title]'), gateCopy: $('[data-gate-copy]'), gateStatus: $('[data-gate-status]'),
@@ -722,6 +723,7 @@
         ui.log.replaceChildren(); ui.tiles.replaceChildren(); ui.text.value = ''; ui.url.value = '';
         ui.peers.textContent = ''; ui.turnStatus.textContent = ''; redraw();
         ui.room.hidden = true; ui.gate.hidden = false; ui.enter.disabled = true;
+        syncSharedLayout();
         setGate(reason); say(reason);
     }
 
@@ -1066,11 +1068,11 @@
         stopPreCheck();
         ui.gate.hidden = true;
         ui.room.hidden = false;
-        win.SharedRoomLayout?.set('watch', true);
-        paintConsent();
+        if (invitedActivity === 'paint') setBob(true);
+        else syncSharedLayout();
         if (mq('(max-width: 820px)')) {
             doc.querySelector('.room-description').open = false;
-            doc.querySelector('[data-chat-details]').open = false;
+            if (!doc.body.dataset.sharedLayout) doc.querySelector('[data-chat-details]').open = false;
         }
         doc.body.classList.toggle('is-host', app.isHost);
         ui.hostNote.textContent = app.isHost ? 'You started this room, so you drive the video and the wipe.' : 'The person who started the room drives the video.';
@@ -1124,6 +1126,9 @@
     ui.copy.addEventListener('click', async () => {
         const linkUrl = new URL(win.location.href);
         linkUrl.searchParams.delete('preview');
+        const activity = doc.body.dataset.sharedLayout;
+        if (activity) linkUrl.searchParams.set('activity', activity);
+        else linkUrl.searchParams.delete('activity');
         const link = linkUrl.href;
         try {
             if (navigator.share && /Mobi/.test(navigator.userAgent)) await navigator.share({ title: 'Hang out with Stalemate', url: link });
@@ -3081,8 +3086,14 @@
         // Whichever button gets the tap, a camera or mic waiting on one comes back with it.
         if (avResumeWhy.video || avResumeWhy.audio) resumeLocalMedia(true);
     });
-    ui.mic.addEventListener('click', () => toggle('mic'));
-    ui.cam.addEventListener('click', () => toggle('cam'));
+    ui.mic.addEventListener('click', () => {
+        if (!ui.consent.hidden) focusConsent();
+        else toggle('mic');
+    });
+    ui.cam.addEventListener('click', () => {
+        if (doc.body.dataset.sharedLayout && !app.av.cam) startVideoPrompt();
+        else toggle('cam');
+    });
     ui.share.addEventListener('click', () => toggleScreen());
     ui.pip.hidden = !(doc.pictureInPictureEnabled || 'webkitSetPresentationMode' in HTMLVideoElement.prototype);
     ui.pip.addEventListener('click', () => {
@@ -3365,12 +3376,16 @@
         paintConsent();
         say('You’re in without camera. Tap Start video on your tile or the bar whenever you like.');
     }
+    function focusConsent() {
+        ui.consentOn.focus({ preventScroll: true });
+        ui.consent.scrollIntoView({ block: 'nearest' });
+    }
     function startVideoPrompt() {
         if (app.av.cam) return;
-        if (app.bob.on && !app.av.asked.cam && !app.av.mic) {
+        if (doc.body.dataset.sharedLayout && !app.av.asked.cam && !app.av.mic) {
             app.consent.skipped = false;
             paintConsent();
-            if (!ui.consent.hidden) { ui.consent.scrollIntoView({ block: 'nearest' }); ui.consentOn.focus(); return; }
+            if (!ui.consent.hidden) { focusConsent(); return; }
         }
         toggle('cam');
     }
@@ -3382,6 +3397,21 @@
     ui.consentSkip.addEventListener('click', skipConsent);
     win.addEventListener('pagehide', stopConsentPreview);
 
+    function syncSharedLayout() {
+        const mode = ui.room.hidden ? '' : app.bob.on ? 'paint'
+            : app.state.video || invitedActivity === 'watch' ? 'watch' : '';
+        if ((doc.body.dataset.sharedLayout || '') === mode) return;
+        win.SharedRoomLayout?.set(mode, Boolean(mode));
+        ui.modePill.hidden = !mode;
+        ui.modePill.textContent = mode === 'paint' ? 'Paint Along' : 'Watch a Movie Together';
+        ui.canvasCam.hidden = mode === 'watch';
+        setChatOpen(!mode || !mq('(max-width: 820px)'));
+        setMore(false);
+        setSoundtrackPop(false);
+        paintConsent();
+        layout();
+    }
+
     /* ---------------- Bob Ross Paint-Along ---------------- */
     function setBob(on, byUser) {
         const wasOn = app.bob.on;
@@ -3389,10 +3419,7 @@
         if (app.bob.on && !wasOn) { bobPlaybackSample = null; bobPlaybackIntentAt = Date.now(); }
         if (byUser) app.bob.touched = true;
         doc.body.classList.toggle('bob-mode', app.bob.on);
-        win.SharedRoomLayout?.set(app.bob.on ? 'paint' : 'watch', true);
-        ui.modePill.hidden = !app.bob.on;
-        if (app.bob.on && !wasOn) setChatOpen(!(win.matchMedia && win.matchMedia('(max-width: 820px)').matches));
-        if (!app.bob.on && wasOn) { setChatOpen(true); setMore(false); setSoundtrackPop(false); }
+        syncSharedLayout();
         ui.bob.hidden = !app.bob.on;
         ui.bobToggle.setAttribute('aria-pressed', String(app.bob.on));
         ui.bobToggle.textContent = app.bob.on ? 'Exit Paint Along' : '🎨 Paint along with Bob';
@@ -3418,6 +3445,7 @@
     function showEpisode() {
         const ep = currentEpisode();
         if (ep && !app.bob.on && !app.bob.touched) setBob(true);
+        else syncSharedLayout();
         const video = app.state.video;
         const pausedBy = video && !video.playing && video.by ? ` · Paused by ${video.by}` : '';
         ui.bobNow.textContent = ep ? `Now painting: ${ep.title} · ${BOB.label(ep)}${pausedBy}`

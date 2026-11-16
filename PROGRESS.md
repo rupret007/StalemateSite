@@ -13,3 +13,7 @@
 - Done 5 — Split site-wide Music from Video sound and kept the existing game effects and microphone settings.
 - Evidence — Chromium and WebKit verified red and green Music states, independent YouTube mute and a live local and remote microphone.
 - Next — Check visible tap targets, camera prominence, filmstrip and chat against the phone screenshots.
+
+- Done 3 — Promoted camera consent, fitted the top bar, enlarged touch targets and arranged live canvas feeds in a horizontal strip above chat.
+- Evidence — Both phone projects pass the 48px checks and geometry checks. Paint Along points at the real canvas through the camera and keeps it uncropped.
+- Next — Verify Watch opens the same stage, filmstrip, chat and dock from its invitation.
