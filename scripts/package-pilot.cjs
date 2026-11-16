@@ -14,7 +14,7 @@ if (target === 'beta') {
         fs.copyFileSync(path.join(chessJoin, file), path.join(out, 'join', file));
     }
     const musicJoin = path.join(root, 'hangout-worker', 'web-join-music');
-    for (const file of ['handoff.html', 'handoff.js']) {
+    for (const file of ['app.js', 'handoff.html', 'handoff.js']) {
         fs.copyFileSync(path.join(musicJoin, file), path.join(out, 'join', file));
     }
     const play = path.join(root, 'play');
