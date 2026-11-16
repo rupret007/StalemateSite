@@ -176,6 +176,26 @@ it('uses the shared roster and native return to send one Music invitation withou
     expect(JSON.stringify({ ...window.sessionStorage, ...window.localStorage })).not.toContain(href);
 });
 
+it('explains an empty Music invite roster and focuses Cancel', async () => {
+    const { window, ws } = await visitor('rad-dad', { directMusicInvites: 1, personTargets: 1 }, { secureOrigin: true });
+    const { document } = window;
+    window.BroadcastChannel = class {};
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    const self = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
+    ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', capabilities: {} });
+    ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', modes: {}, names: [self] } });
+    ws.receive({ t: 'join', ch: { name: '#jam-rehearsal', kind: 'jam', keepRef: 'd'.repeat(32), modes: { i: true }, names: [self] } });
+
+    document.querySelector('[data-jam-invite-music]').click();
+    const dialog = document.querySelector('[data-invite-dialog]');
+    expect(dialog.open).toBe(true);
+    const hint = document.getElementById(dialog.getAttribute('aria-describedby'));
+    expect(hint?.textContent).toContain('Ask your guest to open Hang Out and choose a nickname');
+    expect(dialog.querySelector('[data-invite-options]').disabled).toBe(true);
+    expect(dialog.querySelector('[data-invite-person-send]').disabled).toBe(true);
+    expect(document.activeElement).toBe(dialog.querySelector('[data-invite-cancel]'));
+});
+
 describe('focus after private guest entry', () => {
     it('takes a guest to Chat when the nickname gate disappears', async () => {
         const { window, welcome, join } = await visitor();

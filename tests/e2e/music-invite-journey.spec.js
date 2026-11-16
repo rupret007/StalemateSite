@@ -61,8 +61,6 @@ for (const { width, height, hostSite, guestSite } of viewports) {
         const capture = (page, name) => page.screenshot({ path: testInfo.outputPath(`${name}-${width}x${height}.png`) });
         try {
             const host = await enter('MusicHost', hostSite);
-            const guest = await enter('ChosenGuest', guestSite);
-            const peer = await enter('OtherGuest', guestSite);
             if (width < 901) await host.locator('.phonetabs [data-show="rooms"]').click();
             await host.getByRole('button', { name: /^jam \(webjam\)/i }).click();
             const roomContext = host.locator('[data-chat-context]');
@@ -71,12 +69,26 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             const callback = await host.context().newPage();
             await callback.goto(baseURL);
             const inviteButton = host.getByRole('button', { name: 'Invite to Music', exact: true });
+            const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
+            await inviteButton.click();
+            const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });
+            await expect(dialog).toHaveAccessibleDescription(/No guests are online yet/);
+            await expect(dialog.getByRole('button', { name: 'Continue in WebJam' })).toBeDisabled();
+            await expect(cancel).toBeInViewport({ ratio: 1 });
+            await expect(cancel).toBeFocused();
+            await capture(host, '00-host-waits-for-guest');
+            await cancel.press('Enter');
+            await expect(inviteButton).toBeFocused();
+            const guest = await enter('ChosenGuest', guestSite);
+            const peer = await enter('OtherGuest', guestSite);
+            // The dialog takes a snapshot of the host's current shared roster.
+            await expect.poll(() => host.evaluate(() =>
+                window.__lobby.chans.get('#stalemate')?.names.map(person => person.nick) ?? [])).toContain('ChosenGuest');
             const expiry = Math.floor(Date.now() / 1000) + 70;
             const href = `https://webjam.example/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${expiry}`;
             async function invite(sequence, link = href) {
                 await inviteButton.click();
-                const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
-                const roster = dialog.getByRole('combobox', { name: 'Choose a current person' });
+                const roster = dialog.getByRole('combobox', { name: 'Online guests' });
                 await expect(roster).toBeFocused();
                 await roster.selectOption({ label: 'ChosenGuest' });
                 if (sequence === 2) await capture(host, '01-host-chooses-guest');

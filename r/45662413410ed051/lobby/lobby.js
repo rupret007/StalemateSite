@@ -3013,7 +3013,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-invite-nick]').disabled = music;
         $('[data-invite-person-send]').textContent = music ? 'Continue in WebJam' : 'Invite selected person';
         $('[data-game-invite-picker]').hidden = !isGame;
-        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose a current person'; $('[data-invite-options]').append(placeholder);
+        const people = $('[data-invite-options]');
+        people.labels[0].textContent = music ? 'Online guests' : 'Choose a current person';
+        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose someone online'; people.append(placeholder);
         for (const person of app.chans.get('#stalemate')?.names || []) {
             if (!personId(person.id) || person.id === app.selfId || !music && current.names.some(member => member.id === person.id)) continue;
             const context = personContext(person.id, current.name, inviteInstance, person.nick);
@@ -3027,16 +3029,25 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 button.addEventListener('click', () => inviteCurrentPerson(context));
                 roster.append(button);
             } else {
-                const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; $('[data-invite-options]').append(option);
+                const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; people.append(option);
             }
         }
         const canInviteNew = isGame && gameGuestInvitesSupported;
         const target = canInviteNew && (exactTable || guestLinkTarget());
         drawGuestInviteChoice(target, canInviteNew);
-        $('[data-invite-person-send]').disabled = !personTargetsSupported || !roomNonce(inviteInstance);
-        $('[data-invite-dialog]').showModal();
+        const emptyMusicRoster = music && invitePeople.size === 0;
+        people.disabled = emptyMusicRoster;
+        $('[data-invite-person-send]').disabled = emptyMusicRoster || !personTargetsSupported || !roomNonce(inviteInstance);
+        const dialog = $('[data-invite-dialog]');
+        if (emptyMusicRoster) {
+            const hint = $('[data-invite-error]');
+            hint.textContent = 'No guests are online yet. Ask your guest to open Hang Out and choose a nickname, then reopen this list.';
+            dialog.setAttribute('aria-describedby', hint.id);
+        } else dialog.removeAttribute('aria-describedby');
+        dialog.showModal();
         if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
-        else $(music ? '[data-invite-options]' : '[data-invite-nick]').focus();
+        else if (emptyMusicRoster) $('[data-invite-cancel]').focus();
+        else (music ? people : $('[data-invite-nick]')).focus();
     }
     function drawGuestInviteChoice(target, canInviteNew) {
         const inviteHint = $('[data-game-invite-empty]');
