@@ -15,6 +15,20 @@ const test = base.extend({
     }, { scope: 'worker' }],
     userAgent: async ({ browserName }, use) => {
         await use(devices[browserName === 'webkit' ? 'iPhone 13' : 'Pixel 5'].userAgent);
+    },
+    peerBrowser: async ({ browser, browserName, launchOptions }, use) => {
+        if (browserName !== 'webkit') {
+            await use(browser);
+            return;
+        }
+        // Concurrent fake capture in one WebKit process crashes on Bobserver.
+        // Use independent browsers like two phones, with real peer connections.
+        const peer = await browser.browserType().launch(launchOptions);
+        try {
+            await use(peer);
+        } finally {
+            await peer.close();
+        }
     }
 });
 test.use({
@@ -174,7 +188,7 @@ async function joinWithCamera(page) {
     await expect(consent).toBeHidden();
 }
 
-async function sharedPair(context, origin, viewport, mode = 'paint') {
+async function sharedPair(context, peerBrowser, origin, viewport, mode = 'paint') {
     const host = await openHost(context, origin);
     let invite;
     if (mode === 'paint') {
@@ -193,7 +207,7 @@ async function sharedPair(context, origin, viewport, mode = 'paint') {
         expect(invite.searchParams.get('activity')).toBe('watch');
         expect(invite.searchParams.has('preview')).toBe(false);
     }
-    const guestContext = await context.browser().newContext({
+    const guestContext = await peerBrowser.newContext({
         ...contextOptions(host), viewport, permissions: ['camera', 'microphone']
     });
     try {
@@ -234,9 +248,9 @@ async function expectPhoneStage(page) {
     expect(unobstructed).toBe(true);
 }
 
-test('the Paint Along stage stays fully visible above two live tiles and open chat at both phone sizes', async ({ context, baseURL, viewport }) => {
+test('the Paint Along stage stays fully visible above two live tiles and open chat at both phone sizes', async ({ context, peerBrowser, baseURL, viewport }) => {
     test.setTimeout(60000);
-    const { host, guest, guestContext } = await sharedPair(context, baseURL, viewport);
+    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
     try {
         await joinWithCamera(host);
         await joinWithCamera(guest);
@@ -261,8 +275,8 @@ test('the Paint Along stage stays fully visible above two live tiles and open ch
     }
 });
 
-test('a guest pauses, plays and seeks for everyone, including a late join', async ({ context, baseURL, viewport }) => {
-    const { host, guest, guestContext } = await sharedPair(context, baseURL, viewport);
+test('a guest pauses, plays and seeks for everyone, including a late join', async ({ context, peerBrowser, baseURL, viewport }) => {
+    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
     try {
         const pages = [host, guest];
         const expectPlayback = async (state, participants = pages) => {
@@ -293,8 +307,8 @@ test('a guest pauses, plays and seeks for everyone, including a late join', asyn
     }
 });
 
-test('music, video sound, game effects and live microphone remain independent', async ({ context, baseURL, viewport }) => {
-    const { host, guest, guestContext } = await sharedPair(context, baseURL, viewport);
+test('music, video sound, game effects and live microphone remain independent', async ({ context, peerBrowser, baseURL, viewport }) => {
+    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
     try {
         await joinWithCamera(host);
         await joinWithCamera(guest);
@@ -350,9 +364,9 @@ async function expectTouchTargets(root) {
     expect(small).toEqual([]);
 }
 
-test('the phone layout gives camera consent priority and keeps labeled 48px controls', async ({ page, context, baseURL, viewport }) => {
+test('the phone layout gives camera consent priority and keeps labeled 48px controls', async ({ page, context, peerBrowser, baseURL, viewport }) => {
     test.setTimeout(60000);
-    const { host, guest, guestContext } = await sharedPair(context, baseURL, viewport);
+    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
     try {
         await page.goto(inviteFor(host).href);
         await expectTouchTargets(page.locator('body'));
@@ -391,9 +405,9 @@ test('the phone layout gives camera consent priority and keeps labeled 48px cont
     }
 });
 
-test('Watch a Movie Together uses the shared phone stage and keeps video selection with the host', async ({ context, baseURL, viewport }) => {
+test('Watch a Movie Together uses the shared phone stage and keeps video selection with the host', async ({ context, peerBrowser, baseURL, viewport }) => {
     test.setTimeout(60000);
-    const { host, guest, guestContext } = await sharedPair(context, baseURL, viewport, 'watch');
+    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport, 'watch');
     try {
         for (const page of [host, guest]) {
             await expect(page.locator('body')).toHaveAttribute('data-shared-layout', 'watch');

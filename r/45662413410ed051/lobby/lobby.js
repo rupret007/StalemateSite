@@ -250,6 +250,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 fallback?.focus({ preventScroll: true });
             }
         }
+        revealFocusedComposer();
     }
     function rememberMessage(text) {
         const context = recoveryContext();
@@ -2973,19 +2974,22 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
 
     // At deep zoom the workspace can scroll vertically. Native focus may expose
     // the input while leaving its enclosing border or Send partly below the
-    // viewport (notably WebKit). Reveal the complete composer without moving
-    // focus, changing a draft, or disturbing an already-visible normal layout.
+    // viewport (notably WebKit). Saved-message updates can move it while focus
+    // stays on Send, so also check after rendering the recovery row.
     const composer = $('[data-say]');
     let composerFocusFrame = 0;
+    function revealFocusedComposer() {
+        if (innerWidth > 900 || innerHeight > 450 || !composer.contains(document.activeElement)) return;
+        const bounds = composer.getBoundingClientRect();
+        if (bounds.top < 0 || bounds.bottom > innerHeight)
+            composer.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
     composer.addEventListener('focusin', () => {
         if (innerWidth > 900 || innerHeight > 450) return;
         cancelAnimationFrame(composerFocusFrame);
         composerFocusFrame = requestAnimationFrame(() => {
             composerFocusFrame = 0;
-            if (innerWidth > 900 || innerHeight > 450 || !composer.contains(document.activeElement)) return;
-            const bounds = composer.getBoundingClientRect();
-            if (bounds.top < 0 || bounds.bottom > innerHeight)
-                composer.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            revealFocusedComposer();
         });
     });
     window.addEventListener('pagehide', () => {
