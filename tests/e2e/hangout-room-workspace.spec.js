@@ -15,6 +15,7 @@ async function checkControls(page) {
         height: document.documentElement.scrollHeight,
         viewportWidth: innerWidth,
         viewportHeight: innerHeight,
+        top: document.querySelector('#room-call-controls').getBoundingClientRect().top,
         bottom: document.querySelector('#room-call-controls').getBoundingClientRect().bottom
     }));
     expect(geometry.width).toBeLessThanOrEqual(geometry.viewportWidth + 1);
@@ -70,6 +71,7 @@ for (const viewport of sizes) {
         expect(stageBox.width).toBeGreaterThan(tileBox.width * 2);
         expect(tileBox.y).toBeGreaterThan(stageBox.y + stageBox.height);
         const call = await checkControls(page);
+        expect(tileBox.y + tileBox.height).toBeLessThanOrEqual(call.top);
         if (viewport.width <= 820) expect(call.height).toBeLessThanOrEqual(call.viewportHeight + 2);
         await page.screenshot({ path: testInfo.outputPath('03-speaker-stage-and-filmstrip.png') });
 

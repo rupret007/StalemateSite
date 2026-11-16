@@ -207,7 +207,7 @@ test('a PM person sheet kept open across nickname reuse blocks the original live
         await third.getByRole('tab', { name: '#stalemate', exact: true }).click();
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedRecipient$/ })).toHaveCount(1);
         await send(third, '/nick Recipient');
-        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ })).toHaveCount(1);
+        await expect(third.locator('[data-nicks] span.nick[data-self="true"]')).toHaveText('Recipient');
         const noticesBefore = fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').length;
         await sheet.getByRole('button', { name: 'Who?', exact: true }).click();
         await expect.poll(() => fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').length).toBe(noticesBefore + 1);
@@ -429,7 +429,7 @@ test('an accepted PM keeps its original peer and unsent draft when another accep
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedRecipient$/ })).toHaveCount(1);
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ })).toHaveCount(0);
         await send(third, '/nick Recipient');
-        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ })).toHaveCount(1);
+        await expect(third.locator('[data-nicks] span.nick[data-self="true"]')).toHaveText('Recipient');
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedRecipient$/ })).toHaveCount(1);
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Third$/ })).toHaveCount(0);
         await expect(sender.locator('[data-text]')).toHaveValue(draft);
@@ -816,8 +816,10 @@ for (const [label, feature] of [['missing', null], ['a string', '1'], ['a boolea
             const sender = await fixture.guest('Sender'), original = await fixture.guest('Original'); fixture.advance(180000);
             const text = 'An exact delivered message can still be reported on an older server';
             await send(original, text); await expect(received(sender, text)).toHaveCount(1);
-            await expect(sender.locator('[data-nicks] button.nick').filter({ hasText: /^Original$/ })).toBeDisabled();
-            await expect(received(sender, text).getByRole('button', { name: '<Original>', exact: true })).toBeDisabled();
+            await expect(sender.locator('[data-nicks] span.nick').filter({ hasText: /^Original$/ })).toBeVisible();
+            await expect(sender.locator('[data-nicks] button.nick').filter({ hasText: /^Original$/ })).toHaveCount(0);
+            await expect(received(sender, text).locator('span.who')).toHaveText('<Original>');
+            await expect(received(sender, text).getByRole('button', { name: '<Original>', exact: true })).toHaveCount(0);
             await received(sender, text).locator('.flag').click();
             await expect(received(sender, text).locator('.flag')).toHaveText('✓');
             expect(fixture.inbound.filter(frame => frame.t === 'cmd' && frame.personContext === 1)).toEqual([]);
@@ -880,7 +882,7 @@ test('current-person invitation selection stays bound while deliberate nickname 
         await send(original, '/nick RenamedOriginal');
         await expect(replacement.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedOriginal$/ })).toHaveCount(1);
         await send(replacement, '/nick Original');
-        await expect(replacement.locator('[data-nicks] button.nick').filter({ hasText: /^Original$/ })).toHaveCount(1);
+        await expect(replacement.locator('[data-nicks] span.nick[data-self="true"]')).toHaveText('Original');
         const before = fixture.delivered.length;
         await dialog.getByRole('button', { name: 'Invite selected person', exact: true }).click();
         await expect.poll(() => fixture.delivered.slice(before).filter(frame => frame.t === 'invite').length).toBe(1);

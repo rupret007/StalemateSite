@@ -46,7 +46,9 @@ async function hostAndGuest(browser) {
 }
 
 async function drawLine(page) {
-    const box = await page.locator('[data-canvas]').boundingBox();
+    const canvas = page.locator('[data-canvas]');
+    await canvas.evaluate(element => element.scrollIntoView({ block: 'center' }));
+    const box = await canvas.boundingBox();
     await page.mouse.move(box.x + 40, box.y + 40);
     await page.mouse.down();
     for (let i = 1; i <= 10; i += 1) await page.mouse.move(box.x + 40 + i * 20, box.y + 40 + i * 10);
