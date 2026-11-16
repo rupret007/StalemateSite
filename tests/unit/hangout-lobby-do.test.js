@@ -143,7 +143,7 @@ describe('HangoutLobby AI review integration', () => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('protected Music invitation capability', () => {
+describe('protected lobby invitations', () => {
     const origin = 'https://music.example.test';
     const protectedEnv = {
         HANGOUT_BETA_MODE: 'protected',
@@ -209,6 +209,39 @@ describe('protected Music invitation capability', () => {
         expect(JSON.stringify(host.frames)).not.toContain(href);
         expect(observer.frames.some(frame => frame.t.startsWith('music-invite'))).toBe(false);
         expect(JSON.stringify(observer.frames)).not.toContain(href);
+    });
+
+    it('keeps an admitted invite recipient in the lobby when the host closes the room', async () => {
+        const pairs = installUpgradeRuntime();
+        const lobby = new HangoutLobby(stateWith(), protectedEnv);
+        const lobbyRoom = '#stalemate', room = '#closed-invite-studio';
+        const send = (socket, frame) => lobby.webSocketMessage(socket, JSON.stringify(frame));
+        const connect = async (nick) => {
+            expect((await lobby.fetch(request(admitted(nick.toLowerCase())))).status).toBe(101);
+            const socket = pairs.at(-1)[1];
+            await send(socket, { t: 'hello', nick, age13: true });
+            return socket;
+        };
+        const host = await connect('ClosingHost');
+        const guest = await connect('InvitedGuest');
+        const observer = await connect('LobbyObserver');
+        await send(host, { t: 'cmd', name: 'join', args: [room], ch: lobbyRoom });
+        const original = host.frames.find(frame => frame.t === 'join' && frame.ch.name === room).ch;
+        await send(host, { t: 'cmd', name: 'mode', args: ['+i'], ch: room });
+        await send(host, { t: 'cmd', name: 'invite', args: ['InvitedGuest'], ch: room, personNamed: true });
+        const invite = guest.frames.find(frame => frame.t === 'invite');
+        expect(invite).toMatchObject({ ch: room, roomInstance: original.keepRef });
+        expect(observer.frames.some(frame => frame.t === 'invite')).toBe(false);
+
+        await send(host, { t: 'cmd', name: 'close', args: [], ch: room });
+        await send(guest, { t: 'cmd', name: 'join', args: [room], ch: lobbyRoom, roomInstance: invite.roomInstance });
+        expect(guest.frames).toContainEqual(expect.objectContaining({
+            t: 'notice', kind: 'error', text: 'That room changed or closed. Ask the host for a new invitation or choose another room.',
+        }));
+        expect(guest.frames.some(frame => frame.t === 'join' && frame.ch.name === room)).toBe(false);
+        expect(lobby.engine.roomSnapshot().rooms.some(candidate => candidate.name === room)).toBe(false);
+        await send(guest, { t: 'say', ch: lobbyRoom, text: 'I can still chat in the lobby.' });
+        expect(observer.frames).toContainEqual(expect.objectContaining({ t: 'line', ch: lobbyRoom, text: 'I can still chat in the lobby.' }));
     });
 });
 
