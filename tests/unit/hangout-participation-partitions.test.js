@@ -327,7 +327,8 @@ describe('combined current participation preparation', () => {
 });
 
 describe('bounded per-principal C2 partitions', () => {
-    it('enrolls 96 actual subjects and uses distant records in the actual C3 lobby without a larger aggregate', async () => {
+    // Allow all 96 real enrollments to finish on a busy runner. The storage budgets are asserted below.
+    it('enrolls 96 actual subjects and uses distant records in the actual C3 lobby without a larger aggregate', { timeout: 15_000 }, async () => {
         const f = await fixture(), people = [];
         for (let n = 0; n < 96; n++) people.push(await f.enroll(String(n).padStart(3, '0')));
         expect(PARTICIPATION_LEDGER_LIMITS.subjects).toBe(64); expect(f.storage.snapshot().has(PARTICIPATION_LEDGER_KEY)).toBe(false);

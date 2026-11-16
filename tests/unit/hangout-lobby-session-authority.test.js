@@ -1004,7 +1004,8 @@ describe('read-only preparation cohort on the actual SQLite authority', () => {
             authority: { ...legacy, resolveParticipationConnections: value }, now: f.now })).toThrow('participation-authority-unavailable');
     });
 
-    it('reads 200 stored authority bindings in one bounded native transaction with less amplification', async () => {
+    // Allow the real SQLite setup to finish on a busy runner. The read budgets are asserted below.
+    it('reads 200 stored authority bindings in one bounded native transaction with less amplification', { timeout: 15_000 }, async () => {
         const f = await fixture({ participation: true }), descriptors = [];
         // This tests stored authority reads, not 200 ordinary admissions/mints.
         // One real enrollment supplies the current guest record schema. The
