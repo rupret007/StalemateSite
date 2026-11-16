@@ -1382,6 +1382,9 @@
     function hold(fn) {
         player.applying = Date.now() + 900;
         fn();
+        if (!app.isHost && isSharedMovie(app.state.video?.source)) {
+            playbackSample = { at: Date.now(), pos: localTime(), playing: localPlaying() };
+        }
     }
     function seekTo(s) { hold(() => { if (player.kind === 'file') ui.file.currentTime = s; else if (player.yt) player.yt.seekTo(s, true); }); }
     function playLocal() {
@@ -1477,6 +1480,7 @@
     }
     const videoSyncTimer = win.setInterval(() => {
         if (!app.connected) return;
+        if (!app.isHost && isSharedMovie(app.state.video?.source) && Date.now() - playbackIntentAt < 750) return;
         if (!app.isHost || app.bob.on && isPaintEpisode(app.state.video?.source)) return syncToState(false);
         const v = app.state.video;
         if (!v || !player.kind || (player.kind === 'yt' && !player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
@@ -1488,16 +1492,21 @@
     }, 2000);
     win.setInterval(() => {
         const v = app.state.video;
-        const canDrive = app.bob.on && isPaintEpisode(v?.source) || !app.isHost && isSharedMovie(v?.source);
+        const movieGuest = !app.isHost && isSharedMovie(v?.source);
+        const canDrive = app.bob.on && isPaintEpisode(v?.source) || movieGuest;
         if (!app.connected || !canDrive || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         const at = Date.now(), pos = localTime(), playing = localPlaying();
         if (player.buffering) { playbackSample = { at, pos, playing }; return; }
-        if (at < player.applying || at - playbackIntentAt < 750) { playbackSample = { at, pos, playing }; return; }
+        if (!movieGuest && (at < player.applying || at - playbackIntentAt < 750)) {
+            playbackSample = { at, pos, playing }; return;
+        }
         if (playbackSample) {
             const elapsed = (at - playbackSample.at) / 1000;
             if (elapsed > 2) { playbackSample = { at, pos, playing }; void syncToState(false); return; }
             const natural = elapsed * (playbackSample.playing ? (v.rate || 1) : 0);
-            if (Math.abs((pos - playbackSample.pos) - natural) > 1) void publishVideoIntent(v.source, playing, pos);
+            const jumped = Math.abs((pos - playbackSample.pos) - natural) > 1;
+            const matchesShared = movieGuest && Math.abs(pos - H.expectedPosition(v, app.clock.relayNow())) < 1;
+            if (jumped && !matchesShared) void publishVideoIntent(v.source, playing, pos);
         }
         playbackSample = { at, pos, playing };
     }, 250);
