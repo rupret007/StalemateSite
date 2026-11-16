@@ -104,6 +104,9 @@ for (const width of [375, 1440]) test(`landmarks, visible nickname label and mes
         await expect(page.locator('[data-connection]')).toHaveText('Connected');
         await expect(page.getByRole('main')).toHaveCount(1);
         await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('Community chat');
+        const quick = page.locator('[data-quick]');
+        await expect(quick.getByRole('button', { name: 'Send 🤘 SHRED', exact: true })).toBeVisible();
+        await expect(quick.getByRole('button', { name: 'Send happy little tree 🌲', exact: true })).toBeVisible();
         await send(page, 'A message in the accessible conversation');
         const conversation = page.getByRole('log', { name: 'Conversation' });
         await expect(conversation.getByRole('list', { name: 'Messages' })).toContainText('A message in the accessible conversation');

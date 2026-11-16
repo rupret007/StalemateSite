@@ -227,6 +227,17 @@ describe('focus after private guest entry', () => {
     });
 });
 
+it('identifies emoji shortcuts as actions that send the named message', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const quickReplies = window.document.querySelectorAll('[data-quick-line]');
+    expect([...quickReplies].map(button => button.getAttribute('aria-label'))).toEqual([
+        'Send 🤘 SHRED', 'Send happy little tree 🌲',
+    ]);
+    quickReplies[1].click();
+    expect(ws.sent.at(-1)).toEqual({ t: 'say', ch: '#stalemate', text: 'happy little tree 🌲' });
+});
+
 it('names the channel tab group and describes the conversation with the selected room', async () => {
     const { window, welcome, join } = await visitor();
     welcome(); join(); join('#writing-room');
