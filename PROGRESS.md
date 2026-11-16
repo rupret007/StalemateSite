@@ -9,3 +9,7 @@
 - Done 4 — Retained the newest accepted Paint Along playback when a drawing snapshot arrives.
 - Evidence — The guest pauses, plays and seeks for both players, and a late guest inherits the playback position. Both phone projects and the existing Hang Out guest-control test pass.
 - Next — Separate local music, video sound and mic controls and verify game sound preferences stay independent.
+
+- Done 5 — Split site-wide Music from Video sound and kept the existing game effects and microphone settings.
+- Evidence — Chromium and WebKit verified red and green Music states, independent YouTube mute and a live local and remote microphone.
+- Next — Check visible tap targets, camera prominence, filmstrip and chat against the phone screenshots.

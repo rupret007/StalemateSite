@@ -1,9 +1,17 @@
 const path = require('node:path');
+const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const FAKE_YT = path.join(__dirname, 'support/fake-youtube.js');
+
+async function saveShot(page, filename) {
+    const folder = process.env.PAINT_FOCUS_EVIDENCE;
+    if (!folder || test.info().project.name !== 'chromium-paint-focus') return;
+    await fs.mkdir(folder, { recursive: true });
+    await page.screenshot({ path: path.join(folder, filename), animations: 'disabled' });
+}
 
 async function enter(page, name) {
     await page.locator('[data-name]').fill(name);
@@ -72,6 +80,7 @@ test('invite, name, room, then media consent with denial, reconnect and rejoin',
         await guest.goto(invite.href);
         await expect(guest.locator('[data-gate-title]')).toHaveText('You’re invited');
         await expect(guest.locator('[data-name]')).toBeVisible();
+        await saveShot(guest, 'join.png');
         await expect(guest.locator('[data-check-btn]')).toBeHidden();
         await expect(guest.locator('[data-room]')).toBeHidden();
         await expect(consent).toBeHidden();
@@ -84,6 +93,7 @@ test('invite, name, room, then media consent with denial, reconnect and rejoin',
         await expect(guest.locator('[data-gate]')).toBeHidden();
         await expect(guest.locator('body')).toHaveClass(/bob-mode/);
         await expect(consent).toBeVisible();
+        await saveShot(guest, 'consent.png');
         expect(await attempts()).toBe(0);
         await camera.click();
         await expect(consent).toHaveAttribute('data-state', 'denied');
@@ -200,6 +210,7 @@ test('the Paint Along stage stays fully visible above two live tiles and open ch
             await host.locator('[data-chat-toggle]').click();
             await expect(host.locator('.chat')).toBeVisible();
             await expectPhoneStage(host);
+            if (size.width === 390) await saveShot(host, 'paint-along-two-tiles.png');
             await host.locator('[data-chat-toggle]').click();
         }
     } finally {
@@ -280,6 +291,58 @@ test('music, video sound, game effects and live microphone remain independent', 
         await expect(videoSound).toHaveAttribute('aria-pressed', 'true');
         expect(await host.evaluate(() => localStorage.getItem('stalemate.music'))).toBe('off');
         expect(await host.evaluate(() => localStorage.getItem('turdsuite_muted'))).toBe('1');
+    } finally {
+        await guestContext.close();
+    }
+});
+
+async function expectTouchTargets(root) {
+    const small = await root.locator('button:visible, a[href]:visible, input:visible, select:visible, summary:visible')
+        .evaluateAll(elements => elements.flatMap(element => {
+            const target = element.matches('input[type="checkbox"]') ? element.closest('label') || element : element;
+            const { width, height } = target.getBoundingClientRect();
+            const label = element.getAttribute('aria-label') || element.textContent.trim() || element.outerHTML.split('>')[0];
+            return width < 48 || height < 48 ? [{ label, width, height }] : [];
+        }));
+    expect(small).toEqual([]);
+}
+
+test('the phone layout gives camera consent priority and keeps labeled 48px controls', async ({ page, context, baseURL, viewport }) => {
+    test.setTimeout(60000);
+    const { host, guest, guestContext } = await paintPair(context, baseURL, viewport);
+    try {
+        await page.goto(inviteFor(host).href);
+        await expectTouchTargets(page.locator('body'));
+        const consent = host.locator('[data-consent]');
+        const camera = consent.locator('[data-consent-on]');
+        await expect(camera).toContainText('Turn on camera');
+        await expect(camera).toHaveCSS('background-color', 'rgb(31, 122, 69)');
+        expect((await camera.boundingBox()).width).toBeGreaterThan((await consent.locator('[data-consent-skip]').boundingBox()).width);
+        await expectTouchTargets(consent);
+        await joinWithCamera(host);
+        await joinWithCamera(guest);
+        const tiles = host.locator('[data-tiles] .tile');
+        await expect(tiles).toHaveCount(2);
+        const [remote, local] = await Promise.all([tiles.first().boundingBox(), tiles.last().boundingBox()]);
+        expect(remote.y).toBe(local.y);
+        expect(remote.x + remote.width).toBeLessThanOrEqual(local.x);
+        expect(remote.width).toBeGreaterThan(local.width);
+        await expect(tiles.locator('video').first()).toHaveCSS('object-fit', 'contain');
+        await expect(host.locator('[data-canvas]')).toBeHidden();
+        await host.locator('[data-chat-toggle]').click();
+        await expect(host.locator('.chat')).toBeVisible();
+        await expectTouchTargets(host.locator('body'));
+        const dock = host.locator('.callbar');
+        const dockBox = await dock.boundingBox();
+        expect(dockBox.y + dockBox.height).toBe(viewport.height);
+        for (const button of await dock.locator('.callbar-main .btn').all()) {
+            expect((await button.innerText()).trim()).not.toBe('');
+        }
+        await host.locator('[data-more]').click();
+        await expectTouchTargets(dock);
+        await host.locator('[data-more]').click();
+        await host.locator('[data-soundtrack]').click();
+        await expectTouchTargets(dock);
     } finally {
         await guestContext.close();
     }

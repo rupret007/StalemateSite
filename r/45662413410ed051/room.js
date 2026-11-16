@@ -799,7 +799,13 @@
     function showPeers(n) {
         const names = Array.from(app.names.values());
         const count = Number(n) || 1;
-        ui.peers.textContent = count <= 1 ? 'Just you' : `${count} here${names.length ? `: ${names.slice(0, 5).join(', ')} + you` : ''}`;
+        ui.peers.textContent = count <= 1 ? 'Just you' : `${count} here`;
+        if (count > 1 && names.length) {
+            const roster = doc.createElement('span');
+            roster.className = 'peer-names';
+            roster.textContent = `: ${names.slice(0, 5).join(', ')} + you`;
+            ui.peers.append(roster);
+        }
     }
 
     async function handle(msg, meta) {
@@ -1715,8 +1721,11 @@
     }
     function camConstraints() {
         const p = prefs();
-        const c = Object.assign({}, CAM);
-        if (p.cam) c.deviceId = { ideal: p.cam };
+        const c = { ...(app.bob.on ? CANVAS_CAM : CAM) };
+        if (p.cam) {
+            delete c.facingMode;
+            c.deviceId = { ideal: p.cam };
+        }
         return c;
     }
 
@@ -2513,7 +2522,7 @@
         tile.classList.toggle('tile--screen', isScreen);
         tile.classList.toggle('tile--big', big);
         tile.classList.toggle('tile--nocam', !camOn || paused || (id !== 'me' && app.av.awayPeers.has(id)));
-        tile.classList.toggle('tile--mirror', id === 'me' && camOn && !isScreen && !isCanvas);
+        tile.classList.toggle('tile--mirror', id === 'me' && camOn && !isScreen && !isCanvas && !app.bob.on);
         tile.dataset.initial = (peerName(id).trim()[0] || '?').toUpperCase();
         const label = id === 'me'
             ? (app.av.canvas ? `${app.name}’s canvas (you)` : `${app.name} (you)`)
@@ -3228,7 +3237,8 @@
         ui.consentCopy.textContent = state === 'preview' ? 'Only you can see this preview. Tap Join to share it with this room.'
             : state === 'voice' ? 'Your mic works. You can add the camera later with Start video.'
                 : state === 'asking' ? 'Tap Allow on the pop-up so the room can see and hear you.'
-                    : 'One tap asks your browser for camera and mic together. Cameras are for adults 18+. Only people in this room see and hear you.';
+                    : app.bob.on ? 'Point your camera at your canvas. Only people in this room can see and hear you. Cameras are for adults 18+.'
+                        : 'Your browser will ask for camera and mic access. Only people in this room can see and hear you. Cameras are for adults 18+.';
         if (state === 'voice') ui.consentPlaceholder.textContent = '🎙️ Mic only: no camera was found.';
         else ui.consentPlaceholder.textContent = '📷 Your preview shows here. Nothing turns on until you tap the button.';
     }
@@ -3238,6 +3248,7 @@
         if (!want && app.consent.state !== 'idle') setConsentState('idle');
         const changed = ui.consent.hidden === want;
         ui.consent.hidden = !want;
+        doc.body.classList.toggle('consent-open', want);
         if (changed && app.consent.state === 'idle') setConsentState('idle');
         if (changed) layout();
     }
