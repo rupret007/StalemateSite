@@ -32,14 +32,16 @@ let testOrigin;
 test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
 const roomContexts = new Set();
 let extraBrowser = null;
+let extraGuestBrowser = null;
 test.afterEach(async () => {
     await Promise.all([...roomContexts].map((context) => context.close().catch(() => {})));
     roomContexts.clear();
-    if (extraBrowser) {
-        const closing = extraBrowser;
-        extraBrowser = null;
-        await Promise.race([closing.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 2000))]);
-    }
+    const closing = [extraBrowser, extraGuestBrowser].filter(Boolean);
+    extraBrowser = null;
+    extraGuestBrowser = null;
+    await Promise.all(closing.map((browser) => Promise.race([
+        browser.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 2000))
+    ])));
 });
 
 function scrub(value) {
@@ -86,12 +88,13 @@ function skipForHost(description) {
     test.skip(true, description);
 }
 /** Launches WebKit. Skips only when its executable is missing; any other launch failure fails the test. */
-async function launchWebkit(report) {
+async function launchWebkit(report, forGuest = false) {
     try {
         // The Chromium worker's fake-device flags are the default launch options.
         // Passing an empty args list keeps those flags off this WebKit process.
         const launched = await webkit.launch({ headless: true, args: [] });
-        extraBrowser = launched;
+        if (forGuest) extraGuestBrowser = launched;
+        else extraBrowser = launched;
         report.launched = true;
         return launched;
     } catch (error) {
@@ -446,6 +449,7 @@ test('two people in WebKit when that browser launches', async () => {
     const hostLimitText = WEBKIT_CRASH;
     const report = { launched: false, pass: false, status: 'WebKit did not launch', environment: false };
     let browser;
+    let guestBrowser;
     let host;
     let guest;
     let hostLimit = '';
@@ -462,7 +466,10 @@ test('two people in WebKit when that browser launches', async () => {
     let crash = { seen: false, settle: async () => false };
     const pageDown = () => { if (crash.seen) noteLimit(hostLimitText); return Boolean(hostLimit); };
     browser = await launchWebkit(report);
-    if (!browser) {
+    // Each person gets a WebKit process with its own mock capture device.
+    if (browser) guestBrowser = await launchWebkit(report, true);
+    if (!browser || !guestBrowser) {
+        report.launched = false;
         console.log(`CHECK f fail launched=false env=${Boolean(report.missing)} seconds= status=${report.status}`);
         await writeJson('webkit.json', report);
         if (report.missing) skipForHost(WEBKIT_MISSING);
@@ -471,7 +478,7 @@ test('two people in WebKit when that browser launches', async () => {
     try {
         {
             host = await openBrowser(browser, HOST_VIEW);
-            guest = await openBrowser(browser, PHONE);
+            guest = await openBrowser(guestBrowser, PHONE);
             host.setDefaultTimeout(8000);
             guest.setDefaultTimeout(8000);
             crash = watchCrash([host, guest]);
@@ -498,8 +505,11 @@ test('two people in WebKit when that browser launches', async () => {
                     await turnCamera(host);
                     await turnCamera(guest);
                 } catch (error) {
-                    if (inputs <= 0 && !(await crash.settle())) noteLimit(WEBKIT_NO_CAPTURE);
-                    else throw error;
+                    if (inputs <= 0 && !(await crash.settle())) {
+                        const selfViews = await Promise.all([localSelfView(host), localSelfView(guest)]);
+                        if (selfViews.every((self) => self.videoWidth === 0)) noteLimit(WEBKIT_NO_CAPTURE);
+                        else throw error;
+                    } else throw error;
                 }
             }
             if (pageDown()) noteLimit(hostLimitText);
@@ -562,10 +572,11 @@ test('two people in WebKit when that browser launches', async () => {
         closing = true;
         console.log(`CHECK f ${report.pass ? 'pass' : 'fail'} launched=${report.launched} env=${Boolean(report.environment)} seconds=${report.seconds ?? ''} status=${report.status || ''}`);
         await writeJson('webkit.json', report);
-        if (browser) {
-            extraBrowser = null;
-            await Promise.race([browser.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 1500))]);
-        }
+        extraBrowser = null;
+        extraGuestBrowser = null;
+        await Promise.all([browser, guestBrowser].map((opened) => Promise.race([
+            opened.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 1500))
+        ])));
     }
     if (hostLimit) skipForHost(hostLimit);
 });
