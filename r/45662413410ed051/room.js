@@ -1666,6 +1666,11 @@
     }
 
     let primedCapture = null;
+    const openBrowserHint = 'Video needs Safari or Chrome. Tap ⋯ or Share, then Open in Safari (iPhone) or Open in Chrome (Android). Chat and games still work here.';
+    function needsOpenBrowserHint(error) {
+        return win.isSecureContext === false || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
+            || (Boolean(error) && /FBAN|FBAV|Instagram|GSA\/|Snapchat|Line\/|; wv\)/i.test(navigator.userAgent));
+    }
     function startCapture(constraints) {
         try { return navigator.mediaDevices.getUserMedia(constraints); }
         catch (error) { return Promise.reject(error); }
@@ -1684,6 +1689,7 @@
             if (app.av.kicked) { dropPrimed(); say('The host took you off faces in this room. Chat and draw still work.'); return; }
             if (!restore && app.av.locked && !(app.av.mic || app.av.cam)) { dropPrimed(); say('The host locked faces for now. Chat and draw still work.'); return; }
             if (!restore && !(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { dropPrimed(); say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
+            if (needsOpenBrowserHint()) { say(openBrowserHint); return; }
             const version = ++captureVersion[mediaKind];
             const constraints = kind === 'cam'
                 ? { video: camConstraints() }
@@ -1724,6 +1730,7 @@
                 ensureAudioCtx();
             } catch (error) {
                 if (version !== captureVersion[mediaKind]) return;
+                if (needsOpenBrowserHint(error)) { say(openBrowserHint); return; }
                 if (kind === 'cam' && !app.av.mic && !app.av.jam) {
                     // No camera (blocked, missing or busy)? Don't strand them: offer voice only.
                     const voiceConstraints = { audio: V.micConstraints(app.av.music, prefs().mic) };
@@ -2890,6 +2897,7 @@
             lines.push('🎤 Say something: the bar should jump.');
         } catch (error) {
             if (activeCheck !== check) return;
+            if (needsOpenBrowserHint(error)) { ui.checkOut.textContent = openBrowserHint; return; }
             lines.push('⚠️ Camera or mic is blocked. Allow them by the address bar if you want faces. Chat and draw work either way.');
         }
         ui.checkOut.textContent = lines.join(' ');
