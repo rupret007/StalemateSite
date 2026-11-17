@@ -1067,12 +1067,27 @@ describe('jam rooms hand off to WebJam', () => {
         expect(room.jam.desktop).toBe('webjam://join?v=1#k=abcdef0123');
         cmd(a, 'jamlink', ['web', 'https://jam.example/join#x'], '#jam-garage');
         expect(room.jam.web).toBe('');
+        expect(notices(a)).toContain('Browser joining is not configured for this beta.');
         const fan = join('Fan');
         cmd(fan, 'jamlink', ['webjam://join?v=1#k=hijack999'], '#jam-garage');
         expect(room.jam.desktop).toBe('webjam://join?v=1#k=abcdef0123');
         expect(validWebjamInvite('webjam://x" onclick=1')).toBe('');
         expect(validWebJoin('https://jam.example/j#x', ['https://jam.example'])).toBe('https://jam.example/j#x');
         expect(validWebJoin('javascript:alert(1)#x', ['https://jam.example'])).toBe('');
+    });
+
+    it('tells a host how to replace an invalid browser invitation when browser joining is available', () => {
+        boot({ webJoinOrigins: ['https://jam.example'] });
+        const host = join('Alpha');
+        const room = '#jam-garage';
+        cmd(host, 'join', [room]);
+        const jam = L._debug.channels.get(room).jam;
+        cmd(host, 'jamlink', ['web', 'https://other.example/join/#synthetic'], room);
+        expect(jam.web).toBe('');
+        expect(notices(host)).toContain('Copy a fresh browser invite in WebJam and try again.');
+        expect(notices(host)).not.toContain('Browser joining is not configured');
+        cmd(host, 'jamlink', ['web', 'https://jam.example/join/#synthetic'], room);
+        expect(jam.web).toBe('https://jam.example/join/#synthetic');
     });
 });
 

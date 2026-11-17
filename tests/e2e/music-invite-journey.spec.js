@@ -171,6 +171,7 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             const manualResult = host.locator('[data-jam-share-status]').and(host.getByRole('status'));
             await expect(manualResult).toHaveText('Share rejected. Edit the paste and try again.');
             await expect(manualResult).toBeVisible();
+            await expect(host.locator('[data-toast]')).toContainText('Copy a fresh browser invite in WebJam and try again.');
             await expect(manualSummary).toBeFocused();
             await manualResult.scrollIntoViewIfNeeded();
             await capture(host, '00d-manual-rejection-with-form-closed');

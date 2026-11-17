@@ -1934,7 +1934,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (lc(which) === 'clear') { chan.jam = { desktop: '', web: '' }; event(chan, `${c.nick} cleared the jam links`); return sendChan(chan); }
             requireParticipation(c, 'publicArtifact');
             const v = which === 'web' ? validWebJoin(link, L.webJoinOrigins) : which === 'invitation' ? validWebjamInvitation(link) : validWebjamInvite(which === 'desktop' ? link : which);
-            if (!v) return bot(c, which === 'web' ? 'Browser joining is not configured for this beta.' : 'Paste the complete message from WebJam’s Copy Invite into the room’s invitation box (maximum 8 KB).', 'error');
+            if (!v) {
+                if (which !== 'web') return bot(c, 'Paste the complete message from WebJam’s Copy Invite into the room’s invitation box (maximum 8 KB).', 'error');
+                const message = L.webJoinOrigins?.length
+                    ? 'That browser invite can’t be used here. Copy a fresh browser invite in WebJam and try again.'
+                    : 'Browser joining is not configured for this beta.';
+                return bot(c, message, 'error');
+            }
             if (which === 'web') chan.jam.web = v;
             else { chan.jam.invitation = v; chan.jam.desktop = validWebjamInvite(v); }
             event(chan, which === 'web'
