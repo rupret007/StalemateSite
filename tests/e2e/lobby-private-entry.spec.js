@@ -139,6 +139,114 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
     }
 });
 
+for (const width of [390, 1440]) for (const retained of [false, true]) {
+    test(`protected room reconnect preserves ${retained ? 'a draft' : 'a blank composer'} at ${width}px`, async ({ browser }, testInfo) => {
+        const { privateCommunity } = await import('./helpers/private-community.mjs');
+        const community = await privateCommunity(), contexts = [], errors = [];
+        async function enter(name, via, viewWidth) {
+            const context = await browser.newContext({ ignoreHTTPSErrors: true,
+                viewport: { width: viewWidth, height: viewWidth === 390 ? 844 : 900 },
+                hasTouch: viewWidth === 390, reducedMotion: 'reduce' });
+            contexts.push(context);
+            await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+            await context.addInitScript(() => {
+                window.fixtureCaptureCalls = 0;
+                if (!navigator.mediaDevices) return;
+                for (const name of ['getUserMedia', 'getDisplayMedia']) {
+                    Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), name, {
+                        configurable: true, value: async () => { window.fixtureCaptureCalls++; throw new Error('Protected reconnect never captures media'); }
+                    });
+                }
+            });
+            const page = await context.newPage();
+            page.on('pageerror', error => errors.push(error.name));
+            await page.goto(community.origin + '/beta/?via=' + via + '#invite=' + community.invitation);
+            await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+            await page.getByRole('textbox', { name: 'Your nick', exact: true }).pressSequentially(name);
+            await page.locator('[data-enter]').press('Enter');
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+            return { page, context };
+        }
+        async function send(page, message) {
+            const input = page.getByRole('textbox', { name: 'Message', exact: true });
+            await input.pressSequentially(message); await input.press('Enter');
+        }
+        async function rooms(page) {
+            const button = page.locator('nav [data-show="rooms"]');
+            if (await button.isVisible()) await button.click();
+        }
+        const capture = (page, state) => page.screenshot({ path: testInfo.outputPath(`${state}-${width}-${retained ? 'draft' : 'blank'}.png`) });
+        try {
+            // Preparation is independent. Both protected cookies and welcomes
+            // finish before either visitor joins the shared room.
+            const [host, guest] = await Promise.all([
+                enter('RecoveryHost', 'stalemate', width === 390 ? 1440 : 390),
+                enter('RecoveryGuest', 'rad-dad', width)
+            ]);
+            await send(host.page, '/join #recovery-studio');
+            await expect(host.page.locator('[data-chat-context]')).toHaveText('#recovery-studio');
+            await rooms(guest.page);
+            const search = guest.page.getByRole('searchbox', { name: 'Find a room' });
+            await search.pressSequentially('recovery-studio');
+            const room = guest.page.locator('[data-roomlist] button[data-room="#recovery-studio"]');
+            await expect(room).toBeVisible();
+            await room.press('Enter');
+            await expect(guest.page.locator('[data-chat-context]')).toHaveText('#recovery-studio');
+            const earlier = 'This room message belongs to the earlier connection.';
+            await send(host.page, earlier);
+            await expect(guest.page.getByRole('log', { name: 'Conversation' })).toContainText(earlier);
+            const input = guest.page.getByRole('textbox', { name: 'Message', exact: true });
+            const draft = retained ? 'My private unsent room draft survives the interruption.' : '';
+            if (draft) await input.pressSequentially(draft);
+            await expect(input).toHaveValue(draft);
+            await capture(guest.page, '01-before-room-interruption');
+            const cookie = (await guest.context.cookies()).find(cookie => cookie.name === community.sessionCookieName);
+            expect(cookie).toMatchObject({ secure: true, httpOnly: true, sameSite: 'Lax' });
+            community.interruptGuest(cookie.value);
+            // Observe a genuinely new admission, not the old Connected label.
+            await expect.poll(() => community.diagnostics().admittedUpgrades).toBe(3);
+            await expect(guest.page.locator('[data-connection]')).toHaveText('Connected');
+            await expect(guest.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            await expect(input).toHaveValue('');
+            await expect(guest.page.getByRole('log', { name: 'Conversation' })).not.toContainText(earlier);
+            await expect(guest.page.getByText('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.', { exact: true })).toBeVisible();
+            await capture(guest.page, '02-fresh-lobby-recovery');
+            await rooms(guest.page);
+            await search.fill('recovery-studio');
+            await expect(room).toBeVisible();
+            if (width === 390) await room.tap(); else await room.press('Enter');
+            await expect(guest.page.locator('[data-chat-context]')).toHaveText('#recovery-studio');
+            await expect(guest.page.getByRole('tab', { name: '#recovery-studio', exact: true })).toBeFocused();
+            await expect(input).toHaveValue(draft);
+            await expect(input).toBeInViewport({ ratio: 1 });
+            await expect(guest.page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+            await expect(guest.page.getByRole('log', { name: 'Conversation' })).not.toContainText(earlier);
+            const hostLog = host.page.getByRole('log', { name: 'Conversation' });
+            if (draft) {
+                await expect(hostLog).not.toContainText(draft);
+                expect(await guest.page.evaluate(text => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(text), draft)).toBe(false);
+            }
+            await capture(guest.page, '03-room-rejoined-draft-not-sent');
+            const message = draft || 'A deliberate new message after room recovery.';
+            if (!draft) await input.pressSequentially(message);
+            await input.press('Enter');
+            await expect(hostLog.getByRole('listitem').filter({ hasText: message })).toHaveCount(1);
+            await expect(input).toHaveValue('');
+            expect(await guest.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await capture(guest.page, '04-deliberate-message-received');
+            for (const visitor of [host, guest]) expect(await visitor.page.evaluate(() => window.fixtureCaptureCalls)).toBe(0);
+            expect(community.diagnostics().interruptions).toBe(1);
+            expect(community.diagnostics().failures).toEqual([]); expect(errors).toEqual([]);
+            await testInfo.attach('protected-reconnect-scope', { contentType: 'application/json', body: JSON.stringify(community.diagnostics()) });
+        } finally {
+            const closed = await Promise.allSettled(contexts.map(context => context.close()));
+            await community.close();
+            const failed = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+            if (failed.length) throw new AggregateError(failed, 'Owned reconnect contexts did not close cleanly');
+        }
+    });
+}
+
 async function contained(page, locator) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const bounds = await locator.boundingBox(); expect(bounds).not.toBeNull();
