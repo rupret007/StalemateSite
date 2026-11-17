@@ -17,6 +17,7 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
         await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
         await context.addInitScript(() => {
             window.fixtureCaptureCalls = 0;
+            if (!navigator.mediaDevices) return; // Initial blank tabs have no media API.
             for (const name of ['getUserMedia', 'getDisplayMedia']) {
                 Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), name, {
                     configurable: true, value: async () => { window.fixtureCaptureCalls++; throw new Error('This newcomer walkthrough never captures media'); }
@@ -41,6 +42,7 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
         expect(cookie).toMatchObject({ secure: true, httpOnly: true, sameSite: 'Lax', path: '/' });
         await proceed.press('Enter');
         await expect(page.locator('[data-entry-label]').first()).toHaveText('via ' + (visitor.source === 'rad-dad' ? 'Rad Dad' : 'Stalemate'));
+        expect(await page.evaluate(() => typeof navigator.mediaDevices?.getUserMedia === 'function')).toBe(true);
     }
     async function nick(page, name) {
         const input = page.getByRole('textbox', { name: 'Your nick', exact: true });
@@ -97,7 +99,9 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
         await host.page.locator('[data-roomtools]').press('Enter');
         await host.page.getByRole('dialog', { name: 'Commands', exact: true }).getByRole('button', { name: 'Invite guest', exact: true }).press('Enter');
         const invite = host.page.getByRole('dialog', { name: 'Invite a guest', exact: true });
-        await invite.getByRole('combobox', { name: 'Online guests', exact: true }).selectOption({ label: 'StudioGuest' });
+        const roster = invite.getByRole('combobox', { name: 'Online guests', exact: true });
+        await expect(roster).toBeVisible(); await expect(roster).toBeFocused();
+        await roster.selectOption({ label: 'StudioGuest' });
         await invite.getByRole('button', { name: 'Invite selected person', exact: true }).press('Enter');
         await expect(invite).toBeHidden();
         const offer = guest.page.locator('[data-room-invite]');
@@ -128,8 +132,10 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
         expect(community.diagnostics().failures).toEqual([]); expect(pageErrors).toEqual([]);
         await testInfo.attach('protected-newcomer-scope', { contentType: 'application/json', body: JSON.stringify(community.diagnostics()) });
     } finally {
-        for (const context of contexts) await context.close();
+        const closed = await Promise.allSettled(contexts.map(context => context.close()));
         await community.close();
+        const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (failures.length) throw new AggregateError(failures, 'Owned newcomer contexts did not close cleanly');
     }
 });
 
