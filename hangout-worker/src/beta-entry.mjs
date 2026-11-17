@@ -210,7 +210,7 @@ async function unlock(key) {
         if (attempt !== currentAttempt) return;
         if (result.status === 410) return finish(attempt, 'invitation', 'This demo invite is no longer valid. Ask your host for a new one.');
         if (!result.ok) return finish(attempt, result.status === 401 || result.status === 403 ? 'invitation' : 'unavailable',
-            result.status === 401 || result.status === 403 ? 'The invitation was not accepted. Check the code or the house rules before trying again.' : unavailable);
+            result.status === 401 || result.status === 403 ? 'This invitation didn’t work. Check the link or code, or ask your host for a new invitation.' : unavailable);
         $('#code').value = '';
         operation = '';
         await draw();
