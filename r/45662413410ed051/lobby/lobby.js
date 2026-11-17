@@ -1852,7 +1852,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             : invitation.error || `${invitation.from} invited you to ${invitation.room}`;
         const waiting = roomInvites.size - 1;
         roomInviteMessage(waiting > 0 ? `${message} · ${waiting} more invitation${waiting === 1 ? '' : 's'}` : message);
-        if (!invitation && focused) focusChannelTab(app.active);
+        if (!invitation && focused) focusChannelTab(app.active, { preventScroll: false });
     }
     function clearRoomInvites() {
         if (roomJoinFocus?.instance) roomJoinFocus = null;

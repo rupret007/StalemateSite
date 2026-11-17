@@ -597,14 +597,14 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
     } finally { await visitor?.close(); await host.close(); }
 });
 
-test('short reflow: the guest can dismiss a room invitation by keyboard', async ({ browser, baseURL }, testInfo) => {
+for (const height of [256, 210]) test(`short reflow: the guest can dismiss a room invitation by keyboard at 320×${height}`, async ({ browser, baseURL }, testInfo) => {
     const relay = hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
     const host = await guest(browser, baseURL, 'ShortInviteHost', { width: 1440, height: 900 }, relay);
     let visitor;
     try {
         await send(host.page, '/join #invite-dismiss');
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#invite-dismiss');
-        visitor = await guest(browser, baseURL, 'ShortInviteGuest', { width: 320, height: 256 }, relay);
+        visitor = await guest(browser, baseURL, 'ShortInviteGuest', { width: 320, height }, relay);
         const { page } = visitor;
         await send(host.page, '/invite ShortInviteGuest');
         const invitation = page.locator('[data-room-invite]');
@@ -627,7 +627,7 @@ test('short reflow: the guest can dismiss a room invitation by keyboard', async 
         await expect(invitation).toBeHidden();
         const lobbyTab = page.getByRole('tab', { name: '#stalemate', selected: true });
         await expect(lobbyTab).toBeFocused();
-        await expect(lobbyTab).toBeInViewport();
+        await expect(lobbyTab).toBeInViewport({ ratio: 1 });
         await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
         await expect(page.locator('[data-channel-key="#invite-dismiss"]')).toHaveCount(0);
         const message = page.getByRole('textbox', { name: 'Message', exact: true });
