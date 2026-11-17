@@ -297,3 +297,65 @@ for (const width of [375, 390, 1440]) test(`protected module download failure of
         try { await context?.close(); } finally { await community.close(); }
     }
 });
+
+// The private gateway admits the visitor, but only its initial bootstrap fails.
+// Keep media-attempt evidence outside the page so reload cannot reset it.
+for (const { width, fault } of [{ width: 375, fault: 'network' }, { width: 390, fault: '503' }, { width: 1440, fault: 'network' }]) {
+    test(`protected bootstrap failure offers explicit recovery at ${width}px for ${fault}`, async ({ browser }, testInfo) => {
+        const { privateCommunity } = await import('./helpers/private-community.mjs');
+        const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
+        const community = await privateCommunity(); let context, failures = 0;
+        try {
+            context = await browser.newContext({ ignoreHTTPSErrors: true,
+                viewport: { width, height: width <= 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+            await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+            const sentinel = await installNoCaptureSentinel(context);
+            const bootstrap = community.origin + '/beta/bootstrap.js';
+            const unavailable = route => {
+                failures++;
+                return fault === 'network' ? route.abort('failed') : route.fulfill({ status: 503,
+                    contentType: 'text/javascript', body: '/* Synthetic unavailable private bootstrap. */' });
+            };
+            await context.route(bootstrap, unavailable);
+            const page = await context.newPage();
+            await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+            await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+            await page.waitForLoadState('load');
+            await expect.poll(() => failures).toBe(1);
+            expect(await page.evaluate(() => !!window.HangoutBootstrap)).toBe(false);
+            expect(community.diagnostics().admittedUpgrades).toBe(0);
+            await sentinel.assertClean();
+            await page.screenshot({ path: testInfo.outputPath(`01-bootstrap-unavailable-${width}.png`) });
+            const recovery = page.locator('[data-startup-recovery]');
+            await expect(recovery).toBeVisible();
+            await expect(recovery).toHaveAttribute('role', 'status');
+            await expect(recovery).toContainText('Chat could not load. Check your connection, then reload chat. Your camera and microphone are off.');
+            await expect(page.locator('[data-gate-copy]')).not.toContainText('Not open yet');
+            const reload = page.getByRole('button', { name: 'Reload chat', exact: true });
+            await reload.scrollIntoViewIfNeeded(); await expect(reload).toBeInViewport({ ratio: 1 });
+            const bounds = await reload.boundingBox();
+            expect(bounds.width).toBeGreaterThanOrEqual(48); expect(bounds.height).toBeGreaterThanOrEqual(48);
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await page.screenshot({ path: testInfo.outputPath(`02-bootstrap-recovery-action-${width}.png`) });
+            await context.unroute(bootstrap, unavailable);
+            await Promise.all([page.waitForEvent('domcontentloaded'), reload.press('Enter')]);
+            await expect(recovery).toBeHidden(); await expect(page.locator('[data-enter]')).toBeEnabled();
+            expect(community.diagnostics().admittedUpgrades).toBe(0);
+            await sentinel.assertClean();
+            await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('BootstrapGuest');
+            await page.locator('[data-enter]').press('Enter');
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+            await expect(page.getByRole('region', { name: 'Chat', exact: true })).toBeFocused();
+            const message = page.getByRole('textbox', { name: 'Message', exact: true });
+            await message.fill('Back after recovering the private session setup.'); await message.press('Enter');
+            await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('Back after recovering the private session setup.');
+            await expect(message).toBeInViewport({ ratio: 1 });
+            await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+            await sentinel.assertClean();
+            expect(community.diagnostics().admittedUpgrades).toBe(1); expect(community.diagnostics().failures).toEqual([]);
+            await page.screenshot({ path: testInfo.outputPath(`03-private-bootstrap-recovered-chat-${width}.png`) });
+        } finally {
+            try { await context?.close(); } finally { await community.close(); }
+        }
+    });
+}
