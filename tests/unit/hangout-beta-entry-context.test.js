@@ -29,8 +29,53 @@ it('puts one Game Night join action before the optional invitation details', asy
         expect(join.getAttribute('aria-describedby')).toBe('guest-agreement');
         expect(join.previousElementSibling.id).toBe('guest-agreement');
         expect(join.previousElementSibling.textContent).toContain('13+');
+        const name = section.querySelector('label:has([data-guest-name])');
+        expect(name.textContent.trim()).toBe('Your nickname');
+        expect(name.nextElementSibling.id).toBe('guest-agreement');
         expect(section.lastElementChild.matches('[data-guest-expiry]')).toBe(true);
         expect(section.querySelector('a[href="/beta/privacy"]').textContent).toBe('House rules');
+    } finally {
+        window.close();
+    }
+});
+
+it('prefills the nickname, keeps one Join action and lets a guest correct a rejected name', async () => {
+    const guestPath = '/beta/game-night/guest';
+    const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1', ASSETS: {
+        fetch: vi.fn(request => new Response(readFileSync(new URL('../..' + new URL(request.url).pathname, import.meta.url), 'utf8')))
+    } });
+    const request = path => new Request('https://beta.example.test' + path);
+    const html = await (await betaFetch(request(guestPath), config)).text();
+    const client = await (await betaFetch(request(guestPath + '.js'), config)).text();
+    const { window } = new JSDOM(html, { url: request(guestPath).url + '#invite=fixture', runScripts: 'outside-only' });
+    try {
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE, unlockGameNightAudio: vi.fn() };
+        window.TextEncoder = TextEncoder;
+        Object.defineProperty(window.crypto, 'subtle', { value: crypto.subtle });
+        window.fetch = vi.fn()
+            .mockResolvedValueOnce(Response.json({ game: 'Royal Flush Chess', host: 'Fixture host', guestName: 'Guest-123456' }))
+            .mockResolvedValueOnce(Response.json({ error: 'That nick is reserved.' }, { status: 422 }))
+            .mockResolvedValueOnce(Response.json({ error: 'Temporary connection failure.' }, { status: 503 }));
+        window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
+            'const { $1 } = sharedGameNight;'));
+        const name = window.document.querySelector('[data-guest-name]');
+        const join = window.document.querySelector('[data-guest-join]');
+        const status = window.document.querySelector('[data-guest-status]');
+        await vi.waitFor(() => expect(name.value).toBe('Guest-123456'));
+        expect(name.closest('label').hidden).toBe(false);
+        expect(window.fetch).toHaveBeenCalledTimes(1);
+
+        name.value = 'admin';
+        join.click();
+        await vi.waitFor(() => expect(status.textContent).toBe('That nick is reserved.'));
+        expect(window.document.activeElement).toBe(name);
+        expect(join.disabled).toBe(false);
+        name.value = 'ArcadeFriend';
+        join.click();
+        await vi.waitFor(() => expect(status.textContent).toBe('Temporary connection failure.'));
+        const [invalid, corrected] = window.fetch.mock.calls.slice(1).map(([, options]) => JSON.parse(options.body));
+        expect(invalid).toMatchObject({ age13: true, nick: 'admin' });
+        expect(corrected).toEqual({ ...invalid, nick: 'ArcadeFriend' });
     } finally {
         window.close();
     }

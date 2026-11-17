@@ -1103,12 +1103,19 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return { ok: false, reason: 'Couldn’t assign a guest name. Ask your host for a fresh invitation.' };
     }
 
+    function availableGameGuestNick(nick) {
+        const checked = checkNick(nick, net.lists);
+        return checked.ok && byNick(checked.nick) ? { ok: false, reason: 'That nick is taken right now.' } : checked;
+    }
+
     function hello(c, f) {
         if (c.nick) return bot(c, 'Already here. Use /nick to change.', 'error');
         if (!isStaff(c) && f.age13 !== true) return bot(c, 'Tick "I\'m 13+ and will be cool" to chat.', 'error');
         const game = c.gameGuest && invitedGameRoom(c.gameGuest);
         if (c.gameGuest && (!game || game.host.blocks.has(c.dev))) return out(c, { t: 'nick-error', text: 'Your host’s room is unavailable. Ask them to send a fresh invitation.' });
-        const v = c.gameGuest ? gameGuestNick(c.gameGuest.nameSeed) : checkNick(f.nick, net.lists, { band: isBand(c) });
+        const preferred = c.gameGuest?.nick ? availableGameGuestNick(c.gameGuest.nick) : null;
+        const v = c.gameGuest ? (preferred?.ok ? preferred : gameGuestNick(c.gameGuest.nameSeed))
+            : checkNick(f.nick, net.lists, { band: isBand(c) });
         if (!v.ok) return out(c, { t: 'nick-error', text: v.reason });
         if (byNick(v.nick)) return out(c, { t: 'nick-error', text: 'That nick is taken right now.' });
         if (!isBand(c) && banned(net.bans, { ...c, nick: v.nick })) { kill(c, 4403, 'banned'); return undefined; }
@@ -2614,7 +2621,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return controlledRun(message, [...args, true], safetyMessage(args[1]));
         }, flushPresence,
         transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
-        arcadeActor, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: (name, allowWebJamChess = false) => {
+        arcadeActor, gameGuestNick, availableGameGuestNick, invitedGameHost: guest => invitedGameRoom(guest)?.host.id, arcadeRoomRef: (name, allowWebJamChess = false) => {
             const room = ch(name);
             return room && (roomKind(room) === 'game' || (allowWebJamChess && privateWebJam(room))) ? room.keepRef : null;
         }, approveArcade: id => execute(approveArcade, [id]),

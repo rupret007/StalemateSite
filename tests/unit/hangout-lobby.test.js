@@ -951,6 +951,13 @@ describe('Game Night', () => {
         L.message(visitor.id, JSON.stringify({ t: 'hello', nick: 'Ignored', age13: true }));
         expect(got(visitor).find(frame => frame.t === 'welcome')).toMatchObject({ nick: 'Guest-000000' });
         expect(got(visitor).filter(frame => frame.t === 'join').map(frame => frame.ch.name)).toEqual([room]);
+
+        const named = { id: 'named-visitor' };
+        expect(L.connect({ ...named, dev: 'named-guest-device', iph: 'ip3', betaSid: 'named-guest-session',
+            gameGuest: { room, ref, host: 'room-host-session', nameSeed: 42, nick: 'ArcadeFriend' } }).ok).toBe(true);
+        L.message(named.id, JSON.stringify({ t: 'hello', nick: 'Ignored', age13: true }));
+        expect(got(named).find(frame => frame.t === 'welcome')).toMatchObject({ nick: 'ArcadeFriend' });
+        expect(got(named).filter(frame => frame.t === 'join').map(frame => frame.ch.name)).toEqual([room]);
     });
 
     it('only accepts HTTPS Discord invites and server channel links', () => {

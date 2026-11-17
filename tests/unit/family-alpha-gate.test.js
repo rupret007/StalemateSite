@@ -6,8 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { ARCADE_TAG, createArcadeTransport } from '../../hangout-worker/src/arcade-transport.mjs';
 import { DEMO_INVITE_TTL } from '../../hangout-worker/src/beta-auth.mjs';
 import { GAME_INVITE_UNAVAILABLE, gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
+import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
 const room = '#game-2ca9e1x1be34a';
+const { gameGuestNick } = createLobby();
 const ref = '0'.repeat(32);
 const actorId = index => 'c' + String(index + 1).repeat(32);
 const sidFor = index => 'seat-' + index;
@@ -233,7 +235,7 @@ describe('family alpha: an expired invite', () => {
             arcadeAvailable: () => true,
             arcadeBinding: () => ({ betaSid: host, betaInviteVersion: '1', canOpen: true, canPlay: true, nick: 'HostExample' }),
             sessionActive: async () => true,
-            engine: { invitedGameHost: () => 'c' + 'a'.repeat(32) },
+            engine: { invitedGameHost: () => 'c' + 'a'.repeat(32), gameGuestNick },
             arcade: { get: () => ({
                 hasGuestSeat: async () => true,
                 guestTableId: async (_scope, match) => match,

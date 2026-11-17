@@ -192,7 +192,8 @@ test('chess exposes intentional retry when its computer request fails', async ({
     await expect(page.locator('#moves button')).toHaveCount(1);
     await page.context().unroute('**/stockfish-19-lite-single.wasm');
     await page.locator('#retry').click();
-    await expect(page.locator('#moves button')).toHaveCount(2);
+    // A fresh worker can use the engine's 15s deadline to load and search.
+    await expect(page.locator('#moves button')).toHaveCount(2, { timeout: 15_000 });
     await expect(page.locator('#engine-recovery')).toBeHidden();
 });
 
