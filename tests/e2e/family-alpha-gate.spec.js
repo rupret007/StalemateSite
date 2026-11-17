@@ -557,6 +557,13 @@ test('Turd Rush confirms the first tap after its rendering frame is delayed', as
         await fixture.act('SwipeGuest', game, { action: 'sync' });
         await expect(match).toHaveAttribute('data-phase', 'play');
         await expect(match).toHaveAttribute('data-lane', '1');
+        const controls = guest.locator('.rush-race-controls .btn');
+        await expect(controls).toHaveCount(4);
+        for (const button of await controls.all()) {
+            await expect(button).toBeInViewport({ ratio: 1 });
+            const box = await button.boundingBox();
+            expect(Math.min(box?.width ?? 0, box?.height ?? 0)).toBeGreaterThanOrEqual(48);
+        }
         await guest.evaluate(() => {
             const native = window.requestAnimationFrame.bind(window);
             window.requestAnimationFrame = callback => native(time => {
