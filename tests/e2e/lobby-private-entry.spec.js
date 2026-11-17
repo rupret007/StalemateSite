@@ -499,3 +499,56 @@ for (const { width, fault } of [{ width: 375, fault: 'network' }, { width: 390, 
         }
     });
 }
+
+// Random-name delivery is optional: a failed first-party script must not make
+// keyboard nickname entry confusing or overwrite a name already being typed.
+for (const width of [375, 390, 1440]) test(`protected nickname picker failure explains manual entry at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity(); let context, blocked = 0;
+    const errors = [];
+    try {
+        context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width, height: width <= 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        await context.route(community.origin + '/r/45662413410ed051/names.js', route => { blocked++; return route.abort('failed'); });
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.waitForLoadState('load'); await expect.poll(() => blocked).toBe(1);
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        expect(community.diagnostics().admittedUpgrades).toBe(0);
+        const nick = page.getByRole('textbox', { name: 'Your nick', exact: true });
+        await nick.fill('FirstChoice');
+        const roll = page.getByRole('button', { name: 'Make me a name — random fun nickname', exact: true });
+        await roll.press('Enter');
+        await sentinel.assertClean();
+        await page.screenshot({ path: testInfo.outputPath(`01-random-name-unavailable-${width}.png`) });
+        await testInfo.attach('nickname-picker-scope', { contentType: 'application/json',
+            body: JSON.stringify({ scriptFailures: blocked, pageErrorNames: errors, admittedUpgrades: community.diagnostics().admittedUpgrades }) });
+        const explanation = 'Random names aren’t available right now. Type a nickname to join.';
+        await expect(nick).toBeFocused(); await expect(nick).toHaveValue('FirstChoice');
+        await expect(nick).toHaveAccessibleDescription(explanation);
+        await expect(page.locator('[data-gate-status]')).toHaveText(explanation);
+        await expect(page.locator('[data-gate-status]')).toBeVisible();
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        expect(community.diagnostics().admittedUpgrades).toBe(0); expect(errors).toEqual([]);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath(`02-manual-name-guidance-${width}.png`) });
+        // A deliberate choice of nickname and Enter is still required; no
+        // fallback generation, reload or automatic join hides the failure.
+        await nick.press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await expect(page.getByRole('region', { name: 'Chat', exact: true })).toBeFocused();
+        const message = page.getByRole('textbox', { name: 'Message', exact: true });
+        await message.fill('I joined with my own nickname after the picker failed.'); await message.press('Enter');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('I joined with my own nickname after the picker failed.');
+        await expect(message).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        await sentinel.assertClean(); expect(errors).toEqual([]);
+        expect(community.diagnostics().admittedUpgrades).toBe(1); expect(community.diagnostics().failures).toEqual([]);
+        await page.screenshot({ path: testInfo.outputPath(`03-manual-name-first-chat-${width}.png`) });
+    } finally {
+        try { await context?.close(); } finally { await community.close(); }
+    }
+});
