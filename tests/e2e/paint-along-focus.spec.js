@@ -152,9 +152,21 @@ function inviteFor(host) {
     return invite;
 }
 
+async function shareInvite(host) {
+    await host.evaluate(() => {
+        navigator.share = async data => { window.copiedInvite = data.url; };
+        navigator.clipboard.writeText = async url => { window.copiedInvite = url; };
+    });
+    await host.locator('[data-copy]').click();
+    const invite = new URL(await host.evaluate(() => window.copiedInvite));
+    expect(invite.searchParams.has('preview')).toBe(false);
+    return invite;
+}
+
 test('invite, name, room, then media consent with denial, reconnect and rejoin', async ({ page, context, baseURL }) => {
     const host = await paintInvite(context, baseURL);
-    const invite = inviteFor(host);
+    const invite = await shareInvite(host);
+    expect(invite.searchParams.get('activity')).toBe('paint');
     // Use a separate browser context to exercise the guest's private admission and history.
     const guestContext = await context.browser().newContext({
         ...contextOptions(page),
@@ -280,14 +292,8 @@ async function sharedPair(context, peerBrowser, origin, viewport, mode = 'paint'
         await host.locator('[data-watch-toggle]').click();
         await host.locator('[data-pick-yt="BtnyqIHTDMM"]').click();
         await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
-        await host.evaluate(() => {
-            navigator.share = async data => { window.copiedInvite = data.url; };
-            navigator.clipboard.writeText = async url => { window.copiedInvite = url; };
-        });
-        await host.locator('[data-copy]').click();
-        invite = new URL(await host.evaluate(() => window.copiedInvite));
+        invite = await shareInvite(host);
         expect(invite.searchParams.get('activity')).toBe('watch');
-        expect(invite.searchParams.has('preview')).toBe(false);
     }
     const guestContext = await peerBrowser.newContext({
         ...contextOptions(host), viewport, permissions: ['camera', 'microphone']
