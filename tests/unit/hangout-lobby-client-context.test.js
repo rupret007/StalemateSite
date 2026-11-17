@@ -1138,12 +1138,28 @@ describe('newcomer navigation and closed sessions', () => {
         const commands = document.querySelector('[data-palette-open]');
         const composer = document.querySelector('[data-text]');
         composer.value = 'Copy this draft before returning';
+        const roomSearch = document.querySelector('[data-room-search]');
+        const roomFilter = document.querySelector('[data-room-filter]');
+        const pmOff = document.querySelector('[data-pm-off]');
+        const roomCount = document.querySelector('[data-room-count]');
+        const directoryNote = document.querySelector('[data-rooms-empty]');
+        const starters = document.querySelector('[data-lobby-welcome]');
         expect(quickActions.hidden).toBe(false);
         expect(commands.disabled).toBe(false);
+        expect(starters.hidden).toBe(false);
+        expect(roomSearch.disabled).toBe(false);
+        expect(roomFilter.disabled).toBe(false);
+        expect(pmOff.disabled).toBe(false);
 
         await ws.close(4401);
 
         expect(document.activeElement.id).toBe('session-ended-title');
+        expect(roomSearch.disabled).toBe(true);
+        expect(roomFilter.disabled).toBe(true);
+        expect(pmOff.disabled).toBe(true);
+        expect(roomCount.hidden).toBe(true);
+        expect(directoryNote.textContent).toBe('Join again to see rooms.');
+        expect(starters.hidden).toBe(true);
         expect(quickActions.hidden).toBe(true);
         expect(commands.disabled).toBe(true);
         expect(composer.value).toBe('Copy this draft before returning');
@@ -1157,6 +1173,13 @@ describe('newcomer navigation and closed sessions', () => {
         expect(quickActions.hidden).toBe(false);
         expect(commands.disabled).toBe(false);
         expect(composer.readOnly).toBe(false);
+        expect(roomSearch.disabled).toBe(false);
+        expect(roomFilter.disabled).toBe(false);
+        expect(pmOff.disabled).toBe(false);
+        expect(roomCount.hidden).toBe(false);
+        expect(directoryNote.textContent).toContain('No rooms yet');
+        sockets[1].receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', title: 'Shared chat', names: [] } });
+        expect(starters.hidden).toBe(false);
     });
 
     it('lets a guest select the unsent draft after leaving chat if clipboard access fails', async () => {

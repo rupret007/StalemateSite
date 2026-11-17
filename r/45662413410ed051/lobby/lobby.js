@@ -696,7 +696,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         retryButton.hidden = !showRetry;
         if (state === 'offline' && showRetry && document.activeElement === status) retryButton.focus({ preventScroll: true });
         $('[data-send]').disabled = state !== 'connected';
-        const chatActionsUnavailable = state === 'ended' || app.localMediaPaused;
+        const ended = state === 'ended';
+        const chatActionsUnavailable = ended || app.localMediaPaused;
+        $('[data-room-search]').disabled = ended;
+        $('[data-room-filter]').disabled = ended;
+        $('[data-pm-off]').disabled = state !== 'connected';
         $('[data-quick]').hidden = chatActionsUnavailable;
         $('[data-palette-open]').disabled = chatActionsUnavailable;
         $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting' || state === 'ended' && betaShell;
@@ -2737,7 +2741,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const c = store(key);
         const isPm = key.startsWith('pm:');
         const pmLabel = c?.nick || (sessionEnded && endedPmLabel?.key === key ? endedPmLabel.nick : 'unconfirmed visitor');
-        $('[data-lobby-welcome]').hidden = app.localMediaPaused || key !== '#stalemate';
+        $('[data-lobby-welcome]').hidden = sessionEnded || app.localMediaPaused || key !== '#stalemate';
         $('[data-chat-context]').textContent = isPm ? `PM · ${pmLabel}` : key;
         $('[data-topic]').textContent = isPm ? `Private chat with ${pmLabel}${c?.open ? '' : ' · replies unconfirmed; draft kept'} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
@@ -2825,8 +2829,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const rooms = Discovery.describeRooms(app.rooms.filter((r) =>
             (filter === 'mine' ? r.mine : filter === 'registered' ? r.persistent : r.count > 0 || !r.persistent)
             && (!query || `${r.name} ${r.title}`.toLowerCase().includes(query))), [...app.chans.keys()]);
-        $('[data-room-count]').textContent = String(rooms.length);
-        $('[data-rooms-empty]').hidden = rooms.length > 0;
+        const count = $('[data-room-count]');
+        count.hidden = sessionEnded;
+        count.textContent = String(rooms.length);
+        const empty = $('[data-rooms-empty]');
+        empty.hidden = rooms.length > 0;
+        empty.textContent = sessionEnded ? 'Join again to see rooms.' : 'No rooms yet. Stay for a chat, or be the first to start one.';
         const rows = rooms.map(r => {
             const li = previous.get(r.name) || document.createElement('li');
             li.dataset.roomKey = r.name;
@@ -2950,6 +2958,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     $('[data-lobby-home]').addEventListener('click', () => { if (app.chans.has('#stalemate')) switchTo('#stalemate'); });
     $('[data-reconnect]').addEventListener('click', () => connect(app.me || nickInput.value.trim()));
     $('.conversation-starters').addEventListener('click', (event) => {
+        if (sessionEnded) return;
         const button = event.target.closest('button');
         if (!button || !$('.conversation-starters').contains(button)) return;
         const draft = button.dataset.prompt;

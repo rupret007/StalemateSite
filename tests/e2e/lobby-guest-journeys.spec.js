@@ -341,6 +341,15 @@ for (const width of [375, 390, 1440]) {
             await ended.keyboard.press('Enter');
             await expect(ended.locator('[data-toast]')).toContainText('Draft copied. Nothing was sent.');
             expect(await ended.evaluate(() => window.copiedInvites.at(-1))).toBe('Unsent drawing idea — never move this into lobby chat');
+            await openRooms(ended);
+            await expect(ended.getByRole('searchbox', { name: 'Find a room' })).toBeDisabled();
+            await expect(ended.getByRole('combobox', { name: 'Room directory' })).toBeDisabled();
+            await expect(ended.locator('[data-room-count]')).toBeHidden();
+            await expect(ended.getByText('Join again to see rooms.', { exact: true })).toBeVisible();
+            if (width === 390) await ended.screenshot({ path: testInfo.outputPath('session-ended-rooms-390.png') });
+            if (width !== 1440) await ended.locator('.phonetabs [data-show="people"]').click();
+            await expect(ended.getByRole('checkbox', { name: 'Turn off PM requests' })).toBeDisabled();
+            await expect(ended.getByRole('link', { name: 'House rules', exact: true })).toBeVisible();
             const reentry = recovery.getByRole('link', { name: 'Return to invitation', exact: true });
             await expect(reentry).toHaveAttribute('href', '/beta/'); await reentry.click();
             await expect(ended).toHaveURL(baseURL + '/beta/');
