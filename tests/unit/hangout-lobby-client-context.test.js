@@ -855,6 +855,37 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     expect(JSON.stringify({ ...window.sessionStorage, ...window.localStorage })).not.toContain(href);
 });
 
+it.each([true, false])('puts the available drawing invite path first (online guest: %s)', async online => {
+    const { window, ws } = await visitor('rad-dad', { personTargets: 1 });
+    const { document } = window;
+    window.HangoutCore = { emptyState: () => ({ strokes: [], video: null }), apply() {} };
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+    const host = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
+    const guest = { id: 'guest-peer', nick: 'SketchGuest', prefix: '' };
+    ws.receive({ t: 'welcome', id: host.id, nick: host.nick, role: 'fan', capabilities: {} });
+    ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', modes: {}, names: online ? [host, guest] : [host] } });
+    ws.receive({ t: 'join', ch: { name: '#drawing-room', kind: 'art', keepRef: 'd'.repeat(32), modes: { C: true }, names: [host] } });
+
+    document.querySelector('[data-roomtools]').click();
+    const palette = document.querySelector('[data-palette]');
+    [...palette.querySelectorAll('button')].find(button => button.textContent === 'Invite guest').click();
+
+    const dialog = document.querySelector('[data-invite-dialog]');
+    const people = dialog.querySelector('[data-invite-options]');
+    const nickname = dialog.querySelector('[data-invite-nick]');
+    const nicknameSend = dialog.querySelector('[data-invite-form] button[type="submit"]');
+    expect(dialog.open).toBe(true);
+    expect(document.activeElement).toBe(online ? people : nickname);
+    expect(nicknameSend.classList.contains('btn--ghost')).toBe(online);
+    expect(nickname.hidden).toBe(false);
+    if (online) {
+        people.value = guest.id;
+        dialog.querySelector('[data-invite-person-send]').click();
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'invite', args: [guest.nick, '#drawing-room'] });
+    }
+});
+
 it('explains an empty Music invite roster and focuses Cancel', async () => {
     const { window, ws } = await visitor('rad-dad', { directMusicInvites: 1, personTargets: 1 }, { secureOrigin: true });
     const { document } = window;

@@ -3309,7 +3309,6 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-invite-person-send]').textContent = music ? 'Continue in WebJam' : 'Invite selected person';
         $('[data-game-invite-picker]').hidden = !isGame;
         const people = $('[data-invite-options]');
-        people.labels[0].textContent = music ? 'Online guests' : 'Choose a current person';
         const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose someone online'; people.append(placeholder);
         for (const person of app.chans.get('#stalemate')?.names || []) {
             if (!personId(person.id) || person.id === app.selfId || !music && current.names.some(member => member.id === person.id)) continue;
@@ -3331,8 +3330,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const target = canInviteNew && (exactTable || guestLinkTarget());
         drawGuestInviteChoice(target, canInviteNew);
         const emptyMusicRoster = music && invitePeople.size === 0;
+        const canInviteByRoster = personTargetsSupported && roomNonce(inviteInstance);
+        const preferRoster = activityRoom(current) && canInviteByRoster && invitePeople.size > 0;
+        people.labels[0].textContent = music || preferRoster ? 'Online guests' : 'Choose a current person';
         people.disabled = emptyMusicRoster;
-        $('[data-invite-person-send]').disabled = emptyMusicRoster || !personTargetsSupported || !roomNonce(inviteInstance);
+        $('[data-invite-person-send]').disabled = emptyMusicRoster || !canInviteByRoster;
+        $('[data-invite-form] button[type="submit"]').classList.toggle('btn--ghost', preferRoster);
         const dialog = $('[data-invite-dialog]');
         if (emptyMusicRoster) {
             const hint = $('[data-invite-error]');
@@ -3342,7 +3345,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         dialog.showModal();
         if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
         else if (emptyMusicRoster) $('[data-invite-cancel]').focus();
-        else (music ? people : $('[data-invite-nick]')).focus();
+        else (music || preferRoster ? people : $('[data-invite-nick]')).focus();
     }
     function drawGuestInviteChoice(target, canInviteNew) {
         const inviteHint = $('[data-game-invite-empty]');
