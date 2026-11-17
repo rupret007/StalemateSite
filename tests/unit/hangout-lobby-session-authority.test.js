@@ -1622,3 +1622,33 @@ describe('offline validation-to-start time boundary', () => {
         } finally { await h.dispose(); }
     });
 });
+
+describe('recovery batch read reuse remains scoped to native transactions', () => {
+    it('rechecks the live clock after a previous recovery and never reuses its affirmative bindings', async () => {
+        const f = await fixture(), person = await f.enroll('load-cache-clock');
+        const before = fingerprint(f.driver);
+        expect((await f.authority.load()).bindings.find(row => row.binding.id === person.binding.id).active).toBe(true);
+        f.advance(100001);
+        expect((await f.authority.load()).bindings.find(row => row.binding.id === person.binding.id).active).toBe(false);
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('rechecks current staff roles after a previous recovery without changing stored state', async () => {
+        const f = await fixture(), account = await accountId('reviewer@example.invalid', f.env.HANGOUT_HMAC_KEY);
+        const person = await f.enroll('load-cache-role', { kind: 'staff', account, role: 'moderator', admin: true, expiresAt: NOW + 50000 });
+        const before = fingerprint(f.driver);
+        expect((await f.authority.load()).bindings.find(row => row.binding.id === person.binding.id).active).toBe(true);
+        f.env.HANGOUT_MODERATOR_EMAILS = '';
+        expect((await f.authority.load()).bindings.find(row => row.binding.id === person.binding.id).active).toBe(false);
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('rejects newly corrupt physical binding bytes after a successful recovery without repair', async () => {
+        const f = await fixture(), person = await f.enroll('load-cache-corrupt');
+        expect((await f.authority.load()).bindings[0].active).toBe(true);
+        const hex = Buffer.from('authority-connection:' + person.binding.id).toString('hex');
+        const physical = [...f.driver.rows().keys()].find(key => key.includes(':part:' + hex + ':'));
+        expect(physical).toBeDefined(); await f.rawPut(physical, new Uint8Array([255]));
+        const before = fingerprint(f.driver);
+        await expect(f.authority.load()).rejects.toThrow();
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+});
