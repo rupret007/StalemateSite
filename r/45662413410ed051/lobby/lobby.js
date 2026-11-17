@@ -1049,8 +1049,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         let status = sheet.querySelector('[data-person-status]');
         if (sheet.open) {
             if (!status) { status = document.createElement('p'); status.dataset.personStatus = ''; status.className = 'status'; status.setAttribute('role', 'status'); sheet.append(status); }
+            delete status.dataset.waitingReport;
             status.textContent = text;
-        } else toast(text);
+            return status;
+        }
+        toast(text);
     }
     function acknowledgePersonPreferences(frame) {
         const names = frame.names, peers = frame.peers;
@@ -1482,6 +1485,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (submitted) for (const c of [...app.chans.values(), ...app.pms.values()]) {
             const l = c.lines.find((line) => line.id === id); if (l) l.reported = true;
         }
+        const sheetStatus = $('[data-sheet][open] [data-person-status]');
+        if (pending && sheetStatus?.dataset.waitingReport === id) {
+            delete sheetStatus.dataset.waitingReport;
+            sheetStatus.textContent = submitted ? REPORT_QUEUED_LABEL + '.' : 'The report wasn’t confirmed. You can try again.';
+        }
         const button = pending?.button || $$('[data-id]').find((line) => line.dataset.id === id)?.querySelector('.flag');
         if (button) {
             if (submitted) {
@@ -1496,6 +1504,29 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (submitted) button.setAttribute('aria-label', REPORT_QUEUED_LABEL);
             revealFocusedReport(button);
         }
+    }
+    function submitReport(line, button, showStatus = toast) {
+        if (line.reported) {
+            showStatus('This message is already queued for moderator review.');
+            return false;
+        }
+        if (pendingReports.has(line.id)) {
+            const status = showStatus('This report is waiting for confirmation.');
+            if (status) status.dataset.waitingReport = line.id;
+            return false;
+        }
+        if (!send({ t: 'report', id: line.id, text: line.text, reportResult: true })) {
+            showStatus('You are offline. Reconnect before reporting this message.');
+            return false;
+        }
+        button.setAttribute('aria-disabled', 'true');
+        button.textContent = '…';
+        const timer = setTimeout(() => {
+            finishReport(line.id, false);
+            toast('Report confirmation did not arrive. Try again or use the moderation contact.');
+        }, 10000);
+        pendingReports.set(line.id, { button, timer });
+        return true;
     }
     function resetPendingReports() { for (const id of [...pendingReports.keys()]) finishReport(id, false); }
     function removeChatRow(row) {
@@ -1536,11 +1567,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 else if (pendingReports.has(l.id)) { r.setAttribute('aria-disabled', 'true'); r.textContent = '…'; pendingReports.get(l.id).button = r; }
                 r.addEventListener('focus', () => revealFocusedReport(r));
                 r.addEventListener('click', () => {
-                    if (l.reported || pendingReports.has(l.id)) return;
-                    if (!send({ t: 'report', id: l.id, text: l.text, reportResult: true })) return toast('You are offline. Reconnect before reporting this message.');
-                    r.setAttribute('aria-disabled', 'true'); r.textContent = '…';
-                    const timer = setTimeout(() => { finishReport(l.id, false); toast('Report confirmation did not arrive. Try again or use the moderation contact.'); }, 10000);
-                    pendingReports.set(l.id, { button: r, timer });
+                    if (r.getAttribute('aria-disabled') !== 'true') submitReport(l, r);
                 });
                 li.append(r);
             }
@@ -3106,8 +3133,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             const message = !pmView && context?.message;
             if (!message?.id || typeof message.text !== 'string') { personSheetStatus('Use the report flag beside the exact message you want to share.'); return false; }
             const flag = $$('[data-buffer] li').find(row => row.dataset.id === message.id)?.querySelector('.flag');
-            if (flag && !flag.disabled) { flag.click(); return true; }
-            personSheetStatus('Use the report flag beside that exact message. Its confirmation may already be pending.'); return false;
+            if (flag) return submitReport(message, flag, personSheetStatus);
+            personSheetStatus('This message is no longer visible in the conversation.'); return false;
         }, 'btn--ghost');
         const origin = !pmView && app.chans.get(selected.channel);
         if (origin && amOp(origin)) {

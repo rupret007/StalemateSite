@@ -470,6 +470,46 @@ it('keeps unrelated moderation reports pending until each selected message gets 
     expect(document.querySelector('[data-toast]').textContent).toContain('That message is gone already.');
 });
 
+it('keeps report feedback in the sender menu when a report is unsent, waiting or already confirmed', async () => {
+    const { window, ws, join } = await visitor('stalemate', { personTargets: 1 });
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+    ws.receive({ t: 'welcome', id: 'self-peer', nick: 'Viewer', role: 'fan', capabilities: {}, transportSeq: 1 });
+    const roomInstance = 'a'.repeat(32);
+    join('#stalemate', roomInstance);
+    const id = 'msenderreport', text = 'An exact message to report';
+    ws.receive({ t: 'line', id, text, ch: '#stalemate', from: 'Guest', personSelf: false, personPeer: 'guest-peer', roomInstance });
+    const { document } = window;
+    const row = document.querySelector(`[data-id="${id}"]`);
+    const sheet = document.querySelector('[data-sheet]');
+    const reports = () => ws.sent.filter(frame => frame.t === 'report');
+    const open = () => row.querySelector('.who').click();
+    const report = () => [...sheet.querySelectorAll('button')].find(button => button.textContent === '🚩 Report').click();
+    const status = () => sheet.querySelector('[data-person-status]');
+    const originalSend = ws.send;
+    ws.send = () => { throw new Error('socket closed before report send'); };
+    open(); report();
+    expect(sheet.open).toBe(true);
+    expect(status().textContent).toBe('You are offline. Reconnect before reporting this message.');
+    expect(reports()).toEqual([]);
+
+    ws.send = originalSend;
+    report();
+    expect(sheet.open).toBe(false);
+    expect(reports()).toEqual([{ t: 'report', id, text, reportResult: true }]);
+
+    open(); report();
+    expect(sheet.open).toBe(true);
+    expect(status().textContent).toBe('This report is waiting for confirmation.');
+    expect(reports()).toHaveLength(1);
+    ws.receive({ t: 'report-status', id, submitted: true });
+    expect(status().textContent).toBe('Queued for review when a moderator is available.');
+    report();
+    expect(sheet.open).toBe(true);
+    expect(status().textContent).toBe('This message is already queued for moderator review.');
+    expect(reports()).toHaveLength(1);
+});
+
 it.each([false, true])('keeps focus usable when moderation removes a message (flag focused: %s)', async (focusedFlag) => {
     const { window, ws, welcome, join } = await visitor();
     window.requestAnimationFrame = (callback) => window.setTimeout(callback, 16);
