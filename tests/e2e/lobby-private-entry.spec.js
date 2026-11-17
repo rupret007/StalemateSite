@@ -232,3 +232,68 @@ test('an open connection without a welcome times out and the guest can retry', a
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
     expect(attempts).toBe(2);
 });
+
+// Abort only the main module after actual private admission. No app patch,
+// live provider, browser permission grant or capture is involved.
+for (const width of [375, 390, 1440]) test(`protected module download failure offers explicit reload at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity();
+    let context, blocked = 0;
+    try {
+        context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width, height: width <= 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        await context.addInitScript(() => {
+            window.fixtureCaptureCalls = 0;
+            if (!navigator.mediaDevices) return;
+            for (const name of ['getUserMedia', 'getDisplayMedia']) {
+                Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), name, {
+                    configurable: true, value: async () => { window.fixtureCaptureCalls++; throw new Error('Startup recovery never captures media'); }
+                });
+            }
+        });
+        const moduleUrl = community.origin + ROOT + 'lobby.js';
+        const failModule = route => { blocked++; return route.abort('failed'); };
+        await context.route(moduleUrl, failModule);
+        const page = await context.newPage();
+        await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await expect.poll(() => blocked).toBe(1);
+        await expect(page.locator('[data-enter]')).toBeDisabled();
+        expect(community.diagnostics().admittedUpgrades).toBe(0);
+        expect(await page.evaluate(() => window.fixtureCaptureCalls)).toBe(0);
+        await page.screenshot({ path: testInfo.outputPath(`01-main-module-failed-${width}.png`) });
+        const recovery = page.locator('[data-startup-recovery]');
+        const reload = page.getByRole('button', { name: 'Reload chat', exact: true });
+        await expect(recovery).toBeVisible();
+        await expect(recovery).toHaveAttribute('role', 'status');
+        await expect(recovery).toContainText('Chat could not load. Check your connection, then reload chat. Your camera and microphone are off.');
+        await expect(reload).toBeVisible(); await expect(reload).toBeEnabled();
+        await reload.scrollIntoViewIfNeeded();
+        await expect(reload).toBeInViewport({ ratio: 1 });
+        const bounds = await reload.boundingBox();
+        expect(bounds.width).toBeGreaterThanOrEqual(48); expect(bounds.height).toBeGreaterThanOrEqual(48);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath(`02-explicit-startup-recovery-${width}.png`) });
+        await context.unroute(moduleUrl, failModule);
+        await Promise.all([page.waitForEvent('domcontentloaded'), reload.press('Enter')]);
+        await expect(recovery).toBeHidden();
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        expect(community.diagnostics().admittedUpgrades).toBe(0);
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('StartupGuest');
+        await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await expect(page.getByRole('region', { name: 'Chat', exact: true })).toBeFocused();
+        const message = page.getByRole('textbox', { name: 'Message', exact: true });
+        await message.fill('A deliberate message after reloading chat.'); await message.press('Enter');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('A deliberate message after reloading chat.');
+        await expect(message).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        expect(community.diagnostics().admittedUpgrades).toBe(1);
+        expect(community.diagnostics().failures).toEqual([]);
+        expect(await page.evaluate(() => window.fixtureCaptureCalls)).toBe(0);
+        await page.screenshot({ path: testInfo.outputPath(`03-reloaded-first-chat-${width}.png`) });
+    } finally {
+        try { await context?.close(); } finally { await community.close(); }
+    }
+});
