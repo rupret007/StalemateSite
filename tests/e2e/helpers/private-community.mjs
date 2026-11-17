@@ -22,7 +22,7 @@ export async function privateCommunity() {
     assert.equal(createHash('sha256').update(tlsBytes).digest('hex'),
         'f5a8debf3c77cc48655be93b4076f397f4c5517b207dc9712a1e736f38fe4071');
     const { key, cert } = JSON.parse(tlsBytes);
-    const records = new Map(), sockets = new Set(), failures = [];
+    const records = new Map(), sockets = new Set(), admittedSockets = new Map(), failures = [];
     const storage = {
         get: async key => structuredClone(records.get(key)),
         put: async (key, value) => records.set(key, structuredClone(value)),
@@ -49,7 +49,7 @@ export async function privateCommunity() {
     const registry = new BetaSessions({ storage, blockConcurrencyWhile: callback => callback() }, env);
     env.BETA_SESSIONS = { idFromName: name => name, get: () => registry };
     const outbound = { fetch: () => assert.fail('Outbound fixture request denied') };
-    let origin, admittedUpgrades = 0, refusedUpgrades = 0;
+    let origin, admittedUpgrades = 0, refusedUpgrades = 0, interruptions = 0;
     const server = createServer({ key, cert }, async (incoming, response) => {
         try {
             const parts = []; let bytes = 0;
@@ -84,12 +84,26 @@ export async function privateCommunity() {
                 refusedUpgrades++; socket.end('HTTP/1.1 ' + result.status + ' Refused\r\n\r\n'); return;
             }
             admittedUpgrades++;
+            const cookie = String(incoming.headers.cookie || '').split(/;\s*/)
+                .find(value => value.startsWith(BETA_COOKIE + '='))?.slice(BETA_COOKIE.length + 1);
+            assert(cookie, 'Admitted fixture upgrade must have its private session cookie');
+            const session = createHash('sha256').update(cookie).digest('hex');
+            const connections = admittedSockets.get(session) || new Set();
+            connections.add(socket); admittedSockets.set(session, connections);
+            socket.once('close', () => { connections.delete(socket); if (!connections.size) admittedSockets.delete(session); });
             await relay.handleUpgrade(incoming, socket, head, new URL(incoming.url, origin));
         } catch (error) { failures.push(error.name); socket.destroy(); }
     });
     return {
         origin, invitation: env.HANGOUT_BETA_INVITE_KEY, sessionCookieName: BETA_COOKIE,
-        diagnostics: () => ({ admittedUpgrades, refusedUpgrades, failures: [...failures], storage: 'in-memory fixture',
+        interruptGuest(cookie) {
+            assert.equal(typeof cookie, 'string', 'Fixture interruption needs an owned session');
+            const session = createHash('sha256').update(cookie).digest('hex');
+            const connections = [...(admittedSockets.get(session) || [])].filter(socket => !socket.destroyed);
+            assert.equal(connections.length, 1, 'Interrupt exactly one owned admitted chat connection');
+            interruptions++; connections[0].destroy();
+        },
+        diagnostics: () => ({ admittedUpgrades, refusedUpgrades, interruptions, failures: [...failures], storage: 'in-memory fixture',
             scope: 'HTTPS beta admission and asset gate; upgrade-to-engine bridge fixture. No live-cookie, restart or existing-socket revocation proof.' }),
         async close() {
             await relay.close();

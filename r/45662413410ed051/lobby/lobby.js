@@ -3899,4 +3899,5 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         toastDuration = actions.length ? 12000 : 4000;
         scheduleToastDismiss();
     }
+    document.dispatchEvent(new Event('hangout:lobby-ready'));
 })();
