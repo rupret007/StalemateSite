@@ -735,7 +735,7 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     document.querySelector('[data-music-handoff-manual]').click();
     expect(manualShare.open).toBe(true);
     expect(document.activeElement).toBe(manualInput);
-    expect(manualInput.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+    expect(manualInput.scrollIntoView).toHaveBeenCalledWith({ block: 'center', inline: 'nearest' });
     const manualForm = manualInput.form;
     manualInput.value = 'draft for this room';
     manualForm.dispatchEvent(new window.Event('submit', { cancelable: true }));

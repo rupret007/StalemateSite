@@ -1787,7 +1787,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         jamManualShare.open = true;
         const input = $('[data-jam-link]');
         input.focus({ preventScroll: true });
-        input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        input.scrollIntoView({ block: 'center', inline: 'nearest' });
     });
     window.addEventListener('pagehide', () => stopMusicHandoff());
 
