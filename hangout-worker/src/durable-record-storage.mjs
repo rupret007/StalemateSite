@@ -106,7 +106,16 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                     if (await digest(bytes) !== meta.sha256) fail('storage-corrupt');
                     let value;
                     try { value = JSON.parse(dec.decode(bytes)); } catch { fail('storage-corrupt'); }
-                    try { if (await digest(encode(value, maxRecordBytes)) !== meta.sha256) fail('storage-corrupt'); }
+                    try {
+                        // The raw bytes already passed the manifest integrity hash.
+                        // Require their exact canonical representation, not merely
+                        // another digest match. Keep all encoder resource checks.
+                        const canonical = encode(value, maxRecordBytes);
+                        if (canonical.byteLength !== bytes.byteLength) fail('storage-corrupt');
+                        for (let i = 0; i < bytes.byteLength; i += 1) {
+                            if (canonical[i] !== bytes[i]) fail('storage-corrupt');
+                        }
+                    }
                     catch { fail('storage-corrupt'); }
                     return value;
                 };

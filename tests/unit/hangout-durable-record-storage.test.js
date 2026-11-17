@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -282,6 +282,62 @@ describe('strict representation, physical corruption and resource ceilings', () 
             await tx.put(key, { v: 1, bytes: bytes.byteLength, chunks: 1, sha256: sha(bytes) });
         });
         await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+    });
+
+    it.each([
+        ['numeric alias', '{"n":1.0}'],
+        ['exponent alias', '{"n":1e0}'],
+        ['escaped Unicode alias', '{"s":"\\u0061"}'],
+        ['escaped slash alias', '{"s":"a\\/b"}'],
+        ['integer-key ordering alias', '{"2":2,"1":1}'],
+        ['negative zero', '{"n":-0}'],
+        ['duplicate keys', '{"a":1,"a":1}']
+    ])('canonical-byte validation rejects %s with an authentic raw hash', async (_name, json) => {
+        const f = await fixture(); await write(f, 'record', null);
+        const key = manifestKey(f, 'record'), bytes = enc.encode(json);
+        expect(() => JSON.parse(json)).not.toThrow();
+        await f.driver.transaction(async tx => {
+            await tx.put(partKey(key, 0), bytes);
+            await tx.put(key, { v: 1, bytes: bytes.byteLength, chunks: 1, sha256: sha(bytes) });
+        });
+        const before = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+    });
+
+    it('canonical-byte validation retains one fresh integrity digest per read and detached aliases', async () => {
+        const f = await fixture(), shared = { text: 'é🎸', value: [1, true, null] };
+        await write(f, 'record', { left: shared, right: shared });
+        const before = physicalSnapshot(f.driver), spy = vi.spyOn(crypto.subtle, 'digest');
+        const first = await read(f, 'record');
+        expect(spy).toHaveBeenCalledTimes(1);
+        first.left.value.push('local');
+        expect(first.right.value).toEqual([1, true, null]);
+        const second = await read(f, 'record');
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(second).toEqual({ left: shared, right: shared });
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+        const key = manifestKey(f, 'record');
+        await f.driver.transaction(async tx => {
+            const bytes = await tx.get(partKey(key, 0));
+            const offset = bytes.indexOf('1'.charCodeAt(0)); expect(offset).toBeGreaterThan(0);
+            bytes[offset] = '2'.charCodeAt(0); // Still valid canonical JSON, but not the committed hash.
+            await tx.put(partKey(key, 0), bytes);
+        });
+        const corrupt = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(spy).toHaveBeenCalledTimes(3);
+        expect(physicalSnapshot(f.driver)).toEqual(corrupt);
+    });
+
+    it('canonical-byte validation rejects fresh canonical corruption against the stored raw digest', async () => {
+        const f = await fixture(); await write(f, 'record', { value: 1 });
+        expect(await read(f, 'record')).toEqual({ value: 1 });
+        const key = manifestKey(f, 'record');
+        await f.driver.transaction(tx => tx.put(partKey(key, 0), enc.encode('{"value":2}')));
+        const before = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
     });
 
     it('bounds aggregate transaction writes at 16 MiB and rolls back two accepted 8 MiB records', async () => {
