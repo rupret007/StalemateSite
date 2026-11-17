@@ -18,6 +18,7 @@ const lobbyPath = '/r/45662413410ed051/lobby/?game-guest=1';
 const gameDestination = tableId => lobbyPath + (typeof tableId === 'string' && tableIdPattern.test(tableId) ? '&table=' + tableId : '');
 const requestedTable = resumeGuest ? new URLSearchParams(location.search).get('table') : null;
 const inviter = document.querySelector('[data-guest-inviter]');
+const guestName = document.querySelector('[data-guest-name]');
 const expiry = document.querySelector('[data-guest-expiry]');
 const returnToRoom = document.querySelector('[data-guest-return]');
 const webJam = document.querySelector('[data-webjam-guest]') !== null;
@@ -30,6 +31,8 @@ let waitUntil = webJam ? restored?.waitUntil ?? (fragment.get('wait') === '1' ? 
 const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
 const pass = restored?.pass ?? Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
 let watching = restored?.watch === true;
+let chosenName = typeof restored?.nick === 'string' ? restored.nick : undefined;
+let suggestedName = '';
 const confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
 const hasInvitation = typeof code === 'string' && (webJam ? /^[A-Za-z0-9_-]{32,128}$/.test(code) : code.length > 0 && code.length <= 250);
 
@@ -40,7 +43,7 @@ async function sha256(value) {
 
 function retainInvitation(confirmedGame) {
     // A refresh can use this history entry, without putting the link back in the address.
-    history.replaceState({ [historyKey]: { code, attempt, pass, confirmedGame, waitUntil, watch: watching } }, '', location.pathname);
+    history.replaceState({ [historyKey]: { code, attempt, pass, confirmedGame, waitUntil, watch: watching, nick: chosenName } }, '', location.pathname);
 }
 
 function clearInvitation() {
@@ -64,6 +67,7 @@ async function request(action, data) {
 
 async function acceptInvitation() {
     const body = { age13: true, attempt, passHash: await sha256(pass) };
+    if (chosenName) body.nick = chosenName;
     let retriedConnection = false;
     for (;;) {
         try { return await request('accept', body); }
@@ -85,6 +89,11 @@ async function acceptInvitation() {
 async function describe() {
     retry.hidden = true;
     if (!hasInvitation) {
+        // An existing WebJam member can return to their room when the grant is missing.
+        if (!webJam) {
+            showClosedInvitation('This link is missing its Game Night invitation.');
+            return;
+        }
         status.textContent = 'Open the Game Night invitation your host sent you.';
         if (returnToRoom) returnToRoom.hidden = false;
         return;
@@ -105,7 +114,7 @@ async function describe() {
     }
     status.textContent = 'Checking your invitation…';
     try {
-        const { game, host, watch, inviteExpiresAt } = await request('details');
+        const { game, host, watch, inviteExpiresAt, guestName: defaultName } = await request('details');
         if (expiry && Number.isSafeInteger(inviteExpiresAt) && inviteExpiresAt > 0 && inviteExpiresAt <= 8.64e15) {
             const time = expiry.querySelector('time');
             time.dateTime = new Date(inviteExpiresAt).toISOString();
@@ -119,8 +128,13 @@ async function describe() {
         inviter.hidden = false;
         gameTitle.textContent = game;
         status.textContent = '';
+        if (guestName) {
+            suggestedName = defaultName ?? '';
+            guestName.value = chosenName ?? suggestedName;
+            guestName.closest('label').hidden = false;
+        }
         invite.hidden = false;
-        if (document.activeElement === document.body) join.focus({ preventScroll: true });
+        if (document.activeElement === document.body || document.activeElement === retry) join.focus({ preventScroll: true });
     } catch (error) {
         status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE : 'Couldn’t check the invitation. Try again.';
         retry.hidden = error.status === 410;
@@ -129,6 +143,8 @@ async function describe() {
             offerFreshLink();
             status.tabIndex = -1;
             status.focus({ preventScroll: true });
+        } else if (document.activeElement === document.body) {
+            retry.focus({ preventScroll: true });
         }
     }
 }
@@ -136,6 +152,7 @@ async function describe() {
 async function accept() {
     retry.hidden = true;
     join.disabled = true;
+    if (guestName) guestName.disabled = true;
     status.textContent = watching ? 'Opening the table…' : 'Joining the game…';
     try {
         const { next, tableId } = await acceptInvitation();
@@ -158,7 +175,7 @@ async function accept() {
             : 'This table is full. Ask your host for a new invite when a seat opens.';
         else if (closed) status.textContent = webJam && waitUntil > 0
             ? 'Your Chess seat wasn’t confirmed. Ask your host for a new WebJam invite.' : GAME_INVITE_UNAVAILABLE;
-        else if ([429, 503].includes(error.status)) status.textContent = error.message;
+        else if ([422, 429, 503].includes(error.status)) status.textContent = error.message;
         if (status.textContent === GAME_INVITE_UNAVAILABLE) offerFreshLink();
         if (closed) {
             clearInvitation();
@@ -177,8 +194,10 @@ async function accept() {
             if (document.activeElement === document.body) retry.focus({ preventScroll: true });
         } else {
             join.disabled = false;
+            if (guestName) guestName.disabled = false;
             join.textContent = watching ? 'Watch game' : 'Join game';
-            if (document.activeElement === document.body) join.focus({ preventScroll: true });
+            if (error.status === 422 && guestName) guestName.focus({ preventScroll: true });
+            else if (document.activeElement === document.body) join.focus({ preventScroll: true });
         }
     }
 }
@@ -186,6 +205,10 @@ async function accept() {
 join.addEventListener('click', event => {
     if (!watching) unlockGameNightAudio(event);
     if (waitUntil === -1) waitUntil = Date.now() + 25_000;
+    if (!webJam && guestName) {
+        const byChoice = guestName.value.trim();
+        chosenName = byChoice && byChoice !== suggestedName ? byChoice : undefined;
+    }
     retainInvitation(gameTitle.textContent);
     void accept();
 });
@@ -197,21 +220,22 @@ function offerFreshLink() {
 }
 
 async function shareFreshLink() {
-    const payload = { title: 'Game Night', text: FRESH_LINK };
+    const message = 'Could you send me a fresh Game Night link?';
+    const payload = { title: 'Game Night', text: message };
     if (typeof navigator.share === 'function') {
         try { await navigator.share(payload); return; }
         catch (error) { if (error?.name === 'AbortError') return; }
     }
     if (typeof navigator.clipboard?.writeText === 'function') {
         try {
-            await navigator.clipboard.writeText(FRESH_LINK);
+            await navigator.clipboard.writeText(message);
             if (askHost) askHost.textContent = 'Copied. Send it to your host.';
         } catch { /* The button still shows the line to send. */ }
     }
 }
 
-function showClosedInvitation() {
-    status.textContent = GAME_INVITE_UNAVAILABLE;
+function showClosedInvitation(message = GAME_INVITE_UNAVAILABLE) {
+    status.textContent = message;
     offerFreshLink();
     status.tabIndex = -1;
     status.focus({ preventScroll: true });
@@ -244,11 +268,14 @@ async function resume() {
             } catch { /* The rejected pass cannot authorize a session. */ }
             return;
         }
-        const { next } = response.ok ? await response.json() : {};
+        if (!response.ok) throw Object.assign(new Error('Could not resume'), { status: response.status });
+        const { next } = await response.json();
         if (next !== lobbyPath) throw new Error('Could not resume');
         location.replace(gameDestination(tableId));
-    } catch {
-        status.textContent = 'Couldn’t reconnect. Try again.';
+    } catch (error) {
+        status.textContent = error?.status === 429
+            ? 'Too many reconnect attempts. Wait a minute, then try again.'
+            : 'Couldn’t reconnect. Try again.';
         retry.hidden = false;
         retry.focus({ preventScroll: true });
     }

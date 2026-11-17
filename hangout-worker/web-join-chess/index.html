@@ -17,6 +17,12 @@
     <div class="join-card">
       <p id="status" role="status" tabindex="-1" aria-describedby="error-hint">Open the invite link from your host.</p>
       <p id="error-hint" class="error-hint" hidden></p>
+      <div id="listen-actions" hidden>
+        <div class="actions">
+          <button type="button" id="listen" aria-describedby="listen-guidance" disabled>Join to listen</button>
+          <p id="listen-guidance">Your microphone stays off.</p>
+        </div>
+      </div>
       <section id="prejoin" hidden aria-labelledby="prejoin-heading">
         <h2 id="prejoin-heading">Check your audio</h2>
         <div class="mic-actions">
@@ -38,7 +44,7 @@
         <label class="headphones"><input id="headphones" type="checkbox"> I’m wearing headphones to prevent echo.</label>
         <p id="join-guidance" class="join-guidance">Check your microphone first.</p>
       </section>
-      <div class="actions"><button id="join" aria-describedby="join-guidance" disabled>Join with microphone</button><button id="retry" hidden>Retry</button><button id="leave" hidden>Leave session</button></div>
+      <div class="actions"><button id="join" aria-describedby="join-guidance" disabled>Join with microphone</button><button id="retry" hidden>Retry</button><button class="secondary" type="button" id="audio-options" hidden>Back to audio options</button><button type="button" id="resume-audio" hidden>Resume audio</button><button id="leave" hidden>Leave session</button></div>
       <p id="audio-quality" role="status"></p>
       <section id="game-offer" hidden aria-live="polite" aria-label="Game offer"></section>
       <div id="access-window" class="access-window" hidden>

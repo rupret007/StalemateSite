@@ -3,9 +3,9 @@ import { createLobby, validWebjamInvitation } from '../../hangout-worker/src/lob
 
 const LINK = 'webjam://join?v=3&r=direct-stun&i=opaque-fixture-only';
 const INVITATION = `Join beta rehearsal on WebJam:\nKeep this room open.\nOpen WebJam, choose Join, then paste this full invitation.\n${LINK}\nwebjam-signal:V0pTRQ${'x'.repeat(3000)}`;
-function harness() {
+function harness(limits = {}) {
     const messages = [], writes = [], ai = [];
-    const lobby = createLobby({ send: (id, message) => messages.push({ id, message }), persist: (kind, value) => writes.push({ kind, value }), reviewPublicText: (value) => ai.push(value) });
+    const lobby = createLobby({ limits, send: (id, message) => messages.push({ id, message }), persist: (kind, value) => writes.push({ kind, value }), reviewPublicText: (value) => ai.push(value) });
     const command = (id, name, args, ch = '#jam-fixture') => lobby.message(id, JSON.stringify({ t: 'cmd', ch, name, args }));
     for (const [id, nick] of [['host', 'JamHost'], ['guest', 'JamGuest']]) {
         lobby.connect({ id, dev: `dev-${id}`, iph: `ip-${id}`, role: 'fan' });
@@ -67,10 +67,16 @@ describe('request-correlated WebJam share feedback', () => {
             && row.message.ch.name === '#jam-fixture' && row.message.ch.jam.invitation === INVITATION)).toBe(true);
         expect(JSON.stringify({ rooms: lobby.roomSnapshot(), sessions: lobby.sessionSnapshot(), writes, log: lobby.modlog })).not.toContain(A);
     });
-    it('rejects an unconfigured origin without replacing the existing invitation or reflecting capabilities', () => {
-        const { lobby, messages } = harness();
+    it.each([
+        [[], 'browser-unavailable'],
+        [['https://approved.example'], 'invalid-browser-invite'],
+    ])('returns the browser refusal only to its caller (%s)', (webJoinOrigins, reason) => {
+        const { lobby, messages } = harness({ webJoinOrigins });
         share(lobby, 'host', A); share(lobby, 'host', B, ['web', 'https://unapproved.example/join/#fixture']);
-        expect(results(messages).at(-1)).toEqual({ id: 'host', message: { t: 'jam-share-result', id: B, status: 'rejected' } });
+        expect(results(messages)).toEqual([
+            { id: 'host', message: { t: 'jam-share-result', id: A, status: 'published' } },
+            { id: 'host', message: { t: 'jam-share-result', id: B, status: 'rejected', reason } },
+        ]);
         expect(lobby._debug.channels.get('#jam-fixture').jam.invitation).toBe(INVITATION);
     });
     it('never treats an echoed request ID as host permission', () => {

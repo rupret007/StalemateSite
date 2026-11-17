@@ -7,21 +7,25 @@ test.skip(({ browserName }) => browserName !== 'chromium', 'Report protocol fixt
 const LINE = { t: 'line', id: 'mreportfixture', ch: '#stalemate', from: 'OtherGuest', prefix: '',
     band: false, moderator: false, me: false, text: 'An exact received line for a report', ts: 1800000000000 };
 
-async function openFixture(page, baseURL) {
+async function openFixture(page, baseURL, { personActions = false } = {}) {
+    const roomInstance = 'a'.repeat(32);
     let socket; const reports = [];
     await page.routeWebSocket((url) => url.pathname.endsWith('/lobby'), (ws) => {
         socket = ws;
         ws.onMessage((raw) => {
             const frame = JSON.parse(String(raw));
             if (frame.t === 'hello') {
-                ws.send(JSON.stringify({ t: 'welcome', nick: 'Witness', band: false, verified: false }));
+                ws.send(JSON.stringify({ t: 'welcome', nick: 'Witness', band: false, verified: false, ...(personActions ? { id: 'witness' } : {}) }));
                 ws.send(JSON.stringify({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', title: 'The lobby', topic: '', count: 2,
                     modes: { m: false, i: false, k: false, l: 150, t: true, S: 0, C: false, Q: false, locked: false },
+                    ...(personActions ? { keepRef: roomInstance } : {}),
                     names: [{ id: 'witness', nick: 'Witness', prefix: '' }, { id: 'author', nick: 'OtherGuest', prefix: '' }] } }));
-                ws.send(JSON.stringify(LINE));
+                ws.send(JSON.stringify(personActions
+                    ? { ...LINE, personSelf: false, personPeer: 'author', roomInstance } : LINE));
             } else if (frame.t === 'report') reports.push(frame);
         });
-        ws.send(JSON.stringify({ t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true }));
+        ws.send(JSON.stringify({ t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true,
+            ...(personActions ? { features: { personTargets: 1 } } : {}) }));
     });
     const relay = hangoutRelayWsBase(baseURL, 'report-ui-fixture');
     await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
@@ -34,7 +38,7 @@ test('reports send exact received text and confirm only on server acknowledgemen
     const fixture = await openFixture(page, baseURL);
     const flag = page.locator('[data-id="mreportfixture"] .flag');
     await flag.click(); await expect(flag).toHaveText('…'); await expect(flag).toBeDisabled();
-    await expect.poll(() => fixture.reports).toEqual([{ t: 'report', id: LINE.id, text: LINE.text }]);
+    await expect.poll(() => fixture.reports).toEqual([{ t: 'report', id: LINE.id, text: LINE.text, reportResult: true }]);
     fixture.publish({ t: 'report-status', id: LINE.id, submitted: true });
     fixture.publish({ t: 'notice', from: 'StaleBot', kind: 'info',
         text: 'Queued for review when a moderator is available. This is not a promise that someone is reading it now. Appeals are in House rules.' });
@@ -55,10 +59,13 @@ test('storage errors and report limits restore the report button for a truthful 
     const flag = page.locator('[data-id="mreportfixture"] .flag');
     await flag.click();
     fixture.publish({ t: 'notice', from: 'StaleBot', kind: 'error', text: 'Storage is unavailable. Changes are not confirmed; reconnect after administrator recovery.' });
+    await expect(flag).toBeDisabled();
+    fixture.publish({ t: 'report-status', id: LINE.id, submitted: false });
     await expect(flag).toBeEnabled(); await expect(flag).toHaveText('🚩');
     await expect(page.locator('[data-buffer]')).toContainText('Changes are not confirmed');
     await flag.click();
     fixture.publish({ t: 'rate-limit', scope: 'report', retryAfter: 1, text: 'Please wait 1s before trying again.' });
+    fixture.publish({ t: 'report-status', id: LINE.id, submitted: false });
     await expect(flag).toBeEnabled(); await expect(flag).toHaveText('🚩');
     await flag.click();
     fixture.publish({ t: 'report-status', id: LINE.id, submitted: true });
@@ -72,6 +79,7 @@ test('a full report queue explains the contact fallback and permits a manually c
     await flag.click(); await expect(flag).toHaveText('…');
     fixture.publish({ t: 'notice', from: 'StaleBot', kind: 'error',
         text: 'The report queue is full. Try again later or use the moderation contact in House rules.' });
+    fixture.publish({ t: 'report-status', id: LINE.id, submitted: false });
     await expect(flag).toBeEnabled(); await expect(flag).toHaveText('🚩');
     await expect(page.locator('[data-buffer]')).toContainText('moderation contact in House rules');
     const rules = page.locator('.people-help').getByRole('link', { name: 'House rules', exact: true });
@@ -88,3 +96,33 @@ test('a full report queue explains the contact fallback and permits a manually c
     fixture.publish({ t: 'report-status', id: LINE.id, submitted: true });
     await expect(flag).toHaveText('✓'); await expect(flag).toBeDisabled();
 });
+
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`the sender menu explains pending and queued reports without duplicating them at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        const fixture = await openFixture(page, baseURL, { personActions: true });
+        const row = page.locator('[data-id="mreportfixture"]');
+        const flag = row.locator('.flag');
+        const author = row.locator('button.who');
+        const menu = page.locator('[data-sheet]');
+        const report = menu.getByRole('button', { name: '🚩 Report', exact: true });
+        const status = menu.getByRole('status');
+        await flag.press('Enter');
+        await expect.poll(() => fixture.reports).toHaveLength(1);
+        await author.press('Enter');
+        await expect(menu).toBeVisible();
+        await report.press('Enter');
+        await expect(report).toBeFocused();
+        await expect(status).toHaveText('This report is waiting for confirmation.');
+        await page.screenshot({ path: testInfo.outputPath('report-waiting.png') });
+
+        fixture.publish({ t: 'report-status', id: LINE.id, submitted: true });
+        await expect(flag).toHaveText('✓');
+        await expect(status).toHaveText('Queued for review when a moderator is available.');
+        await report.press('Enter');
+        await expect(status).toHaveText('This message is already queued for moderator review.');
+        await expect(report).toBeFocused();
+        expect(fixture.reports).toHaveLength(1);
+        await page.screenshot({ path: testInfo.outputPath('report-already-queued.png') });
+    });
+}

@@ -50,11 +50,18 @@ export class ChessEngine {
         }
       };
       try {
-        job.worker = warm || this.workerFactory(new globalThis.URL('../assets/chess/stockfish-loader.js#stockfish-19-lite-single.wasm', import.meta.url));
+        const workerUrl = new globalThis.URL('../assets/chess/stockfish-loader.js#stockfish-19-lite-single.wasm', import.meta.url);
+        workerUrl.searchParams.set('v', '2');
+        job.worker = warm || this.workerFactory(workerUrl);
         job.timer = setTimeout(() => finish(null, new Error('The computer took too long to respond.')), this.timeout);
         job.worker.onerror = event => { event.preventDefault?.(); finish(null, new Error('The computer could not load.')); };
         job.worker.onmessage = event => {
-          if (this.active !== job || typeof event.data !== 'string') { return; }
+          if (this.active !== job) { return; }
+          if (event.data?.type === 'engine-load-failed') {
+            finish(null, new Error('The computer could not load.'));
+            return;
+          }
+          if (typeof event.data !== 'string') { return; }
           for (const line of event.data.split('\n')) {
             if (line.trim() === 'uciok' && job.stage === 'uci') {
               job.stage = 'ready';

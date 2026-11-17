@@ -27,6 +27,7 @@ const GAME_GUEST_QUERY = '?game-guest=1';
 const scopedGuestQuery = tableId => GAME_GUEST_QUERY + (tableId ? '&table=' + tableId : '');
 const CSP = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://www.youtube.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' wss: https://challenges.cloudflare.com https://www.youtube.com https://*.googlevideo.com; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 const WEB_JOIN_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://webjam-turn-credentials.jeffstory007.workers.dev; media-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const MUSIC_HANDOFF_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const LOBBY_ENTRANCE = `<!doctype html>
 <html lang="en">
 <head>
@@ -68,10 +69,11 @@ const GAME_GUEST_ENTRANCE = `<!doctype html>
 <body><main class="game-invitation"><p class="eyebrow">PRIVATE GAME NIGHT</p><h1 data-guest-game>Game Night</h1>
 <p class="lede" data-guest-inviter hidden></p><p id="guest-invitation-status" data-guest-status role="status">Checking your invitation…</p>
 <section data-guest-invite aria-label="Accept the invitation" hidden>
-<p class="muted" data-guest-expiry hidden>Invite expires <time></time>.</p>
+<label data-guest-name-field hidden>Your nickname<input data-guest-name type="text" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Use a guest name"></label>
 <p id="guest-agreement">By joining, you confirm you’re 13+ and agree to the house rules.</p>
 <button type="button" aria-describedby="guest-agreement" data-guest-join>Join game</button>
-<p class="muted">Camera and microphone stay off. <a href="/beta/privacy" target="_blank" rel="noopener">Read the house rules</a></p>
+<p class="muted">Camera and microphone stay off. <a href="/beta/privacy" target="_blank" rel="noopener">House rules</a></p>
+<p class="muted" data-guest-expiry hidden>Invite expires <time></time>.</p>
 </section><button type="button" data-guest-retry hidden>Try again</button><button type="button" data-guest-fresh hidden>Ask the host for a fresh link</button></main></body></html>`;
 const GAME_GUEST_STYLE = `
 .game-invitation h1 { font-size: clamp(2.6rem, 9vw, 4.5rem); }
@@ -209,7 +211,7 @@ async function unlock(key) {
         if (attempt !== currentAttempt) return;
         if (result.status === 410) return finish(attempt, 'invitation', 'This demo invite is no longer valid. Ask your host for a new one.');
         if (!result.ok) return finish(attempt, result.status === 401 || result.status === 403 ? 'invitation' : 'unavailable',
-            result.status === 401 || result.status === 403 ? 'The invitation was not accepted. Check the code or the house rules before trying again.' : unavailable);
+            result.status === 401 || result.status === 403 ? 'This invitation didn’t work. Check the link or code, or ask your host for a new invitation.' : unavailable);
         $('#code').value = '';
         operation = '';
         await draw();
@@ -607,8 +609,9 @@ async function betaRequest(request, env, deps = {}) {
         // and omit the chat bootstrap; invitation admission above still applies.
         const result = new Response(asset.body, asset);
         for (const [key, value] of Object.entries(headers)) result.headers.set(key, value);
-        result.headers.set('Content-Security-Policy', WEB_JOIN_CSP);
-        result.headers.set('Permissions-Policy', 'camera=(), geolocation=(), microphone=(self)');
+        const musicHandoff = assetPath === '/join/handoff.html' || assetPath === '/join/handoff.js';
+        result.headers.set('Content-Security-Policy', musicHandoff ? MUSIC_HANDOFF_CSP : WEB_JOIN_CSP);
+        result.headers.set('Permissions-Policy', musicHandoff ? 'camera=(), geolocation=(), microphone=()' : 'camera=(), geolocation=(), microphone=(self)');
         return result;
     }
     if (!asset.headers.get('Content-Type')?.includes('text/html')) {

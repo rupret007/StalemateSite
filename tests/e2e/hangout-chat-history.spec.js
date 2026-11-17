@@ -138,7 +138,9 @@ async function chatIs(page, texts) {
 }
 
 async function drawLine(page) {
-    const box = await page.locator('[data-canvas]').boundingBox();
+    const canvas = page.locator('[data-canvas]');
+    await canvas.evaluate(element => element.scrollIntoView({ block: 'center' }));
+    const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
     await page.mouse.move(box.x + 30, box.y + 30);
     await page.mouse.down();

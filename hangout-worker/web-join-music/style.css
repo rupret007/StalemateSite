@@ -1,0 +1,14 @@
+/* Keep the protected browser receiver's audio controls easy to tap. */
+.join-card button, .mic-picker select, main > details > summary, .headphones {
+  min-block-size: 48px;
+  min-inline-size: 48px;
+}
+
+main > details > summary {
+  align-content: center;
+}
+
+.headphones {
+  align-items: center;
+  padding-block: 8px;
+}

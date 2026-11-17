@@ -150,6 +150,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} ${previousWorker ? 'current client with previous Worker' : 'previous and current clients together'}, invitation and two-way room chat.`);
     }
+    async function expectRecoveryToast(page, message) {
+        await expect(page.locator('[data-toast]').getByText(message, { exact: true })).toBeVisible();
+        const announcement = page.locator('[data-toast-announcement]');
+        await expect(announcement).toHaveAttribute('role', 'status');
+        await expect(announcement).toHaveText(message);
+    }
+
     async function captureArcadeInvite(page, viewport, step, mask = []) {
         const output = process.env.ARCADE_INVITE_EVIDENCE || evidence;
         if (!output) return;
@@ -251,7 +258,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await host.getByRole('button', { name: 'Open Chess match' }).click();
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await accept.tap();
-                    await expect(friend.getByText('This game invitation no longer has an open seat. Ask the host for a fresh invitation.')).toBeVisible();
+                    await expectRecoveryToast(friend, 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await friend.locator('[data-leave]').click();
                     await expect(friend.locator('[data-game-night]')).toBeHidden();
@@ -315,6 +322,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             }, useClipboard);
             await host.setViewportSize(original);
         }
+    }
+    async function expectGameNightNickname(page) {
+        await expect(page.getByRole('textbox')).toHaveCount(1);
+        const nickname = page.getByRole('textbox', { name: 'Your nickname' });
+        await expect(nickname).toBeInViewport({ ratio: 1 });
+        await expect(nickname).toHaveValue(/^(Guest|Player|Arcade)-\d{6}$/);
+        assert.ok(await nickname.evaluate(input => input.closest('label').nextElementSibling.id === 'guest-agreement'),
+            'the name field appears before the age and rules acknowledgement');
     }
     async function openGameNightLink(page, link) {
         // Keep the invitation out of browser automation navigation logs.
@@ -406,7 +421,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const expires = guest.locator('[data-guest-expiry] time');
                 await expect(expires).toBeVisible();
                 assert.ok(Date.parse(await expires.getAttribute('datetime')) > Date.now());
-                await expect(guest.getByRole('textbox')).toHaveCount(0);
+                await expectGameNightNickname(guest);
                 await expect(guest.getByRole('button')).toHaveCount(1);
                 assert.equal(new URL(guest.url()).hash, '');
                 assert.equal(await guest.evaluate(() => window.gameAudioContexts), 0, 'opening the invite does not unlock sound');
@@ -803,6 +818,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (!phone) await guest.getByRole('button', { name: 'Retry closing invitation', exact: true }).click();
                 await expect.poll(async () => (await context.request.get(origin + '/beta/state?game-guest=1')).status()).toBe(401);
                 await expect(guest.locator('[data-session-reason]')).toHaveText('You left Game Night. Ask your host for a fresh invitation.');
+                await expect(guest.locator('[data-text]')).toHaveValue('');
+                await expect(guest.locator('[data-session-draft]')).toBeHidden();
+                await expect(guest.locator('[data-network-note]')).toBeHidden();
                 await expect.poll(() => guest.evaluate(() => {
                     const { acquired, released } = window.gameNightWakeLocks;
                     return acquired > 0 && acquired === released;
@@ -1166,7 +1184,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const joinOffer = player.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night', exact: true });
         async function expectRefusal() {
             await joinOffer.click();
-            await expect(player.getByText('Couldn’t join Game Night. Ask the host for a fresh invitation.', { exact: true })).toBeVisible();
+            await expectRecoveryToast(player, 'Couldn’t join Game Night. Ask the host for a fresh invitation.');
             await expect(player.locator('[data-game-night]')).toBeHidden();
         }
         assert.equal(new URL(player.url()).hash, '');
@@ -1437,7 +1455,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(gameTitle).toBeVisible();
                 assert.equal(attempts.length, 0, 'refresh before confirmation must not attempt to join');
                 assert.equal((await friend.context().cookies()).length, 0, 'refresh before confirmation grants no access');
-                await expect(friend.getByRole('textbox')).toHaveCount(0);
+                await expectGameNightNickname(friend);
                 await expect(friend.getByRole('button')).toHaveCount(1);
                 const joinGame = friend.getByRole('button', { name: 'Join game', exact: true });
                 await expectUncoveredControl(joinGame);

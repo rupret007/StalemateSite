@@ -15,6 +15,72 @@ function env(extra = {}) {
         ASSETS: { fetch: vi.fn(async () => new Response(readFileSync(new URL('../../r/45662413410ed051/entry-sites.mjs', import.meta.url), 'utf8'))) },
         LOBBY: {}, QUOTA: {}, ROOMS: {}, BETA_SESSIONS: {}, ...extra };
 }
+
+it('puts one Game Night join action before the optional invitation details', async () => {
+    const response = await betaFetch(new Request('https://beta.example/beta/game-night/guest'),
+        env({ HANGOUT_GAME_NIGHT_GUESTS: '1' }));
+    const { window } = new JSDOM(await response.text());
+    try {
+        expect(response.status).toBe(200);
+        const section = window.document.querySelector('[data-guest-invite]');
+        const join = section.querySelector('[data-guest-join]');
+        expect([...section.querySelectorAll('button')]).toEqual([join]);
+        expect(join.textContent).toBe('Join game');
+        expect(join.getAttribute('aria-describedby')).toBe('guest-agreement');
+        expect(join.previousElementSibling.id).toBe('guest-agreement');
+        expect(join.previousElementSibling.textContent).toContain('13+');
+        const name = section.querySelector('label:has([data-guest-name])');
+        expect(name.textContent.trim()).toBe('Your nickname');
+        expect(name.nextElementSibling.id).toBe('guest-agreement');
+        expect(section.lastElementChild.matches('[data-guest-expiry]')).toBe(true);
+        expect(section.querySelector('a[href="/beta/privacy"]').textContent).toBe('House rules');
+    } finally {
+        window.close();
+    }
+});
+
+it('prefills the nickname, keeps one Join action and lets a guest correct a rejected name', async () => {
+    const guestPath = '/beta/game-night/guest';
+    const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1', ASSETS: {
+        fetch: vi.fn(request => new Response(readFileSync(new URL('../..' + new URL(request.url).pathname, import.meta.url), 'utf8')))
+    } });
+    const request = path => new Request('https://beta.example.test' + path);
+    const html = await (await betaFetch(request(guestPath), config)).text();
+    const client = await (await betaFetch(request(guestPath + '.js'), config)).text();
+    const { window } = new JSDOM(html, { url: request(guestPath).url + '#invite=fixture', runScripts: 'outside-only' });
+    try {
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE, unlockGameNightAudio: vi.fn() };
+        window.TextEncoder = TextEncoder;
+        Object.defineProperty(window.crypto, 'subtle', { value: crypto.subtle });
+        window.fetch = vi.fn()
+            .mockResolvedValueOnce(Response.json({ game: 'Royal Flush Chess', host: 'Fixture host', guestName: 'Guest-123456' }))
+            .mockResolvedValueOnce(Response.json({ error: 'That nick is reserved.' }, { status: 422 }))
+            .mockResolvedValueOnce(Response.json({ error: 'Temporary connection failure.' }, { status: 503 }));
+        window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
+            'const { $1 } = sharedGameNight;'));
+        const name = window.document.querySelector('[data-guest-name]');
+        const join = window.document.querySelector('[data-guest-join]');
+        const status = window.document.querySelector('[data-guest-status]');
+        await vi.waitFor(() => expect(name.value).toBe('Guest-123456'));
+        expect(name.closest('label').hidden).toBe(false);
+        expect(window.fetch).toHaveBeenCalledTimes(1);
+
+        name.value = 'admin';
+        join.click();
+        await vi.waitFor(() => expect(status.textContent).toBe('That nick is reserved.'));
+        expect(window.document.activeElement).toBe(name);
+        expect(join.disabled).toBe(false);
+        name.value = 'ArcadeFriend';
+        join.click();
+        await vi.waitFor(() => expect(status.textContent).toBe('Temporary connection failure.'));
+        const [invalid, corrected] = window.fetch.mock.calls.slice(1).map(([, options]) => JSON.parse(options.body));
+        expect(invalid).toMatchObject({ age13: true, nick: 'admin' });
+        expect(corrected).toEqual({ ...invalid, nick: 'ArcadeFriend' });
+    } finally {
+        window.close();
+    }
+});
+
 it('explains an invalid Game Night link before loading the lobby', async () => {
     const config = env({ HANGOUT_GAME_NIGHT_GUESTS: '1' });
     const response = await betaFetch(new Request('https://beta.example' + root + 'lobby/?game-guest=1&table=invalid'), config);
@@ -127,7 +193,73 @@ it.each(['details', 'accept'])('uses the shared copy on a guest %s 410', async o
     }
 });
 
-it('offers a shareable fresh link when a guest invite has expired', async () => {
+it.each(['chess', 'turdspades'])('moves focus from the successful %s invitation retry to Join game', async game => {
+    const pagePath = '/beta/game-night/guest';
+    const config = env({
+        HANGOUT_GAME_NIGHT_GUESTS: '1',
+        ASSETS: { fetch: vi.fn(request => new Response(readFileSync(new URL('../..' + new URL(request.url).pathname, import.meta.url), 'utf8'))) }
+    });
+    const request = path => new Request('https://beta.example.test' + path);
+    const html = await (await betaFetch(request(pagePath), config)).text();
+    const client = await (await betaFetch(request(pagePath + '.js'), config)).text();
+    const dom = new JSDOM(html, { url: request(pagePath).url + '#invite=fixture', runScripts: 'outside-only' });
+    const { window } = dom;
+    try {
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE, unlockGameNightAudio: vi.fn() };
+        window.TextEncoder = TextEncoder;
+        Object.defineProperty(window.crypto, 'subtle', { value: crypto.subtle });
+        const title = game === 'chess' ? 'Royal Flush Chess' : 'TurdSpades';
+        window.fetch = vi.fn()
+            .mockResolvedValueOnce(Response.json({ error: 'Temporary connection failure.' }, { status: 503 }))
+            .mockResolvedValueOnce(Response.json({ game: title, host: 'Fixture host' }));
+        window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
+            'const { $1 } = sharedGameNight;'));
+        const retry = window.document.querySelector('[data-guest-retry]');
+        const join = window.document.querySelector('[data-guest-join]');
+        await vi.waitFor(() => expect(retry.hidden).toBe(false));
+        retry.focus();
+        retry.click();
+        await vi.waitFor(() => expect(join.closest('section').hidden).toBe(false));
+        expect(window.document.querySelector('[data-guest-game]').textContent).toBe(title);
+        expect(retry.hidden).toBe(true);
+        expect(window.document.activeElement).toBe(join);
+        expect(window.fetch.mock.calls.map(([path]) => path)).toEqual(Array(2).fill('/beta/game-night/invitation/details'));
+    } finally {
+        window.close();
+    }
+});
+
+it.each(['', '#invite='])('offers a fresh-link action when a guest invitation code is missing (%j)', async fragment => {
+    const pagePath = '/beta/game-night/guest';
+    const config = env({
+        HANGOUT_GAME_NIGHT_GUESTS: '1',
+        ASSETS: { fetch: vi.fn(request => new Response(readFileSync(new URL('../..' + new URL(request.url).pathname, import.meta.url), 'utf8'))) }
+    });
+    const request = path => new Request('https://beta.example.test' + path);
+    const html = await (await betaFetch(request(pagePath), config)).text();
+    const client = await (await betaFetch(request(pagePath + '.js'), config)).text();
+    const dom = new JSDOM(html, { url: request(pagePath).url + fragment, runScripts: 'outside-only' });
+    const { window } = dom;
+    try {
+        window.sharedGameNight = { GAME_INVITE_UNAVAILABLE, unlockGameNightAudio: vi.fn() };
+        window.fetch = vi.fn();
+        window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
+            'const { $1 } = sharedGameNight;'));
+        const status = window.document.querySelector('[data-guest-status]');
+        const fresh = window.document.querySelector('[data-guest-fresh]');
+        expect(fresh.hidden).toBe(false);
+        expect(status.textContent).toBe('This link is missing its Game Night invitation.');
+        expect(window.document.activeElement).toBe(status);
+        expect(fresh.textContent).toBe('Ask the host for a fresh link.');
+        expect(window.document.querySelector('[data-guest-invite]').hidden).toBe(true);
+        expect(window.document.querySelector('[data-guest-retry]').hidden).toBe(true);
+        expect(window.fetch).not.toHaveBeenCalled();
+    } finally {
+        window.close();
+    }
+});
+
+it.each(['share', 'clipboard'])('asks the host directly for a fresh invite via %s', async method => {
     const pagePath = '/beta/game-night/guest';
     const config = env({
         HANGOUT_GAME_NIGHT_GUESTS: '1',
@@ -138,12 +270,16 @@ it('offers a shareable fresh link when a guest invite has expired', async () => 
     const client = await (await betaFetch(request(pagePath + '.js'), config)).text();
     const dom = new JSDOM(html, { url: request(pagePath).url + '#invite=fixture-link', runScripts: 'outside-only' });
     const { window } = dom;
-    const share = vi.fn().mockResolvedValue(undefined);
+    const send = vi.fn().mockResolvedValue(undefined);
     try {
         window.sharedGameNight = { GAME_INVITE_UNAVAILABLE, unlockGameNightAudio: vi.fn() };
         window.TextEncoder = TextEncoder;
         Object.defineProperty(window.crypto, 'subtle', { configurable: true, value: crypto.subtle });
-        Object.defineProperty(window.navigator, 'share', { configurable: true, value: share });
+        if (method === 'share') {
+            Object.defineProperty(window.navigator, 'share', { configurable: true, value: send });
+        } else {
+            Object.defineProperty(window.navigator, 'clipboard', { configurable: true, value: { writeText: send } });
+        }
         window.fetch = vi.fn(async () => Response.json({ error: 'expired' }, { status: 410 }));
         window.eval(client.replace(/^import \{ ([A-Za-z_]+) \} from '[^']+';/gm,
             'const { $1 } = sharedGameNight;'));
@@ -155,9 +291,13 @@ it('offers a shareable fresh link when a guest invite has expired', async () => 
         expect(ask.hidden).toBe(false);
         expect(ask.textContent).toBe('Ask the host for a fresh link.');
         ask.click();
-        await vi.waitFor(() => expect(share).toHaveBeenCalledTimes(1));
-        expect(share).toHaveBeenCalledWith({ title: 'Game Night', text: 'Ask the host for a fresh link.' });
-        expect(JSON.stringify(share.mock.calls)).not.toContain('fixture-link');
+        await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+        const message = 'Could you send me a fresh Game Night link?';
+        expect(send).toHaveBeenCalledWith(method === 'share' ? { title: 'Game Night', text: message } : message);
+        expect(JSON.stringify(send.mock.calls)).not.toContain('fixture-link');
+        if (method === 'clipboard') {
+            await vi.waitFor(() => expect(ask.textContent).toBe('Copied. Send it to your host.'));
+        }
     } finally {
         window.close();
     }

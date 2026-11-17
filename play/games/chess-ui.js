@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { Chess, createGame, playMove, claimDraw, claimReason, intendedClaims, undoTurn, resign,
   loadGame, saveGame, recordResult, readResults, exportPgn, LEVELS, colorName, pieceName } from './chess-core.js?v=99a08f6ff639de1d';
-import { ChessEngine } from './chess-engine.js?v=278c2488721a0324';
+import { ChessEngine } from './chess-engine.js?v=abf1f1c7c038c50b';
 import { pieceSvg, PIECE_GUIDE, loadPieceArtwork } from './chess-pieces.js';
 import { ChessBoard, MOVE_ANIMATION_MS } from './chess-board.js?v=9a72af72421e8d82';
 

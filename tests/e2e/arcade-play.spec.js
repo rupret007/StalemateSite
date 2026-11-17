@@ -4,7 +4,7 @@ async function board(page) {
     return page.locator('#board .tile').evaluateAll((tiles) => tiles.map((t) => [Number(t.dataset.id), Number(t.dataset.kind), Number(t.dataset.col), Number(t.dataset.row)]).sort((a, b) => a[0] - b[0]));
 }
 
-async function activate(page, target) {
+async function activate(target) {
     if (!test.info().project.use.hasTouch) {
         await target.click();
         return;
@@ -16,7 +16,6 @@ async function activate(page, target) {
         const y = rect.y + rect.height / 2;
         const hit = document.elementFromPoint(x, y);
         return {
-            x, y,
             onScreen: rect.width > 0 && rect.height > 0 && rect.x >= 0 && rect.y >= 0
                 && rect.right <= innerWidth && rect.bottom <= innerHeight,
             receivesTouch: hit === el || el.contains(hit),
@@ -31,7 +30,8 @@ async function activate(page, target) {
     }
     expect(point.onScreen, 'The control must fit on screen').toBe(true);
     expect(point.receivesTouch, 'The control must receive the touch').toBe(true);
-    await page.touchscreen.tap(point.x, point.y);
+    // Re-resolve the same control and wait for stable layout before sending a touch.
+    await target.tap();
 }
 
 async function popOne(page) {
@@ -55,7 +55,7 @@ async function popOne(page) {
         return move;
     });
     if (!move) return false;
-    await activate(page, page.locator(`.tile[data-col="${move.cell[0]}"][data-row="${move.cell[1]}"]`));
+    await activate(page.locator(`.tile[data-col="${move.cell[0]}"][data-row="${move.cell[1]}"]`));
     await expect.poll(() => page.evaluate(() => window.__turdomania.state.moves), {
         message: 'A real input must complete exactly one legal pop'
     }).toBe(move.previousMoves + 1);
@@ -73,34 +73,34 @@ async function ready(page, path) {
     ]);
 }
 
-test('homepage and hub offer nine ordinary games at root and project paths', async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    for (const prefix of ['', '/StalemateSite']) {
+for (const prefix of ['', '/StalemateSite']) {
+    test(`homepage and hub offer nine ordinary games at ${prefix || '/'}`, async ({ page }) => {
+        const errors = [];
+        page.on('pageerror', (error) => errors.push(error.message));
         await page.goto(prefix + '/');
         await expect(page.locator('body')).not.toContainText('Daily Dump');
         const open = page.getByRole('link', { name: 'Open Stalemate Arcade', exact: true });
         await expect(open).toHaveAttribute('href', 'play/');
-        await activate(page, open);
+        await activate(open);
         await expect(page).toHaveURL(new RegExp(prefix + '/play/$'));
         await expect(page.locator('h1')).toHaveText('Stalemate Arcade');
         await expect(page.locator('body')).not.toContainText('Daily Dump');
         await expect(page.locator('a[href*="daily="]')).toHaveCount(0);
         await expect(page.locator('.game-card')).toHaveCount(9);
         const turdomania = page.locator('a.game-card[href="turdomania.html"]');
-        await activate(page, turdomania);
+        await activate(turdomania);
         await expect(page).toHaveURL(new RegExp(prefix + '/play/turdomania\\.html$'));
         await page.waitForFunction(() => !!window.__turdomania);
         await expect(page).toHaveTitle('Turdomania');
         await expect(page.locator('#newBtn')).toBeEnabled();
-    }
-    expect(errors).toEqual([]);
-});
+        expect(errors).toEqual([]);
+    });
+}
 
-test('former daily links open seeded free play with working undo at either base path', async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    for (const [prefix, legacy] of [['', 'daily=2026-10-21&v=1'], ['/StalemateSite', 'daily=not-a-date&v=999']]) {
+for (const [prefix, legacy] of [['', 'daily=2026-10-21&v=1'], ['/StalemateSite', 'daily=not-a-date&v=999']]) {
+    test(`former daily links open seeded free play with working undo at ${prefix || '/'}`, async ({ page }) => {
+        const errors = [];
+        page.on('pageerror', (error) => errors.push(error.message));
         const game = prefix + '/play/turdomania.html';
         const options = 'seed=12345&level=easy&reducedMotion=1';
         await ready(page, game + '?' + options);
@@ -116,12 +116,12 @@ test('former daily links open seeded free play with working undo at either base 
         const undo = page.locator('#undoBtn');
         const [afterPop] = await Promise.all([board(page), expect(undo).toBeEnabled()]);
         expect(afterPop.length).toBeLessThan(ordinary.length);
-        await activate(page, undo);
+        await activate(undo);
         const [afterUndo] = await Promise.all([board(page), expect(page.locator('#newBtn')).toBeEnabled()]);
         expect(afterUndo).toEqual(ordinary);
-    }
-    expect(errors).toEqual([]);
-});
+        expect(errors).toEqual([]);
+    });
+}
 
 test('ordinary Turdomania completes and preserves existing preferences and records', async ({ page }) => {
     await page.goto('/play/turdomania.html');
@@ -158,7 +158,7 @@ test('free play and the arcade hub remain usable when storage is unavailable', a
     await ready(page, '/play/turdomania.html?daily=2026-10-21&v=1&seed=12345&level=easy&reducedMotion=1');
     const initial = await board(page);
     expect(await popOne(page)).toBe(true);
-    await activate(page, page.locator('#undoBtn'));
+    await activate(page.locator('#undoBtn'));
     expect(await board(page)).toEqual(initial);
     await page.goto('/StalemateSite/play/');
     await expect(page.locator('.game-card')).toHaveCount(9);

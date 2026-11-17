@@ -52,6 +52,29 @@ describe('private caller sharing controls in the actual browser client', () => {
         const { window } = await visitor();
         expect(window.document.querySelector('[data-sharing-controls]').hidden).toBe(true); expect(window.fetch).not.toHaveBeenCalled();
     });
+    it('honors a server-confirmed Stop even if this tab has no sharing controls', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        const name = '#jam-stop';
+        const href = 'https://music.example.test/join/#synthetic';
+        join(name, { kind: 'jam', jam: { webReady: true, web: href } });
+        const browserJoin = window.document.querySelector('[data-jam-web]');
+        expect(browserJoin.disabled).toBe(false);
+        const cachedJoin = browserJoin.onclick;
+        window.open = vi.fn();
+        cachedJoin();
+        expect(window.open).toHaveBeenCalledWith(href, '_blank', 'noopener,noreferrer');
+        window.open.mockClear();
+
+        ws.receive({ t: 'sharing-stopped' });
+        expect(window.__lobby.localMediaPaused).toBe(true);
+        expect(window.__lobby.chans.get(name).jam).toBeNull();
+        expect(browserJoin.disabled).toBe(true);
+        expect(window.document.querySelector('[data-text]').disabled).toBe(true);
+        cachedJoin();
+        expect(window.open).not.toHaveBeenCalled();
+        expect(window.fetch).not.toHaveBeenCalled();
+    });
     it('shows unknown/expired status without implying email grants permission or collecting private fields', async () => {
         const { window } = await visitor('stalemate', { entrySources: 1 }, { sharing: true, fetcher: async () => Response.json({ ok: true, state: 'expired', available: false, purposes: [], revision: 2, canStop: true }) });
         await vi.waitFor(() => expect(window.document.querySelector('[data-sharing-status]').textContent).toContain('expired'));

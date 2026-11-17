@@ -56,10 +56,11 @@
         </div>
     </section>
 
-    <main class="room" data-room hidden>
+    <main class="room" data-room data-room-workspace hidden>
         <div class="bar">
             <span class="peers" data-peers>Just you</span>
             <button class="btn" data-copy type="button">Copy invite link</button>
+            <button class="btn btn--ghost" type="button" data-workspace-only data-room-controls-jump hidden>Call controls</button>
             <button class="btn btn--ghost host-only watch-room-toggle" data-watch-toggle type="button">Watch a Movie Together</button>
             <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">🎨 Paint along with Bob</button>
             <button class="btn btn--ghost" data-private-report type="button" hidden>Report a problem to staff</button>
@@ -132,15 +133,20 @@
                     <button class="btn btn--ghost" data-consent-skip type="button">Join without camera</button>
                 </div>
             </section>
-            <div class="tiles" data-tiles data-view="grid"></div>
+            <div class="room-stage-empty" data-workspace-only>
+                <strong>Video is off</strong>
+                <p>Start video, use your mic, or keep chatting.</p>
+                <button class="btn" type="button" data-workspace-start-video hidden>Start video</button>
+            </div>
+            <div class="tiles" data-tiles data-view="grid" role="group" aria-label="Participants"></div>
             <button class="btn faces-play" type="button" data-faces-play hidden>Tap to play and unmute</button>
             <div class="react-float" data-react-float aria-live="polite"></div>
-            <div class="tools callbar" role="toolbar" aria-label="Call controls">
+            <div class="tools callbar" id="room-call-controls" tabindex="-1" role="group" aria-label="Call controls">
                 <div class="callbar-main">
-                    <button class="btn" type="button" data-mic aria-pressed="false">Unmute mic</button>
-                    <button class="btn" type="button" data-cam aria-pressed="false">Start video</button>
+                    <button class="btn" type="button" data-mic aria-pressed="false">Turn on my mic</button>
+                    <button class="btn" type="button" data-cam aria-pressed="false">Turn on my camera</button>
                     <button class="btn soundtrack-btn" type="button" data-soundtrack aria-expanded="false" aria-controls="soundtrack-pop" aria-pressed="true" title="Volume of the shared video">Video sound</button>
-                    <button class="btn btn--ghost" type="button" data-chat-toggle aria-expanded="true" aria-controls="room-chat" data-ico="💬" data-short="Chat">Chat</button>
+                    <button class="btn btn--ghost" type="button" data-chat-toggle data-room-chat-open aria-expanded="true" aria-controls="room-chat" data-ico="💬" data-short="Chat">Chat</button>
                     <button class="btn btn--ghost more-btn" type="button" data-more aria-expanded="false" aria-controls="callbar-more" data-ico="⋯" data-short="More">More</button>
                     <a class="btn btn--ghost leave-room" href="lobby/" data-ico="🚪" data-short="Leave">Leave</a>
                 </div>
@@ -166,16 +172,20 @@
             </div>
         </section>
 
-        <section class="panel chat" id="room-chat" aria-label="Chat">
-            <details data-chat-details open><summary><h2>Chat</h2></summary>
-            <p class="small" data-sync-status role="status" hidden></p>
-            <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>
-            <ol class="log" data-log aria-live="polite"></ol>
-            <form class="say" data-say>
-                <input data-text maxlength="400" placeholder="Say something dumb" aria-label="Message">
-                <button class="btn" type="submit">Send</button>
-            </form>
-            </details>
+        <section class="panel chat" id="room-chat" aria-labelledby="room-chat-title">
+            <div class="room-chat-heading">
+                <h2 id="room-chat-title" tabindex="-1">Chat</h2>
+                <button class="btn btn--ghost" type="button" data-workspace-only data-room-chat-close hidden>Close chat</button>
+            </div>
+            <div data-chat-details>
+                <p class="small" data-sync-status role="status" hidden></p>
+                <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>
+                <ol class="log" data-log aria-live="polite"></ol>
+                <form class="say" data-say>
+                    <input data-text maxlength="400" placeholder="Say something dumb" aria-label="Message">
+                    <button class="btn" type="submit">Send</button>
+                </form>
+            </div>
         </section>
     </main>
 
@@ -210,9 +220,9 @@
         </form>
     </dialog>
 
-    <dialog class="ask" data-ask>
-        <h2 data-ask-title>Use your camera?</h2>
-        <p data-ask-copy></p>
+    <dialog class="ask" data-ask aria-labelledby="room-consent-title" aria-describedby="room-consent-copy">
+        <h2 id="room-consent-title" data-ask-title>Use your camera?</h2>
+        <p id="room-consent-copy" data-ask-copy></p>
         <div class="tools">
             <button class="btn" data-ask-yes type="button">OK, ask my browser</button>
             <button class="btn btn--ghost" data-ask-no type="button">Not now</button>
@@ -254,5 +264,6 @@
     <script src="shared-layout.js"></script>
     <script src="names.js"></script>
     <script src="room.js"></script>
+    <script src="room-workspace.js" defer></script>
 </body>
 </html>

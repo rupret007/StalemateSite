@@ -39,6 +39,15 @@
         return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null;
     }
 
+    function validRoomActivity(activity) {
+        return activity === 'room' || activity === 'paint' || activity === 'watch';
+    }
+
+    function isActivityOnlyVideo(body) {
+        return body.source === null && validRoomActivity(body.activity)
+            && body.playing === false && body.pos === 0 && body.control === undefined;
+    }
+
     function cleanSource(source) {
         if (!source || typeof source !== 'object') return null;
         if (source.kind === 'yt' && /^[A-Za-z0-9_-]{11}$/.test(String(source.id))) return { kind: 'yt', id: source.id };
@@ -296,7 +305,7 @@
         return JSON.parse(dec.decode(data));
     }
 
-    const api = { LIMITS, COLORS, FILE_SOURCES, parseYouTubeId, cleanSource, expectedPosition, needsCorrection, createClock, cleanStroke, cleanSnapshotStroke, strokeRangeStatus, resetStrokeRanges, emptyState, apply, newSecret, validSecret, deriveRoom, roomRelayToken, seal, open };
+    const api = { LIMITS, COLORS, FILE_SOURCES, parseYouTubeId, cleanSource, validRoomActivity, isActivityOnlyVideo, expectedPosition, needsCorrection, createClock, cleanStroke, cleanSnapshotStroke, strokeRangeStatus, resetStrokeRanges, emptyState, apply, newSecret, validSecret, deriveRoom, roomRelayToken, seal, open };
     if (typeof module === 'object' && module.exports) module.exports = api;
     global.HangoutCore = api;
 }(typeof window !== 'undefined' ? window : globalThis));

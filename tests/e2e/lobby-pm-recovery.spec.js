@@ -64,6 +64,11 @@ async function community(browser, baseURL, { privateContextFeature = 1, privateP
     };
 }
 
+async function showPhoneSection(page, section) {
+    const tab = page.locator(`.phonetabs [data-show="${section}"]`);
+    if (await tab.isVisible() && await tab.getAttribute('aria-current') !== 'true') await tab.click();
+}
+
 const send = async (page, text) => { await page.fill('[data-text]', text); await page.press('[data-text]', 'Enter'); };
 const received = (page, text) => page.locator('[data-buffer] li[data-id]').filter({ hasText: text });
 async function accept(sender, recipient) {
@@ -201,19 +206,21 @@ test('a PM person sheet kept open across nickname reuse blocks the original live
         await expect(sender.locator('[data-chat-context]')).toHaveText('PM · Third');
         const other = fixture.delivered.filter(frame => frame.t === 'pm-open' && frame.recipient === original.recipient).at(-1);
         await sender.getByRole('tab', { name: '✉ Recipient', exact: true }).click();
+        await showPhoneSection(sender, 'people');
         await sender.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ }).click();
         const sheet = sender.locator('dialog[data-sheet]'); await expect(sheet).toBeVisible();
         await send(recipient, '/nick RenamedRecipient');
         await third.getByRole('tab', { name: '#stalemate', exact: true }).click();
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedRecipient$/ })).toHaveCount(1);
         await send(third, '/nick Recipient');
-        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ })).toHaveCount(1);
+        await expect(third.locator('[data-nicks] span.nick[data-self="true"]')).toHaveText('Recipient');
         const noticesBefore = fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').length;
         await sheet.getByRole('button', { name: 'Who?', exact: true }).click();
         await expect.poll(() => fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').length).toBe(noticesBefore + 1);
         expect(fixture.delivered.filter(frame => frame.recipient === original.recipient && frame.t === 'notice').at(-1).text).toContain('RenamedRecipient');
         expect(fixture.inbound.filter(frame => frame.name === 'whois').at(-1)).toMatchObject({ pmPeer: original.peer, pmRef: original.ref });
         // A historical transcript label is not a fresh nickname selection.
+        await showPhoneSection(sender, 'chat');
         await received(sender, history).getByRole('button', { name: '<Recipient>', exact: true }).click();
         await expect(sheet).toBeVisible(); await expect(sheet.locator('[data-sheet-title]')).toHaveText('RenamedRecipient');
         const before = fixture.delivered.length;
@@ -429,7 +436,7 @@ test('an accepted PM keeps its original peer and unsent draft when another accep
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedRecipient$/ })).toHaveCount(1);
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ })).toHaveCount(0);
         await send(third, '/nick Recipient');
-        await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Recipient$/ })).toHaveCount(1);
+        await expect(third.locator('[data-nicks] span.nick[data-self="true"]')).toHaveText('Recipient');
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedRecipient$/ })).toHaveCount(1);
         await expect(third.locator('[data-nicks] button.nick').filter({ hasText: /^Third$/ })).toHaveCount(0);
         await expect(sender.locator('[data-text]')).toHaveValue(draft);
@@ -637,6 +644,7 @@ test('a public People sheet kept open across nickname reuse requests only the or
         fixture.advance(180000);
         const person = sender.locator('[data-nicks] button.nick').filter({ hasText: /^Original$/ });
         await expect(person).toHaveAttribute('data-connection-id', originalId);
+        await showPhoneSection(sender, 'people');
         await person.click();
         const sheet = sender.locator('dialog[data-sheet]');
         await expect(sheet).toBeVisible();
@@ -742,6 +750,7 @@ test('identity Ignore waits for its committed snapshot and survives a same-socke
         // selected-person operation before delivering that earlier snapshot.
         await send(sender, '/ignore UnknownRule');
         await expect.poll(() => fixture.delivered.some(frame => frame.recipient === senderId && frame.t === 'person-preferences' && frame.names.includes('unknownrule') && frame.peers.length === 0)).toBe(true);
+        await showPhoneSection(sender, 'people');
         await sender.locator('[data-nicks] button.nick').filter({ hasText: /^Original$/ }).click();
         const sheet = sender.locator('dialog[data-sheet]');
         await sheet.getByRole('button', { name: 'Ignore', exact: true }).click();
@@ -769,6 +778,7 @@ test('identity Ignore waits for its committed snapshot and survives a same-socke
         const beforeWake = { server: fixture.roomInstance('#stalemate'), client: await sender.evaluate(() => window.__lobby.chans.get('#stalemate').keepRef) };
         const restoreStart = fixture.delivered.length, saved = fixture.wake();
         const afterWake = { server: fixture.roomInstance('#stalemate'), client: await sender.evaluate(() => window.__lobby.chans.get('#stalemate').keepRef), savedLobbyInstance: saved.sessions.lobbyInstance ?? null };
+        await showPhoneSection(sender, 'people');
         await sender.locator(`[data-nicks] button[data-connection-id="${originalId}"]`).click();
         await expect(sheet.getByRole('button', { name: 'Unignore', exact: true })).toBeVisible();
         const unignoreInputStart = fixture.inbound.length, unignoreOutputStart = fixture.delivered.length;
@@ -816,8 +826,10 @@ for (const [label, feature] of [['missing', null], ['a string', '1'], ['a boolea
             const sender = await fixture.guest('Sender'), original = await fixture.guest('Original'); fixture.advance(180000);
             const text = 'An exact delivered message can still be reported on an older server';
             await send(original, text); await expect(received(sender, text)).toHaveCount(1);
-            await expect(sender.locator('[data-nicks] button.nick').filter({ hasText: /^Original$/ })).toBeDisabled();
-            await expect(received(sender, text).getByRole('button', { name: '<Original>', exact: true })).toBeDisabled();
+            await expect(sender.locator('[data-nicks] span.nick').filter({ hasText: /^Original$/ })).toBeVisible();
+            await expect(sender.locator('[data-nicks] button.nick').filter({ hasText: /^Original$/ })).toHaveCount(0);
+            await expect(received(sender, text).locator('span.who')).toHaveText('<Original>');
+            await expect(received(sender, text).getByRole('button', { name: '<Original>', exact: true })).toHaveCount(0);
             await received(sender, text).locator('.flag').click();
             await expect(received(sender, text).locator('.flag')).toHaveText('✓');
             expect(fixture.inbound.filter(frame => frame.t === 'cmd' && frame.personContext === 1)).toEqual([]);
@@ -836,6 +848,7 @@ test('a held room-host person action stays on its original endpoint and refuses 
         fixture.advance(180000);
         const originalId = fixture.inbound.find(frame => frame.t === 'hello' && frame.nick === 'Original').sender;
         const replacementId = fixture.inbound.find(frame => frame.t === 'hello' && frame.nick === 'Third').sender;
+        await showPhoneSection(host, 'people');
         await host.locator('[data-nicks] button.nick').filter({ hasText: /^Original$/ }).click();
         const sheet = host.locator('dialog[data-sheet]'); await expect(sheet.getByRole('button', { name: 'Kick', exact: true })).toBeVisible();
         await send(original, '/nick RenamedOriginal');
@@ -848,6 +861,7 @@ test('a held room-host person action stays on its original endpoint and refuses 
         const kick = fixture.inbound.filter(frame => frame.name === 'kick').at(-1);
         expect(kick).toMatchObject({ personContext: 1, personPeer: originalId, ch: room });
         expect(kick.roomInstance).toMatch(/^[a-f0-9]{32}$/);
+        await showPhoneSection(host, 'people');
         await host.locator(`[data-nicks] button[data-connection-id="${replacementId}"]`).click();
         // Actual authorized close/recreate commands change the room generation
         // while the old selected-person sheet is held; they do not fake roles.
@@ -880,7 +894,7 @@ test('current-person invitation selection stays bound while deliberate nickname 
         await send(original, '/nick RenamedOriginal');
         await expect(replacement.locator('[data-nicks] button.nick').filter({ hasText: /^RenamedOriginal$/ })).toHaveCount(1);
         await send(replacement, '/nick Original');
-        await expect(replacement.locator('[data-nicks] button.nick').filter({ hasText: /^Original$/ })).toHaveCount(1);
+        await expect(replacement.locator('[data-nicks] span.nick[data-self="true"]')).toHaveText('Original');
         const before = fixture.delivered.length;
         await dialog.getByRole('button', { name: 'Invite selected person', exact: true }).click();
         await expect.poll(() => fixture.delivered.slice(before).filter(frame => frame.t === 'invite').length).toBe(1);

@@ -2,8 +2,11 @@
 import { expect, it, vi } from 'vitest';
 import { gameNightPassRecord } from '../../hangout-worker/src/game-night-pass.mjs';
 import { gameGuestScope, gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
+import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
 import { gameNightReturnHint, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+
+const { gameGuestNick, availableGameGuestNick } = createLobby();
 
 it('keeps a saved game only in a Game Night room', () => {
     const fields = { ref: 'a'.repeat(32), until: 2000 };
@@ -58,7 +61,7 @@ it('caps demo Chess links and admitted guests at the demo host session deadline'
             arcadeAvailable: game => game === 'chess',
             arcadeBinding: () => ({ betaSid: host, betaInviteVersion: '1', canOpen: true, canPlay: true }),
             sessionActive: async () => true,
-            engine: { invitedGameHost: () => 'c' + 'a'.repeat(32) },
+            engine: { invitedGameHost: () => 'c' + 'a'.repeat(32), gameGuestNick },
             arcade: { get: () => ({
                 hasGuestSeat: async () => true,
                 guestTableId: async (_scope, match) => match,
@@ -174,7 +177,7 @@ it('keeps a Spades watch link read-only and bound to the same table through rede
             arcadeAvailable: game => game === 'turdspades',
             arcadeBinding: () => ({ betaSid: host, nick: 'Host', betaInviteVersion: '1', canOpen: true, canPlay: true }),
             sessionActive: async () => true,
-            engine: { invitedGameHost: () => 'c' + 'a'.repeat(32) },
+            engine: { invitedGameHost: () => 'c' + 'a'.repeat(32), gameGuestNick, availableGameGuestNick },
             arcade: new Map([['turdspades', table]])
         };
         const payload = { actor: 'c' + 'a'.repeat(32), room: '#game-1acbefx23acbe', ref: 'c'.repeat(32),
@@ -195,8 +198,10 @@ it('keeps a Spades watch link read-only and bound to the same table through rede
         expect(await (await details(original.code)).json()).toMatchObject({ host: 'Host', watch: true, inviteExpiresAt: original.until });
         expect(await (await details(short.code)).json()).toMatchObject({ inviteExpiresAt: short.until });
         expect((await accept(original.code, { age13: false })).status).toBe(400);
-        const admitted = await (await accept(original.code, { watch: false })).json();
-        expect(admitted.scope).toMatchObject({ tableId, watch: true });
+        expect(await (await details(original.code)).json()).toMatchObject({ guestName: expect.stringMatching(/^Guest-\d{6}$/) });
+        expect((await accept(original.code, { nick: 'admin' })).status).toBe(422);
+        const admitted = await (await accept(original.code, { watch: false, nick: 'ArcadeFriend' })).json();
+        expect(admitted.scope).toMatchObject({ tableId, watch: true, nick: 'ArcadeFriend' });
         expect(admitted.exp).toBe(nightEndsAt);
         expect(await (await accept(original.code)).json()).toEqual(admitted);
         expect((await accept(original.code, { attempt: 'f'.repeat(32) })).status).toBe(410);

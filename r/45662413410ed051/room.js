@@ -58,6 +58,7 @@
         share: $('[data-share]'), pip: $('[data-pip]'), hand: $('[data-hand]'), view: $('[data-view-toggle]'), reacts: $('[data-reacts]'), reactFloat: $('[data-react-float]'),
         settings: $('[data-settings]'), settingsDlg: $('[data-settings-dlg]'), devCam: $('[data-dev-cam]'), devMic: $('[data-dev-mic]'), devSpk: $('[data-dev-spk]'),
         music: $('[data-music]'), jamNote: $('[data-jam-note]'), bgPicks: $('[data-bg-picks]'), bgStatus: $('[data-bg-status]'), bgSupport: $('[data-bg-support]'),
+        chat: $('#room-chat'), chatTitle: $('#room-chat-title'), chatClose: $('[data-room-chat-close]'),
         lock: $('[data-lock]'), allCamsOff: $('[data-all-cams-off]'), hands: $('[data-hands]'), tileMenu: $('[data-tile-menu]'),
         checkBtn: $('[data-check-btn]'), check: $('[data-check]'), checkVideo: $('[data-check-video]'), checkMeter: $('[data-check-meter]'), checkOut: $('[data-check-out]'), checkDone: $('[data-check-done]')
     };
@@ -68,7 +69,7 @@
         hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastHostSigned: null, lastVideoSigned: null,
         lastClearSigned: null, drawingEpoch: 0, snapshotRequest: null, snapshotFresh: false, knownHostId: null,
         names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false, ended: false, retries: 0, privateReports: false,
-        bob: { on: false, explicit: invitedActivity === 'paint', touched: false, lastNudge: 0 },
+        bob: { on: false, lastNudge: 0 },
         watchLayout: invitedActivity === 'watch',
         consent: { state: 'idle', stream: null, ac: null, frame: 0, version: 0, skipped: false },
         soundtrack: { volume: 80, muted: false },
@@ -514,7 +515,7 @@
             ? await signHost({ kind: 'hello', from: id, request }) : undefined;
         if (app.ended || app.ws !== socket || !app.connected || app.myId !== id || app.snapshotRequest !== request) return;
         await send({ type: 'hello', ...(to ? { to } : {}), ...(reply ? { reply: true } : {}),
-            name: app.name, av: avFlags(), protocol: 2, snapshotRequest: request, hostHello });
+            name: app.name, av: avFlags(), protocol: 2, activityOnlyVideo: true, snapshotRequest: request, hostHello });
     }
     async function confirmedHostHello(msg, meta) {
         const signed = msg.hostHello;
@@ -824,7 +825,9 @@
             if (!relayCurrent(meta) || !meta.peer.live) return;
             if (!msg.reply || askHost) await sendHello(meta.from, true);
             if (!relayCurrent(meta) || !meta.peer.live) return;
-            if (!msg.reply || app.isHost && S.validNonce(msg.snapshotRequest)) scheduleSnapshot(meta.from, msg.snapshotRequest);
+            if (!msg.reply || app.isHost && S.validNonce(msg.snapshotRequest)) {
+                scheduleSnapshot(meta.from, msg.snapshotRequest, msg.activityOnlyVideo === true);
+            }
             return;
         }
         case 'bye':
@@ -958,11 +961,11 @@
         }
     }
 
-    function scheduleSnapshot(to, request) {
+    function scheduleSnapshot(to, request, activityOnlyVideo) {
         const previous = snapshotJobs.get(to);
         if (previous && previous.socket === app.ws && previous.request === request) return;
         if (previous) clearTimeout(previous.timer);
-        const job = { to, request, socket: app.ws, timer: 0 };
+        const job = { to, request, activityOnlyVideo, socket: app.ws, timer: 0 };
         snapshotJobs.set(to, job);
         job.timer = win.setTimeout(() => { void sendSnapshot(job); }, app.isHost ? 0 : 150 + Math.random() * 400);
     }
@@ -996,6 +999,10 @@
             .filter(proof => Number.isSafeInteger(proof?.body?.seq))
             .sort((a, b) => b.body.seq - a.body.seq)[0] || null;
     }
+    function snapshotVideo(job) {
+        const video = app.lastVideoSigned;
+        return !job.activityOnlyVideo && video && H.isActivityOnlyVideo(video.signed.body) ? null : video;
+    }
     async function sendSnapshot(job) {
         if (!await settleState(job) || !snapshotJobCurrent(job)) return;
         const status = H.strokeRangeStatus(app.state);
@@ -1015,7 +1022,7 @@
             const parts = S.makeChunks({ to: job.to, request: job.request, seq,
                 epoch: app.drawingEpoch, clear: app.lastClearSigned,
                 strokes: app.state.strokes.map(H.cleanSnapshotStroke),
-                video: app.lastVideoSigned, mods: [app.av.mods.lock, app.av.mods.spot].filter(Boolean) });
+                video: snapshotVideo(job), mods: [app.av.mods.lock, app.av.mods.spot].filter(Boolean) });
             for (const part of parts) {
                 let packet;
                 if (app.isHost) {
@@ -1032,7 +1039,7 @@
     }
     async function sendLegacySnapshot(job) {
         const to = job.to;
-        const video = app.lastVideoSigned;
+        const video = snapshotVideo(job);
         const mods = [app.av.mods.lock, app.av.mods.spot].filter(Boolean);
         const strokes = app.state.strokes.slice(-400);
         const chunks = [];
@@ -1071,8 +1078,8 @@
         else syncSharedLayout();
         if (mq('(max-width: 820px)')) {
             doc.querySelector('.room-description').open = false;
-            if (!doc.body.dataset.sharedLayout) doc.querySelector('[data-chat-details]').open = false;
         }
+        syncChatDisclosure();
         doc.body.classList.toggle('is-host', app.isHost);
         ui.bobToggle.hidden = !app.isHost;
         ui.hostNote.textContent = app.isHost ? 'You started this room, so you drive the video and the wipe.' : 'The person who started the room drives the video.';
@@ -1392,15 +1399,19 @@
     async function acceptVideo(signed, t) {
         if (app.ended) return;
         const b = signed.body;
+        if (b.seq <= (app.lastVideoSigned?.signed.body.seq ?? -1)) return;
         const relayT = Number.isFinite(Number(b.t)) ? Number(b.t) : t;
-        if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t: relayT }) !== 'video') return;
+        const activityOnly = H.isActivityOnlyVideo(b);
+        if (activityOnly) {
+            if (!Number.isFinite(relayT) || relayT < 0) return;
+        } else if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t: relayT }) !== 'video') return;
         app.lastVideoSigned = { signed, t: relayT };
         app.lastHostSeq = Math.max(app.lastHostSeq, b.seq || 0);
         if (b.control?.by !== app.myId) guestPlaybackTarget = null;
         showEpisode();
         // Native player controls already played on the initiating guest. The
         // signed reply must not overwrite a subsequent local seek.
-        if (b.control?.by !== app.myId || !b.control.localApplied) await syncToState(true);
+        if (!activityOnly && (b.control?.by !== app.myId || !b.control.localApplied)) await syncToState(true);
     }
 
     function isPaintEpisode(source) {
@@ -1409,7 +1420,8 @@
 
     function canSharePlayback(source, { chooseEpisode = false } = {}) {
         const selected = app.lastVideoSigned?.signed.body;
-        if (!source || (selected?.activity !== 'paint' && selected?.activity !== 'watch')) return false;
+        const activity = roomActivity();
+        if (!source || !selected?.source || selected.activity !== activity || activity === 'room') return false;
         if (selected.source.kind === source.kind && selected.source.id === source.id) return true;
         return chooseEpisode && selected.activity === 'paint' && isPaintEpisode(source);
     }
@@ -1484,18 +1496,18 @@
         videoPublication = publication;
         return hostWork(async () => {
             if (publication.cancelled || videoPublication !== publication) return false;
+            if (control && !canSharePlayback(source, { chooseEpisode: playing && pos === 0 })) return false;
             const seq = app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
             const t = app.clock.relayNow();
-            const mode = control ? app.lastVideoSigned?.signed.body.activity
-                : app.bob.explicit ? 'paint' : app.watchLayout ? 'watch' : '';
-            const activity = mode ? { activity: mode, ...(control && { control }) } : {};
+            const body = { kind: 'video', seq, source, playing, pos: Math.max(0, pos), t,
+                activity: roomActivity(), ...(control && { control }) };
             const signed = await Promise.race([
-                signHost({ kind: 'video', seq, source, playing, pos: Math.max(0, pos), t, ...activity }), cancelled
+                signHost(body), cancelled
             ]);
             if (!signed || publication.cancelled || videoPublication !== publication
                 || !app.connected || app.ended || app.lastHostSeq !== seq) return false;
             publication.committed = true;
-            H.apply(app.state, { type: 'video', source, playing, pos }, { t });
+            if (source) H.apply(app.state, { type: 'video', source, playing, pos }, { t });
             app.lastVideoSigned = { signed, t };
             recordHost(signed, t);
             showEpisode();
@@ -1959,8 +1971,6 @@
         ui.canvasCam.textContent = app.av.canvas ? 'Stop showing my canvas' : 'Show my real canvas';
         ui.mic.setAttribute('aria-pressed', String(app.av.mic));
         ui.cam.setAttribute('aria-pressed', String(app.av.cam && !app.av.screen));
-        ui.mic.textContent = app.av.mic ? 'Mute mic' : (app.av.jam ? 'Talk (browser mic)' : 'Unmute mic');
-        ui.cam.textContent = app.av.cam && !app.av.screen ? 'Stop video' : 'Start video';
         ui.cam.disabled = app.av.canvas;
         ui.share.setAttribute('aria-pressed', String(Boolean(app.av.screen)));
         ui.share.textContent = app.av.screen ? 'Stop sharing' : 'Share screen';
@@ -1981,6 +1991,11 @@
 
     function paintControls() {
         paintAvResume();
+        const shared = doc.body.classList.contains('shared-layout');
+        ui.mic.textContent = app.av.mic ? (shared ? 'Mute mic' : 'Mute my mic')
+            : (app.av.jam ? 'Talk (browser mic)' : shared ? 'Unmute mic' : 'Turn on my mic');
+        ui.cam.textContent = app.av.cam && !app.av.screen ? (shared ? 'Stop video' : 'Turn off my camera')
+            : (shared ? 'Start video' : 'Turn on my camera');
         // Phones show big icons with a one-word caption; the full words stay for screen readers and desktops.
         const ico = (el, i, short) => { el.dataset.ico = i; el.dataset.short = short; };
         ico(ui.mic, app.av.mic ? '🎙️' : '🔇', app.av.mic ? 'Mute' : (app.av.jam ? 'Talk' : 'Mic'));
@@ -3127,7 +3142,6 @@
     ui.devMic.addEventListener('change', () => switchDevice('mic', ui.devMic.value));
     ui.devSpk.addEventListener('change', () => switchDevice('spk', ui.devSpk.value));
     ui.music.addEventListener('change', () => setMusic(ui.music.checked));
-    ui.chatToggle.addEventListener('click', () => setChatOpen(doc.body.classList.contains('chat-closed')));
     ui.bgPicks.addEventListener('click', (e) => { const b = e.target.closest('button[data-bg]'); if (b && !app.av.bg.loading) setBackground(b.dataset.bg); });
     ui.lock.addEventListener('click', () => hostAct({ kind: 'lock', on: !app.av.locked }));
     ui.allCamsOff.addEventListener('click', () => hostAct({ kind: 'camoff', target: '*' }));
@@ -3143,21 +3157,58 @@
 
 
     /* ---------------- Webex-style call chrome: chat drawer, More, Music ---------------- */
+    const chatPhone = win.matchMedia('(max-width: 820px)');
+    function chatIsVisible() {
+        if (ui.room.hidden) return false;
+        if (doc.body.classList.contains('shared-layout')) return !doc.body.classList.contains('chat-closed');
+        const phoneCall = chatPhone.matches && doc.body.classList.contains('faces-on');
+        return !ui.room.hasAttribute('data-room-chat-closed')
+            && (!phoneCall || ui.room.hasAttribute('data-room-chat-shown'));
+    }
+    function syncChatDisclosure(hadFocus = ui.chat.contains(doc.activeElement)) {
+        const visible = chatIsVisible();
+        ui.chatToggle.setAttribute('aria-expanded', String(visible));
+        if (hadFocus && !visible && !ui.room.hidden) ui.chatToggle.focus({ preventScroll: true });
+    }
+    function resetChatUnread() {
+        delete ui.chatToggle.dataset.unread;
+        ui.chatToggle.textContent = 'Chat';
+    }
     function setChatOpen(open) {
+        const hadFocus = ui.chat.contains(doc.activeElement);
+        if (!doc.body.classList.contains('shared-layout')) {
+            ui.room.toggleAttribute('data-room-chat-closed', !open);
+            ui.room.toggleAttribute('data-room-chat-shown', open);
+            syncChatDisclosure(hadFocus);
+            (open ? ui.chatTitle : ui.chatToggle).focus();
+            return;
+        }
         doc.body.classList.toggle('chat-closed', !open);
-        ui.chatToggle.setAttribute('aria-expanded', String(Boolean(open)));
-        ui.chatToggle.setAttribute('aria-pressed', String(Boolean(open)));
+        syncChatDisclosure(hadFocus);
         if (open) {
-            const details = doc.querySelector('[data-chat-details]');
-            if (details) details.open = true;
-            delete ui.chatToggle.dataset.unread;
-            ui.chatToggle.textContent = 'Chat';
+            resetChatUnread();
             ui.log.scrollTop = ui.log.scrollHeight;
             setMore(false);
         }
     }
+    ui.chatClose.hidden = false;
+    ui.chatToggle.addEventListener('click', () =>
+        setChatOpen(!doc.body.classList.contains('shared-layout') || !chatIsVisible()));
+    ui.chatClose.addEventListener('click', () => setChatOpen(false));
+    ui.chat.addEventListener('focusin', () => {
+        if (doc.body.classList.contains('shared-layout') || ui.room.hasAttribute('data-room-chat-closed')) return;
+        ui.room.setAttribute('data-room-chat-shown', '');
+        syncChatDisclosure();
+    });
+    ui.chat.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || event.defaultPrevented || doc.body.classList.contains('shared-layout')) return;
+        event.preventDefault();
+        setChatOpen(false);
+    });
+    chatPhone.addEventListener('change', () => syncChatDisclosure());
+    new MutationObserver(() => syncChatDisclosure()).observe(doc.body, { attributes: true, attributeFilter: ['class'] });
     function noteUnreadChat() {
-        if (!doc.body.classList.contains('chat-closed')) return;
+        if (!doc.body.classList.contains('shared-layout') || !doc.body.classList.contains('chat-closed')) return;
         const n = Math.min(99, Number(ui.chatToggle.dataset.unread || 0) + 1);
         ui.chatToggle.dataset.unread = String(n);
         ui.chatToggle.textContent = `Chat (${n} new)`;
@@ -3415,17 +3466,26 @@
     ui.consentSkip.addEventListener('click', skipConsent);
     win.addEventListener('pagehide', stopConsentPreview);
 
+    function roomActivity() {
+        return app.bob.on ? 'paint' : app.watchLayout ? 'watch' : 'room';
+    }
     function syncSharedLayout() {
-        if (!ui.room.hidden && app.lastVideoSigned?.signed.body.activity === 'watch') app.watchLayout = true;
-        const mode = ui.room.hidden ? '' : app.bob.on ? 'paint' : app.watchLayout ? 'watch' : '';
+        const activity = roomActivity();
+        const mode = ui.room.hidden || activity === 'room' ? '' : activity;
         if ((doc.body.dataset.sharedLayout || '') === mode) return;
+        const chatHadFocus = ui.chat.contains(doc.activeElement);
         win.SharedRoomLayout?.set(mode, Boolean(mode));
         ui.modePill.hidden = !mode;
         ui.modePill.textContent = mode === 'paint' ? 'Paint Along' : 'Watch a Movie Together';
         ui.watchTitle.textContent = mode === 'watch' ? 'Watch a Movie Together' : 'Watch';
         ui.watchToggle.hidden = Boolean(mode);
         ui.canvasCam.hidden = mode === 'watch';
-        setChatOpen(!mode || !mq('(max-width: 820px)'));
+        ui.room.removeAttribute('data-room-chat-closed');
+        ui.room.removeAttribute('data-room-chat-shown');
+        doc.body.classList.toggle('chat-closed', Boolean(mode) && chatPhone.matches);
+        resetChatUnread();
+        syncChatDisclosure(chatHadFocus);
+        paintControls();
         setMore(false);
         setSoundtrackPop(false);
         paintConsent();
@@ -3433,11 +3493,10 @@
     }
 
     /* ---------------- Bob Ross Paint-Along ---------------- */
-    function setBob(on, byUser) {
+    function setBob(on) {
         const wasOn = app.bob.on;
         app.bob.on = Boolean(on);
         if (app.bob.on && !wasOn) { playbackSample = null; playbackIntentAt = Date.now(); }
-        if (byUser) { app.bob.touched = true; app.bob.explicit = app.bob.on; }
         doc.body.classList.toggle('bob-mode', app.bob.on);
         syncSharedLayout();
         ui.bob.hidden = !app.bob.on;
@@ -3465,9 +3524,11 @@
     function showEpisode() {
         const ep = currentEpisode();
         const activity = app.lastVideoSigned?.signed.body.activity;
-        const paintSelected = activity === 'paint' || (activity !== 'watch' && ep);
-        if (paintSelected && !app.bob.on && !app.bob.touched) setBob(true);
-        else syncSharedLayout();
+        if (!app.isHost && H.validRoomActivity(activity)) {
+            app.watchLayout = activity === 'watch';
+            if (app.bob.on !== (activity === 'paint')) setBob(activity === 'paint');
+        } else if (!app.isHost && ep && !app.bob.on && !app.watchLayout) setBob(true);
+        syncSharedLayout();
         const video = app.state.video;
         const by = app.lastVideoSigned?.signed.body.control?.by;
         const author = by === app.myId ? app.name : app.names.get(by);
@@ -3498,18 +3559,22 @@
         li.append(b);
         ui.bobEpisodes.append(li);
     });
-    ui.watchToggle.addEventListener('click', () => {
-        if (!app.isHost) return;
-        app.watchLayout = true;
+    function publishRoomActivity(activity) {
+        if (!app.isHost || !app.connected) return;
+        app.watchLayout = activity === 'watch';
+        setBob(activity === 'paint');
         const url = new URL(win.location.href);
-        url.searchParams.set('activity', 'watch');
+        if (activity === 'room') url.searchParams.delete('activity');
+        else url.searchParams.set('activity', activity);
         win.history.replaceState(null, '', url);
-        syncSharedLayout();
         const v = app.state.video;
-        if (v) void hostPublish(v.source, v.playing, H.expectedPosition(v, app.clock.relayNow()));
-    });
+        // Carry the mode in the host-signed, replay-protected state already
+        // included in snapshots. A room with no video still has a mode.
+        void hostPublish(v?.source ?? null, v?.playing ?? false, v ? H.expectedPosition(v, app.clock.relayNow()) : 0);
+    }
+    ui.watchToggle.addEventListener('click', () => publishRoomActivity('watch'));
     ui.bobToggle.addEventListener('click', () => {
-        if (app.isHost) setBob(!app.bob.on, true);
+        publishRoomActivity(app.bob.on ? 'room' : 'paint');
     });
     ui.bobHold.addEventListener('click', async () => {
         const v = app.state.video;

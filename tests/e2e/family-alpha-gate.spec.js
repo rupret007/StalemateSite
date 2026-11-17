@@ -18,7 +18,7 @@ const PREVIEW = 'local-preview-key-0001';
 const WAIT_FOR_HOST = /wait(ing)? for (the )?host/i;
 const arcadeFeatures = { arcadeChess: 1, arcadeTurdSpades: 1, arcadeTurdanoid: 1 };
 
-async function gameNight(browser, baseURL) {
+async function gameNight(browser, baseURL, { extraFeatures = {}, extraGames = [] } = {}) {
     const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
     const { arcadeGame, arcadeRoomRequest, createArcadeTransport } = await import('../../hangout-worker/src/arcade-transport.mjs');
     const contexts = [], lobbySockets = new Map(), people = new Map(), matchSockets = [], departures = [], records = new Map();
@@ -41,10 +41,10 @@ async function gameNight(browser, baseURL) {
             const ref = engine.arcadeRoomRef(frame.ch, false);
             if (ref) departures.push({ scope: { room: frame.ch, ref }, subject: person.sid });
         }
-        const sent = frame.t === 'hello' ? { ...frame, features: { ...frame.features, ...arcadeFeatures } } : frame;
+        const sent = frame.t === 'hello' ? { ...frame, features: { ...frame.features, ...arcadeFeatures, ...extraFeatures } } : frame;
         lobbySockets.get(id)?.send(JSON.stringify(sent));
     } });
-    const names = ['chess', 'turdspades', 'turdanoid'];
+    const names = ['chess', 'turdspades', 'turdanoid', ...extraGames];
     const transports = new Map(names.map(name => [name, createArcadeTransport({
         name, state,
         current: scope => {
@@ -134,6 +134,7 @@ async function gameNight(browser, baseURL) {
     const table = name => transports.get(name);
     return {
         phone, people,
+        advance: ms => serial(() => { at += ms; }),
         // The live table as the server sees it for one phone.
         view: (nick, game) => people.get(nick).matches.get(game),
         // Send one match command as this phone's seat, exactly as its socket would.
@@ -262,6 +263,59 @@ const finish = async (fixture, game, nick) => {
     const record = await fixture.record(game.game), saved = record[game.game];
     await fixture.act(nick, game.game, { action: 'resign', id: saved.id, revision: saved.match.revision ?? saved.match.state?.revision ?? 0 });
 };
+
+async function expectPhoneControl(button) {
+    await expect(button).toBeEnabled();
+    await expect(button).toBeInViewport({ ratio: 1 });
+    const box = await button.boundingBox();
+    expect(Math.min(box?.width ?? 0, box?.height ?? 0)).toBeGreaterThanOrEqual(48);
+}
+
+const probeBrowser = process.env.GAME_NIGHT_ACTION_TAP_PROBE;
+if (['chromium', 'webkit'].includes(probeBrowser)) {
+    test.use({ browserName: probeBrowser });
+    const actionGames = [
+        ['chess', 'chess', null, '[data-chess-primary]', '[data-chess-playing]'],
+        ['crapeights', 'eights', 'arcadeCrapeights', '[data-eights-main]', '[data-eights-table]'],
+        ['turdrummy', 'rummy', 'arcadeTurdRummy', '[data-rummy-main]', '[data-rummy-table]'],
+        ['turdtris', 'tris', 'arcadeTurdtris', '[data-tris-main]', '[data-tris-match]'],
+        ['turdomania', 'mania', 'arcadeTurdomania', '[data-mania-main]', '[data-mania-match]'],
+        ['turdrush', 'race', 'arcadeTurdRush', '[data-race-main]', '[data-race-match]'],
+        ['turdanoid', 'brick', null, '[data-brick-main]', '[data-brick-match]']
+    ];
+    async function tapPhoneAction(button) {
+        await expectPhoneControl(button);
+        await button.tap();
+    }
+
+    test.describe(`Game Night action tap targets · ${probeBrowser}`, () => {
+        for (const [game, statusStem, feature, main, match] of actionGames) {
+            test(`${game} opener and rematch`, async ({ browser, baseURL }) => {
+                test.slow();
+                expect(browser.browserType().name()).toBe(probeBrowser);
+                const fixture = await gameNight(browser, baseURL, feature
+                    ? { extraFeatures: { [feature]: 1 }, extraGames: [game] } : {});
+                try {
+                    const [host, guest] = await room(fixture, ['TapHost', 'TapGuest']);
+                    const table = { game, status: `[data-${statusStem}-status]` };
+                    await showTable(host, table);
+                    await showTable(guest, table);
+                    await tapPhoneAction(host.locator(`${main}[data-command="open"]`));
+                    await tapPhoneAction(guest.locator(`${main}[data-command="join"]`));
+                    await expect(host.locator(match)).toBeVisible();
+                    await expect(guest.locator(match)).toBeVisible();
+                    const first = (await fixture.record(game))[game].id;
+                    await finish(fixture, table, 'TapGuest');
+                    await tapPhoneAction(host.locator(`${main}[data-command="rematch"]`));
+                    const accept = guest.locator(`${main}[data-command="rematch"]`);
+                    await expect(accept).toHaveText(/^Accept /);
+                    await tapPhoneAction(accept);
+                    await expect.poll(async () => (await fixture.record(game))[game].id).not.toBe(first);
+                } finally { await fixture.close(); }
+            });
+        }
+    });
+}
 
 for (const game of Object.values(GAMES)) {
     const nicks = ['HostExample', 'GuestWest', 'GuestNorth', 'GuestEast'].slice(0, game.seats);
@@ -489,3 +543,108 @@ for (const game of Object.values(GAMES)) {
         });
     });
 }
+
+test('Turd Rush confirms the first tap after its rendering frame is delayed', async ({ browser, baseURL }) => {
+    const game = 'turdrush';
+    const fixture = await gameNight(browser, baseURL, { extraFeatures: { arcadeTurdRush: 1 }, extraGames: [game] });
+    try {
+        const [host, guest] = await room(fixture, ['SwipeHost', 'SwipeGuest']);
+        const table = { game, status: '[data-race-status]' };
+        await showTable(host, table);
+        await showTable(guest, table);
+        await host.locator('[data-race-main][data-command="open"]').tap();
+        await guest.locator('[data-race-main][data-command="join"]').tap();
+        const match = guest.locator('[data-race-match]');
+        await expect(match).toBeVisible();
+        await fixture.advance(3500);
+        const synced = await guest.evaluate(() => performance.now());
+        await fixture.act('SwipeGuest', game, { action: 'sync' });
+        await expect(match).toHaveAttribute('data-phase', 'play');
+        await expect(match).toHaveAttribute('data-lane', '1');
+        const controls = guest.locator('.rush-race-controls .btn');
+        await expect(controls).toHaveCount(4);
+        for (const button of await controls.all()) await expectPhoneControl(button);
+        await guest.evaluate(() => {
+            const native = window.requestAnimationFrame.bind(window);
+            window.requestAnimationFrame = callback => native(time => {
+                if (callback.name === 'drawFrame' && !window.releaseRushFrame) {
+                    window.releaseRushFrame = () => {
+                        window.requestAnimationFrame = native;
+                        native(callback);
+                    };
+                    return;
+                }
+                callback(time);
+            });
+        });
+        await guest.waitForFunction(() => !!window.releaseRushFrame);
+        await guest.getByRole('button', { name: 'Move left' }).tap();
+        // Keep the renderer paused beyond the server's 320ms input replay buffer.
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fixture.advance(await guest.evaluate(start => performance.now() - start, synced));
+        await guest.evaluate(() => window.releaseRushFrame());
+        await expect(match).toHaveAttribute('data-sequence', '1');
+        await fixture.advance(500);
+        await fixture.act('SwipeGuest', game, { action: 'sync' });
+        await expect(match).toHaveAttribute('data-lane', '0');
+        await expect(match).toHaveAttribute('data-sequence', '1');
+        expect(fixture.errors()).toEqual([]);
+    } finally {
+        await fixture.close();
+    }
+});
+
+for (const [game, prefix, buttons, action, count] of [
+    ['turdtris', 'tris', '[data-tris-input]', 'Hard drop', 7],
+    ['turdanoid', 'brick', '[data-brick-serve]', 'Launch ball', 1]
+]) {
+    test(`${game} in-match phone controls fit at 48px`, async ({ browser, baseURL }) => {
+        const fixture = await gameNight(browser, baseURL, game === 'turdtris'
+            ? { extraFeatures: { arcadeTurdtris: 1 }, extraGames: [game] } : {});
+        try {
+            const [host, guest] = await room(fixture, ['PadHost', 'PadGuest']);
+            const table = { game, status: `[data-${prefix}-status]` };
+            await showTable(host, table);
+            await showTable(guest, table);
+            await host.locator(`[data-${prefix}-main][data-command="open"]`).tap();
+            await guest.locator(`[data-${prefix}-main][data-command="join"]`).tap();
+            const match = guest.locator(`[data-${prefix}-match]`);
+            await expect(match).toBeVisible();
+            await fixture.advance(3500);
+            await fixture.act('PadGuest', game, { action: 'sync' });
+            await expect(match).toHaveAttribute('data-phase', 'play');
+            const controls = guest.locator(buttons);
+            await expect(controls).toHaveCount(count);
+            for (const button of await controls.all()) await expectPhoneControl(button);
+            await guest.getByRole('button', { name: action, exact: true }).tap();
+            await expect(match).toHaveAttribute('data-sequence', '1');
+            expect(fixture.errors()).toEqual([]);
+        } finally { await fixture.close(); }
+    });
+}
+
+test('Crapjack chips picker and Ready are fully visible 48px phone controls', async ({ browser, baseURL }) => {
+    const game = 'turdjack', table = { game, status: '[data-jack-status]' };
+    const fixture = await gameNight(browser, baseURL, { extraFeatures: { arcadeTurdJack: 1 }, extraGames: [game] });
+    try {
+        const [host, guest] = await room(fixture, ['ChipsHost', 'ChipsGuest']);
+        await showTable(host, table);
+        await showTable(guest, table);
+        await host.locator('[data-jack-main][data-command="open"]').tap();
+        const seat = guest.locator('[data-jack-seats] > button:visible').first();
+        await expect(seat).toBeVisible();
+        await seat.tap();
+        await host.getByRole('button', { name: 'Start table', exact: true }).tap();
+        const chips = guest.getByRole('combobox', { name: 'Play chips', exact: true });
+        const ready = guest.getByRole('button', { name: 'Ready', exact: true });
+        await expect(ready).toBeVisible();
+        await expectPhoneControl(ready);
+        await expectPhoneControl(chips);
+        const available = await chips.locator('option').allTextContents();
+        expect(available.length).toBeGreaterThanOrEqual(2);
+        await chips.selectOption({ label: available[1] });
+        await ready.tap();
+        await expect(guest.getByRole('button', { name: 'Update wager', exact: true })).toBeVisible();
+        expect(fixture.errors()).toEqual([]);
+    } finally { await fixture.close(); }
+});

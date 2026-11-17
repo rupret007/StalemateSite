@@ -27,7 +27,7 @@ function store() {
 function gate() {
     let enter, release; return { entered: new Promise(resolve => { enter = resolve; }), wait: () => { enter(); return new Promise(resolve => { release = resolve; }); }, release: () => release() };
 }
-async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICIPATION_PURPOSES, provider = false, maxFrames = 4000 } = {}) {
+async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICIPATION_PURPOSES, provider = false, maxFrames = 4000, musicOrigin = null } = {}) {
     let at = START, serial = 0;
     const reference = () => `synthetic_reference_${String(++serial).padStart(6, '0')}`, storage = store(), participants = new Map(), decisions = new Map(), guardians = new Map(), identities = new Map();
     const config = { policy: { version: 1, policyVersion: 'synthetic-policy-v1', revision: 1, communityRef: 'synthetic_shared_community',
@@ -74,9 +74,9 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
     const moderator = createAiModerator({ enabled: provider, apiKey: 'synthetic_only', now: () => at, fetchImpl: providerFetch,
         saveUsage: async () => { if (providerControls.quotaGate) { const held = providerControls.quotaGate; providerControls.quotaGate = null; await held.wait(); } } });
     let engine;
-    const make = () => createLobby({ now: () => at, participation: enforcement, persist: legacyPersist,
+    const make = () => createLobby({ now: () => at, participation: enforcement, persist: legacyPersist, directMusicInvites: !!musicOrigin,
         send: (id, frame) => frames.push({ recipient: id, ...clone(frame) }), close: (...args) => closed.push(args),
-        limits: { defaultSlow: 0, pmMinLobbyMs: 0, framesPerConnection: maxFrames },
+        limits: { defaultSlow: 0, pmMinLobbyMs: 0, framesPerConnection: maxFrames, webJoinOrigins: musicOrigin ? [musicOrigin] : [] },
         reviewPublicText: provider ? request => { const task = moderator.review(request).then(result => engine.applyAiReview(request.id, result)); providerTasks.push(task); return task; } : null });
     engine = make();
     const connect = async (id, nick = id === 'alice' ? 'Alice' : 'Bravo', extra = {}) => {
@@ -99,6 +99,29 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
 }
 
 describe('controlled C3 engine integration', () => {
+    it('keeps direct Music invitations unavailable under the participation authority', async () => {
+        const musicOrigin = 'https://music.example.test';
+        const f = await setup({ musicOrigin });
+        await f.connect('alice');
+        await f.connect('bravo');
+        for (const recipient of ['alice', 'bravo']) {
+            const hello = f.frames.find(frame => frame.t === 'hello' && frame.recipient === recipient);
+            expect(hello.features).not.toHaveProperty('directMusicInvites');
+            expect(hello.features).not.toHaveProperty('musicInviteOutcomes');
+        }
+
+        const room = '#jam-practice', request = 'd'.repeat(32);
+        await f.cmd('alice', 'join', [room]);
+        const roomInstance = f.frames.find(frame => frame.t === 'join' && frame.recipient === 'alice' && frame.ch.name === room).ch.keepRef;
+        const expiry = Math.floor(f.now() / 1000) + 60;
+        const href = `${musicOrigin}/join/#k=${'A'.repeat(43)}&s=${'1'.repeat(64)}&g=1&e=${expiry}`;
+        await f.message('alice', { t: 'music-invite-offer', request, ch: room, roomInstance, peer: 'bravo', href });
+
+        expect(f.frames).toContainEqual({ recipient: 'alice', t: 'music-invite-result', request, status: 'unavailable' });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-invite')).toBe(false);
+        expect(JSON.stringify(f.frames)).not.toContain(href);
+    });
+
     it('uses verified C2 subjects in actual chat/room/artifact/registration actions without ordinary persist fallback', async () => {
         const f = await setup(); await f.connect('alice'); await f.connect('bravo');
         await f.message('alice', { t: 'say', ch: '#stalemate', text: 'Benign synthetic shared chat' });

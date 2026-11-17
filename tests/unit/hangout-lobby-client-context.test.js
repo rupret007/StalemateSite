@@ -7,13 +7,16 @@ import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs'
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
 const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
+const invitationRoomInstance = 'a'.repeat(32);
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 
 async function visitor(via = 'stalemate', features = { entrySources: 1 }, options = {}) {
-    const dom = new JSDOM(html, { url: `http://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
+    const dom = new JSDOM(html, { url: `${options.secureOrigin ? 'https' : 'http'}://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
     windows.push(dom);
     const { window } = dom, timers = new Map(), sockets = []; let timerId = 0, elapsed = 0;
+    let socketCreated;
+    const firstSocket = new Promise(resolve => { socketCreated = resolve; });
     Object.defineProperty(window.performance, 'now', { value: () => elapsed });
     window.setTimeout = (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; };
     window.clearTimeout = (id) => timers.delete(id);
@@ -21,13 +24,18 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
         const bootstrap = window.document.createElement('script');
         bootstrap.src = '/beta/bootstrap.js'; window.document.head.append(bootstrap);
         window.HangoutBootstrap = { preview: 'local-preview-key-0001', owner: options.owner === true };
+        if (options.participation === true) window.HangoutParticipationControls = true;
     }
     window.fetch = options.fetch || vi.fn();
     const paint = () => { for (const [id, task] of [...timers]) if (task.delay === 16) { timers.delete(id); task.fn(); } };
     const flush = (delay) => { for (const [id, task] of [...timers]) if (task.delay === delay) { timers.delete(id); task.fn(); } };
     window.WebSocket = class {
         readyState = 0; sent = [];
-        constructor(url) { this.url = url; sockets.push(this); }
+        constructor(url) {
+            this.url = url;
+            sockets.push(this);
+            if (sockets.length === 1) socketCreated(this);
+        }
         send(text) { this.sent.push(JSON.parse(text)); }
         open() { this.readyState = 1; this.onopen?.(); }
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
@@ -41,16 +49,1263 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     window.document.querySelector('[data-nick]').value = 'Viewer';
     window.document.querySelector('[data-enter]').click();
-    await vi.waitFor(() => expect(sockets.length).toBe(1));
-    const ws = sockets[0];
+    const ws = await firstSocket;
+    expect(sockets).toHaveLength(1);
     if (options.open !== false) {
         ws.open();
         ws.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok', features });
     }
     const welcome = (socket = ws, seq = 1) => socket.receive({ t: 'welcome', nick: 'Viewer', role: 'fan', band: false, verified: false, capabilities: {}, transportSeq: seq });
-    const join = (name = '#stalemate') => ws.receive({ t: 'join', ch: { name, kind: name === '#stalemate' ? 'lobby' : 'chat', title: 'Shared chat', topic: '', count: 1, modes: {}, names: [{ nick: 'Viewer', prefix: '', entrySource: via }] } });
+    const join = (name = '#stalemate', keepRef) => ws.receive({ t: 'join', ch: { name, keepRef, kind: name === '#stalemate' ? 'lobby' : 'chat', title: 'Shared chat', topic: '', count: 1, modes: {}, names: [{ nick: 'Viewer', prefix: '', entrySource: via }] } });
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
+
+it('returns keyboard focus to the transcript when jumping to new chat messages', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const transcript = document.querySelector('[data-buffer]');
+    const jump = document.querySelector('[data-new-messages]');
+    const composer = document.querySelector('[data-text]');
+    Object.defineProperties(transcript, {
+        scrollHeight: { value: 1000 },
+        clientHeight: { value: 300 },
+    });
+    composer.focus();
+    ws.receive({ t: 'line', ch: '#stalemate', from: 'Friend', text: 'New line below the fold' });
+    expect(jump.hidden).toBe(false);
+    expect(document.activeElement).toBe(composer);
+
+    jump.focus();
+    jump.click();
+
+    expect(jump.hidden).toBe(true);
+    expect(document.activeElement).toBe(transcript);
+    expect(transcript.getAttribute('tabindex')).toBe('0');
+    expect(transcript.scrollTop).toBe(transcript.scrollHeight);
+    expect(transcript.textContent).toContain('New line below the fold');
+});
+
+it('recovers an interrupted named channel request without replaying it', async () => {
+    const { window, ws, welcome, join, sockets, timers, flush } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const dialog = document.querySelector('[data-channel-dialog]');
+    const name = document.querySelector('[data-channel-name]');
+    const status = document.querySelector('[data-channel-error]');
+    const submit = () => document.querySelector('[data-channel-form]').dispatchEvent(
+        new window.Event('submit', { bubbles: true, cancelable: true }));
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; };
+    document.querySelector('[data-start="chat"]').click();
+    name.value = '#reconnect-studio';
+    submit();
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: ['#reconnect-studio'] });
+    expect(status.textContent).toBe('Joining…');
+
+    await ws.close(1006);
+    expect(status.textContent).toBe('Connection lost. Reconnecting…');
+    expect(dialog.open).toBe(true);
+    expect(name.value).toBe('#reconnect-studio');
+    const retry = [...timers.values()].find(task => task.delay >= 750 && task.delay <= 1000);
+    expect(retry).toBeDefined();
+    flush(retry.delay);
+    await vi.waitFor(() => expect(sockets).toHaveLength(2));
+    const replacement = sockets[1];
+    replacement.open();
+    replacement.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok' });
+    welcome(replacement);
+    replacement.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', title: 'Shared chat', topic: '', count: 1, modes: {}, names: [] } });
+    expect(status.textContent).toBe('Connected again. Choose Join / create to try this name again.');
+    flush(8000);
+    expect(status.textContent).toBe('Connected again. Choose Join / create to try this name again.');
+    expect(replacement.sent.some(frame => frame.t === 'cmd' && frame.name === 'join')).toBe(false);
+    expect(dialog.open).toBe(true);
+    expect(name.value).toBe('#reconnect-studio');
+
+    submit();
+    expect(replacement.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: ['#reconnect-studio'] });
+    replacement.receive({ t: 'join', ch: { name: '#reconnect-studio', kind: 'chat', title: 'Reconnect studio', topic: '', count: 1, modes: {}, names: [] } });
+    expect(dialog.open).toBe(false);
+    expect(document.querySelector('[data-chat-context]').textContent).toBe('#reconnect-studio');
+});
+
+it('offers another action when a named channel request gets no reply, and still accepts late confirmation', async () => {
+    const { window, ws, welcome, join, flush } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const dialog = document.querySelector('[data-channel-dialog]');
+    const name = document.querySelector('[data-channel-name]');
+    const status = document.querySelector('[data-channel-error]');
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; dialog.dispatchEvent(new window.Event('close')); };
+    document.querySelector('[data-start="chat"]').click();
+    name.value = '#slow-studio';
+    dialog.querySelector('form').requestSubmit();
+    const requested = () => ws.sent.filter(frame => frame.t === 'cmd' && frame.name === 'join' && frame.args?.[0] === '#slow-studio');
+    expect(requested()).toHaveLength(1);
+    expect(status.textContent).toBe('Joining…');
+
+    flush(8000);
+    expect(status.textContent).toBe('Still waiting for confirmation. You can try Join / create again or choose Cancel.');
+    expect(name.value).toBe('#slow-studio');
+    expect(requested()).toHaveLength(1);
+    expect(dialog.open).toBe(true);
+
+    join('#slow-studio');
+    expect(dialog.open).toBe(false);
+    expect(document.querySelector('[data-chat-context]').textContent).toBe('#slow-studio');
+    expect(requested()).toHaveLength(1);
+});
+
+it('keeps the guest’s Join action after the notice timer and unrelated chat feedback', async () => {
+    const { window, ws, welcome, join, flush } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost', roomInstance: invitationRoomInstance });
+    const invitation = document.querySelector('[data-room-invite]');
+    expect(invitation.hidden).toBe(false);
+    flush(12000);
+    expect(invitation.hidden).toBe(false);
+    ws.receive({ t: 'rate-limit', scope: 'chat', text: 'Please wait before sending another line.' });
+    expect(invitation.querySelector('button')?.textContent).toBe('Join');
+    expect(invitation.textContent).toContain('InvitationHost invited you to #invitation-studio');
+    ws.close(4400);
+    expect(invitation.hidden).toBe(true);
+    expect(document.querySelector('[data-room-invite-announcement]').textContent).toBe('');
+});
+
+it('announces a room invitation in an existing live region and describes its Join action', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    const { document } = window;
+    welcome(); join();
+    const announcement = document.querySelector('[data-room-invite-announcement]');
+    const notice = document.querySelector('[data-room-invite]');
+    const composer = document.querySelector('[data-text]');
+    expect(announcement?.getAttribute('role')).toBe('status');
+    expect(announcement.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+    expect(announcement.textContent).toBe('');
+    expect(notice.hidden).toBe(true);
+    composer.focus();
+
+    ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost', roomInstance: invitationRoomInstance });
+
+    const message = 'InvitationHost invited you to #invitation-studio';
+    expect(document.querySelector('[data-room-invite-announcement]')).toBe(announcement);
+    expect(announcement.textContent).toBe(message);
+    expect(notice.hidden).toBe(false);
+    expect(notice.hasAttribute('role')).toBe(false);
+    const action = notice.querySelector('button');
+    expect(action.textContent).toBe('Join');
+    expect(document.getElementById(action.getAttribute('aria-describedby'))?.textContent).toBe(message);
+    expect(document.activeElement).toBe(composer);
+
+    const dismiss = notice.querySelector('[data-room-invite-dismiss]');
+    const before = ws.sent.length;
+    dismiss.focus();
+    dismiss.click();
+    expect(ws.sent).toHaveLength(before);
+    expect(notice.hidden).toBe(true);
+    expect(document.activeElement.dataset.channelKey).toBe('#stalemate');
+    expect(announcement.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+    expect(announcement.textContent).toBe('');
+});
+
+it.each([
+    ['art', 'Draw together'],
+    ['bobross', 'Bob Ross paint-along'],
+    ['watch', 'Watch together'],
+])('names the %s activity in a room invitation and its accessible description', async (activity, label) => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const room = `#${activity}-little-pickle`;
+    const action = document.querySelector('[data-room-invite-join]');
+    ws.receive({ t: 'invite', ch: room, by: 'InvitationHost', roomInstance: invitationRoomInstance, activity });
+
+    const message = `InvitationHost invited you to ${label} (${room}).`;
+    expect(document.getElementById(action.getAttribute('aria-describedby'))?.textContent).toBe(message);
+    expect(document.querySelector('[data-room-invite-announcement]').textContent).toBe(message);
+    action.click();
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room], roomInstance: invitationRoomInstance });
+});
+
+it('keeps the original Join action when another room invitation arrives', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const first = { t: 'invite', ch: '#first-studio', by: 'FirstHost', roomInstance: invitationRoomInstance };
+    const second = { t: 'invite', ch: '#second-studio', by: 'SecondHost', roomInstance: 'b'.repeat(32) };
+    const panel = document.querySelector('[data-room-invite]');
+    const action = panel.querySelector('[data-room-invite-join]');
+    ws.receive(first);
+    action.focus();
+    ws.receive(second);
+    expect(document.activeElement).toBe(action);
+    expect(panel.textContent).toContain('FirstHost invited you to #first-studio');
+    ws.receive(first);
+    expect(panel.textContent).toContain('1 more invitation');
+
+    action.click();
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: ['#first-studio'], roomInstance: first.roomInstance });
+    join('#first-studio', invitationRoomInstance);
+    expect(document.activeElement.dataset.channelKey).toBe('#first-studio');
+    expect(panel.textContent).toContain('SecondHost invited you to #second-studio');
+    expect(panel.textContent).not.toContain('more invitation');
+    panel.querySelector('[data-room-invite-dismiss]').click();
+    expect(panel.hidden).toBe(true);
+});
+
+it('limits pending room invites and clears them on disconnect', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const panel = window.document.querySelector('[data-room-invite]');
+    const dismiss = panel.querySelector('[data-room-invite-dismiss]');
+    for (let number = 1; number <= 6; number++) {
+        ws.receive({ t: 'invite', ch: `#studio-${number}`, by: 'InvitationHost', roomInstance: String(number).repeat(32) });
+    }
+    expect(panel.textContent).toContain('#studio-1 · 4 more invitations');
+    for (let number = 1; number < 5; number++) dismiss.click();
+    expect(panel.textContent).toContain('#studio-5');
+    ws.close(4400);
+    expect(panel.hidden).toBe(true);
+    expect(panel.querySelector('[data-room-invite-status]').textContent).toBe('');
+});
+
+describe('keyboard room invitation acceptance', () => {
+    it('keeps a join in view until confirmation and restores retry if the room does not reply', async () => {
+        const { window, ws, welcome, join, flush } = await visitor();
+        welcome(); join();
+        const room = '#invitation-studio';
+        ws.receive({ t: 'invite', ch: room, by: 'InvitationHost', roomInstance: invitationRoomInstance });
+        const panel = window.document.querySelector('[data-room-invite]');
+        const action = panel.querySelector('[data-room-invite-join]');
+        action.focus();
+        action.click();
+        expect(panel.hidden).toBe(false);
+        expect(panel.textContent).toContain('Waiting to join #invitation-studio');
+        expect(action.getAttribute('aria-disabled')).toBe('true');
+        expect(window.document.activeElement).toBe(action);
+        const attempt = ws.sent.at(-1);
+        action.click();
+        expect(ws.sent.at(-1)).toBe(attempt);
+        flush(10000);
+        expect(action.textContent).toBe('Retry join');
+        expect(action.getAttribute('aria-disabled')).toBe('false');
+        expect(panel.textContent).toContain(`Joining ${room} timed out.`);
+        action.click();
+        expect(ws.sent.at(-1).joinRequestId).not.toBe(attempt.joinRequestId);
+        ws.receive({ t: 'room-join-result', id: attempt.joinRequestId, status: 'rejected' });
+        expect(panel.hidden).toBe(false);
+        join(room, invitationRoomInstance);
+        expect(panel.hidden).toBe(true);
+        expect(window.document.activeElement.dataset.channelKey).toBe(room);
+    });
+
+    it('keeps room-scoped welcome notices out of the lobby during a delayed join', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        const room = '#invitation-studio';
+        const notice = { t: 'notice', ch: room, roomInstance: invitationRoomInstance, from: 'StaleBot',
+            kind: 'info', text: 'Welcome to the invitation studio.' };
+        const buffer = window.document.querySelector('[data-buffer]');
+        ws.receive(notice);
+        expect(buffer.textContent).not.toContain(notice.text);
+
+        join(room, invitationRoomInstance);
+        ws.receive(notice);
+        expect(buffer.textContent).toContain(notice.text);
+
+        const wrongRoom = { ...notice, roomInstance: 'b'.repeat(32), text: 'Welcome to a replaced room.' };
+        ws.receive(wrongRoom);
+        expect(buffer.textContent).not.toContain(wrongRoom.text);
+    });
+
+    it('recovers a missed room confirmation and preserves active chat on a repeated receipt', async () => {
+        const { window, ws, welcome, join, flush } = await visitor();
+        welcome(); join();
+        const room = '#invitation-studio';
+        ws.receive({ t: 'invite', ch: room, by: 'InvitationHost', roomInstance: invitationRoomInstance });
+        const action = window.document.querySelector('[data-room-invite-join]');
+        action.focus();
+        action.click();
+        flush(10000);
+        action.click();
+        const confirmation = { t: 'join', reconfirmed: true, ch: { name: room, keepRef: invitationRoomInstance,
+            kind: 'chat', title: 'Rehearsal chat', modes: {}, names: [{ nick: 'Viewer', prefix: '' }] } };
+        ws.receive(confirmation);
+        expect(window.__lobby.active).toBe(room);
+        expect(window.document.activeElement.dataset.channelKey).toBe(room);
+        ws.receive({ t: 'line', ch: room, from: 'InvitationHost', text: 'A line received in this session.' });
+        ws.receive(confirmation);
+        expect(window.document.querySelector('[data-buffer]').textContent).toContain('A line received in this session.');
+    });
+
+    it.each([false, true])('retains a meaningful focus target while joining (guest moved focus: %s)', async (moved) => {
+        const { window, ws, welcome, join } = await visitor();
+        const { document } = window;
+        welcome(); join();
+        const room = '#invitation-studio';
+        const notice = document.querySelector('[data-room-invite]');
+        ws.receive({ t: 'invite', ch: room, by: 'InvitationHost', roomInstance: invitationRoomInstance });
+        const action = notice.querySelector('button');
+        action.focus();
+        action.click();
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room], roomInstance: invitationRoomInstance });
+        expect(document.activeElement).toBe(action);
+        expect(notice.hidden).toBe(false);
+        const composer = document.querySelector('[data-text]');
+        if (moved) composer.focus();
+        const focusedChannels = [];
+        document.addEventListener('focusin', event => {
+            if (event.target.dataset.channelKey) focusedChannels.push(event.target.dataset.channelKey);
+        });
+
+        join(room, invitationRoomInstance);
+
+        const tab = document.querySelector('[data-channel-key="#invitation-studio"]');
+        expect(tab.getAttribute('aria-selected')).toBe('true');
+        expect(document.activeElement).toBe(moved ? composer : tab);
+        expect(focusedChannels).toEqual(moved ? [] : [room]);
+    });
+
+    it.each([false, true])('keeps keyboard recovery available after a rejected room invite (another invite: %s)', async (queued) => {
+        const { window, ws, welcome, join } = await visitor();
+        const { document } = window;
+        welcome(); join();
+        const nextInstance = 'b'.repeat(32);
+        ws.receive({ t: 'invite', ch: '#closed-studio', by: 'FirstHost', roomInstance: invitationRoomInstance });
+        if (queued) ws.receive({ t: 'invite', ch: '#open-studio', by: 'SecondHost', roomInstance: nextInstance });
+        const panel = document.querySelector('[data-room-invite]');
+        const action = panel.querySelector('[data-room-invite-join]');
+        action.focus();
+        action.click();
+        const rejectedRequest = ws.sent.at(-1).joinRequestId;
+        ws.receive({ t: 'notice', kind: 'error', text: 'That room changed or closed. Ask the host for a new invitation.' });
+        ws.receive({ t: 'room-join-result', id: rejectedRequest, status: 'rejected' });
+
+        expect(document.querySelector('[data-toast]').textContent).toContain('Ask the host for a new invitation');
+        expect(window.__lobby.active).toBe('#stalemate');
+        expect(panel.hidden).toBe(!queued);
+        expect(document.activeElement).toBe(queued ? action : document.querySelector('[data-channel-key="#stalemate"]'));
+        if (queued) {
+            expect(panel.textContent).toContain('SecondHost invited you to #open-studio');
+            expect(action.getAttribute('aria-disabled')).toBe('false');
+            document.activeElement.click();
+            expect(ws.sent.at(-1)).toMatchObject({ args: ['#open-studio'], roomInstance: nextInstance });
+        }
+    });
+
+    it('removes a stale invite when its rejection arrives after the retry button appears', async () => {
+        const { window, ws, welcome, join, flush } = await visitor();
+        const { document } = window;
+        welcome(); join();
+        ws.receive({ t: 'invite', ch: '#closed-studio', by: 'FirstHost', roomInstance: invitationRoomInstance });
+        const panel = document.querySelector('[data-room-invite]');
+        const action = panel.querySelector('[data-room-invite-join]');
+        action.focus();
+        action.click();
+        const expiredRequest = ws.sent.at(-1).joinRequestId;
+        flush(10000);
+        expect(action.textContent).toBe('Retry join');
+
+        ws.receive({ t: 'notice', kind: 'error', text: 'That room changed or closed. Ask the host for a new invitation.' });
+        ws.receive({ t: 'room-join-result', id: expiredRequest, status: 'rejected' });
+
+        expect(panel.hidden).toBe(true);
+        expect(document.activeElement.dataset.channelKey).toBe('#stalemate');
+        expect(document.querySelector('[data-toast]').textContent).toContain('Ask the host for a new invitation');
+    });
+
+    it('keeps Join available with an explanation when the invitation request could not be sent', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        const { document } = window;
+        welcome(); join();
+        ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost', roomInstance: invitationRoomInstance });
+        const notice = document.querySelector('[data-room-invite]');
+        const action = notice.querySelector('button');
+        const send = ws.send;
+        ws.send = vi.fn(() => { throw new Error('socket closed during send'); });
+        action.focus();
+        action.click();
+
+        expect(notice.hidden).toBe(false);
+        expect(notice.textContent).toContain('Couldn’t send the request to join #invitation-studio.');
+        const retry = notice.querySelector('button');
+        expect(retry?.textContent).toBe('Retry join');
+        expect(document.activeElement).toBe(retry);
+
+        ws.send = send;
+        retry.focus();
+        retry.click();
+        expect(ws.sent.at(-1).roomInstance).toBe(invitationRoomInstance);
+        join('#invitation-studio', invitationRoomInstance);
+        expect(document.activeElement.dataset.channelKey).toBe('#invitation-studio');
+        expect(notice.hidden).toBe(true);
+    });
+
+    it('offers recovery without a blind join when an older server sends an invitation without a room reference', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        const { document } = window;
+        const before = ws.sent.length;
+        ws.receive({ t: 'invite', ch: '#invitation-studio', by: 'InvitationHost' });
+
+        expect(document.querySelector('[data-toast]').textContent).toContain('Ask the host for a new invitation or find the room in Rooms.');
+        expect(document.querySelector('[data-toast] button')).toBeNull();
+        expect(ws.sent).toHaveLength(before);
+    });
+});
+
+it('keeps unrelated moderation reports pending until each selected message gets its own result', async () => {
+    const { window, ws, welcome, join, flush } = await visitor();
+    window.requestAnimationFrame = (callback) => window.setTimeout(callback, 16);
+    welcome(); join();
+    const { document } = window;
+    for (const id of ['mfirst', 'msecond']) {
+        ws.receive({ t: 'line', ch: '#stalemate', id, from: 'EarlierGuest', text: 'Synthetic report fixture' });
+    }
+    const first = document.querySelector('[data-id=mfirst] .flag');
+    const second = document.querySelector('[data-id=msecond] .flag');
+    first.click();
+    second.focus();
+    second.click();
+    ws.receive({ t: 'notice', from: 'StaleBot', kind: 'error', text: 'An unrelated command failed.' });
+    ws.receive({ t: 'rate-limit', scope: 'chat', text: 'Please wait before sending another message.' });
+    expect(first.getAttribute('aria-disabled')).toBe('true');
+    expect(second.getAttribute('aria-disabled')).toBe('true');
+
+    ws.receive({ t: 'notice', from: 'StaleBot', kind: 'error', text: 'That message is gone already.' });
+    ws.receive({ t: 'report-status', id: 'msecond', submitted: false });
+    expect(first.getAttribute('aria-disabled')).toBe('true');
+    expect(second.getAttribute('aria-disabled')).toBeNull();
+    expect(second.textContent).toBe('🚩');
+    expect(document.activeElement).toBe(second);
+    expect(document.querySelector('[data-toast]').textContent).toContain('That message is gone already.');
+
+    ws.receive({ t: 'report-status', id: 'mfirst', submitted: true });
+    flush(10000);
+    expect(first.textContent).toBe('✓');
+    expect(document.querySelector('[data-toast]').textContent).toContain('That message is gone already.');
+});
+
+it('keeps report feedback in the sender menu when a report is unsent, waiting or already confirmed', async () => {
+    const { window, ws, join } = await visitor('stalemate', { personTargets: 1 });
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+    ws.receive({ t: 'welcome', id: 'self-peer', nick: 'Viewer', role: 'fan', capabilities: {}, transportSeq: 1 });
+    const roomInstance = 'a'.repeat(32);
+    join('#stalemate', roomInstance);
+    const id = 'msenderreport', text = 'An exact message to report';
+    ws.receive({ t: 'line', id, text, ch: '#stalemate', from: 'Guest', personSelf: false, personPeer: 'guest-peer', roomInstance });
+    const { document } = window;
+    const row = document.querySelector(`[data-id="${id}"]`);
+    const sheet = document.querySelector('[data-sheet]');
+    const reports = () => ws.sent.filter(frame => frame.t === 'report');
+    const open = () => row.querySelector('.who').click();
+    const report = () => [...sheet.querySelectorAll('button')].find(button => button.textContent === '🚩 Report').click();
+    const status = () => sheet.querySelector('[data-person-status]');
+    const originalSend = ws.send;
+    ws.send = () => { throw new Error('socket closed before report send'); };
+    open(); report();
+    expect(sheet.open).toBe(true);
+    expect(status().textContent).toBe('You are offline. Reconnect before reporting this message.');
+    expect(reports()).toEqual([]);
+
+    ws.send = originalSend;
+    report();
+    expect(sheet.open).toBe(false);
+    expect(reports()).toEqual([{ t: 'report', id, text, reportResult: true }]);
+
+    open(); report();
+    expect(sheet.open).toBe(true);
+    expect(status().textContent).toBe('This report is waiting for confirmation.');
+    expect(reports()).toHaveLength(1);
+    ws.receive({ t: 'report-status', id, submitted: true });
+    expect(status().textContent).toBe('Queued for review when a moderator is available.');
+    report();
+    expect(sheet.open).toBe(true);
+    expect(status().textContent).toBe('This message is already queued for moderator review.');
+    expect(reports()).toHaveLength(1);
+});
+
+it.each([false, true])('keeps focus usable when moderation removes a message (flag focused: %s)', async (focusedFlag) => {
+    const { window, ws, welcome, join } = await visitor();
+    window.requestAnimationFrame = (callback) => window.setTimeout(callback, 16);
+    welcome(); join();
+    const { document } = window;
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'mremoved', from: 'EarlierGuest', text: 'Synthetic removed message' });
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'mretained', from: 'EarlierGuest', text: 'Synthetic retained message' });
+    const flag = document.querySelector('[data-id=mremoved] .flag');
+    const retained = document.querySelector('[data-id=mretained] .flag');
+    const composer = document.querySelector('[data-text]');
+    composer.value = 'Keep this draft';
+    (focusedFlag ? flag : retained).focus();
+
+    ws.receive({ t: 'delete', ids: ['mremoved'] });
+
+    expect(flag.isConnected).toBe(false);
+    expect(document.activeElement).toBe(focusedFlag ? composer : retained);
+    expect(composer.value).toBe('Keep this draft');
+});
+
+describe('opening a room from the directory', () => {
+    const room = '#directory-room';
+    const instance = 'd'.repeat(32);
+    async function directory({ key = false, roomInstance = instance } = {}) {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        ws.receive({ t: 'list', rooms: [{ name: room, title: 'Directory Room', kind: 'chat', count: 1, max: 8, key, locked: false, roomInstance }] });
+        const button = window.document.querySelector(`[data-room="${room}"]`);
+        button.focus();
+        return { window, ws, join, button };
+    }
+
+    it.each([false, true])('moves from the directory to the confirmed room tab unless focus moved (%s)', async (moved) => {
+        const { window, ws, join, button } = await directory();
+        const { document } = window;
+        button.click();
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room], roomInstance: instance });
+        const input = document.querySelector('[data-text]');
+        if (moved) input.focus();
+        join(room);
+        expect(document.activeElement).toBe(moved ? input : document.querySelector(`[data-channel-key="${room}"]`));
+
+        document.querySelector('[data-channel-key="#stalemate"]').click();
+        button.focus();
+        const before = ws.sent.length;
+        button.click();
+        expect(ws.sent).toHaveLength(before);
+        expect(document.activeElement.dataset.channelKey).toBe(room);
+    });
+
+    it('leaves focus in Rooms and sends nothing when the room key prompt is canceled', async () => {
+        const { window, ws, button } = await directory({ key: true });
+        window.prompt = vi.fn(() => null);
+        const before = ws.sent.length;
+        button.click();
+        expect(window.prompt).toHaveBeenCalledOnce();
+        expect(ws.sent).toHaveLength(before);
+        expect(window.document.activeElement).toBe(button);
+    });
+
+    it('keeps legacy rows usable when a relay sends no room reference', async () => {
+        const { ws, button } = await directory({ roomInstance: null });
+        button.click();
+        expect(ws.sent.at(-1)).toEqual({ t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
+    });
+});
+
+it('keeps browser audio guidance and actions off under the protected participation policy', async () => {
+    const { window, ws, welcome, join } = await visitor('rad-dad', {}, { beta: true, participation: true });
+    const { document } = window;
+    window.open = vi.fn();
+    welcome(); join();
+    const room = '#jam-policy-room', href = 'https://audio.example.test/join/';
+    ws.receive({ t: 'join', ch: {
+        name: room, kind: 'jam', keepRef: 'd'.repeat(32), modes: { i: true },
+        names: [{ nick: 'Viewer', prefix: '@' }],
+        jam: { web: href, webReady: true, desktop: 'webjam://fixture-host/', invitation: 'webjam://fixture-host/' },
+    } });
+    const web = document.querySelector('[data-jam-web]');
+    expect(web.hidden).toBe(true);
+    expect(web.disabled).toBe(true);
+    expect(document.querySelector('[data-jam-invite-copy]').hidden).toBe(true);
+    expect(document.querySelector('[data-jam-invite-qr-toggle]').hidden).toBe(true);
+    expect(document.querySelector('[data-jam-desktop]').hidden).toBe(false);
+    expect(document.querySelector('[data-jam-browser-note]').textContent).toContain('Browser audio is unavailable');
+    const shownSteps = [...document.querySelectorAll('[data-jam-host-steps] li:not([hidden])')].map(step => step.textContent);
+    expect(shownSteps[1]).toContain('Copy Invite');
+    web.click();
+    expect(window.open).not.toHaveBeenCalled();
+    const input = document.querySelector('[data-jam-link]');
+    const form = document.querySelector('[data-jam-form]');
+    expect(form.closest('details')?.open).toBe(true);
+    input.value = href;
+    form.dispatchEvent(new window.Event('submit', { cancelable: true }));
+    expect(ws.sent.some(frame => frame.name === 'jamlink')).toBe(false);
+    expect(document.querySelector('[data-jam-share-status]').textContent).toContain('Paste a full desktop invitation');
+    expect(input.value).toBe(href);
+    input.value = 'webjam://fixture-host/';
+    form.dispatchEvent(new window.Event('submit', { cancelable: true }));
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'jamlink', args: ['invitation', input.value], ch: room });
+});
+
+describe('targeted Music invitation', () => {
+    async function setup(features = { directMusicInvites: 1 }) {
+        const { window, ws, welcome, join, flush } = await visitor('rad-dad', features);
+        const { document } = window;
+        window.open = vi.fn();
+        welcome(); join();
+        const room = '#jam-rehearsal', instance = 'a'.repeat(32);
+        const expires = (Math.floor(Date.now() / 1000) + 60) * 1000;
+        const offer = { t: 'music-invite', id: 'b'.repeat(32), ch: room, roomInstance: instance, by: 'GuitarHost', expires };
+        const href = `https://music.example.test/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${expires / 1000}`;
+        const accepted = { ...offer, t: 'music-invite-accepted', href };
+        const joinJam = () => ws.receive({ t: 'join', ch: {
+            name: room, keepRef: instance, kind: 'jam', title: 'Rehearsal', topic: '', modes: { i: true }, count: 1,
+            names: [{ nick: 'Viewer', prefix: '', entrySource: 'rad-dad' }],
+        } });
+        return { window, ws, flush, offer, accepted, href, joinJam,
+            panel: document.querySelector('[data-music-invite]'),
+            action: document.querySelector('[data-music-invite-action]'),
+            status: document.querySelector('[data-music-invite-status]'),
+            dismiss: document.querySelector('[data-music-invite-dismiss]'),
+        };
+    }
+
+    it('accepts into the Jam room, then opens Web Join only on a second user gesture', async () => {
+        const { window, ws, offer, accepted, href, joinJam, panel, action } = await setup();
+        ws.receive(offer);
+        expect(panel.hidden).toBe(false);
+        expect(action.textContent).toBe('Accept and join');
+        action.focus();
+        action.click();
+        expect(ws.sent.at(-1)).toEqual({ t: 'music-invite-accept', ch: offer.ch, roomInstance: offer.roomInstance, id: offer.id });
+        expect(action.getAttribute('aria-disabled')).toBe('true');
+        joinJam();
+        ws.receive(accepted);
+        expect(window.__lobby.active).toBe(offer.ch);
+        expect(action.textContent).toBe('Open WebJam in browser');
+        expect(window.open).not.toHaveBeenCalled();
+        action.click();
+        expect(window.open).toHaveBeenCalledWith(href, '_blank', 'noopener,noreferrer');
+        expect(JSON.stringify({ ...window.sessionStorage, ...window.localStorage })).not.toContain(href);
+        ws.receive({ t: 'part', ch: offer.ch });
+        expect(action.hidden).toBe(true);
+        action.click();
+        expect(window.open).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['invite', 'composer'])('recovers from delayed Music confirmation with focus in the %s', async focus => {
+        const { window, ws, offer, accepted, joinJam, action, dismiss, status, flush } = await setup();
+        const { document } = window;
+        ws.receive(offer);
+        action.focus();
+        action.click();
+        flush(10000);
+        expect(action.hidden).toBe(true);
+        expect(status.textContent).toMatch(/hasn’t confirmed/);
+        expect(document.activeElement).toBe(dismiss);
+        const composer = document.querySelector('[data-text]');
+        if (focus === 'composer') composer.focus();
+        joinJam();
+        ws.receive(accepted);
+        expect(action.textContent).toBe('Open WebJam in browser');
+        expect(action.hidden).toBe(false);
+        expect(document.activeElement).toBe(focus === 'invite' ? action : composer);
+        expect(window.open).not.toHaveBeenCalled();
+    });
+
+    it('announces Music invite updates without revealing the private browser link', async () => {
+        const { window, ws, offer, accepted, href, joinJam, panel, action, dismiss } = await setup();
+        const { document } = window;
+        const live = document.querySelector('[data-music-invite-announcement]');
+        const composer = document.querySelector('[data-text]');
+        expect(panel.hidden).toBe(true);
+        expect(live?.getAttribute('role')).toBe('status');
+        expect(live.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+        expect(live.textContent).toBe('');
+        composer.focus();
+
+        ws.receive(offer);
+        expect(live.textContent).toBe('GuitarHost invited you to join Music.');
+        expect(document.activeElement).toBe(composer);
+        action.focus();
+        action.click();
+        expect(live.textContent).toBe('Waiting for the room to confirm you joined.');
+        joinJam();
+        ws.receive(accepted);
+        expect(live.textContent).toContain('You’re in the Jam room.');
+        expect(document.body.innerHTML).not.toContain(href);
+
+        ws.receive({ t: 'music-invite-ended', id: offer.id });
+        expect(live.textContent).toBe('This Music invitation ended. Ask the host for a new one.');
+        expect(document.activeElement).toBe(dismiss);
+        dismiss.click();
+        expect(panel.hidden).toBe(true);
+        expect(live.textContent).toBe('');
+        expect(live.closest('[hidden], [aria-hidden="true"]')).toBeNull();
+    });
+
+    it('ignores offers without the negotiated capability and declines without opening audio', async () => {
+        const old = await setup({});
+        old.ws.receive(old.offer);
+        expect(old.panel.hidden).toBe(true);
+        const { window, ws, offer, panel, dismiss } = await setup();
+        ws.receive(offer);
+        dismiss.click();
+        expect(panel.hidden).toBe(true);
+        expect(ws.sent.at(-1)).toEqual({ t: 'music-invite-decline', ch: offer.ch, roomInstance: offer.roomInstance, id: offer.id });
+        expect(window.open).not.toHaveBeenCalled();
+    });
+});
+
+it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])('uses the shared roster and native return without pasting (%s)', async (receipt) => {
+    const { window, ws, flush } = await visitor('stalemate', { directMusicInvites: 1, personTargets: 1, jamShareResults: 1 }, { secureOrigin: true });
+    const { document } = window;
+    const request = 'c'.repeat(32), keepRef = 'd'.repeat(32);
+    const timedOutRequest = 'b'.repeat(32), leftBeforeSubmit = 'e'.repeat(32);
+    Object.defineProperty(window.crypto, 'randomUUID', { value: vi.fn().mockReturnValueOnce(timedOutRequest)
+        .mockReturnValueOnce(leftBeforeSubmit).mockReturnValue(request) });
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+    const launch = vi.fn();
+    window.HTMLAnchorElement.prototype.click = function () { launch(this.href); };
+    const channels = [];
+    window.BroadcastChannel = class {
+        constructor(name) { this.name = name; this.postMessage = vi.fn(); this.close = vi.fn(); channels.push(this); }
+        receive(data) { this.onmessage({ data }); }
+    };
+    const self = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
+    const guest = { id: 'rad-dad-peer', nick: 'DrumGuest', prefix: '', entrySource: 'rad-dad' };
+    ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', capabilities: {} });
+    ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', modes: {}, names: [self, guest] } });
+    ws.receive({ t: 'join', ch: { name: '#jam-rehearsal', kind: 'jam', keepRef, modes: { i: true }, names: [self] } });
+    const invite = document.querySelector('[data-jam-invite-music]');
+    expect(invite.hidden).toBe(false);
+    const shownSteps = [...document.querySelectorAll('[data-jam-host-steps] li:not([hidden])')].map(step => step.textContent);
+    expect(shownSteps[1]).toContain('Invite to Music');
+    expect(shownSteps.join(' ')).not.toContain('Copy browser invite');
+    const manualShare = document.querySelector('[data-jam-form]').closest('details');
+    expect(manualShare?.open).toBe(false);
+    const chooseGuest = () => {
+        invite.click();
+        const people = document.querySelector('[data-invite-options]');
+        expect([...people.options].map(option => option.value)).toEqual(['', guest.id]);
+        const proceed = document.querySelector('[data-invite-person-send]');
+        expect(proceed.disabled).toBe(true);
+        people.value = guest.id;
+        people.dispatchEvent(new window.Event('change'));
+        expect(proceed.disabled).toBe(false);
+        proceed.click();
+    };
+    const status = document.querySelector('[data-music-handoff-status]');
+    const selectChannel = name => document.querySelector(`[data-channel-key="${name}"]`).click();
+    const expiry = Math.floor(Date.now() / 1000) + 60;
+    const href = `${window.location.origin}/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${expiry}`;
+
+    chooseGuest();
+    expect(launch).toHaveBeenLastCalledWith(`webjam-beta://hangout-music/${timedOutRequest}`);
+    flush(90000);
+    expect(status.textContent).toContain('Check that your private rehearsal build is open and hosting Music');
+    expect(document.querySelector('[data-music-handoff-manual]').hidden).toBe(false);
+    expect(channels[0].close).toHaveBeenCalledOnce();
+    channels[0].receive({ href });
+    expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
+    const manualInput = document.querySelector('[data-jam-link]');
+    manualInput.scrollIntoView = vi.fn();
+    document.querySelector('[data-music-handoff-manual]').click();
+    expect(manualShare.open).toBe(true);
+    expect(document.activeElement).toBe(manualInput);
+    expect(manualInput.scrollIntoView).toHaveBeenCalledWith({ block: 'center', inline: 'nearest' });
+    const manualForm = manualInput.form;
+    manualInput.value = 'draft for this room';
+    manualForm.dispatchEvent(new window.Event('submit', { cancelable: true }));
+    const share = ws.sent.at(-1);
+    expect(share).toMatchObject({ t: 'cmd', name: 'jamlink', jamRequestId: expect.stringMatching(/^[0-9a-f]{32}$/) });
+    manualShare.open = false;
+    ws.receive({ t: 'jam-share-result', id: share.jamRequestId, status: 'rejected' });
+    const manualStatus = document.querySelector('[data-jam-share-status]');
+    expect(manualStatus.textContent).toContain('Edit the paste and try again');
+    expect(manualStatus.getAttribute('role')).toBe('status');
+    expect(manualStatus.closest('details:not([open])')).toBeNull();
+    expect(manualInput.value).toBe('draft for this room');
+    for (const [reason, guidance] of [
+        ['invalid-browser-invite', 'Copy a fresh browser invite in WebJam'],
+        ['browser-unavailable', 'Use a desktop invitation instead'],
+    ]) {
+        const draft = 'https://unapproved.example/join/#fixture';
+        manualShare.open = true;
+        manualInput.value = draft;
+        manualForm.dispatchEvent(new window.Event('submit', { cancelable: true }));
+        const request = ws.sent.at(-1);
+        manualShare.open = false;
+        ws.receive({ t: 'jam-share-result', id: request.jamRequestId, status: 'rejected', reason });
+        expect(manualStatus.textContent).toContain(guidance);
+        expect(manualInput.value).toBe(draft);
+    }
+
+    chooseGuest();
+    selectChannel('#stalemate');
+    expect(channels[1].postMessage).toHaveBeenCalledWith({ returned: false });
+    expect(channels[1].close).toHaveBeenCalledOnce();
+    channels[1].receive({ href });
+    expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
+    selectChannel('#jam-rehearsal');
+    expect(manualShare.open).toBe(false);
+    expect(manualInput.value).toBe('');
+    expect(manualStatus.textContent).toBe('');
+
+    chooseGuest();
+    expect(launch).toHaveBeenLastCalledWith(`webjam-beta://hangout-music/${request}`);
+    expect(channels[2].name).toBe(`webjam-music-${request}`);
+    channels[2].receive({ href });
+    channels[2].receive({ href });
+    expect(ws.sent.filter(frame => frame.t === 'music-invite-offer')).toEqual([
+        { t: 'music-invite-offer', request, ch: '#jam-rehearsal', roomInstance: keepRef, peer: guest.id, href },
+    ]);
+    selectChannel('#stalemate');
+    expect(channels[2].close).not.toHaveBeenCalled();
+    const late = receipt !== 'on time';
+    if (late) {
+        flush(90000);
+        selectChannel('#jam-rehearsal');
+        expect(status.textContent).toContain('Hang Out did not confirm delivery');
+        ws.receive({ t: 'music-invite-result', request: timedOutRequest, status: 'sent' });
+        expect(status.textContent).toContain('Hang Out did not confirm delivery');
+        selectChannel('#stalemate');
+    }
+    if (receipt === 'outcome before receipt') ws.receive({ t: 'music-invite-outcome', request, status: 'accepted' });
+    ws.receive({ t: 'music-invite-result', request, status: receipt === 'late rejection' ? 'unavailable' : 'sent' });
+    if (late) expect(channels[2].postMessage).not.toHaveBeenCalled();
+    else expect(channels[2].postMessage).toHaveBeenCalledWith({ returned: true });
+    expect(channels[2].close).toHaveBeenCalledOnce();
+    selectChannel('#jam-rehearsal');
+    if (receipt === 'late rejection') {
+        expect(status.textContent).toContain('couldn’t be sent');
+        expect(document.querySelector('[data-music-handoff-manual]').hidden).toBe(false);
+        return;
+    }
+    if (receipt === 'outcome before receipt') expect(status.textContent).toBe('DrumGuest accepted and joined the Jam room.');
+    else expect(status.textContent).toContain('sent to DrumGuest');
+    selectChannel('#stalemate');
+    ws.receive({ t: 'music-invite-outcome', request, status: 'accepted' });
+    expect(status.textContent).toBe('');
+    selectChannel('#jam-rehearsal');
+    expect(document.querySelector('[data-music-handoff-status]').textContent).toBe('DrumGuest accepted and joined the Jam room.');
+    expect(document.querySelector('[data-jam-link]').value).toBe('');
+    expect(JSON.stringify({ ...window.sessionStorage, ...window.localStorage })).not.toContain(href);
+});
+
+it.each([true, false])('puts the available drawing invite path first (online guest: %s)', async online => {
+    const { window, ws } = await visitor('rad-dad', { personTargets: 1 });
+    const { document } = window;
+    window.HangoutCore = { emptyState: () => ({ strokes: [], video: null }), apply() {} };
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    window.HTMLDialogElement.prototype.close = function () { this.open = false; };
+    const host = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
+    const guest = { id: 'guest-peer', nick: 'SketchGuest', prefix: '' };
+    ws.receive({ t: 'welcome', id: host.id, nick: host.nick, role: 'fan', capabilities: {} });
+    ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', modes: {}, names: online ? [host, guest] : [host] } });
+    ws.receive({ t: 'join', ch: { name: '#drawing-room', kind: 'art', keepRef: 'd'.repeat(32), modes: { C: true }, names: [host] } });
+
+    document.querySelector('[data-roomtools]').click();
+    const palette = document.querySelector('[data-palette]');
+    [...palette.querySelectorAll('button')].find(button => button.textContent === 'Invite guest').click();
+
+    const dialog = document.querySelector('[data-invite-dialog]');
+    const people = dialog.querySelector('[data-invite-options]');
+    const nickname = dialog.querySelector('[data-invite-nick]');
+    const nicknameSend = dialog.querySelector('[data-invite-form] button[type="submit"]');
+    expect(dialog.open).toBe(true);
+    expect(document.activeElement).toBe(online ? people : nickname);
+    expect(nicknameSend.classList.contains('btn--ghost')).toBe(online);
+    expect(nickname.hidden).toBe(false);
+    const sendToGuest = dialog.querySelector('[data-invite-person-send]');
+    expect(sendToGuest.disabled).toBe(true);
+    if (online) {
+        const select = value => {
+            people.value = value;
+            people.dispatchEvent(new window.Event('change'));
+        };
+        select(guest.id);
+        expect(sendToGuest.disabled).toBe(false);
+        select('');
+        expect(sendToGuest.disabled).toBe(true);
+        expect(nicknameSend.disabled).toBe(false);
+        select(guest.id);
+        sendToGuest.focus();
+        const replacement = { ...guest, id: 'replacement-peer' };
+        ws.receive({ t: 'chan', ch: { name: '#stalemate', names: [host, replacement] } });
+        expect(people.value).toBe('');
+        expect([...people.options].map(option => option.value)).toEqual(['', replacement.id]);
+        expect(sendToGuest.disabled).toBe(true);
+        expect(document.activeElement).toBe(people);
+        expect(dialog.querySelector('[data-invite-error]').textContent).toContain('unavailable');
+        select(replacement.id);
+        sendToGuest.click();
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'invite', args: [guest.nick, '#drawing-room'], personPeer: replacement.id });
+    } else {
+        const updated = { ...guest, nick: 'NewSketchGuest' };
+        ws.receive({ t: 'chan', ch: { name: '#stalemate', names: [host, updated] } });
+        expect([...people.options].map(option => option.textContent)).toContain(updated.nick);
+        expect(document.activeElement).toBe(nickname);
+    }
+});
+
+it('explains an empty Music invite roster and focuses Cancel', async () => {
+    const { window, ws } = await visitor('rad-dad', { directMusicInvites: 1, personTargets: 1 }, { secureOrigin: true });
+    const { document } = window;
+    window.BroadcastChannel = class {};
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    const self = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
+    ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', capabilities: {} });
+    ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', modes: {}, names: [self] } });
+    ws.receive({ t: 'join', ch: { name: '#jam-rehearsal', kind: 'jam', keepRef: 'd'.repeat(32), modes: { i: true }, names: [self] } });
+
+    document.querySelector('[data-jam-invite-music]').click();
+    const dialog = document.querySelector('[data-invite-dialog]');
+    expect(dialog.open).toBe(true);
+    const hint = document.getElementById(dialog.getAttribute('aria-describedby'));
+    expect(hint?.textContent).toContain('Ask your guest to open Hang Out and choose a nickname');
+    expect(dialog.querySelector('[data-invite-options]').disabled).toBe(true);
+    expect(dialog.querySelector('[data-invite-person-send]').disabled).toBe(true);
+    expect(document.activeElement).toBe(dialog.querySelector('[data-invite-cancel]'));
+});
+
+describe('focus after private guest entry', () => {
+    it('takes a guest to Chat when the nickname gate disappears', async () => {
+        const { window, welcome, join } = await visitor();
+        const { document } = window;
+        const nick = document.querySelector('[data-nick]');
+        nick.focus();
+        expect(document.activeElement).toBe(nick);
+
+        welcome();
+        join();
+
+        const chat = document.querySelector('[data-pane="chat"]');
+        expect(document.querySelector('[data-gate]').hidden).toBe(true);
+        expect(document.querySelector('[data-app]').hidden).toBe(false);
+        expect(document.activeElement).toBe(chat);
+    });
+
+    it('does not interrupt a guest who moved focus outside the gate while waiting', async () => {
+        const { window, welcome, join } = await visitor();
+        const { document } = window;
+        const otherControl = document.createElement('button');
+        document.body.prepend(otherControl);
+        otherControl.focus();
+
+        welcome();
+        join();
+
+        expect(document.activeElement).toBe(otherControl);
+    });
+});
+
+it('identifies emoji shortcuts as actions that send the named message', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const quickReplies = window.document.querySelectorAll('[data-quick-line]');
+    expect([...quickReplies].map(button => button.getAttribute('aria-label'))).toEqual([
+        'Send 🤘 SHRED', 'Send happy little tree 🌲',
+    ]);
+    quickReplies[1].click();
+    expect(ws.sent.at(-1)).toEqual({ t: 'say', ch: '#stalemate', text: 'happy little tree 🌲' });
+});
+
+it('retries the same Away action after a socket send fails in either direction', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const away = document.querySelector('[data-quick-cmd="away"]');
+    const send = ws.send.bind(ws);
+    const commands = () => ws.sent.filter(frame => frame.t === 'cmd' && frame.name === 'away');
+    const failSend = () => { ws.send = () => { throw new Error('socket closed during send'); }; };
+
+    failSend();
+    away.click();
+    expect(commands()).toHaveLength(0);
+    ws.send = send;
+    away.click();
+    expect(commands().at(-1)?.args).toEqual(['grabbing', 'a', 'snack']);
+    expect(document.querySelector('[data-toast]').textContent).toContain('Away status couldn’t be sent');
+
+    failSend();
+    away.click();
+    expect(commands()).toHaveLength(1);
+    ws.send = send;
+    away.click();
+    expect(commands().at(-1)?.args).toEqual([]);
+    expect(commands()).toHaveLength(2);
+});
+
+it('names the channel tab group and describes the conversation with the selected room', async () => {
+    const { window, welcome, join } = await visitor();
+    welcome(); join(); join('#writing-room');
+    const { document } = window;
+    const tabs = document.querySelector('[role="tablist"]');
+    const panel = document.querySelector('[role="tabpanel"]');
+    const log = document.querySelector('[role="log"]');
+    const context = document.querySelector('[data-chat-context]');
+    expect(tabs.getAttribute('aria-label')).toBe('Channels and direct messages');
+    expect(document.getElementById(log.getAttribute('aria-describedby'))).toBe(context);
+    expect(context.textContent).toBe('#writing-room');
+    const roomTab = tabs.querySelector('[data-channel-key="#writing-room"]');
+    const lobbyTab = tabs.querySelector('[data-channel-key="#stalemate"]');
+    expect(panel).not.toBeNull();
+    expect(roomTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.getElementById(roomTab.getAttribute('aria-controls'))).toBe(panel);
+    expect(document.getElementById(panel.getAttribute('aria-labelledby'))).toBe(roomTab);
+    expect(panel.contains(tabs)).toBe(false);
+    expect(panel.contains(log)).toBe(true);
+
+    roomTab.focus();
+    roomTab.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+
+    expect(context.textContent).toBe('#stalemate');
+    expect(lobbyTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(lobbyTab);
+    expect(document.getElementById(lobbyTab.getAttribute('aria-controls'))).toBe(panel);
+    expect(document.getElementById(panel.getAttribute('aria-labelledby'))).toBe(lobbyTab);
+    expect(log.getAttribute('aria-label')).toBe('Conversation');
+});
+
+it('renders informational chat names as text and keeps live person actions available', async () => {
+    const { window, ws, join } = await visitor('stalemate', { personTargets: 1 });
+    ws.receive({ t: 'welcome', id: 'self-peer', nick: 'Viewer', role: 'fan', capabilities: {}, transportSeq: 1 });
+    join();
+    const ch = '#stalemate';
+    const roomInstance = 'a'.repeat(32);
+    ws.receive({ t: 'line', ch, from: 'Viewer', text: 'Own message', personSelf: true, personPeer: 'self-peer', roomInstance });
+    ws.receive({ t: 'line', ch, from: 'EarlierGuest', text: 'Earlier message without a person target', id: 'earlier-message' });
+    ws.receive({ t: 'line', ch, from: 'CurrentGuest', text: 'Current message', personSelf: false, personPeer: 'current-peer', roomInstance });
+
+    const { document } = window;
+    const authors = [...document.querySelectorAll('[data-chat-lines] .who')];
+    expect(authors.map(author => [author.tagName, author.textContent])).toEqual([
+        ['SPAN', '<Viewer>'],
+        ['SPAN', '<EarlierGuest>'],
+        ['BUTTON', '<CurrentGuest>'],
+    ]);
+    expect(authors[2].disabled).toBe(false);
+    expect(document.querySelector('[data-id="earlier-message"] button.flag')).toBeTruthy();
+});
+
+it('keeps a blue nickname readable in chat and on the hovered People row', async () => {
+    const { window, ws, welcome } = await visitor('stalemate', { personTargets: 1 });
+    const blueNick = 'abi';
+    welcome();
+    ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', title: 'Shared chat', count: 1,
+        modes: {}, names: [{ nick: blueNick, prefix: '' }] } });
+    ws.receive({ t: 'line', ch: '#stalemate', from: blueNick, text: 'A message from a blue nickname.' });
+
+    const { document } = window;
+    const author = document.querySelector('[data-chat-lines] .who');
+    const person = document.querySelector('[data-nicks] .nick');
+    expect(author.textContent).toBe(`<${blueNick}>`);
+    expect(person.textContent).toBe(blueNick);
+    const luminance = ([red, green, blue]) => {
+        const linear = [red, green, blue].map(byte => {
+            const value = byte / 255;
+            return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+    };
+    // Chat uses --ink. The hovered People row uses --raised.
+    for (const [element, background] of [[author, [13, 16, 17]], [person, [26, 32, 32]]]) {
+        const rgb = element.style.color.match(/\d+/g).map(Number);
+        expect(rgb).toHaveLength(3);
+        expect((luminance(rgb) + 0.05) / (luminance(background) + 0.05)).toBeGreaterThanOrEqual(4.5);
+    }
+});
+
+it('renders the guest name as roster text and preserves focus on a current peer during updates', async () => {
+    const { window, ws } = await visitor('stalemate', { personTargets: 1 });
+    const self = { id: 'self-peer', nick: 'Viewer', prefix: '' };
+    const peer = { id: 'current-peer', nick: 'CurrentGuest', prefix: '' };
+    const channel = { name: '#stalemate', kind: 'lobby', title: 'Shared chat', keepRef: 'a'.repeat(32),
+        count: 2, modes: {}, names: [self, peer] };
+    ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', capabilities: {}, transportSeq: 1 });
+    ws.receive({ t: 'join', ch: channel });
+    const { document } = window;
+    const roster = document.querySelector('[data-nicks]');
+    const ownName = roster.querySelector('.nick[data-self="true"]');
+    const peerButton = roster.querySelector('button.nick[data-self="false"]');
+    expect(ownName.tagName).toBe('SPAN');
+    expect(ownName.textContent).toBe('Viewer');
+    peerButton.focus();
+
+    ws.receive({ t: 'chan', ch: { ...channel, names: [self, { ...peer, nick: 'RenamedGuest' }] } });
+
+    expect(roster.querySelector('button.nick[data-self="false"]')).toBe(peerButton);
+    expect(peerButton.textContent).toBe('RenamedGuest');
+    expect(document.activeElement).toBe(peerButton);
+});
+
+describe('channel tab focus during live updates', () => {
+    it('updates the unread count without replacing or refocusing the active room tab', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join(); join('#temporary');
+        const { document } = window;
+        const lobby = document.querySelector('[data-channel-key="#stalemate"]');
+        const room = document.querySelector('[data-channel-key="#temporary"]');
+        room.focus();
+        const refocus = vi.fn();
+        document.addEventListener('focusin', refocus);
+
+        ws.receive({ t: 'line', ch: '#stalemate', from: 'CurrentGuest', text: 'New lobby message' });
+
+        expect(document.querySelector('[data-channel-key="#stalemate"]')).toBe(lobby);
+        expect(lobby.textContent).toBe('#stalemate (1)');
+        expect(document.activeElement).toBe(room);
+        expect(refocus).not.toHaveBeenCalled();
+    });
+
+
+    it.each(['room tab', 'message composer'])('keeps keyboard focus usable from the %s', async (start) => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join(); join('#temporary');
+        const { document } = window;
+        const tab = document.querySelector('[data-channel-key="#temporary"]');
+        const lobby = document.querySelector('[data-channel-key="#stalemate"]');
+        const composer = document.querySelector('[data-text]');
+        const focused = start === 'room tab' ? tab : composer;
+        focused.focus();
+        expect(document.activeElement).toBe(focused);
+        const refocus = vi.fn();
+        document.addEventListener('focusin', refocus);
+
+        ws.receive({ t: 'closed', ch: '#temporary', reason: 'closed by the host' });
+
+        expect(document.querySelector('[data-channel-key="#stalemate"]')).toBe(lobby);
+        expect(tab.isConnected).toBe(false);
+        expect(lobby.getAttribute('aria-selected')).toBe('true');
+        expect(document.activeElement).toBe(start === 'room tab' ? lobby : composer);
+        expect(refocus).toHaveBeenCalledTimes(start === 'room tab' ? 1 : 0);
+    });
+});
+
+describe('nickname rejection recovery', () => {
+    it('returns keyboard focus to the rejected nickname and identifies its error', async () => {
+        const { window, ws } = await visitor();
+        const { document } = window;
+        const submit = document.querySelector('[data-enter]');
+        const nickname = document.querySelector('[data-nick]');
+        nickname.focus();
+        nickname.blur();
+        expect(document.activeElement).toBe(document.body);
+
+        ws.receive({ t: 'nick-error', text: 'That nick is taken right now.' });
+
+        expect(document.activeElement).toBe(nickname);
+        expect(nickname.value).toBe('Viewer');
+        const description = document.getElementById(nickname.getAttribute('aria-describedby'));
+        expect(description.textContent).toBe('That nick is taken right now.');
+        expect(submit.disabled).toBe(false);
+
+        nickname.value = 'AnotherName';
+        submit.click();
+
+        expect(nickname.hasAttribute('aria-describedby')).toBe(false);
+        expect(description.textContent).toBe('Getting you in…');
+    });
+});
+
+describe('newcomer navigation and closed sessions', () => {
+    it('reveals the first chat action on a room change without disturbing the current room', async () => {
+        const { window, welcome, join } = await visitor();
+        welcome(); join();
+        const actions = window.document.querySelector('[data-quick]');
+        actions.scrollLeft = 120;
+
+        join('#other-room');
+
+        expect(actions.scrollLeft).toBe(0);
+        actions.scrollLeft = 85;
+        window.document.querySelector('[data-channel-key="#other-room"]').click();
+        expect(actions.scrollLeft).toBe(85);
+    });
+
+    it('retires chat shortcuts when a session ends and restores them on reentry', async () => {
+        const { window, ws, welcome, join, sockets } = await visitor();
+        welcome(); join();
+        const { document } = window;
+        const quickActions = document.querySelector('[data-quick]');
+        const commands = document.querySelector('[data-palette-open]');
+        const composer = document.querySelector('[data-text]');
+        composer.value = 'Copy this draft before returning';
+        const roomSearch = document.querySelector('[data-room-search]');
+        const roomFilter = document.querySelector('[data-room-filter]');
+        const pmOff = document.querySelector('[data-pm-off]');
+        const roomCount = document.querySelector('[data-room-count]');
+        const directoryNote = document.querySelector('[data-rooms-empty]');
+        const starters = document.querySelector('[data-lobby-welcome]');
+        expect(quickActions.hidden).toBe(false);
+        expect(commands.disabled).toBe(false);
+        expect(starters.hidden).toBe(false);
+        expect(roomSearch.disabled).toBe(false);
+        expect(roomFilter.disabled).toBe(false);
+        expect(pmOff.disabled).toBe(false);
+
+        await ws.close(4401);
+
+        expect(document.activeElement.id).toBe('session-ended-title');
+        expect(roomSearch.disabled).toBe(true);
+        expect(roomFilter.disabled).toBe(true);
+        expect(pmOff.disabled).toBe(true);
+        expect(roomCount.hidden).toBe(true);
+        expect(directoryNote.textContent).toBe('Join again to see rooms.');
+        expect(starters.hidden).toBe(true);
+        expect(quickActions.hidden).toBe(true);
+        expect(commands.disabled).toBe(true);
+        expect(composer.value).toBe('Copy this draft before returning');
+        expect(composer.readOnly).toBe(true);
+
+        document.querySelector('[data-reconnect]').click();
+        await vi.waitFor(() => expect(sockets).toHaveLength(2));
+        sockets[1].open();
+        welcome(sockets[1]);
+
+        expect(quickActions.hidden).toBe(false);
+        expect(commands.disabled).toBe(false);
+        expect(composer.readOnly).toBe(false);
+        expect(roomSearch.disabled).toBe(false);
+        expect(roomFilter.disabled).toBe(false);
+        expect(pmOff.disabled).toBe(false);
+        expect(roomCount.hidden).toBe(false);
+        expect(directoryNote.textContent).toContain('No rooms yet');
+        sockets[1].receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', title: 'Shared chat', names: [] } });
+        expect(starters.hidden).toBe(false);
+    });
+
+    it('lets a guest select the unsent draft after leaving chat if clipboard access fails', async () => {
+        const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ state: 'accepted' }) }));
+        const { window, ws, welcome, join } = await visitor('stalemate', {}, { beta: true, participation: true, fetch });
+        welcome(); join();
+        const { document } = window;
+        const composer = document.querySelector('[data-text]');
+        composer.value = 'An unsent rehearsal idea';
+        const writeText = vi.fn().mockRejectedValue(new Error('Clipboard denied'));
+        Object.defineProperty(window.navigator, 'clipboard', { value: { writeText } });
+
+        document.querySelector('[data-sharing-leave]').click();
+
+        expect(document.querySelector('[data-session-ended]').hidden).toBe(false);
+        expect(composer.disabled).toBe(false);
+        expect(composer.readOnly).toBe(true);
+        const copy = document.querySelector('[data-session-copy-draft]');
+        const sentBeforeCopy = ws.sent.length;
+        expect(copy.hidden).toBe(false);
+        copy.click();
+        await vi.waitFor(() => expect(document.activeElement).toBe(composer));
+        expect(composer.value.slice(composer.selectionStart, composer.selectionEnd)).toBe('An unsent rehearsal idea');
+        expect(writeText).toHaveBeenCalledExactlyOnceWith('An unsent rehearsal idea');
+        expect(ws.sent).toHaveLength(sentBeforeCopy);
+    });
+
+    it.each([
+        ['hides', '   ', true],
+        ['shows', 'Keep this draft', false],
+    ])('%s draft copy guidance after a session ends', async (_label, text, hidden) => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        const { document } = window;
+        const composer = document.querySelector('[data-text]');
+        composer.value = text;
+
+        ws.close(4401);
+
+        expect(document.querySelector('[data-session-ended]').hidden).toBe(false);
+        expect(document.querySelector('[data-session-ended] p.small').hidden).toBe(hidden);
+        expect(document.querySelector('[data-session-copy-draft]').hidden).toBe(hidden);
+        expect(document.querySelector('[data-network-note]').hidden).toBe(hidden);
+        expect(composer.value).toBe(text);
+        expect(composer.readOnly).toBe(true);
+    }, 15000);
+});
 
 describe('private entry recovery after a rejected socket admission', () => {
     it('offers normal private entry only after the same-origin access check returns 401', async () => {
@@ -335,6 +1590,38 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(ws.sent.filter((frame) => frame.t === 'transport-ack')).toEqual([]);
         expect(replacement.sent.filter((frame) => frame.t === 'transport-ack')).toEqual([{ t: 'transport-ack', seq: 1 }]);
     });
+    it.each([false, true])('keeps manual reconnect keyboard focus usable when the guest moves focus: %s', async (moved) => {
+        const { window, ws, sockets, welcome, join, flush } = await visitor();
+        welcome(); join();
+        const { document } = window;
+        const retry = document.querySelector('[data-reconnect]');
+        const status = document.querySelector('[data-connection]');
+        const composer = document.querySelector('[data-text]');
+        ws.close(4400);
+        expect(retry.hidden).toBe(false);
+        retry.focus();
+        retry.click();
+        expect(retry.hidden).toBe(true);
+        expect(status.textContent).toBe('Reconnecting…');
+        expect(document.activeElement).toBe(status);
+        await vi.waitFor(() => expect(sockets).toHaveLength(2));
+
+        if (moved) composer.focus();
+        flush(20000);
+        expect(retry.hidden).toBe(false);
+        expect(status.textContent).toBe('Offline');
+        expect(document.activeElement).toBe(moved ? composer : retry);
+        if (moved) return;
+
+        retry.click();
+        await vi.waitFor(() => expect(sockets).toHaveLength(3));
+        const replacement = sockets[2];
+        replacement.open();
+        replacement.receive({ t: 'hello', role: 'fan', lock: 'off', budget: 'ok' });
+        welcome(replacement);
+        expect(status.textContent).toBe('Connected');
+        expect(document.activeElement).toBe(status);
+    });
     it('coalesces join bursts into at most one acknowledgement per 50ms', async () => {
         const { ws, welcome, flush, advance } = await visitor(); welcome();
         for (let seq = 2; seq <= 32; seq++) ws.receive({ t: 'entry-source', transportSeq: seq });
@@ -392,23 +1679,31 @@ describe('browser client privacy and bounded delivery wiring', () => {
     });
     it('bounds and clears messages without removing their list or the live-region preference', async () => {
         const { window, ws, welcome, join, paint } = await visitor(); welcome(); join(); paint(); paint();
+        window.requestAnimationFrame = (callback) => window.setTimeout(callback, 16);
         const log = window.document.querySelector('[data-buffer]');
         const messages = log.querySelector('[role="list"][aria-label="Messages"]');
         expect(messages).not.toBeNull();
-        for (let index = 0; index < 305; index++)
-            ws.receive({ t: 'line', id: `bounded-${index}`, ch: '#stalemate', from: 'Friend', text: `Bounded line ${index}` });
+        ws.receive({ t: 'line', ch: '#stalemate', id: 'moldest', from: 'Friend', text: 'Bounded line 0' });
+        const oldest = messages.querySelector('[data-id=moldest] .flag');
+        oldest.focus();
+        for (let index = 1; index <= 300; index++)
+            ws.receive({ t: 'line', ch: '#stalemate', from: 'Friend', text: `Bounded line ${index}` });
         expect(messages.children).toHaveLength(300);
-        expect(messages.firstElementChild.textContent).toContain('Bounded line 5');
-        expect(messages.lastElementChild.textContent).toContain('Bounded line 304');
+        expect(oldest.isConnected).toBe(false);
+        expect(window.document.activeElement).toBe(window.document.querySelector('[data-text]'));
+        expect(messages.firstElementChild.textContent).toMatch(/Bounded line 1$/);
+        expect(messages.lastElementChild.textContent).toContain('Bounded line 300');
         expect([...messages.children].every(item => item.tagName === 'LI')).toBe(true);
         window.document.querySelector('[data-chat-announcements]').click();
         join('#another-room'); paint(); paint();
         expect(log.querySelector('[role="list"]')).toBe(messages);
         expect(messages.children).toHaveLength(0);
         expect(log.getAttribute('aria-live')).toBe('off');
+        ws.receive({ t: 'line', ch: '#another-room', from: 'Friend', text: 'Clear this when the session ends' });
+        expect(messages.children).toHaveLength(1);
         ws.close(4401);
         expect(log.querySelector('[role="list"]')).toBe(messages);
         expect(messages.children).toHaveLength(0);
         expect(log.getAttribute('aria-live')).toBe('off');
-    });
+    }, 15000);
 });

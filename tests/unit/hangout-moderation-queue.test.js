@@ -4,12 +4,18 @@ import { createLobby, LOBBY, REPORT_ALREADY_QUEUED_NOTICE, REPORT_QUEUED_NOTICE 
 
 const DAY = 24 * 60 * 60 * 1000;
 let clock; let engine; let frames; let writes; let seq;
-function boot() {
+function boot(persistReport = () => {}) {
     clock = 1_800_000_000_000; frames = new Map(); writes = []; seq = 0;
     engine = createLobby({ now: () => clock, send: (id, frame) => {
         if (!frames.has(id)) frames.set(id, []);
         frames.get(id).push(frame);
-    }, persist: (key, value) => writes.push([key, structuredClone(value)]) });
+    }, persist: (key, value) => {
+        if (key === 'moderation-queue') {
+            const result = persistReport();
+            if (result) return result;
+        }
+        writes.push([key, structuredClone(value)]);
+    } });
 }
 function guest(nick, role = 'fan', dev = `dev-${nick}`) {
     const id = `conn-${++seq}`;
@@ -30,7 +36,7 @@ const say = (person, text, ch = LOBBY) => {
 const saved = () => writes.filter(([key]) => key === 'moderation-queue').at(-1)?.[1];
 const cam = (person, ch) => engine.message(person.id, JSON.stringify({ t: 'cam', ch, on: true, adult18: true }));
 
-beforeEach(boot);
+beforeEach(() => boot());
 
 describe('human moderation evidence and recipient authorization', () => {
     it('rejects private-room ID guesses, late joiners and ignored recipients, while preserving a witness report after part', () => {
@@ -168,6 +174,29 @@ describe('human moderation evidence and recipient authorization', () => {
         expect(saved().reports.map(entry => entry.id)).toEqual([...remaining, rejected]);
         expect(engine._debug.reports.size).toBe(100);
         expect(saved().reports[0]).toMatchObject({ id: accepted[0], text: 'accepted report evidence 0' });
+    });
+
+    it('returns a scoped negative receipt when the requested report cannot be stored', async () => {
+        let rejectReports = true;
+        boot(() => rejectReports ? Promise.reject(new Error('fixture write failed')) : undefined);
+        const author = guest('Author'); const witness = guest('Witness'); const bystander = guest('Bystander');
+        const text = 'report that could not be written';
+        const id = say(author, text);
+        const request = { t: 'report', id, text, reportResult: true };
+        await engine.message(witness.id, JSON.stringify(request));
+        expect(got(witness).filter(frame => frame.t === 'report-status')).toEqual([{ t: 'report-status', id, submitted: false }]);
+        expect(got(witness)).toContainEqual(expect.objectContaining({ t: 'notice', kind: 'error' }));
+        expect(got(bystander).some(frame => frame.t === 'report-status')).toBe(false);
+        expect(saved()).toBeUndefined();
+
+        await report(bystander, id);
+        expect(got(bystander).some(frame => frame.t === 'report-status')).toBe(false);
+        rejectReports = false;
+        await engine.message(witness.id, JSON.stringify(request));
+        expect(got(witness).filter(frame => frame.t === 'report-status')).toEqual([
+            { t: 'report-status', id, submitted: false }, { t: 'report-status', id, submitted: true },
+        ]);
+        expect(saved().reports).toContainEqual(expect.objectContaining({ id }));
     });
 
     it('sanitizes restored queues and rejects malformed, expired and unbounded evidence', () => {

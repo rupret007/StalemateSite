@@ -339,6 +339,7 @@ export class HangoutLobby {
         this.engine = createLobby({
             incidentSources: !!this.incidentSourceMode,
             gameNight: env.HANGOUT_BETA_MODE === 'protected',
+            directMusicInvites: env.HANGOUT_BETA_MODE === 'protected',
             webJamChess: gameRoomGrantsEnabled(env) && arcadeEnabled(env, 'chess'),
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
             ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority,

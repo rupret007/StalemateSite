@@ -1,4 +1,151 @@
+const { readFileSync } = require('node:fs');
+const { resolve } = require('node:path');
 const { test, expect } = require('@playwright/test');
+
+async function routeProtectedListen(page, baseURL, sessionSource) {
+    const origin = new URL(baseURL).origin;
+    const external = [];
+    await page.route('**/*', route => {
+        const address = new URL(route.request().url());
+        if (address.origin !== origin) {
+            external.push(address.origin);
+            return route.abort();
+        }
+        if (address.pathname === '/join/') {
+            return route.fulfill({ path: resolve(__dirname, '../../hangout-worker/web-join-chess/index.html'), contentType: 'text/html' });
+        }
+        if (address.pathname === '/join/app.js') {
+            return route.fulfill({ path: resolve(__dirname, '../../hangout-worker/web-join-music/app.js'), contentType: 'text/javascript' });
+        }
+        if (address.pathname === '/join/style.css') {
+            const baseStyle = readFileSync(resolve(__dirname, '../../join/style.css'), 'utf8');
+            const privateStyle = readFileSync(resolve(__dirname, '../../hangout-worker/web-join-music/style.css'), 'utf8');
+            return route.fulfill({ contentType: 'text/css', body: `${baseStyle}\n${privateStyle}` });
+        }
+        if (address.pathname === '/join/session.js') {
+            return route.fulfill({ contentType: 'text/javascript', body: sessionSource });
+        }
+        return route.continue();
+    });
+    return external;
+}
+
+for (const [width, height] of [[375, 667], [390, 844], [1440, 900]]) {
+    test(`private Web Join audio controls have usable tap targets at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        const external = await routeProtectedListen(page, baseURL, `
+            export class WebJoinSession {
+                constructor(options) { this.options = options; }
+                async join() { this.options.onStatus('Connected'); }
+                close() {}
+            }`);
+        const capability = Buffer.alloc(32, 17).toString('base64url');
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        const listen = page.getByRole('button', { name: 'Join to listen', exact: true });
+        const leave = page.getByRole('button', { name: 'Leave session', exact: true });
+        const details = page.getByText('Audio details', { exact: true });
+        const check = page.getByRole('button', { name: 'Check microphone', exact: true });
+        const skip = page.getByRole('button', { name: 'Skip check', exact: true });
+        const headphones = page.locator('label.headphones');
+        const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+        for (const control of [listen, details, check, skip, headphones, join]) {
+            await expect(control).toBeVisible();
+            const { width, height } = await control.boundingBox();
+            expect(width).toBeGreaterThanOrEqual(48);
+            expect(height).toBeGreaterThanOrEqual(48);
+        }
+        await join.scrollIntoViewIfNeeded();
+        await expect(join).toBeInViewport({ ratio: 1 });
+        await page.screenshot({ path: testInfo.outputPath('prejoin-tap-targets.png') });
+        await listen.click();
+        await expect(leave).toBeInViewport({ ratio: 1 });
+        const bounds = await leave.boundingBox();
+        expect(bounds.width).toBeGreaterThanOrEqual(48);
+        expect(bounds.height).toBeGreaterThanOrEqual(48);
+        await details.click();
+        await expect(page.locator('details')).toHaveAttribute('open', '');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath('connected-tap-targets.png') });
+        await leave.click();
+        await expect(listen).toBeVisible();
+        expect(external).toEqual([]);
+    });
+}
+
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`completing a listening join preserves Audio details keyboard focus at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        const external = await routeProtectedListen(page, baseURL, `
+            export class WebJoinSession {
+                constructor(options) { this.options = options; }
+                join() {
+                    return new Promise(resolve => {
+                        window.finishListening = () => { this.options.onStatus('Connected'); resolve(); };
+                    });
+                }
+                close() {}
+            }`);
+        await page.addInitScript(() => {
+            window.micRequests = 0;
+            Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
+                configurable: true, value: async () => { window.micRequests++; throw new Error('Listen-only fixture'); }
+            });
+        });
+        const capability = Buffer.alloc(32, 17).toString('base64url');
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        const listen = page.getByRole('button', { name: 'Join to listen', exact: true });
+        const leave = page.getByRole('button', { name: 'Leave session', exact: true });
+        const details = page.getByText('Audio details', { exact: true });
+        await listen.press('Enter');
+        await expect(leave).toBeFocused();
+        const tab = process.platform === 'darwin' && page.context().browser()?.browserType().name() === 'webkit' ? 'Alt+Tab' : 'Tab';
+        await page.keyboard.press(tab);
+        await expect(details).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(page.locator('details')).toHaveAttribute('open', '');
+        await page.screenshot({ path: testInfo.outputPath('01-listening-connecting-audio-details.png') });
+        await page.waitForFunction(() => typeof window.finishListening === 'function');
+        await page.evaluate(() => window.finishListening());
+        await expect(page.locator('#status')).toHaveText('Connected. You’re listening with your microphone off.');
+        await expect(details).toBeFocused();
+        await expect(details).toBeInViewport();
+        await page.screenshot({ path: testInfo.outputPath('02-listening-connected-audio-details.png') });
+        await leave.click();
+        await expect(listen).toBeVisible();
+        expect(await page.evaluate(() => window.micRequests)).toBe(0);
+        expect(external).toEqual([]);
+    });
+
+    test(`an unverified host requires a fresh browser invite at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        const external = await routeProtectedListen(page, baseURL, `
+            export class WebJoinSession {
+                async join() { throw new Error('Host identity or invite binding did not match'); }
+                close() {}
+            }`);
+        const capability = Buffer.alloc(32, 17).toString('base64url');
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        await page.getByRole('button', { name: 'Join to listen', exact: true }).press('Enter');
+        const status = page.locator('#status');
+        await expect(status).toHaveText('WebJam couldn’t verify this invite.');
+        await expect(status).toBeFocused();
+        await page.evaluate(() => {
+            window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+            window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+        });
+        await expect(status).toHaveText('WebJam couldn’t verify this invite.');
+        await expect(status).toHaveAccessibleDescription('Ask your host for a fresh browser invite and open the new link.');
+        await expect(page.locator('#error-hint')).toBeInViewport({ ratio: 1 });
+        for (const id of ['listen-actions', 'prejoin', 'join', 'retry', 'audio-options', 'leave']) {
+            await expect(page.locator('#' + id)).toBeHidden();
+        }
+        expect(external).toEqual([]);
+        await page.screenshot({ path: testInfo.outputPath('unverified-invite-fresh-link.png') });
+    });
+}
 
 for (const width of [375, 390]) {
     for (const kind of ['missing', 'malformed', 'expired']) {

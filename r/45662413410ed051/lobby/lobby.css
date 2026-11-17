@@ -28,7 +28,7 @@ button, input, select { font: inherit; }
 button, summary { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 button, input, select { border-radius: 4px; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .toast:focus-visible,
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, .toast:focus-visible, .say:focus-visible,
 .rooms h2[tabindex="-1"]:focus-visible, [data-people-title]:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 ::selection { background: var(--lime); color: var(--ink); }
 a { color: var(--blue); text-underline-offset: 3px; }
@@ -36,9 +36,10 @@ h1, h2, h3, p { margin-top: 0; }
 h2, h3 { font-weight: 650; }
 .small { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .eyebrow { margin: 0; color: var(--muted); font: 600 10px/1.5 var(--mono); letter-spacing: .1em; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+/* Keep the invite status in the accessibility tree before its text changes. */
+.sr-only, [data-invite-error]:empty { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .status { color: var(--amber); font-size: 13px; margin: 0; }
-.status:empty { display: none; }
+.status:empty:not([data-invite-error]) { display: none; }
 .btn { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--lime); background: var(--lime); color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 700; }
 .btn:hover:enabled { background: #e0ffa5; border-color: #e0ffa5; }
 .btn:active:enabled { transform: translateY(1px); }
@@ -59,6 +60,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .connection-tools { display: flex; flex-wrap: wrap; justify-content: flex-end; min-width: 0; gap: 10px; align-items: center; }
 .entry-return { display: inline-flex; align-items: center; min-height: 44px; font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }
 .connection { color: var(--muted); font: 11px var(--mono); white-space: nowrap; }
+.connection:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 .connection::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 1px 0; background: var(--amber); border-radius: 50%; }
 .connection[data-state=connected]::before { background: var(--lime); box-shadow: 0 0 0 3px #d1fa7810; }
 .connection[data-state=offline]::before { background: var(--pink); }
@@ -68,7 +70,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .session-ended h2 { margin: 0 0 4px; font-size: 16px; }
 .session-ended p { margin: 4px 0; font-size: 13px; overflow-wrap: anywhere; }
 .session-ended .small { color: var(--muted); font-size: 12px; }
-.session-ended .btn { flex: none; }
+.session-ended .btn { flex: none; min-height: 48px; }
 /* Entry: the room's character on the left, one clear action on the right. */
 .gate { display: grid; place-items: center; flex: 1; overflow: auto; min-height: 0; padding: 48px 36px; background-image: radial-gradient(#343d3655 .6px, transparent .6px); background-size: 22px 22px; }
 .gate-layout { width: min(1080px, 100%); display: grid; grid-template-columns: 1.1fr 1fr; gap: 72px; align-items: center; }
@@ -88,6 +90,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .nickrow { display: grid; gap: 8px; font: 11px var(--mono); color: var(--muted); }
 .nickbox { display: flex; gap: 8px; }
 .nickbox input { width: 0; flex: 1; font: 14px var(--mono); }
+[data-gate-status]:not(:empty) { margin-top: 8px; }
 .dice { width: 46px; min-height: 46px; flex: none; padding: 0; font-size: 0; }
 .dice::before { content: '⚄'; font: 29px/1 var(--mono); color: var(--lime); }
 .gate-hint { margin: -8px 0 0; font-size: 11px; line-height: 1.6; }
@@ -140,6 +143,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .room-details p { margin: 6px 0; }
 .private-invite { border-top: 1px solid var(--line); margin: 14px 0 0; padding: 13px 0 0; color: var(--muted); }
 .chat { display: flex; flex-direction: column; overflow: hidden; background: var(--ink); }
+.channel-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .irc, .pane, .lobby-welcome, .welcome-copy, .topic, .buffer, .quick, .say, .jam, .activity { min-width: 0; max-width: 100%; }
 .topic, .lobby-welcome, .buffer { overflow-wrap: anywhere; }
 .tabs { display: flex; flex: none; min-height: 54px; gap: 4px; padding: 8px 14px 0; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--line); scrollbar-width: thin; }
@@ -174,6 +178,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 [data-message-copy-text] { width: 100%; min-width: 0; max-width: 100%; font: 16px/1.5 var(--mono); }
 .buffer { flex: 1; min-height: 100px; margin: 0; padding: 14px 24px; list-style: none; overflow-y: auto; color: #e1e4d9; font: 12px/1.85 var(--mono); overflow-wrap: anywhere; scrollbar-width: thin; scrollbar-color: #465144 transparent; }
 .buffer-lines { margin: 0; padding: 0; list-style: none; }
+.buffer:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
 .buffer li { padding: 2px 5px; border-left: 2px solid transparent; }
 .buffer li:hover { background: #ffffff03; }
 .buffer .mention { background: #2b2719; border-left-color: var(--amber); }
@@ -231,6 +236,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .host-status { flex-basis: 100%; color: #8b958c; font-size: 10px; }
 [data-cam][aria-pressed=true] { color: var(--lime); border-color: #637943; background: #242f1c; }
 .jam { flex: 0 1 auto; min-height: 0; overflow: auto; max-height: 35dvh; padding: 16px 20px; background: #171e15; border-bottom: 1px solid #43543a; font-size: 12px; }
+[data-jam] :is(button, a.btn, summary) { min-width: 48px; min-height: 48px; }
 .jam-title { margin: 0 0 4px; font-size: 14px; }
 .jam-note { margin: 0 0 6px; }
 .jam-room-invite { margin-bottom: 8px; }
@@ -388,7 +394,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .tris-actions:has([data-tris-main][hidden]):has([data-tris-leave]:not([hidden])) { display: contents; }
 .tris-hud { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; gap: 8px; margin: 3px 0 5px; background: var(--surface); color: var(--cream); font: 600 .8rem var(--mono); }
 .tris-hud time { color: var(--lime); font-variant-numeric: tabular-nums; }
-.tris-arena { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px 10px; }
+.tris-arena { --tris-control-size: 44px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px 10px; }
 .tris-primary { position: relative; width: min(11rem, max(6.25rem, calc((100dvh - 420px) / 2))); }
 .tris-rival { display: grid; gap: 4px; color: var(--muted); font: .73rem var(--mono); }
 .tris-rival canvas { width: min(100%, 5.25rem, 22vw); }
@@ -397,9 +403,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .tris-countdown { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 6px; pointer-events: none; background: #061411ab; color: var(--lime); font: bold 2.4rem var(--mono); }
 .tris-countdown[hidden] { display: none; }
 .tris-preview { max-width: 14ch; color: var(--cream); }
-.tris-controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); gap: 4px; }
+.tris-controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--tris-control-size), 1fr)); gap: 4px; }
 .tris-controls[hidden] { display: none; }
-.tris-controls .btn { min-width: 44px; min-height: 44px; padding: 0; touch-action: none; user-select: none; color: var(--cream); font: bold 1.2rem var(--mono); }
+.tris-controls .btn { min-width: var(--tris-control-size); min-height: var(--tris-control-size); padding: 0; touch-action: none; user-select: none; color: var(--cream); font: bold 1.2rem var(--mono); }
 .tris-controls [data-tris-input="drop"] { color: var(--lime); border-color: #637943; }
 .tris-keyboard { margin-block: 5px 0; color: var(--muted); }
 @media (pointer: coarse) { .tris-keyboard { display: none; } }
@@ -407,8 +413,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .tris-primary { width: min(11rem, max(5.5rem, calc((100dvh - 458px) / 2))); }
 }
 @media (max-width: 580px) and (max-height: 740px) {
-  .tris-arena:has(.tris-controls:not([hidden])) { grid-template-columns: auto minmax(0, 1fr) 92px; }
-  .tris-controls { grid-column: auto; grid-template-columns: repeat(2, minmax(44px, 1fr)); }
+  .tris-arena:has(.tris-controls:not([hidden])) { grid-template-columns: auto minmax(0, 1fr) calc(var(--tris-control-size) * 2 + 4px); }
+  .tris-controls { grid-column: auto; grid-template-columns: repeat(2, minmax(var(--tris-control-size), 1fr)); }
 }
 @media (max-width: 430px) and (min-height: 741px) and (max-height: 880px) {
   /* Leave room for the full control row below the board on portrait phones. */
@@ -525,11 +531,13 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .game-call-peers video { display: block; width: min(100%, 150px); aspect-ratio: 16 / 9; object-fit: cover; }
 .game-call-peers video[hidden] { display: none; }
 .jam-paste .small { flex-basis: 100%; margin: 0; }
-[data-jam-share-status]:empty { display: none; }
+[data-jam-share-status] { margin: 8px 0 0; }
+[data-jam-share-status]:empty { margin: 0; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }
 .jam textarea { box-sizing: border-box; width: 100%; max-width: 100%; font: inherit; font-size: 16px; resize: vertical; }
 .jam-setup { margin-top: 8px; border-top: 1px solid var(--line); }
-.jam-setup summary { min-height: 44px; padding: 10px 2px; color: var(--blue); font: 12px/1.8 var(--mono); }
+.jam-setup summary, .jam-manual-share summary { min-height: 44px; padding: 10px 2px; color: var(--blue); font: 12px/1.8 var(--mono); }
+.jam-manual-share summary { width: fit-content; cursor: pointer; }
 .jam-setup p { margin: 0 0 10px; overflow-wrap: anywhere; }
 .jam-setup p:last-child { margin-bottom: 0; }
 .activity { flex: 0 1 auto; min-height: 0; max-height: 49dvh; overflow: auto; background: #141a14; border-bottom: 1px solid #43543a; scrollbar-width: thin; }
@@ -629,6 +637,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
    keyboard-focusable so a long notice and its actions can scroll in place. */
 .irc-notices { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
 .irc-notices:not(:has(> :not([hidden]))) { display: none; }
+.irc-notices:has(> :not([hidden]) ~ :not([hidden])) { max-height: min(38dvh, 180px); overflow: auto; }
 .toast { min-width: 0; max-width: 100%; max-height: min(20dvh, 120px); overflow: auto; overflow-wrap: anywhere; padding: 8px 16px; border-top: 1px solid var(--lime); color: var(--cream); background: var(--surface); font-size: 13px; }
 .toast .btn { margin: 4px; }
 .guest-check { position: fixed; z-index: 20; right: 16px; bottom: 80px; width: min(340px, calc(100vw - 32px)); padding: 16px; background: var(--surface); border: 1px solid var(--amber); border-radius: 4px; }
@@ -697,7 +706,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .irc:has(.game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) :is(.phonetabs, .phonetabs button) {
     min-height: 44px;
   }
-  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .quick { display: none; }
+  .channel-panel:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .quick { display: none; }
   .game-night { scroll-padding-block: 8px; }
   .tabs { min-height: 47px; padding: 4px 10px 0; }
   .tabs button { min-height: 42px; padding: 8px 12px; font-size: 11px; }
@@ -775,13 +784,36 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .act-paint canvas { width: min(100%, 30dvh); }
 }
 @media (max-width: 480px) {
+  .titlebar { gap: 10px; }
+  .brand { flex-shrink: 0; gap: 8px; }
+  .brand b { white-space: nowrap; }
+  .connection-tools { column-gap: 8px; row-gap: 4px; }
   input, select, textarea, .nickbox input, .directory-controls input, .directory-controls select, .act-load input, .jam-paste input { font-size: 16px; }
+  .directory-controls input, .directory-controls select { min-height: 48px; }
+  .directory-controls label:has(> select) { position: relative; }
+  .directory-controls select { appearance: none; padding-inline-end: 28px; }
+  .directory-controls label:has(> select)::after {
+    content: ''; position: absolute; inset-inline-end: 12px; top: calc(50% - 5px);
+    width: 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0;
+    transform: rotate(45deg); pointer-events: none;
+  }
   .buffer, .who { font-size: 14px; }
   .ev { font-size: 12px; }
   .lobby-welcome b, .lobby-welcome p { font-size: 14px; }
   .topic { font-size: 12px; }
   .conversation-starters button, .quiet-action { font-size: 11px; }
   .quick button { font-size: 12px; }
+  :is([data-room-invite], [data-music-invite]) .btn { min-width: 48px; min-height: 48px; }
+  [data-music-invite] p { flex-basis: 100px; }
+}
+@media (max-width: 480px) and (min-height: 621px) {
+  .channel-panel:has(> [data-jam]:not([hidden])) > .roombar .btn { min-width: 48px; min-height: 48px; }
+  .channel-panel:not(:has(> .game-night:not([hidden]))) .say .btn { min-height: 48px; margin-block: 2px; }
+  .channel-panel:not(:has(> .game-night:not([hidden]))) .slash { min-width: 48px; min-height: 48px; }
+}
+/* Leave the composer and invitations room on shorter phones. */
+@media (max-width: 480px) and (min-height: 741px) {
+  .conversation-starters { flex-wrap: wrap; overflow: visible; }
 }
 /* Small phones and landscape windows keep the composer ahead of welcome copy. */
 @media (max-height: 620px) and (max-width: 900px) {
@@ -803,6 +835,8 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
      the conversation/composer below fixed workspace rows. */
   body { overflow-y: auto; }
   .irc { min-height: 252px; flex-shrink: 0; }
+  /* The invitation takes a grid row at deep zoom. Keep one chat line above the composer. */
+  .irc:has([data-room-invite]:not([hidden])) { min-height: 280px; }
   /* Recovery/jump rows can exceed the short pane. Keep them and the composer
      reachable by vertical scrolling, including when keyboard focus moves. */
   .chat { overflow-y: auto; }
@@ -823,12 +857,13 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
+  :where(.irc:has([data-room-invite]:not([hidden]))) .buffer { min-height: calc(1lh + 2px); }
   .buffer:has(:focus-visible) { min-height: 64px; flex-shrink: 0; }
   .buffer li { padding-block: 0; }
   .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
   .chat:has(.buffer :focus-visible) .say,
-  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .say { position: static; }
+  .channel-panel:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .say { position: static; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   /* Send is shorter than its input. Leave room for the entire composer when
      native focus scrolling brings the button into a deeply zoomed viewport. */
@@ -839,13 +874,13 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
 }
 @media (max-height: 450px) and (max-width: 900px) and (orientation: landscape) {
   /* Keep each board within one scroll pane so the composer cannot cover it. */
-  .chat:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
+  .channel-panel:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
     :is([data-chess-playing], [data-card-table]):not([hidden])) .game-night {
     flex-shrink: 0;
     max-height: none;
     overflow: visible;
   }
-  .chat:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
+  .channel-panel:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
     :is([data-chess-playing], [data-card-table]):not([hidden])) .say { position: static; }
   .tris-arena:has(.tris-controls:not([hidden])) { grid-template-columns: auto minmax(0, 1fr) minmax(92px, 8rem); }
   .tris-controls { grid-column: auto; grid-template-columns: repeat(2, minmax(44px, 1fr)); }
@@ -872,8 +907,16 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
    Short landscape screens keep their existing compact layout. */
 @media (max-width: 430px) and (min-height: 451px) {
   body:has(.game-night:not([hidden])) :is(.tabs button, .roombar .btn, .game-actions .btn, .connection-tools [data-fullscreen], .say .btn,
-    .arcade-card-table summary, [data-game-editor] summary, .arcade-brick-race [data-brick-serve]) { min-height: 44px !important; }
+    .arcade-card-table summary, [data-game-editor] summary) { min-height: 44px !important; }
   body:has(.game-night:not([hidden])) :is(.connection-tools [data-fullscreen], .slash, .roombar .btn) { min-width: 44px !important; }
+  .game-night :is(.arcade-chess, .brick-race-actions, .tris-actions, .mania-actions, .rush-race-actions) .btn { min-width: 44px; min-height: 44px; }
+  .game-night .arcade-card-actions > .btn,
+  .game-night .arcade-jack [data-jack-wager] select,
+  .game-night .arcade-chess :is([data-chess-primary], [data-chess-start-rematch]),
+  .game-night .arcade-card-table :is([data-eights-main], [data-rummy-main], [data-start-rematch]) {
+    min-width: 48px;
+    min-height: 48px;
+  }
   /* The 44px room chrome eats the card panel. Keep a short transcript and return
      the rest so phone boards and hands clear the clip. Eights sets its own floor. */
   .chat:has(.arcade-card-table[open] [data-card-table]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 28px; }
@@ -882,7 +925,8 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   /* The 44px Eights summary sits above the hand. Give the transcript minimum back
      so the hand stays inside the phone panel. */
   .chat:has(.arcade-eights[open] [data-card-table]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 34px; }
-  /* The 44px Rush summary and room chrome use the slack under the track.
-     Shorten the track so the 44px race controls stay fully in view. */
-  .rush-race-track { height: clamp(132px, calc(100dvh - 521px), 275px); }
+  /* Reserve room below the track for the full-height phone race controls. */
+  .rush-race-track { height: clamp(128px, calc(100dvh - 525px), 271px); }
+  .rush-race-controls .btn, .brick-race-rail [data-brick-serve] { min-width: 48px; min-height: 48px; }
+  .tris-arena { --tris-control-size: 48px; }
 }

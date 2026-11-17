@@ -1,7 +1,7 @@
 import { gameNightCue } from './game-night-audio.mjs';
 import { createGameNightMatchClient, matchConnectionErrors } from './game-night-match-client.mjs';
 import { classifyRushSwipe } from '/play/games/turdrush-core.js';
-import { advanceRushRacer, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer } from '/play/games/turdrush-race.js';
+import { advanceRushRacer, RUSH_INPUT_BUFFER_MS, RUSH_LIMIT_TICKS, rushRaceTick, unpackRushRacer } from '/play/games/turdrush-race.js';
 import { TurdRushRenderer } from '/play/games/turdrush-renderer.js';
 
 const keys = { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'jump', w: 'jump', ' ': 'jump', ArrowDown: 'slide', s: 'slide' };
@@ -31,9 +31,10 @@ const markup = `
         ${buttons.map(([action, symbol, label]) => `<button type="button" class="btn btn--ghost" data-race-input="${action}" aria-label="${label}">${symbol} <small>${label.replace('Move ', '')}</small></button>`).join('')}
     </div>
 </div>
-<dialog class="sheet" aria-labelledby="race-confirm-title" data-race-confirm>
+<dialog class="sheet" aria-labelledby="race-confirm-title" aria-describedby="race-confirm-effect race-confirm-stay" data-race-confirm>
     <h3 id="race-confirm-title">Leave this race?</h3>
-    <p class="small" data-race-confirm-text></p>
+    <p class="small" id="race-confirm-effect" data-race-confirm-text></p>
+    <p class="small" id="race-confirm-stay">You’ll stay in Game Night.</p>
     <div class="arcade-card-actions">
         <button class="btn btn--small" type="button" data-race-confirm-yes>Leave race</button>
         <button class="btn btn--small btn--ghost" type="button" data-race-confirm-no>Keep running</button>
@@ -185,18 +186,28 @@ export function mountArcadeTurdRush(container, onMatch) {
         raf = 0;
         const match = model?.match, seat = model?.seat;
         if (!match || !visual || !panel.open || panel.hidden) return;
+        const at = serverNow(time);
         if (connection === 'ready' && !match.result) {
             if (flights.length && time - flights[0].sent > 4000) { client.start(scope); return; }
             if (buffer.length && flights.length < 4 && !pending && time >= retryAt && time - lastSent >= 85) {
-                const sequence = (flights.at(-1)?.sequence ?? match.runner.sequence) + 1, inputs = buffer.splice(0, 4);
+                const sequence = (flights.at(-1)?.sequence ?? match.runner.sequence) + 1;
+                const cutoff = rushRaceTick(match.startsAt + RUSH_INPUT_BUFFER_MS / 2, at);
+                // A stalled render can age an unsent tap past the server's replay buffer.
+                // Rebase only unsent input and keep its order and original action.
+                const rebase = buffer[0][0] <= cutoff;
+                const nextTick = Math.min(RUSH_LIMIT_TICKS, rushRaceTick(match.startsAt, at) + 1);
+                const queued = rebase ? buffer.map(([tick, action]) => [Math.max(tick, nextTick), action]) : buffer;
+                const inputs = queued.slice(0, 4);
                 if (client.send({ action: 'input', id: match.id, sequence, inputs })) {
+                    buffer = queued.slice(inputs.length);
                     flights.push({ sequence, inputs, sent: time });
                     lastSent = time;
+                    if (rebase) rebuild();
                 }
             }
             if (time - lastSync >= 950 && time - lastSent >= 350 && client.send({ action: 'sync' })) lastSync = time;
         }
-        const at = serverNow(time), countdown = Math.ceil((match.startsAt - at) / 1000), oldTick = visual.tick;
+        const countdown = Math.ceil((match.startsAt - at) / 1000), oldTick = visual.tick;
         if (connection === 'ready' && !match.result && countdown <= 0) {
             advanceRushRacer(visual, seat ? rushRaceTick(match.startsAt, at) : match.tick);
         }

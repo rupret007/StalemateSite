@@ -8,11 +8,19 @@ if (!['pilot', 'beta'].includes(target)) throw new Error('Choose pilot or beta a
 const out = path.join(root, `.${target}-assets`);
 fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
 for (const dir of ['r', 'assets', ...(target === 'beta' ? ['join'] : [])]) fs.cpSync(path.join(root, dir), path.join(out, dir), { recursive: true });
+fs.mkdirSync(path.join(out, 'js'), { recursive: true });
+fs.copyFileSync(path.join(root, 'js', 'music-preference.js'), path.join(out, 'js', 'music-preference.js'));
 if (target === 'beta') {
     const chessJoin = path.join(root, 'hangout-worker', 'web-join-chess');
     for (const file of ['index.html', 'session.js', 'game-offer.js']) {
         fs.copyFileSync(path.join(chessJoin, file), path.join(out, 'join', file));
     }
+    const musicJoin = path.join(root, 'hangout-worker', 'web-join-music');
+    for (const file of ['app.js', 'handoff.html', 'handoff.js']) {
+        fs.copyFileSync(path.join(musicJoin, file), path.join(out, 'join', file));
+    }
+    const joinStyle = path.join(out, 'join', 'style.css');
+    fs.appendFileSync(joinStyle, '\n' + fs.readFileSync(path.join(musicJoin, 'style.css'), 'utf8'));
     const play = path.join(root, 'play');
     fs.mkdirSync(path.join(out, 'play/assets'), { recursive: true });
     fs.copyFileSync(path.join(play, 'assets/suite-sound.js'), path.join(out, 'play/assets/suite-sound.js'));

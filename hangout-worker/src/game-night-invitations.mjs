@@ -34,9 +34,11 @@ export function gameGuestScope(value, allowWebJamChess = false) {
     if (!game || !validRoom || !codePattern.test(value.ref || '') || !sidPattern.test(value.host || '')
         || !Number.isInteger(value.nameSeed) || value.nameSeed < 0 || value.nameSeed > 0xffffffff) return null;
     if (value.tableId !== undefined && !validGameNightTableId(value.tableId)) return null;
+    if (value.nick !== undefined && (typeof value.nick !== 'string' || !/^[A-Za-z][A-Za-z0-9_\-\[\]{}^`|]{2,19}$/.test(value.nick))) return null;
     if (value.watch !== undefined && (value.watch !== true || game.game !== 'turdspades')) return null;
     return { ...game, room: value.room, ref: value.ref, host: value.host, nameSeed: value.nameSeed,
         ...(value.watch ? { watch: true } : {}),
+        ...(value.nick === undefined ? {} : { nick: value.nick }),
         ...(value.tableId === undefined ? {} : { tableId: value.tableId }) };
 }
 
@@ -120,9 +122,16 @@ export async function gameInvitationRequest(lobby, operation, body, session) {
     if (!tableId || scope.tableId && scope.tableId !== tableId) return unavailable();
     if (operation === 'details') {
         return reply({ game: gameNightLabels[scope.game], host: binding.nick, inviteExpiresAt: record.until,
+            guestName: lobby.engine.gameGuestNick(scope.nameSeed).nick || '',
             ...(scope.watch ? { watch: true } : {}) });
     }
     scope = { ...scope, tableId };
+    if (body.nick !== undefined) {
+        if (typeof body.nick !== 'string' || body.nick.length > 20) return reply({ error: 'Choose a nickname with 3 to 20 characters.' }, 422);
+        const name = lobby.engine.availableGameGuestNick(body.nick);
+        if (!name.ok) return reply({ error: name.reason }, 422);
+        scope.nick = name.nick;
+    }
     const sid = crypto.randomUUID();
     const nightEndsAt = await table.guestNightEndsAt(scope);
     const exp = Math.min(nightEndsAt, record.accessUntil ?? (record.demo ? record.until : Infinity));

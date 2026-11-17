@@ -9,16 +9,16 @@ let clock;
 let L;
 let inbox;
 let closed;
-function boot(limits = {}, gameNight = false) {
+function boot(limits = {}, gameNight = false, directMusicInvites = false) {
     clock = 1_800_000_000_000;
     inbox = new Map();
     closed = [];
-    L = createLobby({ gameNight, now: () => clock, limits, send: (id, m) => { if (!inbox.has(id)) inbox.set(id, []); inbox.get(id).push(m); }, close: (id, code) => closed.push([id, code]) });
+    L = createLobby({ gameNight, directMusicInvites, now: () => clock, limits, send: (id, m) => { if (!inbox.has(id)) inbox.set(id, []); inbox.get(id).push(m); }, close: (id, code) => closed.push([id, code]) });
 }
 let n = 0;
-function join(nick, { role = 'fan', iph = 'ip1', dev, admin } = {}) {
+function join(nick, { role = 'fan', iph = 'ip1', dev, admin, account } = {}) {
     const id = `c${(n += 1)}`;
-    const r = L.connect({ id, dev: dev || `dev-${nick}`, iph, role, admin: admin ?? role !== 'fan' });
+    const r = L.connect({ id, dev: dev || `dev-${nick}`, iph, role, account, admin: admin ?? role !== 'fan' });
     if (!r.ok) return { id, refused: r };
     L.message(id, JSON.stringify({ t: 'hello', nick, age13: true }));
     return { id, nick };
@@ -33,6 +33,131 @@ const notices = (u) => got(u).filter((m) => m.t === 'notice' || m.t === 'denied'
 const later = (ms) => { clock += ms; };
 
 beforeEach(() => boot());
+
+describe('direct Jam music invitations', () => {
+    const room = '#jam-practice';
+    const origin = 'https://music.example.test';
+    const send = (user, frame) => L.message(user.id, JSON.stringify(frame));
+    let host, guest, peer, invite, roomInstance;
+    beforeEach(() => {
+        boot({ webJoinOrigins: [origin] }, false, true);
+        host = join('GuitarHost');
+        guest = join('DrumGuest');
+        peer = join('OtherBandmate');
+        cmd(host, 'join', [room]);
+        roomInstance = got(host).find(m => m.t === 'join' && m.ch.name === room).ch.keepRef;
+        invite = `${origin}/join/#k=${'A'.repeat(43)}&s=${'0'.repeat(64)}&g=1&e=${clock / 1000 + 60}`;
+    });
+    function offer(sender = host, overrides = {}) {
+        send(sender, { t: 'music-invite-offer', request: 'd'.repeat(32), ch: room, roomInstance, peer: guest.id, href: invite, ...overrides });
+        return got(guest).filter(m => m.t === 'music-invite').at(-1);
+    }
+    function accept(user, received, overrides = {}) {
+        send(user, { t: 'music-invite-accept', id: received.id, ch: room, roomInstance, ...overrides });
+    }
+    const delivered = user => got(user).filter(m => m.t === 'music-invite-accepted');
+    const outcomes = () => got(host).filter(m => m.t === 'music-invite-outcome');
+    it('sends only an offer to the chosen connection and delivers audio only once after room admission', () => {
+        const pending = offer();
+        expect(pending).toMatchObject({ ch: room, roomInstance, by: host.nick });
+        expect(got(host).at(-1)).toEqual({ t: 'music-invite-result', request: 'd'.repeat(32), status: 'sent' });
+        expect(got(peer).some(m => m.t === 'music-invite')).toBe(false);
+        expect(JSON.stringify([...inbox.values()])).not.toContain(invite);
+        expect(JSON.stringify(L.roomSnapshot())).not.toContain(invite);
+        expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
+        accept(peer, pending);
+        expect(delivered(peer)).toHaveLength(0);
+        accept(guest, pending);
+        const guestFrames = got(guest);
+        expect(delivered(guest)).toEqual([expect.objectContaining({ id: pending.id, href: invite })]);
+        expect(outcomes()).toEqual([{ t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'accepted' }]);
+        expect(guestFrames.findIndex(m => m.t === 'join' && m.ch.name === room)).toBeLessThan(guestFrames.indexOf(delivered(guest)[0]));
+        accept(guest, pending);
+        expect(delivered(guest)).toHaveLength(1);
+        expect(outcomes()).toHaveLength(1);
+        expect(JSON.stringify(got(host))).not.toContain(invite);
+        expect(JSON.stringify(got(peer))).not.toContain(invite);
+        L.disconnect(guest.id);
+        const returning = join(guest.nick);
+        cmd(returning, 'join', [room]);
+        expect(got(returning).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
+        accept(returning, pending);
+        expect(delivered(returning)).toHaveLength(0);
+        cmd(returning, 'part', [], room);
+        cmd(returning, 'join', [room]);
+        expect(got(returning).filter(m => m.t === 'join' && m.ch.name === room)).toHaveLength(1);
+    });
+    it('reports a decline only from the selected guest and expires a replacement separately', () => {
+        const pending = offer();
+        const decline = (user, id) => send(user, { t: 'music-invite-decline', id, ch: room, roomInstance });
+        decline(peer, pending.id);
+        expect(outcomes()).toEqual([]);
+        decline(guest, pending.id);
+        expect(outcomes()).toEqual([{ t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'declined' }]);
+        expect(got(guest).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
+        expect(JSON.stringify(got(guest))).not.toContain(invite);
+        const replacement = offer(host, { request: 'e'.repeat(32) });
+        expect(replacement.id).not.toBe(pending.id);
+        decline(guest, pending.id);
+        later(61_000);
+        L.tick();
+        expect(outcomes()).toEqual([
+            { t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'declined' },
+            { t: 'music-invite-outcome', request: 'e'.repeat(32), status: 'expired' }
+        ]);
+        expect(got(peer).some(m => m.t === 'music-invite-outcome')).toBe(false);
+    });
+    it('refuses a nonhost, a different room instance, and an invalid browser destination', () => {
+        expect(offer(peer)).toBeUndefined();
+        expect(offer(host, { roomInstance: '0'.repeat(32) })).toBeUndefined();
+        expect(offer(host, { href: invite.replace('/join/', '/other/') })).toBeUndefined();
+        expect(offer(host, { href: invite.replace(origin, 'https://another.example.test') })).toBeUndefined();
+        expect(got(host).at(-1)).toEqual({ t: 'music-invite-result', request: 'd'.repeat(32), status: 'unavailable' });
+    });
+    it('refuses expired offers and offers whose host has left', () => {
+        const expired = offer();
+        later(61_000);
+        accept(guest, expired);
+        invite = invite.replace(/&e=\d+$/, `&e=${clock / 1000 + 60}`);
+        const pending = offer();
+        cmd(host, 'part', [], room);
+        const ended = () => got(guest).filter(m => m.t === 'music-invite-ended').map(m => m.id);
+        expect(ended()).toEqual([expired.id, pending.id]);
+        accept(guest, pending);
+        expect(delivered(guest)).toHaveLength(0);
+        expect(ended()).toEqual([expired.id, pending.id, pending.id]);
+    });
+    it('does not transfer an unaccepted invitation to a new connection for the same bandmate', () => {
+        const pending = offer();
+        L.disconnect(guest.id);
+        const reconnected = join(guest.nick);
+        expect(reconnected.id).not.toBe(guest.id);
+        expect(got(reconnected).some(m => m.t === 'music-invite')).toBe(false);
+        accept(reconnected, pending);
+        expect(delivered(reconnected)).toHaveLength(0);
+        expect(got(reconnected).some(m => m.t === 'join' && m.ch.name === room)).toBe(false);
+    });
+    it('keeps targeted offers disabled unless both the test lane and an approved origin are configured', () => {
+        for (const [limits, enabled] of [[{}, true], [{ webJoinOrigins: [origin] }, false]]) {
+            boot(limits, false, enabled);
+            host = join('GuitarHost');
+            guest = join('DrumGuest');
+            cmd(host, 'join', [room]);
+            roomInstance = got(host).find(frame => frame.t === 'join' && frame.ch.name === room).ch.keepRef;
+            expect(got(host).find(frame => frame.t === 'hello').features.directMusicInvites).toBeUndefined();
+            expect(offer()).toBeUndefined();
+            expect(got(host)).toContainEqual({ t: 'music-invite-result', request: 'd'.repeat(32), status: 'unavailable' });
+        }
+    });
+    it('clears a pending offer when its Jam room closes', () => {
+        const pending = offer();
+        cmd(host, 'close', [], room);
+        expect(got(guest)).toContainEqual({ t: 'music-invite-ended', id: pending.id });
+        expect(outcomes()).toContainEqual({ t: 'music-invite-outcome', request: 'd'.repeat(32), status: 'unavailable' });
+        accept(guest, pending);
+        expect(delivered(guest)).toHaveLength(0);
+    });
+});
 
 describe('filter', () => {
     it('allows swearing (Jeff: it’s part of speech) and blocks slurs and sexual content, incl. leetspeak', () => {
@@ -366,8 +491,115 @@ describe('permissions are enforced on the server (forged commands)', () => {
         expect(notices(b)).toMatch(/invite-only/);
         namedCmd(a, 'invite', ['Bravo'], '#watch-x');
         expect(got(b).some((m) => m.t === 'invite')).toBe(true);
+        expect(got(b).find((m) => m.t === 'invite')).toMatchObject({ ch: '#watch-x', activity: 'watch' });
         cmd(b, 'join', ['#watch-x']);
         expect(L._debug.channels.get('#watch-x').members.has(b.id)).toBe(true);
+    });
+    it('explains that a verified Keep return lost its original room after sign-in', () => {
+        const host = join('OldHost');
+        const replacementHost = join('ReplacementHost');
+        const returning = join('VerifiedGuest', { account: 'fixture-account' });
+        const guest = join('OtherGuest');
+        const room = '#keep-return';
+        cmd(host, 'join', [room]);
+        const roomInstance = L._debug.channels.get(room).keepRef;
+        cmd(host, 'close', [], room);
+        cmd(replacementHost, 'join', [room]);
+        expect(L._debug.channels.get(room).keepRef).not.toBe(roomInstance);
+        const sendKeepReturn = visitor => L.message(visitor.id, JSON.stringify({
+            t: 'cmd', name: 'join', args: [room], ch: LOBBY, roomInstance, keepReturn: true,
+        }));
+        sendKeepReturn(returning);
+        expect(notices(returning)).toContain('That room changed or closed while you signed in.');
+        sendKeepReturn(guest);
+        expect(notices(guest)).not.toContain('while you signed in');
+        expect(notices(guest)).toContain('Ask the host for a new invitation');
+        expect(L._debug.channels.get(room).members.has(returning.id)).toBe(false);
+        expect(L._debug.channels.get(room).members.has(guest.id)).toBe(false);
+    });
+    it('binds an ordinary invitation to the original room without granting access by reference alone', () => {
+        const host = join('InviteHost');
+        const guest = join('InviteGuest');
+        const replacementHost = join('ReplacementHost');
+        const outsider = join('InviteOutsider');
+        const room = '#invite-studio';
+        const accept = (user, offer, joinRequestId) => L.message(user.id, JSON.stringify({
+            t: 'cmd', name: 'join', args: [room], ch: LOBBY, roomInstance: offer.roomInstance, joinRequestId,
+        }));
+        cmd(host, 'join', [room]);
+        namedCmd(host, 'invite', [guest.nick], room);
+        const originalOffer = got(guest).find(m => m.t === 'invite');
+        const originalRef = L._debug.channels.get(room).keepRef;
+
+        cmd(host, 'close', [], room);
+        const staleRequest = 'a'.repeat(32);
+        accept(guest, originalOffer, staleRequest);
+        expect(L._debug.channels.has(room)).toBe(false);
+        expect(got(guest)).toContainEqual({ t: 'room-join-result', id: staleRequest, status: 'rejected' });
+        expect(originalOffer.roomInstance).toBe(originalRef);
+        expect(notices(guest)).toContain('That room changed or closed. Ask the host for a new invitation');
+
+        cmd(replacementHost, 'join', [room]);
+        accept(guest, originalOffer);
+        const replacement = L._debug.channels.get(room);
+        expect(replacement.members.has(guest.id)).toBe(false);
+
+        cmd(replacementHost, 'mode', ['+i'], room);
+        namedCmd(replacementHost, 'invite', [guest.nick], room);
+        const freshOffer = got(guest).filter(m => m.t === 'invite').at(-1);
+        expect(freshOffer.roomInstance).toBe(replacement.keepRef);
+        accept(outsider, freshOffer);
+        expect(replacement.members.has(outsider.id)).toBe(false);
+        const freshRequest = 'b'.repeat(32);
+        accept(guest, freshOffer, freshRequest);
+        expect(replacement.members.has(guest.id)).toBe(true);
+        const joined = got(guest).findIndex(frame => frame.t === 'join' && frame.ch.name === room);
+        const result = got(guest).findIndex(frame => frame.t === 'room-join-result' && frame.id === freshRequest && frame.status === 'joined');
+        expect(joined).toBeGreaterThanOrEqual(0);
+        expect(result).toBeGreaterThan(joined);
+        expect(got(guest).slice(joined + 1, result)).toContainEqual(expect.objectContaining({
+            t: 'notice', ch: room, roomInstance: replacement.keepRef, text: expect.stringContaining(`welcome to ${room}`),
+        }));
+        expect(got(outsider).some(frame => frame.t === 'room-join-result')).toBe(false);
+
+        const retry = 'c'.repeat(32);
+        const before = got(guest).length, hostBefore = got(replacementHost).length;
+        accept(guest, freshOffer, retry);
+        const retryFrames = got(guest).slice(before);
+        expect(retryFrames).toEqual([
+            expect.objectContaining({ t: 'join', reconfirmed: true, ch: expect.objectContaining({ name: room, keepRef: replacement.keepRef }) }),
+            { t: 'room-join-result', id: retry, status: 'joined' },
+        ]);
+        expect(retryFrames[0].ch).not.toHaveProperty('lines');
+        expect(got(replacementHost)).toHaveLength(hostBefore);
+    });
+
+    it('keeps a stale room directory entry from creating or joining a different room', () => {
+        const host = join('DirectoryHost');
+        const guest = join('DirectoryGuest');
+        const replacementHost = join('DirectoryReplacement');
+        const room = '#directory-studio';
+        const item = user => got(user).filter(frame => frame.t === 'list').at(-1).rooms.find(row => row.name === room);
+        const open = (user, row) => L.message(user.id, JSON.stringify({
+            t: 'cmd', name: 'join', args: [row.name], ch: LOBBY, roomInstance: row.roomInstance,
+        }));
+        cmd(host, 'join', [room]);
+        const original = item(guest);
+        cmd(host, 'close', [], room);
+        open(guest, original);
+        expect(L._debug.channels.has(room)).toBe(false);
+
+        cmd(replacementHost, 'join', [room]);
+        const replacement = L._debug.channels.get(room);
+        const updated = item(guest);
+        expect(original.roomInstance).not.toBe(updated.roomInstance);
+        expect(updated.roomInstance).toBe(replacement.keepRef);
+        open(guest, original);
+        expect(replacement.members.has(guest.id)).toBe(false);
+        open(guest, updated);
+        expect(replacement.members.has(guest.id)).toBe(true);
+        cmd(replacementHost, 'mode', ['+i'], room);
+        expect(item(host)).toBeUndefined();
     });
 });
 
@@ -561,6 +793,21 @@ describe('band moderation', () => {
 });
 
 describe('reports', () => {
+    it('sends a denied report result only to its sender and binds it to the requested message', () => {
+        const author = join('ReportAuthor');
+        const guest = join('ReportGuest');
+        say(author, 'Existing message for the report fixture');
+        const line = got(guest).find(frame => frame.t === 'line');
+        L.message(guest.id, JSON.stringify({ t: 'report', id: 'mmissingreport', reportResult: true }));
+        expect(got(guest)).toContainEqual({ t: 'report-status', id: 'mmissingreport', submitted: false });
+        expect(notices(guest)).toContain('That message is gone already.');
+        expect(got(author).some(frame => frame.t === 'report-status')).toBe(false);
+
+        L.message(guest.id, JSON.stringify({ t: 'report', id: line.id }));
+        expect(got(guest).filter(frame => frame.t === 'report-status' && frame.id === line.id))
+            .toEqual([{ t: 'report-status', id: line.id, submitted: true }]);
+    });
+
     it('auto-hides at 3 distinct devices; same device or same IP hash counts once', () => {
         const bad = join('Bad');
         const r1 = join('Rep1', { iph: 'a' });
@@ -852,12 +1099,27 @@ describe('jam rooms hand off to WebJam', () => {
         expect(room.jam.desktop).toBe('webjam://join?v=1#k=abcdef0123');
         cmd(a, 'jamlink', ['web', 'https://jam.example/join#x'], '#jam-garage');
         expect(room.jam.web).toBe('');
+        expect(notices(a)).toContain('Browser joining is not configured for this beta.');
         const fan = join('Fan');
         cmd(fan, 'jamlink', ['webjam://join?v=1#k=hijack999'], '#jam-garage');
         expect(room.jam.desktop).toBe('webjam://join?v=1#k=abcdef0123');
         expect(validWebjamInvite('webjam://x" onclick=1')).toBe('');
         expect(validWebJoin('https://jam.example/j#x', ['https://jam.example'])).toBe('https://jam.example/j#x');
         expect(validWebJoin('javascript:alert(1)#x', ['https://jam.example'])).toBe('');
+    });
+
+    it('tells a host how to replace an invalid browser invitation when browser joining is available', () => {
+        boot({ webJoinOrigins: ['https://jam.example'] });
+        const host = join('Alpha');
+        const room = '#jam-garage';
+        cmd(host, 'join', [room]);
+        const jam = L._debug.channels.get(room).jam;
+        cmd(host, 'jamlink', ['web', 'https://other.example/join/#synthetic'], room);
+        expect(jam.web).toBe('');
+        expect(notices(host)).toContain('Copy a fresh browser invite in WebJam and try again.');
+        expect(notices(host)).not.toContain('Browser joining is not configured');
+        cmd(host, 'jamlink', ['web', 'https://jam.example/join/#synthetic'], room);
+        expect(jam.web).toBe('https://jam.example/join/#synthetic');
     });
 });
 
@@ -967,6 +1229,13 @@ describe('Game Night', () => {
         L.message(visitor.id, JSON.stringify({ t: 'hello', nick: 'Ignored', age13: true }));
         expect(got(visitor).find(frame => frame.t === 'welcome')).toMatchObject({ nick: 'Guest-000000' });
         expect(got(visitor).filter(frame => frame.t === 'join').map(frame => frame.ch.name)).toEqual([room]);
+
+        const named = { id: 'named-visitor' };
+        expect(L.connect({ ...named, dev: 'named-guest-device', iph: 'ip3', betaSid: 'named-guest-session',
+            gameGuest: { room, ref, host: 'room-host-session', nameSeed: 42, nick: 'ArcadeFriend' } }).ok).toBe(true);
+        L.message(named.id, JSON.stringify({ t: 'hello', nick: 'Ignored', age13: true }));
+        expect(got(named).find(frame => frame.t === 'welcome')).toMatchObject({ nick: 'ArcadeFriend' });
+        expect(got(named).filter(frame => frame.t === 'join').map(frame => frame.ch.name)).toEqual([room]);
     });
 
     it('only accepts HTTPS Discord invites and server channel links', () => {

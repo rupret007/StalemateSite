@@ -65,3 +65,23 @@ The main checkout's ignored `.local/webjam-product-finish/shared-community-acces
 The 200%/400% checks reduce the CSS viewport. They do not exercise native browser zoom, text-only enlargement, operating-system magnification or every WCAG reflow requirement. W3C's [Reflow guidance](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html) explains the 320 CSS-pixel relationship; its separate [Resize Text guidance](https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html) requires checking text enlargement without loss of content or function. That broader text-resizing assessment remains outstanding.
 
 The new keyboard/accessibility suite runs in Chromium. The existing mobile regressions additionally use emulated WebKit/iPhone and Chromium/Android. Neither proves physical iPhone Safari behavior, iOS focus zoom or virtual-keyboard/safe-area behavior. No VoiceOver/NVDA speech, switch input, contrast audit, complete activity-canvas alternative, all-dialog/error combinations, native WebJam audio/camera journey, or full accessibility review is claimed. Those need distinct acceptance evidence before a conformance or universal-accessibility statement.
+
+## Spoken screen-reader walkthrough for the private candidate
+
+Use separate host and guest sessions with a test invitation and synthetic names or
+messages. Start with a desktop browser and a screen reader available in the test
+environment. Record the browser and screen-reader versions and the exact serving
+revision. Use brief written observations in place of an audio recording.
+
+| Guest action | Expected result |
+| --- | --- |
+| Enter with a nickname the host is using, then choose a different one | The rejection is announced. Focus returns to **Your nick**, with the entered text available to edit. |
+| Enter Chat and listen for a message from the host | Chat has a named region and describes the current channel. Each new message is announced once. Tabbing to an emoji shortcut tells you exactly what it sends. |
+| Turn off **Announce new chat messages**, switch channels, and return | The current channel stays identifiable. Existing messages remain readable, and new chat lines no longer interrupt the guest. |
+| Focus the temporary room tab and have the host close the room | Focus returns to the lobby tab. The closure notice can be read, and the chat composer is reachable. |
+| Accept a Music invitation, then open WebJam in the browser | **Accept and join** and **Open WebJam in browser** have distinct names. The browser exposes **Join to listen**. With an interrupted listening fixture, **Retry** stays reachable and **Back to audio options** returns focus to the listening choice. |
+
+Capture the words heard, where focus landed, and any missing or repeated
+announcement. Complete the browser-only Music step with a test fixture that
+simulates the host timeout. Actual audio, a complete assistive-technology
+audit and native browser zoom require their own checks.
