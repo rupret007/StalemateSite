@@ -495,7 +495,9 @@ resumeAudio.addEventListener("click", () => {
 });
 $("leave").addEventListener("click", () => leave());
 window.addEventListener("hashchange", () => window.location.reload());
-window.addEventListener("pagehide", () => leave());
+window.addEventListener("pagehide", () => {
+  if (invite) leave();
+});
 document.addEventListener("visibilitychange", () => {
   if (document.hidden || expireUnusedInvite()) return;
   if (context?.state === "suspended") {

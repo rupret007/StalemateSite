@@ -126,6 +126,32 @@ it.each([
     expect(play).not.toHaveBeenCalled();
 });
 
+it('preserves fresh-link recovery when the browser restores an expired invite page', () => {
+    const { $, window } = fixture({ hash: testInviteHash({ expiresAt: 1 }) });
+
+    window.dispatchEvent(new window.PageTransitionEvent('pagehide', { persisted: true }));
+    window.dispatchEvent(new window.PageTransitionEvent('pageshow', { persisted: true }));
+
+    expect($('status').textContent).toBe('This invite link is no longer valid.');
+    expect($('status').dataset.failure).toBe('true');
+    expect($('error-hint').hidden).toBe(false);
+    expect($('error-hint').textContent).toContain('Ask your host for a new browser invite');
+    expect($('retry').hidden).toBe(true);
+    expect($('join').hidden).toBe(true);
+});
+
+it('still closes an active listening session when the page is hidden for navigation', async () => {
+    const { $, sessions, window } = fixture();
+    $('listen').click();
+    await vi.waitFor(() => expect($('status').textContent).toContain('microphone off'));
+    const close = vi.spyOn(sessions[0], 'close');
+
+    window.dispatchEvent(new window.PageTransitionEvent('pagehide', { persisted: true }));
+
+    expect(close).toHaveBeenCalledOnce();
+    expect($('leave').hidden).toBe(true);
+});
+
 it('keeps a listener’s Retry focused on listening after a host timeout', async () => {
     const { $, capture, sessions, window } = fixture({ firstJoinFails: true });
     $('listen').focus();

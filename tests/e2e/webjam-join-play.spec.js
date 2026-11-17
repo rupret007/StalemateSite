@@ -83,6 +83,11 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         const status = page.locator('#status');
         await expect(status).toHaveText('WebJam couldn’t verify this invite.');
         await expect(status).toBeFocused();
+        await page.evaluate(() => {
+            window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+            window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+        });
+        await expect(status).toHaveText('WebJam couldn’t verify this invite.');
         await expect(status).toHaveAccessibleDescription('Ask your host for a fresh browser invite and open the new link.');
         await expect(page.locator('#error-hint')).toBeInViewport({ ratio: 1 });
         for (const id of ['listen-actions', 'prejoin', 'join', 'retry', 'audio-options', 'leave']) {
