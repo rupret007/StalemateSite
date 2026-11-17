@@ -601,7 +601,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (!gameGuest) nickInput.removeAttribute('aria-describedby');
         $(gameGuest ? '[data-game-guest-status]' : '[data-gate-status]').textContent = text;
     }
-    if (!previewKey) {
+    if (!previewKey && !betaShell) {
         $('[data-gate-copy]').textContent = 'Not open yet. The band is still building this one.';
         $('[data-enter]').hidden = true;
         $('.nickrow').hidden = true;
@@ -3899,5 +3899,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         toastDuration = actions.length ? 12000 : 4000;
         scheduleToastDismiss();
     }
-    document.dispatchEvent(new Event('hangout:lobby-ready'));
+    // A private first visit without its bootstrap is recoverable, not a closed
+    // public preview. Let the independent startup guard offer explicit reload.
+    if (previewKey || !betaShell) document.dispatchEvent(new Event('hangout:lobby-ready'));
 })();
