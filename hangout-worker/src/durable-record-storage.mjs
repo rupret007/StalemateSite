@@ -91,7 +91,10 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                     const bytes = new Uint8Array(meta.bytes);
                     for (let i = 0; i < meta.chunks; i += DURABLE_RECORD_CEILINGS.listPage) {
                         const count = Math.min(DURABLE_RECORD_CEILINGS.listPage, meta.chunks - i);
-                        const parts = await row('list', { prefix: partPrefix(base), limit: count, ...(i ? { startAfter: partKey(base, i - 1) } : {}) });
+                        // A partial final page can also prove no trailing part exists,
+                        // without exceeding the unchanged four-row page ceiling.
+                        const finalPartial = i + count === meta.chunks && count < DURABLE_RECORD_CEILINGS.listPage;
+                        const parts = await row('list', { prefix: partPrefix(base), limit: count + (finalPartial ? 1 : 0), ...(i ? { startAfter: partKey(base, i - 1) } : {}) });
                         if (!(parts instanceof Map) || parts.size !== count) fail('storage-corrupt');
                         let index = i;
                         for (const [physical, part] of parts) {
@@ -101,8 +104,10 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                             bytes.set(part, offset); index += 1;
                         }
                     }
-                    const extra = await row('list', { prefix: partPrefix(base), startAfter: partKey(base, meta.chunks - 1), limit: 1 });
-                    if (!(extra instanceof Map) || extra.size) fail('storage-corrupt');
+                    if (meta.chunks % DURABLE_RECORD_CEILINGS.listPage === 0) {
+                        const extra = await row('list', { prefix: partPrefix(base), startAfter: partKey(base, meta.chunks - 1), limit: 1 });
+                        if (!(extra instanceof Map) || extra.size) fail('storage-corrupt');
+                    }
                     if (await digest(bytes) !== meta.sha256) fail('storage-corrupt');
                     let value;
                     try { value = JSON.parse(dec.decode(bytes)); } catch { fail('storage-corrupt'); }
