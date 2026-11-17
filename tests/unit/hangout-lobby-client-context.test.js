@@ -882,17 +882,29 @@ it('names the channel tab group and describes the conversation with the selected
     welcome(); join(); join('#writing-room');
     const { document } = window;
     const tabs = document.querySelector('[role="tablist"]');
+    const panel = document.querySelector('[role="tabpanel"]');
     const log = document.querySelector('[role="log"]');
     const context = document.querySelector('[data-chat-context]');
     expect(tabs.getAttribute('aria-label')).toBe('Channels and direct messages');
     expect(document.getElementById(log.getAttribute('aria-describedby'))).toBe(context);
     expect(context.textContent).toBe('#writing-room');
-    expect(tabs.querySelector('[aria-selected="true"]').dataset.channelKey).toBe('#writing-room');
+    const roomTab = tabs.querySelector('[data-channel-key="#writing-room"]');
+    const lobbyTab = tabs.querySelector('[data-channel-key="#stalemate"]');
+    expect(panel).not.toBeNull();
+    expect(roomTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.getElementById(roomTab.getAttribute('aria-controls'))).toBe(panel);
+    expect(document.getElementById(panel.getAttribute('aria-labelledby'))).toBe(roomTab);
+    expect(panel.contains(tabs)).toBe(false);
+    expect(panel.contains(log)).toBe(true);
 
-    tabs.querySelector('[data-channel-key="#stalemate"]').click();
+    roomTab.focus();
+    roomTab.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
 
     expect(context.textContent).toBe('#stalemate');
-    expect(tabs.querySelector('[aria-selected="true"]').dataset.channelKey).toBe('#stalemate');
+    expect(lobbyTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(lobbyTab);
+    expect(document.getElementById(lobbyTab.getAttribute('aria-controls'))).toBe(panel);
+    expect(document.getElementById(panel.getAttribute('aria-labelledby'))).toBe(lobbyTab);
     expect(log.getAttribute('aria-label')).toBe('Conversation');
 });
 

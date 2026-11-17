@@ -1071,10 +1071,16 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
             await send(page, '/join #temporary-room');
             const tabs = page.getByRole('tablist', { name: 'Channels and direct messages' });
             const roomTab = tabs.getByRole('tab', { name: '#temporary-room', exact: true });
+            const roomPanel = page.getByRole('tabpanel', { name: '#temporary-room', exact: true });
             const conversation = page.getByRole('log', { name: 'Conversation' });
             await expect(conversation).toHaveAccessibleDescription('#temporary-room');
             await tabTo(page, roomTab);
             await expect(roomTab).toBeInViewport();
+            await expect(roomTab).toHaveAttribute('aria-controls', await roomPanel.getAttribute('id'));
+            await page.keyboard.press(tabKey(page));
+            await expect(roomPanel).toBeFocused();
+            await page.keyboard.press(tabKey(page, true));
+            await expect(roomTab).toBeFocused();
             await roomTab.evaluate(tab => { window.fixtureOriginalRoomTab = tab; });
             await host.page.getByRole('tab', { name: '#stalemate', exact: true }).click();
             await send(host.page, 'A new message in the background lobby.');
@@ -1089,9 +1095,12 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
             await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
             await page.screenshot({ path: testInfo.outputPath('02-after-room-closes.png') });
             const lobbyTab = tabs.getByRole('tab', { name: '#stalemate', exact: true });
+            const lobbyPanel = page.getByRole('tabpanel', { name: '#stalemate', exact: true });
             await expect(conversation).toHaveAccessibleDescription('#stalemate');
             await expect(lobbyTab).toBeFocused();
             await expect(lobbyTab).toBeInViewport();
+            await page.keyboard.press(tabKey(page));
+            await expect(lobbyPanel).toBeFocused();
             const roomEntry = viewport.width === 390
                 ? page.getByRole('button', { name: /start a room/i })
                 : page.getByRole('complementary', { name: 'Rooms', exact: true })

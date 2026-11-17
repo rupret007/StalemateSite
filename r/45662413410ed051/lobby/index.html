@@ -189,6 +189,7 @@
 
         <section class="pane chat" id="chat-pane" data-pane="chat" aria-label="Chat" tabindex="-1">
             <nav class="tabs" data-tabs role="tablist" aria-label="Channels and direct messages"></nav>
+            <div class="channel-panel" id="channel-panel" role="tabpanel" aria-labelledby="chat-context" tabindex="0">
             <div class="topic" data-topic></div>
             <p class="network-note" data-network-note role="status" hidden></p>
             <details class="network-note" data-sharing-controls hidden>
@@ -395,6 +396,7 @@
                 <button class="btn" data-send type="submit">Send</button>
             </form>
             <div class="chat-status"><span id="chat-context" data-chat-context>#stalemate</span><span title="The last 300 lines received in this channel during this session. No earlier messages are replayed.">Session scrollback · /help</span></div>
+            </div>
         </section>
 
         <aside class="pane people" id="people-pane" data-pane="people" aria-label="People">

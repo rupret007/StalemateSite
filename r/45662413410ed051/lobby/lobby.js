@@ -142,6 +142,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     let nextRecoveryContext = 0, recoveryBytes = 2, messageEpoch = 0, recoveryLifecycle = 0;
     let messageResultsSupported = false, copyingMessage = null;
     let channelJoinInterrupted = false, channelReplyTimer;
+    let channelTabSequence = 0;
     function recoveryContext() {
         const view = store(app.active);
         if (!view) return null;
@@ -1162,7 +1163,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         case 'welcome': {
             if (!app.me || app.resetSession || app.verified !== (m.verified === true)) clearMessageRecovery();
-            if (sharingControls) { $('.chat').insertBefore($('[data-sharing-controls]'), $('[data-lobby-welcome]')); $('[data-sharing-leave]').disabled = false; }
+            if (sharingControls) { $('[data-lobby-welcome]').before($('[data-sharing-controls]')); $('[data-sharing-leave]').disabled = false; }
             const wasIn = !!app.me;
             if (!wasIn) count('lobby-join');
             app.verified = m.verified === true; app.capabilities = m.capabilities || app.capabilities;
@@ -1594,6 +1595,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
 
     function drawTabs() {
         const nav = $('[data-tabs]');
+        const panel = $('#channel-panel');
         const focusKey = nav.contains(document.activeElement) ? document.activeElement.dataset.channelKey : null;
         const tabs = new Map();
         for (const tab of [...nav.children]) {
@@ -1608,6 +1610,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (!b) {
                 b = document.createElement('button');
                 b.type = 'button'; b.role = 'tab'; b.dataset.channelKey = key;
+                b.id = `channel-tab-${++channelTabSequence}`;
+                b.setAttribute('aria-controls', panel.id);
                 b.addEventListener('click', () => switchTo(key));
                 tabs.set(key, b);
             }
@@ -1631,6 +1635,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             } else mk(c.name, `${KIND_ICON[c.kind] === '#' ? '' : `${KIND_ICON[c.kind]} `}${c.name}`, c.unread, c.mentions);
         }
         for (const [ref, p] of app.pms) mk(`pm:${ref}`, `✉ ${p.nick}${p.open ? '' : ' (closed)'}`, p.unread, p.mentions);
+        const panelLabel = tabs.get(app.active)?.id || 'chat-context';
+        if (panel.getAttribute('aria-labelledby') !== panelLabel) panel.setAttribute('aria-labelledby', panelLabel);
         if (focusKey) {
             const focusedTab = tabs.get(focusKey);
             if (!focusedTab) focusChannelTab(app.active, { preventScroll: false });

@@ -142,6 +142,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .room-details p { margin: 6px 0; }
 .private-invite { border-top: 1px solid var(--line); margin: 14px 0 0; padding: 13px 0 0; color: var(--muted); }
 .chat { display: flex; flex-direction: column; overflow: hidden; background: var(--ink); }
+.channel-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .irc, .pane, .lobby-welcome, .welcome-copy, .topic, .buffer, .quick, .say, .jam, .activity { min-width: 0; max-width: 100%; }
 .topic, .lobby-welcome, .buffer { overflow-wrap: anywhere; }
 .tabs { display: flex; flex: none; min-height: 54px; gap: 4px; padding: 8px 14px 0; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--line); scrollbar-width: thin; }
@@ -685,7 +686,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .irc:has(.game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) :is(.phonetabs, .phonetabs button) {
     min-height: 44px;
   }
-  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .quick { display: none; }
+  .channel-panel:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .quick { display: none; }
   .game-night { scroll-padding-block: 8px; }
   .tabs { min-height: 47px; padding: 4px 10px 0; }
   .tabs button { min-height: 42px; padding: 8px 12px; font-size: 11px; }
@@ -827,7 +828,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
   .chat:has(.buffer :focus-visible) .say,
-  .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .say { position: static; }
+  .channel-panel:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .say { position: static; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   /* Send is shorter than its input. Leave room for the entire composer when
      native focus scrolling brings the button into a deeply zoomed viewport. */
@@ -838,13 +839,13 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
 }
 @media (max-height: 450px) and (max-width: 900px) and (orientation: landscape) {
   /* Keep each board within one scroll pane so the composer cannot cover it. */
-  .chat:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
+  .channel-panel:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
     :is([data-chess-playing], [data-card-table]):not([hidden])) .game-night {
     flex-shrink: 0;
     max-height: none;
     overflow: visible;
   }
-  .chat:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
+  .channel-panel:has(> .game-night:not([hidden]) :is(.arcade-chess, .arcade-tris, .arcade-mania, .arcade-rush-race, .arcade-brick-race)[open]
     :is([data-chess-playing], [data-card-table]):not([hidden])) .say { position: static; }
   .tris-arena:has(.tris-controls:not([hidden])) { grid-template-columns: auto minmax(0, 1fr) minmax(92px, 8rem); }
   .tris-controls { grid-column: auto; grid-template-columns: repeat(2, minmax(44px, 1fr)); }
