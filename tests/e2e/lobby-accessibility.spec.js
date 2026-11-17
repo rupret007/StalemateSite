@@ -562,6 +562,14 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
         await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-invitation.png`), fullPage: true });
         contained(geometry);
         const action = status.getByRole('button', { name: 'Join', exact: true });
+        if (viewport.label.startsWith('phone')) {
+            for (const button of [action, status.getByRole('button', { name: 'Dismiss', exact: true })]) {
+                await expect(button).toBeInViewport({ ratio: 1 });
+                const bounds = await button.boundingBox();
+                expect(bounds.width).toBeGreaterThanOrEqual(48);
+                expect(bounds.height).toBeGreaterThanOrEqual(48);
+            }
+        }
         await expect(action).toHaveAccessibleDescription('InvitationHost invited you to #invitation-studio');
         await tabTo(visitor.page, action);
         await visitor.page.evaluate(() => {
