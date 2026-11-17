@@ -1652,3 +1652,75 @@ describe('recovery batch read reuse remains scoped to native transactions', () =
         expect(fingerprint(f.driver)).toBe(before);
     });
 });
+
+// Observe real physical reads grouped by actual SQLite transaction, without
+// replacing the codec, cached rows, authority clock or validation functions.
+async function recoverySharedSessionFixture() {
+    const f = await fixture(), first = await f.enroll('reuse-00'), bindings = [first.binding];
+    for (let n = 1; n < 17; n++) {
+        const id = `reuse-${String(n).padStart(2, '0')}`;
+        const binding = { ...first.binding, id, authorityRef: id, dev: `device_${id}` };
+        expect(await f.authority.bind(binding)).toEqual(binding); bindings.push(binding);
+    }
+    const physical = key => ':manifest:' + Buffer.from(key).toString('hex');
+    const keys = { session: physical('authority-session:' + first.request.sid), index: physical(SESSION_INDEX),
+        connections: physical(CONNECTION_INDEX), bindings: new Set(bindings.map(b => physical('authority-connection:' + b.id))) };
+    const transactions = new Map();
+    const observe = event => {
+        if (event.name !== 'get') return;
+        const tx = f.driver.stats.transactions;
+        if (!transactions.has(tx)) transactions.set(tx, []);
+        transactions.get(tx).push(event.key);
+    };
+    const batchRows = () => [...transactions.values()].filter(reads =>
+        reads.some(key => key.endsWith(keys.connections)) && reads.some(key => [...keys.bindings].some(suffix => key.endsWith(suffix))));
+    return { f, bindings, keys, transactions, observe, batchRows };
+}
+
+describe('recovery shares raw reads but never authority across the sixteen-binding boundary', () => {
+    it('reads shared session and index exactly once per native batch and again in the seventeenth binding batch', async () => {
+        const { f, keys, observe, batchRows } = await recoverySharedSessionFixture();
+        const before = fingerprint(f.driver); f.hooks.before = observe;
+        const loaded = await f.authority.load(); delete f.hooks.before;
+        expect(loaded.bindings).toHaveLength(17); expect(loaded.bindings.every(row => row.active)).toBe(true);
+        const batches = batchRows(); expect(batches).toHaveLength(2);
+        expect(batches.map(reads => reads.filter(key => [...keys.bindings].some(suffix => key.endsWith(suffix))).length)).toEqual([16, 1]);
+        for (const reads of batches) {
+            expect(reads.filter(key => key.endsWith(keys.session))).toHaveLength(1);
+            expect(reads.filter(key => key.endsWith(keys.index))).toHaveLength(1);
+            expect(reads.filter(key => key.endsWith(keys.connections))).toHaveLength(1);
+        }
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('advancing the clock within the cached batch denies subsequent bindings sharing the same session', async () => {
+        const { f, keys, observe, transactions } = await recoverySharedSessionFixture();
+        const second = ':manifest:' + Buffer.from('authority-connection:reuse-01').toString('hex');
+        let advanced = false; const before = fingerprint(f.driver);
+        f.hooks.before = event => {
+            observe(event);
+            const reads = transactions.get(f.driver.stats.transactions) || [];
+            if (!advanced && event.name === 'get' && event.key.endsWith(second) && reads.some(key => key.endsWith(keys.connections))) {
+                f.advance(100001); advanced = true;
+            }
+        };
+        const loaded = await f.authority.load(); delete f.hooks.before;
+        expect(advanced).toBe(true);
+        expect(loaded.bindings.map(row => row.active)).toEqual([true, ...Array(16).fill(false)]);
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('does not hide a shared-session native read refusal in the next batch behind the first batch cache', async () => {
+        const { f, keys, observe, transactions } = await recoverySharedSessionFixture();
+        let validatedSessionReads = 0; const before = fingerprint(f.driver);
+        f.hooks.before = event => {
+            observe(event);
+            const reads = transactions.get(f.driver.stats.transactions) || [];
+            if (event.name === 'get' && event.key.endsWith(keys.session) && reads.some(key => key.endsWith(keys.connections))) {
+                validatedSessionReads++;
+                if (validatedSessionReads === 2) throw Error('Synthetic second-batch shared-session read refusal');
+            }
+        };
+        await expect(f.authority.load()).rejects.toThrow('Synthetic second-batch shared-session read refusal');
+        delete f.hooks.before;
+        expect(validatedSessionReads).toBe(2); expect(fingerprint(f.driver)).toBe(before);
+    });
+});
