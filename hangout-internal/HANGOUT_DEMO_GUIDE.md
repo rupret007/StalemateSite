@@ -1,34 +1,40 @@
 # Hang Out: a short shared-community demonstration
 
-For the exact private build, demonstrated checks and remaining work, start with
-the [current readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md).
-The private lobby has passed current Mac and Windows browser checks. The full
-release candidate, including physical music and operator acceptance, remains
-pending. Do not send this as a promise that every feature is already qualified.
+Use the private address and approved build supplied by the host. For the current
+invitation flow, follow the [band walkthrough](HANGOUT_BAND_DEMO_JOURNEY.md).
+The [dated readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+retains earlier Mac and Windows browser evidence at its tested revisions. The
+operator's exact-revision receipt determines what is ready on the selected
+build; a reviewed work branch may differ from the deployed private site. Live
+music and operator acceptance remain separate checks.
 
 The finished Che demo includes **live WebJam music with verified two-way
 audio**, as well as the shared browser community. Follow the
 [music acceptance plan](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md) for the ARM Mac mini,
 Intel/x86 MacBook Pro and Windows PC; keep the original Linux requirements too.
-Audio remains opt-in for each participant.
+Audio remains opt-in for each participant. Keep live Music, Shared Track and
+Webex checks parked until Jeff gives the rehearsal go.
 
 ## What the participant needs
 
 For the first private test, **Jeff hosts with the approved WebJam app on his
 MacBook; Che joins in Chrome on his Windows PC.** Che does not need the native
-client or BlackHole for that browser role. Keep the private community invitation
-and the fresh music link separate: the first admits you to Hang Out; the second
-connects your browser to this one Music session.
+client or BlackHole for that browser role. The private community invitation
+gets Che into Hang Out. Jeff then sends the Music invitation inside the room.
+The normal flow needs no link copying.
 
 1. Have headphones and a working microphone ready. Wired audio and Ethernet are
    preferred for music. A Bluetooth headset can be used for an initial speech
    check, but it does not establish instrument quality or low musical latency.
-2. Open the private community link supplied by Jeff. Enter the community code
-   supplied separately, choose your nickname and say hello. A band account is
-   not required for the guest role. Do not use an old music link as the community
-   code or post either invitation publicly.
-3. Accept Jeff's Jam-room invitation. When he shares the fresh Music destination,
-   choose **Join in browser**. Jeff keeps the native Music session running.
+2. Open the private community invitation supplied by Jeff. A valid invitation
+   takes you through private admission; choose your nickname and say hello.
+   You do not need a band account. If the page asks for an invitation code or
+   says the invitation did not work, ask Jeff for a fresh private community
+   invitation. Code entry is a fallback, not a normal extra setup step.
+3. When Jeff's Music invitation appears, choose **Accept and join**, then
+   **Open WebJam in browser**. Return to the Hang Out tab whenever you want room
+   chat. Jeff keeps the native Music session running. Joining the room does
+   not turn on your microphone or start browser audio automatically.
 4. Choose **Check microphone**, allow the intended input when the browser asks,
    and speak until the level responds. If the wrong input appears, choose the
    correct microphone. Confirm headphones, then **Join with microphone**. A flat
@@ -165,15 +171,26 @@ application role behavior, not real email verification or hosted revocation.
 
 ## WebJam music and results
 
-The native Mac host starts Music, then uses the visible **Copy browser invite**
-control and waits for **Link copied**. This prepares/copies the link in one step;
-no legacy Web Join menu sequence is required. Keep Music running. In Hang Out,
-create a Jam room, invite the other visitor through **Host tools → Invite guest**,
-and paste the fresh browser invitation into the host's invitation box, then
-**Share**. The guest accepts the room invite and explicitly selects **Join in
-browser**. Room membership is not host authority. Sharing never requests capture
-or opens a guest page automatically. See
-[browser invitation sharing](HANGOUT_BROWSER_INVITATION_HANDOFF.md).
+Use a review build that shows **Invite to Music** and the matching approved
+native app. The [band walkthrough](HANGOUT_BAND_DEMO_JOURNEY.md) includes the
+native build-title check and recovery steps.
+
+1. The Mac host starts **Music** → **Host** in WebJam, selecting **Start Session**
+   if shown, and keeps that session running.
+2. In Hang Out, the host chooses **Rooms** → **Jam (WebJam)** → **Invite to Music**,
+   selects the guest's online nickname and chooses **Continue in WebJam**.
+   Confirm the invitation in WebJam when prompted.
+3. Hang Out shows the sent, accepted, declined or expired outcome. If delivery
+   is uncertain, check with the guest before sending again.
+4. The guest chooses **Accept and join**, then **Open WebJam in browser**.
+   Browser audio and microphone setup remain separate explicit actions.
+
+If the app handoff fails, **Share a link instead** opens the host's manual
+fallback. The host can copy a fresh browser invitation from the approved native
+app and share it there. The [manual browser-invitation notes](HANGOUT_BROWSER_INVITATION_HANDOFF.md)
+describe that fallback and its verification scope. It is not the normal guest
+setup. Keep private invitations out of public chat, screenshots and support
+logs. Room membership does not grant host authority.
 
 A separately supported native guest uses the full desktop invitation with the
 native Join action; do not substitute that message for the browser music link.
