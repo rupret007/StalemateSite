@@ -161,6 +161,7 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             });
             await requestInvite(1);
             await expect(status).toContainText('Check that your private rehearsal build is open and hosting Music');
+            if (width === 375) await expect(status).toBeInViewport({ ratio: 1 });
             await expect(panel).toBeHidden();
             const manual = host.getByRole('button', { name: 'Share a link instead' });
             await expect(manual).toBeInViewport({ ratio: 1 });

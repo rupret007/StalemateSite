@@ -1807,7 +1807,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 ? { room, request, nick: pending.nick, awaitingReceipt: true,
                     message: 'Hang Out did not confirm delivery. Check with your bandmate before sending again.' }
                 : { room, manual: true,
-                    message: 'WebJam didn’t return an invitation. Check that your private rehearsal build is open and hosting Music. Then retry or share a link instead.' };
+                    message: 'WebJam didn’t return an invitation. Check that your private rehearsal build is open and hosting Music.' };
             drawMusicHandoff();
         }, 90000) };
         musicHandoff = pending;
