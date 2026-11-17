@@ -134,6 +134,7 @@ async function gameNight(browser, baseURL, { extraFeatures = {}, extraGames = []
     const table = name => transports.get(name);
     return {
         phone, people,
+        advance: ms => serial(() => { at += ms; }),
         // The live table as the server sees it for one phone.
         view: (nick, game) => people.get(nick).matches.get(game),
         // Send one match command as this phone's seat, exactly as its socket would.
@@ -538,3 +539,50 @@ for (const game of Object.values(GAMES)) {
         });
     });
 }
+
+test('Turd Rush confirms the first tap after its rendering frame is delayed', async ({ browser, baseURL }) => {
+    const game = 'turdrush';
+    const fixture = await gameNight(browser, baseURL, { extraFeatures: { arcadeTurdRush: 1 }, extraGames: [game] });
+    try {
+        const [host, guest] = await room(fixture, ['SwipeHost', 'SwipeGuest']);
+        const table = { game, status: '[data-race-status]' };
+        await showTable(host, table);
+        await showTable(guest, table);
+        await host.locator('[data-race-main][data-command="open"]').tap();
+        await guest.locator('[data-race-main][data-command="join"]').tap();
+        const match = guest.locator('[data-race-match]');
+        await expect(match).toBeVisible();
+        await fixture.advance(3500);
+        const synced = await guest.evaluate(() => performance.now());
+        await fixture.act('SwipeGuest', game, { action: 'sync' });
+        await expect(match).toHaveAttribute('data-phase', 'play');
+        await expect(match).toHaveAttribute('data-lane', '1');
+        await guest.evaluate(() => {
+            const native = window.requestAnimationFrame.bind(window);
+            window.requestAnimationFrame = callback => native(time => {
+                if (callback.name === 'drawFrame' && !window.releaseRushFrame) {
+                    window.releaseRushFrame = () => {
+                        window.requestAnimationFrame = native;
+                        native(callback);
+                    };
+                    return;
+                }
+                callback(time);
+            });
+        });
+        await guest.waitForFunction(() => !!window.releaseRushFrame);
+        await guest.getByRole('button', { name: 'Move left' }).tap();
+        // Keep the renderer paused beyond the server's 320ms input replay buffer.
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fixture.advance(await guest.evaluate(start => performance.now() - start, synced));
+        await guest.evaluate(() => window.releaseRushFrame());
+        await expect(match).toHaveAttribute('data-sequence', '1');
+        await fixture.advance(500);
+        await fixture.act('SwipeGuest', game, { action: 'sync' });
+        await expect(match).toHaveAttribute('data-lane', '0');
+        await expect(match).toHaveAttribute('data-sequence', '1');
+        expect(fixture.errors()).toEqual([]);
+    } finally {
+        await fixture.close();
+    }
+});
