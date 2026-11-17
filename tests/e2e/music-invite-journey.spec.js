@@ -163,7 +163,23 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             await expect(manualLink).toBeEmpty();
             await capture(host, '00c-manual-fallback-focused');
 
-            expect(await invite(2, href.replace('webjam.example', 'other-audio.example.test'))).toBe(false);
+            const unsupportedLink = href.replace('webjam.example', 'other-audio.example.test');
+            await manualLink.fill(unsupportedLink);
+            await manualShare.getByRole('button', { name: 'Share', exact: true }).press('Enter');
+            await manualSummary.press('Enter');
+            await expect(manualLink).toBeHidden();
+            const manualResult = host.locator('[data-jam-share-status]').and(host.getByRole('status'));
+            await expect(manualResult).toHaveText('Share rejected. Edit the paste and try again.');
+            await expect(manualResult).toBeVisible();
+            await expect(manualSummary).toBeFocused();
+            await manualResult.scrollIntoViewIfNeeded();
+            await capture(host, '00d-manual-rejection-with-form-closed');
+            await manualSummary.press('Enter');
+            await expect(manualLink).toHaveValue(unsupportedLink);
+            await manualLink.fill('');
+            await manualSummary.press('Enter');
+
+            expect(await invite(2, unsupportedLink)).toBe(false);
             await expect(panel).toBeHidden();
             await expect(status).toContainText('couldn’t be sent');
             await expect(host.getByRole('button', { name: 'Share a link instead' })).toBeVisible();

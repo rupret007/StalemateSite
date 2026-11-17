@@ -683,7 +683,7 @@ describe('targeted Music invitation', () => {
 });
 
 it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])('uses the shared roster and native return without pasting (%s)', async (receipt) => {
-    const { window, ws, flush } = await visitor('stalemate', { directMusicInvites: 1, personTargets: 1 }, { secureOrigin: true });
+    const { window, ws, flush } = await visitor('stalemate', { directMusicInvites: 1, personTargets: 1, jamShareResults: 1 }, { secureOrigin: true });
     const { document } = window;
     const request = 'c'.repeat(32), keepRef = 'd'.repeat(32);
     const timedOutRequest = 'b'.repeat(32), leftBeforeSubmit = 'e'.repeat(32);
@@ -734,7 +734,18 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     expect(manualShare.open).toBe(true);
     const manualInput = document.querySelector('[data-jam-link]');
     expect(document.activeElement).toBe(manualInput);
+    const manualForm = manualInput.form;
     manualInput.value = 'draft for this room';
+    manualForm.dispatchEvent(new window.Event('submit', { cancelable: true }));
+    const share = ws.sent.at(-1);
+    expect(share).toMatchObject({ t: 'cmd', name: 'jamlink', jamRequestId: expect.stringMatching(/^[0-9a-f]{32}$/) });
+    manualShare.open = false;
+    ws.receive({ t: 'jam-share-result', id: share.jamRequestId, status: 'rejected' });
+    const manualStatus = document.querySelector('[data-jam-share-status]');
+    expect(manualStatus.textContent).toContain('Edit the paste and try again');
+    expect(manualStatus.getAttribute('role')).toBe('status');
+    expect(manualStatus.closest('details:not([open])')).toBeNull();
+    expect(manualInput.value).toBe('draft for this room');
 
     chooseGuest();
     selectChannel('#stalemate');
@@ -745,6 +756,7 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     selectChannel('#jam-rehearsal');
     expect(manualShare.open).toBe(false);
     expect(manualInput.value).toBe('');
+    expect(manualStatus.textContent).toBe('');
 
     chooseGuest();
     expect(launch).toHaveBeenLastCalledWith(`webjam-beta://hangout-music/${request}`);

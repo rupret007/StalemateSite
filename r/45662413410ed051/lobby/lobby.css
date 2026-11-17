@@ -528,7 +528,8 @@ button.mania-tile { cursor: pointer; transition: top 110ms ease-out, left 110ms 
 .game-call-peers video { display: block; width: min(100%, 150px); aspect-ratio: 16 / 9; object-fit: cover; }
 .game-call-peers video[hidden] { display: none; }
 .jam-paste .small { flex-basis: 100%; margin: 0; }
-[data-jam-share-status]:empty { display: none; }
+[data-jam-share-status] { margin: 8px 0 0; }
+[data-jam-share-status]:empty { margin: 0; }
 .jam-paste textarea, .act-load input { flex: 1; min-width: 0; }
 .jam textarea { box-sizing: border-box; width: 100%; max-width: 100%; font: inherit; font-size: 16px; resize: vertical; }
 .jam-setup { margin-top: 8px; border-top: 1px solid var(--line); }
