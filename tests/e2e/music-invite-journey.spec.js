@@ -102,7 +102,13 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
                 }
             }
             const callback = await host.context().newPage();
-            await callback.goto(baseURL);
+            // The native return fixture only needs a same-origin BroadcastChannel.
+            const callbackUrl = new URL('/__webjam-native-callback-fixture', baseURL).href;
+            await callback.route(callbackUrl, route => route.fulfill({
+                contentType: 'text/html',
+                body: '<!doctype html><title>WebJam native callback fixture</title>',
+            }));
+            await callback.goto(callbackUrl);
             const inviteButton = host.getByRole('button', { name: 'Invite to Music', exact: true });
             const setupSteps = host.locator('[data-jam-host-steps]');
             await expect(setupSteps.locator('[data-jam-direct-step]')).toBeVisible();
