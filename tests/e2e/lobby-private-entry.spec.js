@@ -508,7 +508,7 @@ for (const width of [375, 390, 1440]) test(`protected nickname picker failure ex
     const errors = [];
     try {
         context = await browser.newContext({ ignoreHTTPSErrors: true,
-            viewport: { width, height: width <= 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+            viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
         await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
         const sentinel = await installNoCaptureSentinel(context);
         await context.route(community.origin + '/r/45662413410ed051/names.js', route => { blocked++; return route.abort('failed'); });
@@ -531,6 +531,8 @@ for (const width of [375, 390, 1440]) test(`protected nickname picker failure ex
         await expect(nick).toHaveAccessibleDescription(explanation);
         await expect(page.locator('[data-gate-status]')).toHaveText(explanation);
         await expect(page.locator('[data-gate-status]')).toBeVisible();
+        await expect(page.locator('[data-gate-status]')).toBeInViewport({ ratio: 1 });
+        await expect(nick).toBeInViewport({ ratio: 1 });
         await expect(page.locator('[data-enter]')).toBeEnabled();
         expect(community.diagnostics().admittedUpgrades).toBe(0); expect(errors).toEqual([]);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
