@@ -412,7 +412,7 @@ test('host command, camera and person dialogs expose visible headings as accessi
     } finally { await peer?.close(); await visitor.close(); }
 });
 
-for (const [width, height] of [[375, 667], [390, 844]]) test(`ordinary phone chat Leave is a 48px target and restores usable lobby at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+for (const [width, height] of [[375, 667], [390, 844]]) test(`ordinary phone chat controls meet 48px and restore usable lobby at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, reducedMotion: 'reduce' });
     try {
         const page = await context.newPage();
@@ -431,6 +431,12 @@ for (const [width, height] of [[375, 667], [390, 844]]) test(`ordinary phone cha
         await attachGeometry(testInfo, `ordinary-chat-leave-${width}`, { viewport: { width, height }, leave: bounds });
         expect(bounds.width).toBeGreaterThanOrEqual(48);
         expect(bounds.height).toBeGreaterThanOrEqual(48);
+        const tools = page.locator('[data-roombar]').getByRole('button', { name: '@ Host tools', exact: true });
+        await expect(tools).toBeInViewport({ ratio: 1 });
+        const toolsBounds = await tools.boundingBox();
+        await attachGeometry(testInfo, `ordinary-chat-host-tools-${width}`, { viewport: { width, height }, tools: toolsBounds });
+        expect(toolsBounds.width).toBeGreaterThanOrEqual(48);
+        expect(toolsBounds.height).toBeGreaterThanOrEqual(48);
         await leave.tap();
         await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
         await expect(page.getByRole('tab', { name: '#phone-chat', exact: true })).toHaveCount(0);
