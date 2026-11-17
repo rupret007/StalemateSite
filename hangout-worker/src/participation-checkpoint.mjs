@@ -101,7 +101,9 @@ export function createParticipationCheckpoint(roots, options = {}) {
             const descriptor = Object.getOwnPropertyDescriptor(item.value, key);
             if (!dataDescriptor(descriptor)) unsupported();
             charge(48 + stringSize(key), 1); entries += 1;
-            item.properties.push([key, { ...descriptor }]);
+            // getOwnPropertyDescriptor already returned a fresh private record.
+            // Keep it directly rather than allocate an identical second record.
+            item.properties.push([key, descriptor]);
             visit(descriptor.value);
         }
         if (item.kind === 'map') {
