@@ -1,3 +1,4 @@
+const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { test, expect } = require('@playwright/test');
 
@@ -16,12 +17,60 @@ async function routeProtectedListen(page, baseURL, sessionSource) {
         if (address.pathname === '/join/app.js') {
             return route.fulfill({ path: resolve(__dirname, '../../hangout-worker/web-join-music/app.js'), contentType: 'text/javascript' });
         }
+        if (address.pathname === '/join/style.css') {
+            const baseStyle = readFileSync(resolve(__dirname, '../../join/style.css'), 'utf8');
+            const privateStyle = readFileSync(resolve(__dirname, '../../hangout-worker/web-join-music/style.css'), 'utf8');
+            return route.fulfill({ contentType: 'text/css', body: `${baseStyle}\n${privateStyle}` });
+        }
         if (address.pathname === '/join/session.js') {
             return route.fulfill({ contentType: 'text/javascript', body: sessionSource });
         }
         return route.continue();
     });
     return external;
+}
+
+for (const [width, height] of [[375, 667], [390, 844], [1440, 900]]) {
+    test(`private Web Join audio controls have usable tap targets at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        const external = await routeProtectedListen(page, baseURL, `
+            export class WebJoinSession {
+                constructor(options) { this.options = options; }
+                async join() { this.options.onStatus('Connected'); }
+                close() {}
+            }`);
+        const capability = Buffer.alloc(32, 17).toString('base64url');
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        const listen = page.getByRole('button', { name: 'Join to listen', exact: true });
+        const leave = page.getByRole('button', { name: 'Leave session', exact: true });
+        const details = page.getByText('Audio details', { exact: true });
+        const check = page.getByRole('button', { name: 'Check microphone', exact: true });
+        const skip = page.getByRole('button', { name: 'Skip check', exact: true });
+        const headphones = page.locator('label.headphones');
+        const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+        for (const control of [listen, details, check, skip, headphones, join]) {
+            await expect(control).toBeVisible();
+            const { width, height } = await control.boundingBox();
+            expect(width).toBeGreaterThanOrEqual(48);
+            expect(height).toBeGreaterThanOrEqual(48);
+        }
+        await join.scrollIntoViewIfNeeded();
+        await expect(join).toBeInViewport({ ratio: 1 });
+        await page.screenshot({ path: testInfo.outputPath('prejoin-tap-targets.png') });
+        await listen.click();
+        await expect(leave).toBeInViewport({ ratio: 1 });
+        const bounds = await leave.boundingBox();
+        expect(bounds.width).toBeGreaterThanOrEqual(48);
+        expect(bounds.height).toBeGreaterThanOrEqual(48);
+        await details.click();
+        await expect(page.locator('details')).toHaveAttribute('open', '');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath('connected-tap-targets.png') });
+        await leave.click();
+        await expect(listen).toBeVisible();
+        expect(external).toEqual([]);
+    });
 }
 
 for (const [width, height] of [[390, 844], [1440, 900]]) {

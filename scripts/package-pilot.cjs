@@ -17,6 +17,8 @@ if (target === 'beta') {
     for (const file of ['app.js', 'handoff.html', 'handoff.js']) {
         fs.copyFileSync(path.join(musicJoin, file), path.join(out, 'join', file));
     }
+    const joinStyle = path.join(out, 'join', 'style.css');
+    fs.appendFileSync(joinStyle, '\n' + fs.readFileSync(path.join(musicJoin, 'style.css'), 'utf8'));
     const play = path.join(root, 'play');
     fs.mkdirSync(path.join(out, 'play/assets'), { recursive: true });
     fs.copyFileSync(path.join(play, 'assets/suite-sound.js'), path.join(out, 'play/assets/suite-sound.js'));
