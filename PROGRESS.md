@@ -121,3 +121,9 @@ Hosted run [43885398784](https://github.com/rupret007/StalemateSite/actions/runs
 - Done — In Bobserver's Chess diagnostic, the aborted engine binary triggered an unhandled worker rejection around 6.3 seconds; the worker stayed open until about 21.0 seconds. The Stockfish loader now forwards terminal rejections to the existing worker error handler. Arcade runs independent checks for the same game state together, while keeping navigation, font readiness, touch input, undo and every assertion in order.
 - Evidence — The loader's source and published copy match. A focused Node harness verified that the worker error is scheduled immediately, carries the rejection as its cause, and preserves the successful WASM response and MIME type. Syntax and diff checks passed. The Bobserver Arcade trace measured multiple navigation and browser inspection calls taking seconds apiece.
 - Next — Run the two original game specs with their existing deadlines on Bobserver, along with the six WebKit phone cases. Then request the full Bobserver gate and Karen review on the same head.
+
+### Late guest camera lock notice
+
+- Done — GitHub CI on `5d83b714` exposed an intermittent late-guest failure. The echo tip replaced the host lock explanation just as a newcomer tried to start their camera. The tip now leaves that explanation visible while the guest's camera and mic are locked out.
+- Evidence — A focused Node check exercised the room's actual echo-tip function with a locked viewer, then after unlock. The existing browser assertion remains. GitHub CI also measured Chess recovery at about 2.5–2.6 seconds on both iPhone projects, down from 17.6–17.8 seconds.
+- Next — Let the already queued `5d83b714` game and phone checks finish. Then verify the lock notice on the updated head and submit the full gate with Karen review.

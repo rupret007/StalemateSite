@@ -2043,6 +2043,9 @@
     let echoTipShown = false;
     function maybeShowEchoTip(entry) {
         if (echoTipShown || app.av.music || entry.pc.connectionState !== 'connected') return;
+        // A late viewer can receive a track while their own camera is locked.
+        // Leave the lock explanation visible until they can join the call.
+        if (app.av.locked && !app.av.mic && !app.av.cam) return;
         if (!entry.stream.getTracks().some((track) => track.readyState === 'live' && !track.muted)) return;
         echoTipShown = true;
         say("Same room? Use headphones, or keep only one phone's mic on, to avoid echo.");
