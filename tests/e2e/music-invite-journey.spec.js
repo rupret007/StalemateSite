@@ -85,6 +85,17 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             const roomContext = host.locator('[data-chat-context]');
             await expect(roomContext).toHaveText(/^#jam-/);
             const room = await roomContext.textContent();
+            if (width <= 480) {
+                const roomBar = host.locator('[data-roombar]');
+                await capture(host, '00-room-controls');
+                for (const name of [/Camera/, /Host tools/, /^Leave$/]) {
+                    const control = roomBar.getByRole('button', { name });
+                    await expect(control).toBeInViewport({ ratio: 1 });
+                    const bounds = await control.boundingBox();
+                    expect(bounds.width, String(name)).toBeGreaterThanOrEqual(48);
+                    expect(bounds.height, String(name)).toBeGreaterThanOrEqual(48);
+                }
+            }
             const callback = await host.context().newPage();
             await callback.goto(baseURL);
             const inviteButton = host.getByRole('button', { name: 'Invite to Music', exact: true });
