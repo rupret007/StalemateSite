@@ -85,6 +85,11 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             const callback = await host.context().newPage();
             await callback.goto(baseURL);
             const inviteButton = host.getByRole('button', { name: 'Invite to Music', exact: true });
+            const setupSteps = host.locator('[data-jam-host-steps]');
+            await expect(setupSteps.locator('[data-jam-direct-step]')).toBeVisible();
+            await expect(setupSteps.locator('[data-jam-direct-step]')).toContainText('Invite to Music');
+            await expect(setupSteps.locator('[data-jam-manual-step]')).toBeHidden();
+            await capture(host, '00a-host-quick-invite-setup');
             const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
             await inviteButton.click();
             const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });

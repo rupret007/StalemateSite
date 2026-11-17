@@ -555,6 +555,8 @@ it('keeps browser audio guidance and actions off under the protected participati
     expect(document.querySelector('[data-jam-invite-qr-toggle]').hidden).toBe(true);
     expect(document.querySelector('[data-jam-desktop]').hidden).toBe(false);
     expect(document.querySelector('[data-jam-browser-note]').textContent).toContain('Browser audio is unavailable');
+    const shownSteps = [...document.querySelectorAll('[data-jam-host-steps] li:not([hidden])')].map(step => step.textContent);
+    expect(shownSteps[1]).toContain('Copy Invite');
     web.click();
     expect(window.open).not.toHaveBeenCalled();
     const input = document.querySelector('[data-jam-link]');
@@ -702,6 +704,9 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     ws.receive({ t: 'join', ch: { name: '#jam-rehearsal', kind: 'jam', keepRef, modes: { i: true }, names: [self] } });
     const invite = document.querySelector('[data-jam-invite-music]');
     expect(invite.hidden).toBe(false);
+    const shownSteps = [...document.querySelectorAll('[data-jam-host-steps] li:not([hidden])')].map(step => step.textContent);
+    expect(shownSteps[1]).toContain('Invite to Music');
+    expect(shownSteps.join(' ')).not.toContain('Copy browser invite');
     const chooseGuest = () => {
         invite.click();
         const people = document.querySelector('[data-invite-options]');

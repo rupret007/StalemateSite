@@ -2228,6 +2228,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-jam-invite-room]').hidden = !next.host;
         const musicButton = $('[data-jam-invite-music]');
         musicButton.hidden = !next.host || !readyForMusicOffer() || typeof window.BroadcastChannel !== 'function';
+        $('[data-jam-direct-step]').hidden = musicButton.hidden;
+        $('[data-jam-manual-step]').hidden = !musicButton.hidden;
         musicButton.setAttribute('aria-disabled', String(!!musicHandoff));
         drawMusicHandoff();
         const desktop = $('[data-jam-desktop]');
