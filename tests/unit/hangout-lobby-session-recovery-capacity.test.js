@@ -109,8 +109,6 @@ beforeAll(async () => { await f.persistSnapshot(true); });
 afterAll(async () => { if (f) { await f.driver.close(); await rm(f.directory, { recursive: true, force: true }); } });
 
 describe('bounded recovery of the existing maximum session and connection allowances', () => {
-    // Allow for SQLite fixture I/O while enforcing recovery transaction limits below.
-    const recoveryTestTimeoutMs = 15_000;
     const verify = async count => {
         expect(f.issued).toHaveLength(1000);
         const expected = f.snapshot(); expect(expected.sessions.connections).toHaveLength(count); expect(expected.modlog).toHaveLength(2000);
@@ -130,13 +128,13 @@ describe('bounded recovery of the existing maximum session and connection allowa
     };
     it('restores 1000 real issued sessions, 150 admitted connections, 2000 actual log entries and a multi-chunk canvas', async () => {
         expect(f.bound.size).toBe(150); await verify(150);
-    }, recoveryTestTimeoutMs);
+    });
     describe('at the full connection allowance', () => {
         beforeAll(async () => { await f.accept(199); });
         queueAdmissionHooks(1, 50);
         beforeAll(async () => { await f.persistSnapshot(); });
         it('restores the same 1000 issued sessions with the full 200 admitted connections within every native transaction budget', async () => {
             expect(f.bound.size).toBe(200); await verify(200);
-        }, recoveryTestTimeoutMs);
+        });
     });
 });

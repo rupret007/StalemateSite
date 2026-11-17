@@ -388,7 +388,8 @@ function posFor(c, r) { return `translate(${c * cell}px, ${(state.rows - 1 - r) 
 
 function render() {
   syncRows();
-  const live = new Set();
+  const live = new Set(), moved = [];
+  const animate = !reduced();
   state.board.forEach((col, c) => col.forEach((t, r) => {
     if (!t) return;
     live.add(t.id);
@@ -416,23 +417,29 @@ function render() {
     el.style.setProperty('--k', (window.Suite && Suite.turdomaniaKindColor) ? Suite.turdomaniaKindColor(t.kind, kind.color) : kind.color);
     el.dataset.col = c; el.dataset.row = r;
     const rowEl = rowEls[state.rows - 1 - r];
-    if (el.parentNode !== rowEl) {
-      const from = el.parentNode ? el.style.transform : '';
-      rowEl.appendChild(el);
-      if (from) { // re-parenting drops the transition start; replay it from the old spot
-        el.style.transition = 'none';
-        el.style.transform = from;
-        void el.offsetWidth;
-        el.style.transition = '';
-      }
-    }
     const pos = posFor(c, r);
+    const from = animate && el.parentNode && el.parentNode !== rowEl ? el.style.transform : '';
+    if (el.parentNode !== rowEl) rowEl.appendChild(el);
     el.style.setProperty('--pos', pos);
-    el.style.transform = pos;
+    if (from && from !== pos) {
+      el.style.transition = 'none';
+      el.style.transform = from;
+      moved.push([el, pos]);
+    } else {
+      el.style.transform = pos;
+    }
     el.setAttribute('aria-label', `${kind.name}, column ${c + 1}, row ${r + 1}`);
     el.setAttribute('aria-colindex', c + 1);
   }));
   for (const [id, el] of tileEls) if (!live.has(id)) { el.remove(); tileEls.delete(id); }
+  if (moved.length) {
+    // Establish every reparented tile's start position in one layout pass.
+    void boardEl.offsetWidth;
+    for (const [el, pos] of moved) {
+      el.style.transition = '';
+      el.style.transform = pos;
+    }
+  }
   els.score.textContent = state.score;
   const best = Core.readBest(safeStorage)[state.level];
   els.best.textContent = Math.max(best, state.score);

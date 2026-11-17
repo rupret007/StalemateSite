@@ -97,9 +97,6 @@ for (const prefix of ['', '/StalemateSite']) {
 
 for (const [prefix, legacy] of [['', 'daily=2026-10-21&v=1'], ['/StalemateSite', 'daily=not-a-date&v=999']]) {
     test(`former daily links open seeded free play with working undo at ${prefix || '/'}`, async ({ page }) => {
-        // Compare two real page loads, then tap a legal group and Undo.
-        // Keep the normal per-assertion deadlines for every check.
-        test.slow();
         const errors = [];
         page.on('pageerror', (error) => errors.push(error.message));
         const game = prefix + '/play/turdomania.html';
@@ -121,9 +118,6 @@ for (const [prefix, legacy] of [['', 'daily=2026-10-21&v=1'], ['/StalemateSite',
 }
 
 test('ordinary Turdomania completes and preserves existing preferences and records', async ({ page }) => {
-    // This run completes a whole board using real input. On CI, 23 WebKit taps
-    // alone used almost 24s. Each move still has the default assertion timeout.
-    test.slow();
     await page.goto('/play/turdomania.html');
     const saved = await page.evaluate(() => {
         const fixture = {
