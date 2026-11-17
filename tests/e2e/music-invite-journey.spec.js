@@ -108,13 +108,17 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             await expect(cancel).toBeInViewport({ ratio: 1 });
             await expect(cancel).toBeFocused();
             await capture(host, '00-host-waits-for-guest');
+            const guest = await enter('ChosenGuest', guestSite);
+            const liveRoster = dialog.getByRole('combobox', { name: 'Online guests' });
+            await expect(liveRoster.getByRole('option', { name: 'ChosenGuest', exact: true })).toBeAttached();
+            await expect(liveRoster).toBeEnabled();
+            await expect(liveRoster).toHaveValue('');
+            await expect(dialog.getByRole('button', { name: 'Continue in WebJam' })).toBeDisabled();
+            await expect(cancel).toBeFocused();
+            await capture(host, '00-host-sees-guest-arrive');
             await cancel.press('Enter');
             await expect(inviteButton).toBeFocused();
-            const guest = await enter('ChosenGuest', guestSite);
             const peer = await enter('OtherGuest', guestSite);
-            // The dialog takes a snapshot of the host's current shared roster.
-            await expect.poll(() => host.evaluate(() =>
-                window.__lobby.chans.get('#stalemate')?.names.map(person => person.nick) ?? [])).toContain('ChosenGuest');
             const expiry = Math.floor(Date.now() / 1000) + 70;
             const capability = Buffer.alloc(32, 1).toString('base64url');
             const href = `https://webjam.example/join/#k=${capability}&s=${'1'.repeat(64)}&g=1&e=${expiry}`;
