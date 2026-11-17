@@ -1074,7 +1074,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && ['invitation', 'web'].includes(f.args[0]) && typeof f.ch === 'string' && /^#[a-z0-9-]{2,30}$/i.test(f.ch)
             && typeof f.jamRequestId === 'string' && /^[a-f0-9]{32}$/.test(f.jamRequestId)
             ? { id: f.jamRequestId, status: 'rejected' } : null;
-        const reportFeedback = f.t === 'report' && moderationId(f.id) ? { id: f.id, submitted: false } : null;
+        // Earlier callers still handle denial through the existing notice.
+        const reportFeedback = f.t === 'report' && f.reportResult === true && moderationId(f.id)
+            ? { id: f.id, submitted: false } : null;
         const joinFeedback = f.t === 'cmd' && f.name === 'join' && validPmRef(f.joinRequestId) && validPmRef(f.roomInstance)
             ? { id: f.joinRequestId, status: 'rejected' } : null;
         const result = feedback ? status => { feedback.status = status; }

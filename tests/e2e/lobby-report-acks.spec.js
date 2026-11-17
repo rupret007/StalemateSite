@@ -34,7 +34,7 @@ test('reports send exact received text and confirm only on server acknowledgemen
     const fixture = await openFixture(page, baseURL);
     const flag = page.locator('[data-id="mreportfixture"] .flag');
     await flag.click(); await expect(flag).toHaveText('…'); await expect(flag).toBeDisabled();
-    await expect.poll(() => fixture.reports).toEqual([{ t: 'report', id: LINE.id, text: LINE.text }]);
+    await expect.poll(() => fixture.reports).toEqual([{ t: 'report', id: LINE.id, text: LINE.text, reportResult: true }]);
     fixture.publish({ t: 'report-status', id: LINE.id, submitted: true });
     fixture.publish({ t: 'notice', from: 'StaleBot', kind: 'info',
         text: 'Queued for review when a moderator is available. This is not a promise that someone is reading it now. Appeals are in House rules.' });

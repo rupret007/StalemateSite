@@ -1537,7 +1537,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 r.addEventListener('focus', () => revealFocusedReport(r));
                 r.addEventListener('click', () => {
                     if (l.reported || pendingReports.has(l.id)) return;
-                    if (!send({ t: 'report', id: l.id, text: l.text })) return toast('You are offline. Reconnect before reporting this message.');
+                    if (!send({ t: 'report', id: l.id, text: l.text, reportResult: true })) return toast('You are offline. Reconnect before reporting this message.');
                     r.setAttribute('aria-disabled', 'true'); r.textContent = '…';
                     const timer = setTimeout(() => { finishReport(l.id, false); toast('Report confirmation did not arrive. Try again or use the moderation contact.'); }, 10000);
                     pendingReports.set(l.id, { button: r, timer });
