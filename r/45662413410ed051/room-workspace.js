@@ -4,6 +4,7 @@
     if (!room) return;
 
     const controls = room.querySelector('#room-call-controls');
+    const chat = room.querySelector('#room-chat');
     const controlsJump = room.querySelector('[data-room-controls-jump]');
     const camera = room.querySelector('[data-cam]');
     const startVideo = room.querySelector('[data-workspace-start-video]');
@@ -21,12 +22,25 @@
         const height = Math.ceil(controls.getBoundingClientRect().height);
         if (phone.matches || document.body.classList.contains('shared-layout') || !height) {
             room.style.removeProperty('--workspace-controls');
+            room.style.removeProperty('--workspace-chat-height');
         } else {
             room.style.setProperty('--workspace-controls', `${height}px`);
+            // Use actual geometry: desktop fonts and wrapped controls vary by platform.
+            if (chat && chat.getClientRects().length) {
+                const available = Math.floor(controls.getBoundingClientRect().top - chat.getBoundingClientRect().top - 8);
+                room.style.setProperty('--workspace-chat-height', `${Math.max(0, available)}px`);
+            }
         }
     }
 
     phone.addEventListener('change', reserveDesktopControls);
-    if (typeof ResizeObserver === 'function') new ResizeObserver(reserveDesktopControls).observe(controls);
+    if (typeof ResizeObserver === 'function') {
+        const observer = new ResizeObserver(reserveDesktopControls);
+        observer.observe(controls);
+        if (chat) observer.observe(chat);
+        const header = room.querySelector('.bar');
+        if (header) observer.observe(header);
+    }
+    window.addEventListener('resize', reserveDesktopControls);
     reserveDesktopControls();
 })();

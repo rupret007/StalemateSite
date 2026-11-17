@@ -2,7 +2,7 @@ const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
-const sizes = [{ width: 375, height: 812 }, { width: 390, height: 844 }, { width: 1440, height: 900 }];
+const sizes = [{ width: 375, height: 812 }, { width: 390, height: 844 }, { width: 1440, height: 900 }, { width: 1440, height: 900, chatPadding: true }];
 
 async function checkControls(page) {
     const controls = page.getByRole('group', { name: 'Call controls' });
@@ -24,9 +24,16 @@ async function checkControls(page) {
 }
 
 for (const viewport of sizes) {
-    test(`private room stage, chat and controls at ${viewport.width}x${viewport.height}`, async ({ page, baseURL }, testInfo) => {
+    test(`private room stage, chat and controls at ${viewport.width}x${viewport.height}${viewport.chatPadding ? " with compact chat padding" : ""}`, async ({ page, baseURL }, testInfo) => {
         await page.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());
-        await page.setViewportSize(viewport);
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        if (viewport.chatPadding) await page.addInitScript(() => {
+            document.addEventListener("DOMContentLoaded", () => {
+                const style = document.createElement("style");
+                style.textContent = "#room-chat { padding-bottom: 0; }";
+                document.head.append(style);
+            });
+        });
         await page.addInitScript(() => {
             window.roomCaptureRequests = 0;
             navigator.mediaDevices.getUserMedia = () => {

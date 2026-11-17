@@ -448,6 +448,7 @@ body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .callbar [data-han
 body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .callbar [data-reacts]{display:inline-flex}
 
 @media (min-width:821px){
+    body:not(.bob-mode):not(.shared-layout) [data-room-workspace] > .chat{max-height:var(--workspace-chat-height,none)}
     body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .callbar{flex-wrap:wrap;overflow:visible}
     body.is-host:not(.bob-mode):not(.shared-layout) [data-room-workspace]{--workspace-host-tools:4rem}
     body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .tiles[data-view=speaker] .tile--big{
