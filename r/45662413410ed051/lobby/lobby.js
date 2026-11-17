@@ -696,6 +696,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         retryButton.hidden = !showRetry;
         if (state === 'offline' && showRetry && document.activeElement === status) retryButton.focus({ preventScroll: true });
         $('[data-send]').disabled = state !== 'connected';
+        const chatActionsUnavailable = state === 'ended' || app.localMediaPaused;
+        $('[data-quick]').hidden = chatActionsUnavailable;
+        $('[data-palette-open]').disabled = chatActionsUnavailable;
         $('[data-enter]').disabled = state === 'connecting' || state === 'reconnecting' || state === 'ended' && betaShell;
         if (gameGuest) $('[data-game-guest-retry]').hidden = state !== 'offline' && !gameGuestReloadOffered;
         $$('[data-start]').forEach((b) => { b.disabled = state !== 'connected'; });

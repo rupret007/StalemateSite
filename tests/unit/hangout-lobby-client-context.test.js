@@ -1130,6 +1130,35 @@ describe('newcomer navigation and closed sessions', () => {
         expect(actions.scrollLeft).toBe(85);
     });
 
+    it('retires chat shortcuts when a session ends and restores them on reentry', async () => {
+        const { window, ws, welcome, join, sockets } = await visitor();
+        welcome(); join();
+        const { document } = window;
+        const quickActions = document.querySelector('[data-quick]');
+        const commands = document.querySelector('[data-palette-open]');
+        const composer = document.querySelector('[data-text]');
+        composer.value = 'Copy this draft before returning';
+        expect(quickActions.hidden).toBe(false);
+        expect(commands.disabled).toBe(false);
+
+        await ws.close(4401);
+
+        expect(document.activeElement.id).toBe('session-ended-title');
+        expect(quickActions.hidden).toBe(true);
+        expect(commands.disabled).toBe(true);
+        expect(composer.value).toBe('Copy this draft before returning');
+        expect(composer.readOnly).toBe(true);
+
+        document.querySelector('[data-reconnect]').click();
+        await vi.waitFor(() => expect(sockets).toHaveLength(2));
+        sockets[1].open();
+        welcome(sockets[1]);
+
+        expect(quickActions.hidden).toBe(false);
+        expect(commands.disabled).toBe(false);
+        expect(composer.readOnly).toBe(false);
+    });
+
     it.each([
         ['hides', '   ', true],
         ['shows', 'Keep this draft', false],

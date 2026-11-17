@@ -309,6 +309,8 @@ for (const width of [375, 390]) {
             await expect(ended.locator('[data-connection]')).toHaveText('Session ended');
             await expect(ended.locator('[data-reconnect]')).toBeHidden();
             await expect(ended.locator('[data-send]')).toBeDisabled();
+            await expect(ended.locator('[data-quick]')).toBeHidden();
+            await expect(ended.getByRole('button', { name: 'Commands', exact: true })).toBeDisabled();
             await expect(ended.locator('[data-text]')).toHaveValue('Unsent drawing idea — never move this into lobby chat');
             await expect(ended.locator('[data-pmreqs]')).toBeEmpty();
             await expect(ended.locator('[data-palette]')).toBeHidden();
