@@ -744,6 +744,34 @@ describe('targeted Music invitation', () => {
         expect(panel.hidden).toBe(true);
     });
 
+    it('shows a waiting Music invite in chat while the accepted browser link stays in its own room', async () => {
+        const { window, ws, offer, accepted, href, joinJam, action, dismiss, panel, status } = await setup();
+        const next = { ...offer, id: 'c'.repeat(32), ch: '#jam-drums', roomInstance: 'd'.repeat(32), by: 'DrumHost' };
+        ws.receive(offer);
+        action.click();
+        joinJam();
+        ws.receive(accepted);
+        ws.receive(next);
+
+        window.document.querySelector('[data-channel-key="#stalemate"]').click();
+        expect(panel.hidden).toBe(false);
+        expect(status.textContent).toBe('Another Music invitation is waiting.');
+        expect(action.hidden).toBe(true);
+        expect(dismiss.textContent).toBe('Next invitation');
+        expect(panel.innerHTML).not.toContain(href);
+        action.click();
+        expect(window.open).not.toHaveBeenCalled();
+
+        window.document.querySelector(`[data-channel-key="${offer.ch}"]`).click();
+        expect(action.hidden).toBe(false);
+        expect(action.textContent).toBe('Open WebJam in browser');
+        window.document.querySelector('[data-channel-key="#stalemate"]').click();
+        dismiss.focus();
+        dismiss.click();
+        expect(status.textContent).toBe('DrumHost invited you to join Music.');
+        expect(window.document.activeElement).toBe(action);
+    });
+
     it('announces Music invite updates without revealing the private browser link', async () => {
         const { window, ws, offer, accepted, href, joinJam, panel, action, dismiss } = await setup();
         const { document } = window;

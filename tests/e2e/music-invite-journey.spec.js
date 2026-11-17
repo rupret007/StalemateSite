@@ -29,6 +29,7 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
         const relay = hangoutRelayWsBase(baseURL, `webjam-browser-targeted-${randomUUID()}`);
         const contexts = [];
         let releaseMusicConfirmation;
+        let deliverWaitingOffer;
         async function enter(nick, via) {
             const site = sites[via];
             const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
@@ -62,6 +63,10 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             if (delayed && nick === 'ChosenGuest') {
                 await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
                     const server = socket.connectToServer();
+                    deliverWaitingOffer = () => socket.send(JSON.stringify({
+                        t: 'music-invite', id: randomUUID().replaceAll('-', ''), ch: '#jam-drums',
+                        roomInstance: randomUUID().replaceAll('-', ''), by: 'DrumHost', expires: Date.now() + 60000,
+                    }));
                     server.onMessage(raw => {
                         if (JSON.parse(String(raw)).t === 'music-invite-accepted') {
                             releaseMusicConfirmation = () => socket.send(raw);
@@ -263,6 +268,10 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
                 await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
                 await expect.poll(() => typeof releaseMusicConfirmation).toBe('function');
                 await capture(guest, '02b-awaiting-delayed-confirmation');
+                // Deliver a second, synthetic host offer while the real first reply is held.
+                deliverWaitingOffer();
+                await expect(panel.getByRole('button', { name: 'Next invitation', exact: true })).toBeFocused();
+                await expect(announcement).toContainText('hasn’t confirmed your reply');
                 releaseMusicConfirmation();
             }
             await expect(guest.locator('[data-chat-context]')).toHaveText(room);
@@ -282,6 +291,21 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             expect(await guest.evaluate(() => window.fixtureMicRequests)).toBe(0);
             expect(await guest.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain(href);
             await expect(host.locator('[data-jam-link]')).toBeEmpty();
+            if (delayed) {
+                const jamTab = guest.locator(`[data-channel-key="${room}"]`);
+                const chatTab = guest.locator('[data-channel-key="#stalemate"]');
+                await chatTab.click();
+                await expect(announcement).toHaveText('Another Music invitation is waiting.');
+                await expect(audio).toBeHidden();
+                await capture(guest, '04a-music-invite-waits-across-tabs');
+                await jamTab.click();
+                await expect(audio).toBeVisible();
+                await chatTab.click();
+                await panel.getByRole('button', { name: 'Next invitation', exact: true }).press('Enter');
+                await expect(announcement).toHaveText('DrumHost invited you to join Music.');
+                await expect(accept).toBeFocused();
+                await capture(guest, '04b-next-music-invitation');
+            }
 
             const listener = await guest.context().newPage();
             await listener.addInitScript(() => {

@@ -2214,10 +2214,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const accepted = state === 'accepted', joining = state === 'joining', ended = state === 'ended', unconfirmed = state === 'unconfirmed';
         const jam = currentJam();
         const inOfferRoom = jam?.name === musicOffer?.room && jam?.keepRef === musicOffer?.instance;
+        const waiting = nextMusicInvite();
+        const acceptedElsewhere = accepted && !inOfferRoom;
         const hadFocus = musicPanel.contains(document.activeElement);
-        musicPanel.hidden = !musicOffer || (accepted && (!inOfferRoom || !readyForMusicOffer()));
+        musicPanel.hidden = !musicOffer || (accepted && (!readyForMusicOffer() || (acceptedElsewhere && !waiting)));
         const message = musicPanel.hidden ? ''
             : ended ? (musicOffer.expires <= Date.now() ? 'This Music invitation expired. Ask the host for a new one.' : 'This Music invitation ended. Ask the host for a new one.')
+            : acceptedElsewhere ? 'Another Music invitation is waiting.'
             : accepted ? 'You’re in the Jam room. Open WebJam in a new tab, then come back here to chat.'
             : unconfirmed ? 'The room hasn’t confirmed your reply. Wait here or ask the host for a new invitation.'
             : joining ? 'Waiting for the room to confirm you joined.'
@@ -2231,13 +2234,14 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (hadFocus) focusChannelTab(app.active, { preventScroll: false });
             return;
         }
-        if (accepted && !amOp(jam) && !jam.jam?.web && !jam.jam?.desktop && !jam.jam?.invitation) $('[data-jam-actions]').hidden = true;
+        if (accepted && inOfferRoom && !amOp(jam) && !jam.jam?.web && !jam.jam?.desktop && !jam.jam?.invitation) $('[data-jam-actions]').hidden = true;
         musicAction.textContent = accepted ? 'Open WebJam in browser' : joining ? 'Joining…' : 'Accept and join';
-        musicDismiss.textContent = state === 'offer' ? 'Not now' : !joining && nextMusicInvite() ? 'Next invitation' : 'Dismiss';
+        musicDismiss.textContent = state === 'offer' ? 'Not now' : !joining && waiting ? 'Next invitation' : 'Dismiss';
         musicAction.setAttribute('aria-disabled', String(joining));
         musicDismiss.setAttribute('aria-disabled', String(joining));
-        if ((ended || unconfirmed) && document.activeElement === musicAction) musicDismiss.focus();
-        musicAction.hidden = ended || unconfirmed;
+        const actionUnavailable = ended || unconfirmed || acceptedElsewhere;
+        if (actionUnavailable && document.activeElement === musicAction) musicDismiss.focus();
+        musicAction.hidden = actionUnavailable;
     }
 
     musicAction.addEventListener('click', () => {
