@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 afterEach(() => {
     vi.unstubAllGlobals();
+    vi.resetModules();
     history.replaceState(null, '', '/');
     document.body.replaceChildren();
 });
@@ -53,4 +54,34 @@ it('tells a returning guest to wait when reconnects are limited, then handles an
         ['/beta/game-night/invitation/resume', { tableId, pass }],
         ['/beta/game-night/invitation/resume', { tableId, pass }]
     ]);
+});
+
+it('focuses retry when an invite check fails and moves focus to Join once recovered', async () => {
+    document.body.innerHTML = `
+        <main>
+            <h1 data-guest-game>Game Night</h1>
+            <p data-guest-inviter hidden></p>
+            <p data-guest-status role="status">Checking your invitation…</p>
+            <section data-guest-invite hidden><button data-guest-join>Join game</button></section>
+            <button data-guest-retry hidden>Try again</button>
+        </main>
+    `;
+    history.replaceState(null, '', '/beta/game-night/guest#invite=fixture');
+    const request = vi.fn()
+        .mockResolvedValueOnce(Response.json({}, { status: 503 }))
+        .mockResolvedValueOnce(Response.json({ game: 'Turdanoid Brick Race', host: 'Test host' }));
+    vi.stubGlobal('fetch', request);
+    await import('../../r/45662413410ed051/lobby/game-night-guest.js');
+
+    const status = document.querySelector('[data-guest-status]');
+    const retry = document.querySelector('[data-guest-retry]');
+    const join = document.querySelector('[data-guest-join]');
+    await vi.waitFor(() => expect(retry.hidden).toBe(false));
+    expect(status.textContent).toBe('Couldn’t check the invitation. Try again.');
+    expect(document.activeElement).toBe(retry);
+
+    retry.click();
+    await vi.waitFor(() => expect(document.activeElement).toBe(join));
+    expect(retry.hidden).toBe(true);
+    expect(request.mock.calls.map(([url]) => url)).toEqual(Array(2).fill('/beta/game-night/invitation/details'));
 });

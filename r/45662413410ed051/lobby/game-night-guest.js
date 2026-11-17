@@ -143,6 +143,8 @@ async function describe() {
             offerFreshLink();
             status.tabIndex = -1;
             status.focus({ preventScroll: true });
+        } else if (document.activeElement === document.body) {
+            retry.focus({ preventScroll: true });
         }
     }
 }
