@@ -412,6 +412,36 @@ test('host command, camera and person dialogs expose visible headings as accessi
     } finally { await peer?.close(); await visitor.close(); }
 });
 
+for (const [width, height] of [[375, 667], [390, 844]]) test(`ordinary phone chat Leave is a 48px target and restores usable lobby at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, reducedMotion: 'reduce' });
+    try {
+        const page = await context.newPage();
+        const relay = hangoutRelayWsBase(baseURL, `chat-leave-${randomUUID()}`);
+        await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('PhoneChatGuest');
+        await page.locator('[data-enter]').tap();
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+        await composer.fill('/join #phone-chat'); await composer.press('Enter');
+        await expect(page.locator('[data-chat-context]')).toHaveText('#phone-chat');
+        const leave = page.locator('[data-roombar]').getByRole('button', { name: 'Leave', exact: true });
+        await expect(leave).toBeInViewport({ ratio: 1 });
+        await page.screenshot({ path: testInfo.outputPath(`ordinary-chat-leave-${width}.png`) });
+        const bounds = await leave.boundingBox();
+        await attachGeometry(testInfo, `ordinary-chat-leave-${width}`, { viewport: { width, height }, leave: bounds });
+        expect(bounds.width).toBeGreaterThanOrEqual(48);
+        expect(bounds.height).toBeGreaterThanOrEqual(48);
+        await leave.tap();
+        await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(page.getByRole('tab', { name: '#phone-chat', exact: true })).toHaveCount(0);
+        contained(await composerGeometry(page));
+        await composer.fill('Back in the lobby after leaving.');
+        await page.getByRole('button', { name: 'Send', exact: true }).tap();
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('Back in the lobby after leaving.');
+        await page.screenshot({ path: testInfo.outputPath(`ordinary-chat-left-${width}.png`) });
+    } finally { await context.close(); }
+});
+
 const viewports = [
     { label: 'phone375', width: 375, height: 844 }, { label: 'phone390', width: 390, height: 844 },
     { label: 'reflow200-equivalent', width: 640, height: 512 }, { label: 'reflow400-equivalent', width: 320, height: 256 }

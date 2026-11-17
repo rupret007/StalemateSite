@@ -790,7 +790,8 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   [data-music-invite] p { flex-basis: 100px; }
 }
 @media (max-width: 480px) and (min-height: 621px) {
-  .channel-panel:has(> [data-jam]:not([hidden])) > .roombar .btn { min-width: 48px; min-height: 48px; }
+  .channel-panel:has(> [data-jam]:not([hidden])) > .roombar .btn,
+  .channel-panel > .roombar [data-leave] { min-width: 48px; min-height: 48px; }
   .channel-panel:not(:has(> .game-night:not([hidden]))) .say .btn { min-height: 48px; margin-block: 2px; }
   .channel-panel:not(:has(> .game-night:not([hidden]))) .slash { min-width: 48px; min-height: 48px; }
 }
