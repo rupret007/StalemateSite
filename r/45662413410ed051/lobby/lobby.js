@@ -2127,14 +2127,33 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const musicDismiss = $('[data-music-invite-dismiss]');
     const musicStatus = $('[data-music-invite-status]');
     const musicAnnouncement = $('[data-music-invite-announcement]');
+    const waitingMusicOffers = new Map();
     const readyForMusicOffer = () => directMusicInvitesSupported && !sharingControls && !gameGuest && connectionState === 'connected'
         && !sessionEnded && !shieldActive && (!app.netLock || app.netLock === 'off') && !app.localMediaPaused && !app.sharingStopped;
 
-    function clearMusicInvite() {
+    function setMusicInvite(offer) {
         clearTimeout(musicOffer?.expiryTimer);
         clearTimeout(musicOffer?.replyTimer);
-        musicOffer = null;
+        musicOffer = offer;
+        if (offer) offer.expiryTimer = setTimeout(endMusicInvite, offer.expires - Date.now());
+    }
+
+    function clearMusicInvite() {
+        for (const id of waitingMusicOffers.keys()) removeWaitingMusicInvite(id);
+        setMusicInvite(null);
         drawMusicInvite();
+    }
+
+    function removeWaitingMusicInvite(id) {
+        clearTimeout(waitingMusicOffers.get(id)?.expiryTimer);
+        return waitingMusicOffers.delete(id);
+    }
+
+    function nextMusicInvite() {
+        for (const [id, offer] of waitingMusicOffers) {
+            if (offer.expires <= Date.now()) removeWaitingMusicInvite(id);
+        }
+        return waitingMusicOffers.values().next().value;
     }
 
     function endMusicInvite() {
@@ -2162,12 +2181,19 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (frame.t === 'music-invite') {
             const remaining = frame.expires - Date.now();
             if (!jamRoomName(frame.ch) || !roomNonce(frame.roomInstance) || typeof frame.by !== 'string'
-                || !Number.isSafeInteger(frame.expires) || remaining <= 0 || remaining > 600000) return;
-            clearTimeout(musicOffer?.expiryTimer);
-            clearTimeout(musicOffer?.replyTimer);
-            musicOffer = { id: frame.id, room: frame.ch, instance: frame.roomInstance, from: frame.by, expires: frame.expires, state: 'offer' };
-            musicOffer.expiryTimer = setTimeout(endMusicInvite, remaining);
+                || !Number.isSafeInteger(frame.expires) || remaining <= 0 || remaining > 600000
+                || musicOffer?.id === frame.id || waitingMusicOffers.has(frame.id)) return;
+            const offer = { id: frame.id, room: frame.ch, instance: frame.roomInstance, from: frame.by, expires: frame.expires, state: 'offer' };
+            const waiting = nextMusicInvite();
+            if (!musicOffer || (musicOffer.state === 'ended' && !waiting)) setMusicInvite(offer);
+            else if (waitingMusicOffers.size < 4) {
+                waitingMusicOffers.set(offer.id, offer);
+                offer.expiryTimer = setTimeout(() => {
+                    if (removeWaitingMusicInvite(offer.id)) drawMusicInvite();
+                }, remaining);
+            }
         } else {
+            if (frame.t === 'music-invite-ended' && removeWaitingMusicInvite(frame.id)) return drawMusicInvite();
             if (musicOffer?.id !== frame.id) return;
             if (frame.t === 'music-invite-ended') return endMusicInvite();
             if (!['joining', 'unconfirmed'].includes(musicOffer.state)) return;
@@ -2189,10 +2215,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const accepted = state === 'accepted', joining = state === 'joining', ended = state === 'ended', unconfirmed = state === 'unconfirmed';
         const jam = currentJam();
         const inOfferRoom = jam?.name === musicOffer?.room && jam?.keepRef === musicOffer?.instance;
+        const waiting = nextMusicInvite();
+        const acceptedElsewhere = accepted && !inOfferRoom;
         const hadFocus = musicPanel.contains(document.activeElement);
-        musicPanel.hidden = !musicOffer || (accepted && (!inOfferRoom || !readyForMusicOffer()));
+        musicPanel.hidden = !musicOffer || (accepted && (!readyForMusicOffer() || (acceptedElsewhere && !waiting)));
         const message = musicPanel.hidden ? ''
             : ended ? (musicOffer.expires <= Date.now() ? 'This Music invitation expired. Ask the host for a new one.' : 'This Music invitation ended. Ask the host for a new one.')
+            : acceptedElsewhere ? 'Another Music invitation is waiting.'
             : accepted ? 'You’re in the Jam room. Open WebJam in a new tab, then come back here to chat.'
             : unconfirmed ? 'The room hasn’t confirmed your reply. Wait here or ask the host for a new invitation.'
             : joining ? 'Waiting for the room to confirm you joined.'
@@ -2206,13 +2235,14 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (hadFocus) focusChannelTab(app.active, { preventScroll: false });
             return;
         }
-        if (accepted && !amOp(jam) && !jam.jam?.web && !jam.jam?.desktop && !jam.jam?.invitation) $('[data-jam-actions]').hidden = true;
+        if (accepted && inOfferRoom && !amOp(jam) && !jam.jam?.web && !jam.jam?.desktop && !jam.jam?.invitation) $('[data-jam-actions]').hidden = true;
         musicAction.textContent = accepted ? 'Open WebJam in browser' : joining ? 'Joining…' : 'Accept and join';
-        musicDismiss.textContent = state === 'offer' ? 'Not now' : 'Dismiss';
+        musicDismiss.textContent = state === 'offer' ? 'Not now' : !joining && waiting ? 'Next invitation' : 'Dismiss';
         musicAction.setAttribute('aria-disabled', String(joining));
         musicDismiss.setAttribute('aria-disabled', String(joining));
-        if ((ended || unconfirmed) && document.activeElement === musicAction) musicDismiss.focus();
-        musicAction.hidden = ended || unconfirmed;
+        const actionUnavailable = ended || unconfirmed || acceptedElsewhere;
+        if (actionUnavailable && document.activeElement === musicAction) musicDismiss.focus();
+        musicAction.hidden = actionUnavailable;
     }
 
     musicAction.addEventListener('click', () => {
@@ -2240,8 +2270,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             musicOffer.sendFailed = true;
             return drawMusicInvite();
         }
-        clearMusicInvite();
+        const next = nextMusicInvite();
+        const hadFocus = document.activeElement === musicDismiss;
+        if (next) removeWaitingMusicInvite(next.id);
+        setMusicInvite(next ?? null);
         drawJam();
+        drawMusicInvite();
+        if (hadFocus && next && !musicPanel.hidden) musicAction.focus();
     });
     window.addEventListener('pagehide', clearMusicInvite);
 
