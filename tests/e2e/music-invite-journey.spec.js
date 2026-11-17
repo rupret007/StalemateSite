@@ -16,10 +16,13 @@ const viewports = [
     { width: 1440, height: 900, hostSite: 'rad-dad', guestSite: 'stalemate' },
 ];
 
-const scenarios = viewports.flatMap(viewport => [
-    { ...viewport, delayed: false },
-    { ...viewport, delayed: true },
-]);
+const scenarios = [
+    { ...viewports[0], width: 375, height: 667, delayed: false },
+    ...viewports.flatMap(viewport => [
+        { ...viewport, delayed: false },
+        { ...viewport, delayed: true },
+    ]),
+];
 
 for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
     test(`targeted Music invite across band entrances at ${width}x${height}${delayed ? ' after delayed confirmation' : ''}`, async ({ browser, baseURL }, testInfo) => {
