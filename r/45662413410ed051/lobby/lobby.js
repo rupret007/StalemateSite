@@ -2087,6 +2087,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
 
     function receiveMusicInvite(frame) {
         if (!readyForMusicOffer() || !roomNonce(frame.id)) return;
+        const restoreActionFocus = frame.t === 'music-invite-accepted' && musicOffer?.state === 'unconfirmed'
+            && document.activeElement === musicDismiss;
         if (frame.t === 'music-invite') {
             const remaining = frame.expires - Date.now();
             if (!jamRoomName(frame.ch) || !roomNonce(frame.roomInstance) || typeof frame.by !== 'string'
@@ -2109,6 +2111,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (app.active !== jam.name) switchTo(jam.name);
         }
         drawMusicInvite();
+        if (restoreActionFocus && document.activeElement === musicDismiss && !musicPanel.hidden) musicAction.focus();
     }
 
     function drawMusicInvite() {

@@ -615,17 +615,24 @@ describe('targeted Music invitation', () => {
         expect(window.open).toHaveBeenCalledTimes(1);
     });
 
-    it('explains an unconfirmed response and still accepts a delayed confirmation', async () => {
-        const { ws, offer, accepted, joinJam, action, status, flush } = await setup();
+    it.each(['invite', 'composer'])('recovers from delayed Music confirmation with focus in the %s', async focus => {
+        const { window, ws, offer, accepted, joinJam, action, dismiss, status, flush } = await setup();
+        const { document } = window;
         ws.receive(offer);
+        action.focus();
         action.click();
         flush(10000);
         expect(action.hidden).toBe(true);
         expect(status.textContent).toMatch(/hasn’t confirmed/);
+        expect(document.activeElement).toBe(dismiss);
+        const composer = document.querySelector('[data-text]');
+        if (focus === 'composer') composer.focus();
         joinJam();
         ws.receive(accepted);
         expect(action.textContent).toBe('Open WebJam in browser');
         expect(action.hidden).toBe(false);
+        expect(document.activeElement).toBe(focus === 'invite' ? action : composer);
+        expect(window.open).not.toHaveBeenCalled();
     });
 
     it('announces Music invite updates without revealing the private browser link', async () => {

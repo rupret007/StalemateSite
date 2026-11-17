@@ -16,10 +16,16 @@ const viewports = [
     { width: 1440, height: 900, hostSite: 'rad-dad', guestSite: 'stalemate' },
 ];
 
-for (const { width, height, hostSite, guestSite } of viewports) {
-    test(`targeted Music invite across band entrances at ${width}x${height}`, async ({ browser, baseURL }, testInfo) => {
+const scenarios = viewports.flatMap(viewport => [
+    { ...viewport, delayed: false },
+    { ...viewport, delayed: true },
+]);
+
+for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
+    test(`targeted Music invite across band entrances at ${width}x${height}${delayed ? ' after delayed confirmation' : ''}`, async ({ browser, baseURL }, testInfo) => {
         const relay = hangoutRelayWsBase(baseURL, `webjam-browser-targeted-${randomUUID()}`);
         const contexts = [];
+        let releaseMusicConfirmation;
         async function enter(nick, via) {
             const site = sites[via];
             const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
@@ -50,6 +56,16 @@ for (const { width, height, hostSite, guestSite } of viewports) {
                 }, true);
             });
             const page = await context.newPage();
+            if (delayed && nick === 'ChosenGuest') {
+                await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
+                    const server = socket.connectToServer();
+                    server.onMessage(raw => {
+                        if (JSON.parse(String(raw)).t === 'music-invite-accepted') {
+                            releaseMusicConfirmation = () => socket.send(raw);
+                        } else socket.send(raw);
+                    });
+                });
+            }
             await page.goto(site.origin);
             await page.getByRole('link', { name: 'Hang Out' }).click();
             await expect(page.locator('[data-entry-label]').first()).toHaveText(`via ${site.label}`);
@@ -166,7 +182,25 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await capture(guest, '02-guest-receives-offer');
             await host.locator('[data-channel-key="#stalemate"]').click();
             await expect(roomContext).toHaveText('#stalemate');
+            if (delayed) {
+                // Keep the genuine acceptance frame and accelerate only the client's reply timer.
+                await guest.evaluate(() => {
+                    const schedule = window.setTimeout;
+                    window.setTimeout = (handler, delay, ...args) => {
+                        if (delay !== 10000) return schedule.call(window, handler, delay, ...args);
+                        window.setTimeout = schedule;
+                        return schedule.call(window, handler, 0, ...args);
+                    };
+                });
+            }
             await accept.press('Enter');
+            if (delayed) {
+                await expect(announcement).toContainText('hasn’t confirmed your reply');
+                await expect(panel.getByRole('button', { name: 'Dismiss', exact: true })).toBeFocused();
+                await expect.poll(() => typeof releaseMusicConfirmation).toBe('function');
+                await capture(guest, '02b-awaiting-delayed-confirmation');
+                releaseMusicConfirmation();
+            }
             await expect(guest.locator('[data-chat-context]')).toHaveText(room);
             const audio = panel.getByRole('button', { name: 'Open WebJam in browser', exact: true });
             await expect(audio).toBeInViewport({ ratio: 1 });
