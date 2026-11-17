@@ -316,6 +316,14 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
             await host.setViewportSize(original);
         }
     }
+    async function expectGameNightNickname(page) {
+        await expect(page.getByRole('textbox')).toHaveCount(1);
+        const nickname = page.getByRole('textbox', { name: 'Your nickname' });
+        await expect(nickname).toBeInViewport({ ratio: 1 });
+        await expect(nickname).toHaveValue(/^(Guest|Player|Arcade)-\d{6}$/);
+        assert.ok(await nickname.evaluate(input => input.closest('label').nextElementSibling.id === 'guest-agreement'),
+            'the name field appears before the age and rules acknowledgement');
+    }
     async function openGameNightLink(page, link) {
         // Keep the invitation out of browser automation navigation logs.
         await page.addInitScript(({ path, hash }) => {
@@ -406,11 +414,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 const expires = guest.locator('[data-guest-expiry] time');
                 await expect(expires).toBeVisible();
                 assert.ok(Date.parse(await expires.getAttribute('datetime')) > Date.now());
-                await expect(guest.getByRole('textbox')).toHaveCount(1);
-                const nickname = guest.getByRole('textbox', { name: 'Your nickname' });
-                await expect(nickname).toHaveValue(/^(Guest|Player|Arcade)-\d{6}$/);
-                assert.ok(await nickname.evaluate(input => input.closest('label').nextElementSibling.id === 'guest-agreement'),
-                    'the name field appears before the age and rules acknowledgement');
+                await expectGameNightNickname(guest);
                 await expect(guest.getByRole('button')).toHaveCount(1);
                 assert.equal(new URL(guest.url()).hash, '');
                 assert.equal(await guest.evaluate(() => window.gameAudioContexts), 0, 'opening the invite does not unlock sound');
@@ -1441,7 +1445,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 await expect(gameTitle).toBeVisible();
                 assert.equal(attempts.length, 0, 'refresh before confirmation must not attempt to join');
                 assert.equal((await friend.context().cookies()).length, 0, 'refresh before confirmation grants no access');
-                await expect(friend.getByRole('textbox')).toHaveCount(0);
+                await expectGameNightNickname(friend);
                 await expect(friend.getByRole('button')).toHaveCount(1);
                 const joinGame = friend.getByRole('button', { name: 'Join game', exact: true });
                 await expectUncoveredControl(joinGame);
