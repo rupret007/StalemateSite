@@ -133,8 +133,17 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             await expect(liveRoster).toBeEnabled();
             await expect(liveRoster).toHaveValue('');
             await expect(dialog.getByRole('status')).toHaveText('');
-            await expect(dialog.getByRole('button', { name: 'Continue in WebJam' })).toBeDisabled();
+            const continueButton = dialog.getByRole('button', { name: 'Continue in WebJam' });
+            await expect(continueButton).toBeDisabled();
             await expect(cancel).toBeFocused();
+            if (width <= 480) {
+                for (const control of [liveRoster, continueButton, cancel]) {
+                    await expect(control).toBeInViewport({ ratio: 1 });
+                    const bounds = await control.boundingBox();
+                    expect(bounds.width).toBeGreaterThanOrEqual(48);
+                    expect(bounds.height).toBeGreaterThanOrEqual(48);
+                }
+            }
             await capture(host, '00-host-sees-guest-arrive');
             await cancel.press('Enter');
             await expect(inviteButton).toBeFocused();

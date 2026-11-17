@@ -786,6 +786,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .conversation-starters button, .quiet-action { font-size: 11px; }
   .quick button { font-size: 12px; }
   :is([data-room-invite], [data-music-invite]) .btn { min-width: 48px; min-height: 48px; }
+  [data-invite-form] :is([data-invite-options], [data-invite-person-send], [data-invite-cancel]) { min-width: 48px; min-height: 48px; }
   [data-music-invite] p { flex-basis: 100px; }
 }
 @media (max-width: 480px) and (min-height: 621px) {
