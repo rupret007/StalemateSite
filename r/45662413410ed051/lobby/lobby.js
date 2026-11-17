@@ -2839,7 +2839,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         count.textContent = String(rooms.length);
         const empty = $('[data-rooms-empty]');
         empty.hidden = rooms.length > 0;
-        empty.textContent = sessionEnded ? 'Join again to see rooms.' : 'No rooms yet. Stay for a chat, or be the first to start one.';
+        if (sessionEnded) empty.textContent = 'Join again to see rooms.';
+        else if (query) empty.textContent = 'No rooms match that search. Clear it or try another name.';
+        else empty.textContent = 'No rooms yet. Stay for a chat, or be the first to start one.';
         const rows = rooms.map(r => {
             const li = previous.get(r.name) || document.createElement('li');
             li.dataset.roomKey = r.name;

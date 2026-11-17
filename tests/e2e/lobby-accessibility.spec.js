@@ -1164,6 +1164,17 @@ for (const width of [375, 390, 1440]) {
             const button = visitor.page.locator('[data-roomlist] button[data-room="#directory-room"]');
             const publicRoom = visitor.page.locator('[data-room="#directory-room"]');
             await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');
+            const directorySearch = visitor.page.getByRole('searchbox', { name: 'Find a room' });
+            const directoryEmpty = visitor.page.locator('[data-rooms-empty]');
+            await tabTo(visitor.page, directorySearch);
+            await visitor.page.keyboard.type('missing-room');
+            await expect(publicRoom).toHaveCount(0);
+            await visitor.page.screenshot({ path: testInfo.outputPath(`directory-no-matches-${width}x${viewport.height}.png`) });
+            await expect(directoryEmpty).toHaveText('No rooms match that search. Clear it or try another name.');
+            await expect(directorySearch).toBeFocused();
+            await visitor.page.keyboard.press('ControlOrMeta+A'); await visitor.page.keyboard.press('Backspace');
+            await expect(publicRoom).toHaveCount(1);
+            await expect(directoryEmpty).toBeHidden();
             await tabTo(visitor.page, button);
             const original = await button.elementHandle();
             arrival = await guest(browser, baseURL, 'DirectoryArrival', viewport, relay);
