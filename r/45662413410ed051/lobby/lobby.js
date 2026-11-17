@@ -920,7 +920,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         announcements.replace(() => $('[data-chat-lines]').replaceChildren());
         setConnection('ended'); drawTabs(); drawChan();
         composer.readOnly = true;
-        $('[data-session-draft]').hidden = !composer.value.trim();
+        const hasDraft = !!composer.value.trim();
+        if (hasDraft) composer.disabled = false;
+        $('[data-session-draft]').hidden = !hasDraft;
+        $('[data-session-copy-draft]').hidden = !hasDraft;
         const ended = reason === 'private-access' ? 'Your private community access needs renewal.'
             : reason === 'removed' ? 'You were removed from this session.'
             : reason === 'left' ? 'You left this chat. Your sign-in and any recorded sharing withdrawal have not been changed.' : reason === 'admission'
@@ -936,6 +939,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-session-ended]').hidden = false;
         show('chat'); $('#session-ended-title').focus({ preventScroll: true });
     }
+    $('[data-session-copy-draft]').addEventListener('click', () => {
+        const input = $('[data-text]');
+        if (!sessionEnded || !input.value.trim()) return;
+        const attempt = connectionAttempt, channel = app.active;
+        void copyDraft(input, () => sessionEnded && connectionAttempt === attempt && app.active === channel);
+    });
     function gameGuestExitMessage(reason) {
         return { left: 'You left Game Night.', canceled: 'You canceled joining Game Night.', closed: 'This Game Night room closed.', removed: 'You were removed from Game Night.' }[reason] || 'Your Game Night access ended.';
     }
@@ -3043,6 +3052,18 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (focus) switchTo(`pm:${view.ref}`);
         return view;
     }
+    async function copyDraft(input, current) {
+        try {
+            await navigator.clipboard.writeText(input.value);
+            if (current()) toast('Draft copied. Nothing was sent.');
+        } catch {
+            if (!current()) return;
+            input.focus();
+            input.select();
+            toast('Copy the selected draft. Nothing was sent.');
+        }
+    }
+
     function pmDraftNotice(view) {
         const key = app.active, input = $('[data-text]');
         toast('Private replies are not confirmed. Your draft stays here.', [
@@ -3050,8 +3071,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 const lifecycle = recoveryLifecycle;
                 if (app.active !== key || store(key) !== view) return;
                 const current = () => lifecycle === recoveryLifecycle && app.active === key && store(key) === view;
-                try { await navigator.clipboard.writeText(input.value); if (current()) toast('Draft copied. Nothing was sent.'); }
-                catch { if (current()) { input.focus(); input.select(); toast('Select and copy this draft. Nothing was sent.'); } }
+                await copyDraft(input, current);
             }],
             ['Discard draft', () => { if (app.active === key && store(key) === view) { input.value = ''; drafts.delete(key); recoveryDraftChanged(); } }]
         ]);

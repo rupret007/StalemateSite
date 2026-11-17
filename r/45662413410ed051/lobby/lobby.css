@@ -69,7 +69,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .session-ended h2 { margin: 0 0 4px; font-size: 16px; }
 .session-ended p { margin: 4px 0; font-size: 13px; overflow-wrap: anywhere; }
 .session-ended .small { color: var(--muted); font-size: 12px; }
-.session-ended .btn { flex: none; }
+.session-ended .btn { flex: none; min-height: 48px; }
 /* Entry: the room's character on the left, one clear action on the right. */
 .gate { display: grid; place-items: center; flex: 1; overflow: auto; min-height: 0; padding: 48px 36px; background-image: radial-gradient(#343d3655 .6px, transparent .6px); background-size: 22px 22px; }
 .gate-layout { width: min(1080px, 100%); display: grid; grid-template-columns: 1.1fr 1fr; gap: 72px; align-items: center; }

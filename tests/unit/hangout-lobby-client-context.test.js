@@ -1159,6 +1159,31 @@ describe('newcomer navigation and closed sessions', () => {
         expect(composer.readOnly).toBe(false);
     });
 
+    it('lets a guest select the unsent draft after leaving chat if clipboard access fails', async () => {
+        const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ state: 'accepted' }) }));
+        const { window, ws, welcome, join } = await visitor('stalemate', {}, { beta: true, participation: true, fetch });
+        welcome(); join();
+        const { document } = window;
+        const composer = document.querySelector('[data-text]');
+        composer.value = 'An unsent rehearsal idea';
+        const writeText = vi.fn().mockRejectedValue(new Error('Clipboard denied'));
+        Object.defineProperty(window.navigator, 'clipboard', { value: { writeText } });
+
+        document.querySelector('[data-sharing-leave]').click();
+
+        expect(document.querySelector('[data-session-ended]').hidden).toBe(false);
+        expect(composer.disabled).toBe(false);
+        expect(composer.readOnly).toBe(true);
+        const copy = document.querySelector('[data-session-copy-draft]');
+        const sentBeforeCopy = ws.sent.length;
+        expect(copy.hidden).toBe(false);
+        copy.click();
+        await vi.waitFor(() => expect(document.activeElement).toBe(composer));
+        expect(composer.value.slice(composer.selectionStart, composer.selectionEnd)).toBe('An unsent rehearsal idea');
+        expect(writeText).toHaveBeenCalledExactlyOnceWith('An unsent rehearsal idea');
+        expect(ws.sent).toHaveLength(sentBeforeCopy);
+    });
+
     it.each([
         ['hides', '   ', true],
         ['shows', 'Keep this draft', false],
@@ -1173,6 +1198,7 @@ describe('newcomer navigation and closed sessions', () => {
 
         expect(document.querySelector('[data-session-ended]').hidden).toBe(false);
         expect(document.querySelector('[data-session-ended] p.small').hidden).toBe(hidden);
+        expect(document.querySelector('[data-session-copy-draft]').hidden).toBe(hidden);
         expect(document.querySelector('[data-network-note]').hidden).toBe(hidden);
         expect(composer.value).toBe(text);
         expect(composer.readOnly).toBe(true);
