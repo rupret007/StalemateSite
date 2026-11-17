@@ -513,6 +513,57 @@ async function openOwnedInvitation(page, width = 390, skipCheck = true, { holdCa
   if (skipCheck) await page.getByRole('button', { name: 'Skip check' }).click();
 }
 
+for (const width of [375, 390, 1440]) for (const focus of ['join', 'details']) {
+  test(`a lost checked microphone recovers keyboard focus from ${focus} at ${width}px`, async ({ page, baseURL }, testInfo) => {
+    const external = await routeProtectedListen(page, baseURL, `
+      export class WebJoinSession {
+        constructor() { window.unexpectedJoinAttempts = (window.unexpectedJoinAttempts || 0) + 1; }
+        async join() { throw new Error('Prejoin recovery never starts a session'); }
+        close() {}
+      }`);
+    await openOwnedInvitation(page, width, false);
+    const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+    const check = page.getByRole('button', { name: 'Check microphone', exact: true });
+    const retry = page.getByRole('button', { name: 'Try again', exact: true });
+    const details = page.locator('details summary');
+    expect(await page.evaluate(() => captureTracks.length)).toBe(0);
+    await check.press('Enter');
+    await expect(page.getByText('Microphone detected.', { exact: true })).toBeVisible();
+    await expect(join).toBeEnabled(); await expect(join).toBeFocused();
+    if (focus === 'details') {
+      await page.keyboard.press('Tab');
+      await expect(details).toBeFocused();
+    }
+    await page.evaluate(() => {
+      captureTracks[0].stop();
+      captureTracks[0].dispatchEvent(new Event('ended'));
+    });
+    await expect(page.locator('#mic-error')).toContainText('Microphone disconnected');
+    await expect(join).toBeDisabled();
+    await expect(page.locator('#mic-heard')).toBeHidden();
+    await page.screenshot({ path: testInfo.outputPath(`mic-lost-${focus}-${width}.png`) });
+    await expect(focus === 'join' ? retry : details).toBeFocused();
+    await expect(focus === 'join' ? retry : details).toBeInViewport({ ratio: 1 });
+    if (focus === 'details') {
+      for (let step = 0; step < 20 && !await retry.evaluate(button => button === document.activeElement); step++) {
+        await page.keyboard.press('Shift+Tab');
+      }
+      await expect(retry).toBeFocused();
+    }
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Microphone detected.', { exact: true })).toBeVisible();
+    await expect(join).toBeEnabled(); await expect(join).toBeFocused();
+    expect(await page.evaluate(() => ({ captures: captureTracks.length, joins: window.unexpectedJoinAttempts || 0 })))
+      .toEqual({ captures: 2, joins: 0 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`mic-recovered-${focus}-${width}.png`) });
+    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+    await expect.poll(() => page.evaluate(() => captureTracks.every(track => track.readyState === 'ended')
+      && audioContexts.every(context => context.state === 'closed'))).toBe(true);
+    expect(external).toEqual([]);
+  });
+}
+
 test('losing the checked microphone clears Join readiness until a deliberate recheck', async ({ page }) => {
   await openOwnedInvitation(page, 390, false);
   await page.getByRole('button', { name: 'Check microphone', exact: true }).click();

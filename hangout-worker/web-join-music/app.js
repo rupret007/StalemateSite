@@ -191,7 +191,8 @@ const refresh = () => {
 };
 
 function showMicError(error, deviceDisconnected = false) {
-  const restoreFocus = document.activeElement === $("mic-progress");
+  // A lost checked input disables Join; keep its keyboard user on recovery.
+  const restoreFocus = [$("mic-progress"), $("join")].includes(document.activeElement);
   stopMicMonitoring(true);
   void closeAudioContext(context);
   context = null;
