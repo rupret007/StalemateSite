@@ -211,6 +211,25 @@ it('announces a room invitation in an existing live region and describes its Joi
     expect(announcement.textContent).toBe('');
 });
 
+it.each([
+    ['art', 'Draw together'],
+    ['bobross', 'Bob Ross paint-along'],
+    ['watch', 'Watch together'],
+])('names the %s activity in a room invitation and its accessible description', async (activity, label) => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const room = `#${activity}-little-pickle`;
+    const action = document.querySelector('[data-room-invite-join]');
+    ws.receive({ t: 'invite', ch: room, by: 'InvitationHost', roomInstance: invitationRoomInstance, activity });
+
+    const message = `InvitationHost invited you to ${label} (${room}).`;
+    expect(document.getElementById(action.getAttribute('aria-describedby'))?.textContent).toBe(message);
+    expect(document.querySelector('[data-room-invite-announcement]').textContent).toBe(message);
+    action.click();
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room], roomInstance: invitationRoomInstance });
+});
+
 it('keeps the original Join action when another room invitation arrives', async () => {
     const { window, ws, welcome, join } = await visitor();
     welcome(); join();

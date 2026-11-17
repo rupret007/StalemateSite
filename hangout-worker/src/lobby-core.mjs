@@ -1920,7 +1920,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const gameRoom = roomKind(chan) === 'game';
             const jamChess = webJamChess && privateWebJam(chan) && chan.modes.i && !!boundPeer && game === 'chess';
             const arcade = (gameRoom || jamChess) && roomInstance === chan.keepRef ? gameNightInvite(game, match) : null;
-            out(t, { t: 'invite', ch: chan.name, by: c.nick, roomInstance: chan.keepRef, ...(arcade ? { arcade } : {}) });
+            const activity = PAINT_KINDS.has(chan.kind) || VIDEO_KINDS.has(chan.kind) ? chan.kind : '';
+            out(t, { t: 'invite', ch: chan.name, by: c.nick, roomInstance: chan.keepRef,
+                ...(arcade ? { arcade } : {}), ...(activity ? { activity } : {}) });
             return arcade ? bot(c, `Invitation sent to ${t.nick} for ${gameNightLabels[arcade.game]}.`, 'game-invite-sent')
                 : bot(c, `Invited ${t.nick} to ${chan.name}.`);
         },

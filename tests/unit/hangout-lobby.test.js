@@ -491,6 +491,7 @@ describe('permissions are enforced on the server (forged commands)', () => {
         expect(notices(b)).toMatch(/invite-only/);
         namedCmd(a, 'invite', ['Bravo'], '#watch-x');
         expect(got(b).some((m) => m.t === 'invite')).toBe(true);
+        expect(got(b).find((m) => m.t === 'invite')).toMatchObject({ ch: '#watch-x', activity: 'watch' });
         cmd(b, 'join', ['#watch-x']);
         expect(L._debug.channels.get('#watch-x').members.has(b.id)).toBe(true);
     });

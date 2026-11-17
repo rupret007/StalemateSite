@@ -126,6 +126,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     count('lobby-view');
     const KIND_ICON = { lobby: '#', chat: '#', bobross: '🎨', watch: '📺', art: '🖌️', jam: '🎸', game: '🎮' };
     const KIND_NAME = { chat: 'Chat channel', bobross: 'Bob Ross paint-along', watch: 'Watch together', art: 'Draw together', jam: 'Jam', game: 'Game Night' };
+    const CREATIVE_ROOM_KINDS = new Set(['art', 'bobross', 'watch']);
     const WORDS = ['happy', 'little', 'gross', 'loud', 'feral', 'fuzzy', 'mighty', 'snotty', 'rad', 'grumpy', 'soggy', 'mosh'];
     const THINGS = ['tree', 'cloud', 'possum', 'riff', 'taco', 'goat', 'ghost', 'drip', 'squirrel', 'pickle', 'van', 'amp'];
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -568,7 +569,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         return roomApi;
     }
-    const activityRoom = c => c && ['art', 'bobross', 'watch'].includes(c.kind)
+    const activityRoom = c => c && CREATIVE_ROOM_KINDS.has(c.kind)
         && connectionState === 'connected' && !sessionEnded && !app.localMediaPaused && !app.sharingStopped && !c.readOnly;
     function activitySnapshot(snapshot) {
         const state = window.HangoutCore.emptyState();
@@ -1901,7 +1902,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function showRoomInvite(frame) {
         if (app.localMediaPaused || app.sharingStopped) return;
         if (app.chans.get(frame.ch)?.keepRef === frame.roomInstance || roomInvites.has(frame.roomInstance) || roomInvites.size >= 5) return;
-        roomInvites.set(frame.roomInstance, { room: frame.ch, instance: frame.roomInstance, from: frame.by });
+        const activity = CREATIVE_ROOM_KINDS.has(frame.activity) ? KIND_NAME[frame.activity] : '';
+        const destination = activity ? `${activity} (${frame.ch}).` : frame.ch;
+        roomInvites.set(frame.roomInstance, { room: frame.ch, instance: frame.roomInstance, from: frame.by, destination });
         drawRoomInvite();
     }
     function drawRoomInvite() {
@@ -1913,7 +1916,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         roomInviteDismiss.setAttribute('aria-disabled', String(waitingForRoom));
         roomInviteAction.textContent = waitingForRoom ? 'Joining…' : invitation?.error ? 'Retry join' : 'Join';
         const message = !invitation ? '' : waitingForRoom ? `Waiting to join ${invitation.room}…`
-            : invitation.error || `${invitation.from} invited you to ${invitation.room}`;
+            : invitation.error || `${invitation.from} invited you to ${invitation.destination}`;
         const waiting = roomInvites.size - 1;
         roomInviteMessage(waiting > 0 ? `${message} · ${waiting} more invitation${waiting === 1 ? '' : 's'}` : message);
         if (!invitation && focused) focusChannelTab(app.active, { preventScroll: false });
