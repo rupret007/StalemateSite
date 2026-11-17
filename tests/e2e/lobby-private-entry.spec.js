@@ -389,25 +389,18 @@ for (const width of [375, 390, 1440]) test(`protected module download failure of
         context = await browser.newContext({ ignoreHTTPSErrors: true,
             viewport: { width, height: width <= 390 ? 844 : 900 }, reducedMotion: 'reduce' });
         await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
-        await context.addInitScript(() => {
-            window.fixtureCaptureCalls = 0;
-            if (!navigator.mediaDevices) return;
-            for (const name of ['getUserMedia', 'getDisplayMedia']) {
-                Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), name, {
-                    configurable: true, value: async () => { window.fixtureCaptureCalls++; throw new Error('Startup recovery never captures media'); }
-                });
-            }
-        });
+        const sentinel = await installNoCaptureSentinel(context);
         const moduleUrl = community.origin + ROOT + 'lobby.js';
         const failModule = route => { blocked++; return route.abort('failed'); };
         await context.route(moduleUrl, failModule);
         const page = await context.newPage();
         await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+        await sentinel.assertClean();
         await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
         await expect.poll(() => blocked).toBe(1);
         await expect(page.locator('[data-enter]')).toBeDisabled();
         expect(community.diagnostics().admittedUpgrades).toBe(0);
-        expect(await page.evaluate(() => window.fixtureCaptureCalls)).toBe(0);
+        await sentinel.assertClean();
         await page.screenshot({ path: testInfo.outputPath(`01-main-module-failed-${width}.png`) });
         const recovery = page.locator('[data-startup-recovery]');
         const reload = page.getByRole('button', { name: 'Reload chat', exact: true });
@@ -421,6 +414,7 @@ for (const width of [375, 390, 1440]) test(`protected module download failure of
         expect(bounds.width).toBeGreaterThanOrEqual(48); expect(bounds.height).toBeGreaterThanOrEqual(48);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await page.screenshot({ path: testInfo.outputPath(`02-explicit-startup-recovery-${width}.png`) });
+        await sentinel.assertClean();
         await context.unroute(moduleUrl, failModule);
         await Promise.all([page.waitForEvent('domcontentloaded'), reload.press('Enter')]);
         await expect(recovery).toBeHidden();
@@ -437,7 +431,7 @@ for (const width of [375, 390, 1440]) test(`protected module download failure of
         await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
         expect(community.diagnostics().admittedUpgrades).toBe(1);
         expect(community.diagnostics().failures).toEqual([]);
-        expect(await page.evaluate(() => window.fixtureCaptureCalls)).toBe(0);
+        await sentinel.assertClean();
         await page.screenshot({ path: testInfo.outputPath(`03-reloaded-first-chat-${width}.png`) });
     } finally {
         try { await context?.close(); } finally { await community.close(); }
