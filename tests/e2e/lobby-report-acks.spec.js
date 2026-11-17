@@ -55,10 +55,13 @@ test('storage errors and report limits restore the report button for a truthful 
     const flag = page.locator('[data-id="mreportfixture"] .flag');
     await flag.click();
     fixture.publish({ t: 'notice', from: 'StaleBot', kind: 'error', text: 'Storage is unavailable. Changes are not confirmed; reconnect after administrator recovery.' });
+    await expect(flag).toBeDisabled();
+    fixture.publish({ t: 'report-status', id: LINE.id, submitted: false });
     await expect(flag).toBeEnabled(); await expect(flag).toHaveText('🚩');
     await expect(page.locator('[data-buffer]')).toContainText('Changes are not confirmed');
     await flag.click();
     fixture.publish({ t: 'rate-limit', scope: 'report', retryAfter: 1, text: 'Please wait 1s before trying again.' });
+    fixture.publish({ t: 'report-status', id: LINE.id, submitted: false });
     await expect(flag).toBeEnabled(); await expect(flag).toHaveText('🚩');
     await flag.click();
     fixture.publish({ t: 'report-status', id: LINE.id, submitted: true });
@@ -72,6 +75,7 @@ test('a full report queue explains the contact fallback and permits a manually c
     await flag.click(); await expect(flag).toHaveText('…');
     fixture.publish({ t: 'notice', from: 'StaleBot', kind: 'error',
         text: 'The report queue is full. Try again later or use the moderation contact in House rules.' });
+    fixture.publish({ t: 'report-status', id: LINE.id, submitted: false });
     await expect(flag).toBeEnabled(); await expect(flag).toHaveText('🚩');
     await expect(page.locator('[data-buffer]')).toContainText('moderation contact in House rules');
     const rules = page.locator('.people-help').getByRole('link', { name: 'House rules', exact: true });

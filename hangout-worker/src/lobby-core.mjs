@@ -392,6 +392,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (actor) bot(actor, failure === 'person-target-stale' ? 'That selected visitor or room changed. Choose a current person; nothing was confirmed.' : failure === 'participation-unavailable'
                 ? 'This action could not be confirmed. Try again or use the moderation contact in House rules.'
                 : 'This action is unavailable under the current participation permissions or capacity. Reporting, blocking and leaving remain available.', 'error');
+            if (fn === message) reportWriteFailed(args[0], args[1]);
             if (restoreFailed) {
                 for (const queued of safetyQueue.splice(0)) queued.resolve({ ok: false, reason: 'participation-unavailable' });
                 safetyDrainScheduled = false;
@@ -1045,6 +1046,20 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     // ---------- inbound ----------
+    function reportFeedbackFor(frame) {
+        return frame?.t === 'report' && frame.reportResult === true && moderationId(frame.id)
+            ? { id: frame.id, submitted: false } : null;
+    }
+
+    function reportWriteFailed(id, raw) {
+        const connection = conns.get(id);
+        if (!connection || typeof raw !== 'string' || raw.length > L.frameBytes) return;
+        let frame;
+        try { frame = JSON.parse(raw); } catch { return; }
+        const feedback = reportFeedbackFor(frame);
+        if (feedback) out(connection, { t: 'report-status', ...feedback });
+    }
+
     function message(id, raw, charged = false) {
         const c = conns.get(id);
         if (!c) return;
@@ -1075,8 +1090,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && typeof f.jamRequestId === 'string' && /^[a-f0-9]{32}$/.test(f.jamRequestId)
             ? { id: f.jamRequestId, status: 'rejected' } : null;
         // Earlier callers still handle denial through the existing notice.
-        const reportFeedback = f.t === 'report' && f.reportResult === true && moderationId(f.id)
-            ? { id: f.id, submitted: false } : null;
+        const reportFeedback = reportFeedbackFor(f);
         const joinFeedback = f.t === 'cmd' && f.name === 'join' && validPmRef(f.joinRequestId) && validPmRef(f.roomInstance)
             ? { id: f.joinRequestId, status: 'rejected' } : null;
         const result = feedback ? status => { feedback.status = status; }
@@ -1574,6 +1588,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 finished();
                 if (controlled) throw Object.assign(new Error('participation-capacity'), { participationDenied: true, reason: 'participation-capacity' });
                 storageUnavailable();
+                if (fn === message) reportWriteFailed(args[0], args[1]);
                 // A failed ban/kick commit may already have removed an endpoint
                 // from engine memory. End its actual socket with a service error
                 // rather than leaving an admitted connection that can never act.
