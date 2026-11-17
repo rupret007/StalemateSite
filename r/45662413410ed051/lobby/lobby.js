@@ -2842,6 +2842,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (sessionEnded) empty.textContent = 'Join again to see rooms.';
         else if (query) empty.textContent = 'No rooms match that search. Clear it or try another name.';
         else empty.textContent = 'No rooms yet. Stay for a chat, or be the first to start one.';
+        const searchStatus = $('[data-room-search-status]');
+        const statusText = !sessionEnded && query && !rooms.length ? empty.textContent : '';
+        if (searchStatus.textContent !== statusText) searchStatus.textContent = statusText;
         const rows = rooms.map(r => {
             const li = previous.get(r.name) || document.createElement('li');
             li.dataset.roomKey = r.name;
