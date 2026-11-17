@@ -113,6 +113,7 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             await expect(liveRoster.getByRole('option', { name: 'ChosenGuest', exact: true })).toBeAttached();
             await expect(liveRoster).toBeEnabled();
             await expect(liveRoster).toHaveValue('');
+            await expect(dialog.getByRole('status')).toHaveText('');
             await expect(dialog.getByRole('button', { name: 'Continue in WebJam' })).toBeDisabled();
             await expect(cancel).toBeFocused();
             await capture(host, '00-host-sees-guest-arrive');
