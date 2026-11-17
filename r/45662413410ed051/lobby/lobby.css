@@ -388,7 +388,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .tris-actions:has([data-tris-main][hidden]):has([data-tris-leave]:not([hidden])) { display: contents; }
 .tris-hud { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; gap: 8px; margin: 3px 0 5px; background: var(--surface); color: var(--cream); font: 600 .8rem var(--mono); }
 .tris-hud time { color: var(--lime); font-variant-numeric: tabular-nums; }
-.tris-arena { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px 10px; }
+.tris-arena { --tris-control-size: 44px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px 10px; }
 .tris-primary { position: relative; width: min(11rem, max(6.25rem, calc((100dvh - 420px) / 2))); }
 .tris-rival { display: grid; gap: 4px; color: var(--muted); font: .73rem var(--mono); }
 .tris-rival canvas { width: min(100%, 5.25rem, 22vw); }
@@ -397,9 +397,9 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .tris-countdown { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 6px; pointer-events: none; background: #061411ab; color: var(--lime); font: bold 2.4rem var(--mono); }
 .tris-countdown[hidden] { display: none; }
 .tris-preview { max-width: 14ch; color: var(--cream); }
-.tris-controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); gap: 4px; }
+.tris-controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--tris-control-size), 1fr)); gap: 4px; }
 .tris-controls[hidden] { display: none; }
-.tris-controls .btn { min-width: 44px; min-height: 44px; padding: 0; touch-action: none; user-select: none; color: var(--cream); font: bold 1.2rem var(--mono); }
+.tris-controls .btn { min-width: var(--tris-control-size); min-height: var(--tris-control-size); padding: 0; touch-action: none; user-select: none; color: var(--cream); font: bold 1.2rem var(--mono); }
 .tris-controls [data-tris-input="drop"] { color: var(--lime); border-color: #637943; }
 .tris-keyboard { margin-block: 5px 0; color: var(--muted); }
 @media (pointer: coarse) { .tris-keyboard { display: none; } }
@@ -407,8 +407,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .tris-primary { width: min(11rem, max(5.5rem, calc((100dvh - 458px) / 2))); }
 }
 @media (max-width: 580px) and (max-height: 740px) {
-  .tris-arena:has(.tris-controls:not([hidden])) { grid-template-columns: auto minmax(0, 1fr) 92px; }
-  .tris-controls { grid-column: auto; grid-template-columns: repeat(2, minmax(44px, 1fr)); }
+  .tris-arena:has(.tris-controls:not([hidden])) { grid-template-columns: auto minmax(0, 1fr) calc(var(--tris-control-size) * 2 + 4px); }
+  .tris-controls { grid-column: auto; grid-template-columns: repeat(2, minmax(var(--tris-control-size), 1fr)); }
 }
 @media (max-width: 430px) and (min-height: 741px) and (max-height: 880px) {
   /* Leave room for the full control row below the board on portrait phones. */
@@ -854,7 +854,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
    Short landscape screens keep their existing compact layout. */
 @media (max-width: 430px) and (min-height: 451px) {
   body:has(.game-night:not([hidden])) :is(.tabs button, .roombar .btn, .game-actions .btn, .connection-tools [data-fullscreen], .say .btn,
-    .arcade-card-table summary, [data-game-editor] summary, .arcade-brick-race [data-brick-serve]) { min-height: 44px !important; }
+    .arcade-card-table summary, [data-game-editor] summary) { min-height: 44px !important; }
   body:has(.game-night:not([hidden])) :is(.connection-tools [data-fullscreen], .slash, .roombar .btn) { min-width: 44px !important; }
   .game-night :is(.arcade-chess, .brick-race-actions, .tris-actions, .mania-actions, .rush-race-actions) .btn { min-width: 44px; min-height: 44px; }
   .game-night .arcade-card-actions > .btn,
@@ -873,5 +873,6 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .chat:has(.arcade-eights[open] [data-card-table]:not([hidden])) .buffer:not(:has(:focus-visible)) { min-height: 34px; }
   /* Reserve room below the track for the full-height phone race controls. */
   .rush-race-track { height: clamp(128px, calc(100dvh - 525px), 271px); }
-  .rush-race-controls .btn { min-width: 48px; min-height: 48px; }
+  .rush-race-controls .btn, .brick-race-rail [data-brick-serve] { min-width: 48px; min-height: 48px; }
+  .tris-arena { --tris-control-size: 48px; }
 }

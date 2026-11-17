@@ -264,6 +264,13 @@ const finish = async (fixture, game, nick) => {
     await fixture.act(nick, game.game, { action: 'resign', id: saved.id, revision: saved.match.revision ?? saved.match.state?.revision ?? 0 });
 };
 
+async function expectPhoneControl(button) {
+    await expect(button).toBeEnabled();
+    await expect(button).toBeInViewport({ ratio: 1 });
+    const box = await button.boundingBox();
+    expect(Math.min(box?.width ?? 0, box?.height ?? 0)).toBeGreaterThanOrEqual(48);
+}
+
 const probeBrowser = process.env.GAME_NIGHT_ACTION_TAP_PROBE;
 if (['chromium', 'webkit'].includes(probeBrowser)) {
     test.use({ browserName: probeBrowser });
@@ -277,10 +284,7 @@ if (['chromium', 'webkit'].includes(probeBrowser)) {
         ['turdanoid', 'brick', null, '[data-brick-main]', '[data-brick-match]']
     ];
     async function tapPhoneAction(button) {
-        await expect(button).toBeEnabled();
-        await expect(button).toBeInViewport({ ratio: 1 });
-        const box = await button.boundingBox();
-        expect(Math.min(box?.width ?? 0, box?.height ?? 0)).toBeGreaterThanOrEqual(48);
+        await expectPhoneControl(button);
         await button.tap();
     }
 
@@ -559,11 +563,7 @@ test('Turd Rush confirms the first tap after its rendering frame is delayed', as
         await expect(match).toHaveAttribute('data-lane', '1');
         const controls = guest.locator('.rush-race-controls .btn');
         await expect(controls).toHaveCount(4);
-        for (const button of await controls.all()) {
-            await expect(button).toBeInViewport({ ratio: 1 });
-            const box = await button.boundingBox();
-            expect(Math.min(box?.width ?? 0, box?.height ?? 0)).toBeGreaterThanOrEqual(48);
-        }
+        for (const button of await controls.all()) await expectPhoneControl(button);
         await guest.evaluate(() => {
             const native = window.requestAnimationFrame.bind(window);
             window.requestAnimationFrame = callback => native(time => {
@@ -593,3 +593,32 @@ test('Turd Rush confirms the first tap after its rendering frame is delayed', as
         await fixture.close();
     }
 });
+
+for (const [game, prefix, buttons, action, count] of [
+    ['turdtris', 'tris', '[data-tris-input]', 'Hard drop', 7],
+    ['turdanoid', 'brick', '[data-brick-serve]', 'Launch ball', 1]
+]) {
+    test(`${game} in-match phone controls fit at 48px`, async ({ browser, baseURL }) => {
+        const fixture = await gameNight(browser, baseURL, game === 'turdtris'
+            ? { extraFeatures: { arcadeTurdtris: 1 }, extraGames: [game] } : {});
+        try {
+            const [host, guest] = await room(fixture, ['PadHost', 'PadGuest']);
+            const table = { game, status: `[data-${prefix}-status]` };
+            await showTable(host, table);
+            await showTable(guest, table);
+            await host.locator(`[data-${prefix}-main][data-command="open"]`).tap();
+            await guest.locator(`[data-${prefix}-main][data-command="join"]`).tap();
+            const match = guest.locator(`[data-${prefix}-match]`);
+            await expect(match).toBeVisible();
+            await fixture.advance(3500);
+            await fixture.act('PadGuest', game, { action: 'sync' });
+            await expect(match).toHaveAttribute('data-phase', 'play');
+            const controls = guest.locator(buttons);
+            await expect(controls).toHaveCount(count);
+            for (const button of await controls.all()) await expectPhoneControl(button);
+            await guest.getByRole('button', { name: action, exact: true }).tap();
+            await expect(match).toHaveAttribute('data-sequence', '1');
+            expect(fixture.errors()).toEqual([]);
+        } finally { await fixture.close(); }
+    });
+}
