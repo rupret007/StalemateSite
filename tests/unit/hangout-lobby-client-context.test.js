@@ -697,6 +697,53 @@ describe('targeted Music invitation', () => {
         expect(window.open).not.toHaveBeenCalled();
     });
 
+    it.each([false, true])('keeps the accepted Music invite when another host invites during confirmation (timed out: %s)', async timedOut => {
+        const { window, ws, offer, accepted, href, joinJam, action, dismiss, status, flush } = await setup();
+        const next = { ...offer, id: 'c'.repeat(32), ch: '#jam-drums', roomInstance: 'd'.repeat(32), by: 'DrumHost' };
+        ws.receive(offer);
+        action.focus();
+        action.click();
+        if (timedOut) flush(10000);
+        ws.receive(next);
+
+        expect(status.textContent).toContain(timedOut ? 'hasn’t confirmed' : 'Waiting for the room');
+        joinJam();
+        ws.receive(accepted);
+        expect(action.textContent).toBe('Open WebJam in browser');
+        expect(window.document.activeElement).toBe(action);
+        action.click();
+        expect(window.open).toHaveBeenCalledWith(href, '_blank', 'noopener,noreferrer');
+
+        expect(dismiss.textContent).toBe('Next invitation');
+        dismiss.focus();
+        dismiss.click();
+        expect(status.textContent).toBe('DrumHost invited you to join Music.');
+        expect(window.document.activeElement).toBe(action);
+        action.click();
+        expect(ws.sent.at(-1)).toEqual({ t: 'music-invite-accept', ch: next.ch, roomInstance: next.roomInstance, id: next.id });
+    });
+
+    it.each(['withdrawn', 'expired', 'disconnected'])('removes a %s queued Music offer', async reason => {
+        const { ws, offer, accepted, joinJam, action, dismiss, panel, flush } = await setup();
+        const next = { ...offer, id: 'c'.repeat(32), ch: '#jam-drums', roomInstance: 'd'.repeat(32), by: 'DrumHost', expires: Date.now() + 1000 };
+        ws.receive(offer);
+        action.click();
+        ws.receive(next);
+        joinJam();
+        ws.receive(accepted);
+        expect(dismiss.textContent).toBe('Next invitation');
+
+        if (reason === 'withdrawn') ws.receive({ t: 'music-invite-ended', id: next.id });
+        else if (reason === 'expired') flush(1000);
+        else ws.close(4400);
+
+        if (reason !== 'disconnected') {
+            expect(dismiss.textContent).toBe('Dismiss');
+            dismiss.click();
+        }
+        expect(panel.hidden).toBe(true);
+    });
+
     it('announces Music invite updates without revealing the private browser link', async () => {
         const { window, ws, offer, accepted, href, joinJam, panel, action, dismiss } = await setup();
         const { document } = window;
