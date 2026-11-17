@@ -251,7 +251,10 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await host.getByRole('button', { name: 'Open Chess match' }).click();
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await accept.tap();
-                    await expect(friend.getByText('This game invitation no longer has an open seat. Ask the host for a fresh invitation.')).toBeVisible();
+                    const staleSeat = 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.';
+                    await expect(friend.locator('[data-toast]').getByText(staleSeat, { exact: true })).toBeVisible();
+                    await expect(friend.locator('[data-toast-announcement]')).toHaveAttribute('role', 'status');
+                    await expect(friend.locator('[data-toast-announcement]')).toHaveText(staleSeat);
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await friend.locator('[data-leave]').click();
                     await expect(friend.locator('[data-game-night]')).toBeHidden();
