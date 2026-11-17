@@ -1759,3 +1759,24 @@ describe('single participation resolver read reuse retains external transaction 
         delete f.hooks.before; expect(advanced).toBe(true); expect(fingerprint(f.driver)).toBe(before);
     });
 });
+
+it('rechecks expiry between single binding validation and identity validation on a cached session hit', async () => {
+    const f = await fixture({ participation: true }), person = await f.enroll('single-between');
+    let clockCalls = 0, expireAfter = Infinity;
+    const authority = createLobbySessionAuthority({ storage: f.storage, env: f.env,
+        now: () => ++clockCalls <= expireAfter ? NOW : NOW + 100001, writeEffects: writeLobbyEffects });
+    expect(await authority.resolveParticipationConnection(person.binding)).not.toBeNull();
+    // Calibrate the live clock calls consumed by the real binding validator.
+    // The resolver must then execute the separate identity validator against
+    // the already-cached session, but with the newly expired live clock.
+    clockCalls = 0; expect(await authority.validate(person.binding)).toBe(true);
+    expireAfter = clockCalls; expect(expireAfter).toBeGreaterThan(0); clockCalls = 0;
+    f.driver.resetOperations(); const before = fingerprint(f.driver);
+    expect(await authority.resolveParticipationConnection(person.binding)).toBeNull();
+    expect(clockCalls).toBeGreaterThan(expireAfter);
+    const reads = key => f.driver.stats.operations.filter(event => event.name === 'get'
+        && event.key.endsWith(':manifest:' + Buffer.from(key).toString('hex'))).length;
+    expect(reads('authority-session:' + person.request.sid)).toBe(1);
+    expect(reads(LOBBY_AUTHORITY_MARKER)).toBeGreaterThanOrEqual(4);
+    expect(fingerprint(f.driver)).toBe(before);
+});
