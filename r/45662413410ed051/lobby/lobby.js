@@ -1896,7 +1896,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         invitation.requestId = requestId;
         invitation.replyTimer = setTimeout(() => {
             invitation.replyTimer = null;
-            invitation.error = 'The room hasn’t confirmed the join. Try again or ask the host for a new invitation.';
+            invitation.error = `Joining ${room} timed out. Try again or ask the host for a new invitation.`;
             drawRoomInvite();
         }, 10000);
         drawRoomInvite();

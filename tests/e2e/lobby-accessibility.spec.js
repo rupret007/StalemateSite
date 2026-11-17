@@ -582,6 +582,7 @@ for (const viewport of invitationViewports) test(`${viewport.label}: invitation 
             const retry = status.getByRole('button', { name: 'Retry join', exact: true });
             await expect(retry).toBeVisible({ timeout: 12000 });
             await expect(retry).toBeFocused();
+            await expect(retry).toHaveAccessibleDescription(/#invitation-studio.*ask the host for a new invitation/);
             await expect(visitor.page.locator('[data-buffer]')).not.toContainText('welcome to #invitation-studio');
             await visitor.page.screenshot({ path: testInfo.outputPath(`${viewport.label}-retry-room-join.png`) });
             await retry.press('Enter');
@@ -614,6 +615,7 @@ for (const height of [256, 210]) test(`short reflow: the guest can dismiss a roo
         const dismiss = invitation.getByRole('button', { name: 'Dismiss', exact: true });
         await tabTo(page, dismiss);
         await expect(dismiss).toBeFocused();
+        await expect(dismiss).toHaveAccessibleDescription('ShortInviteHost invited you to #invite-dismiss');
         await expect(dismiss).toBeInViewport({ ratio: 1 });
         const unobstructed = await dismiss.evaluate(button => {
             const bounds = button.getBoundingClientRect();

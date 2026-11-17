@@ -273,7 +273,7 @@ describe('keyboard room invitation acceptance', () => {
         flush(10000);
         expect(action.textContent).toBe('Retry join');
         expect(action.getAttribute('aria-disabled')).toBe('false');
-        expect(panel.textContent).toContain('The room hasn’t confirmed the join');
+        expect(panel.textContent).toContain(`Joining ${room} timed out.`);
         action.click();
         expect(ws.sent.at(-1).joinRequestId).not.toBe(attempt.joinRequestId);
         ws.receive({ t: 'room-join-result', id: attempt.joinRequestId, status: 'rejected' });
