@@ -144,8 +144,17 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await expect(peer.locator('[data-music-invite]')).toBeHidden();
             const decline = panel.getByRole('button', { name: 'Not now' });
             await expect(decline).toHaveAccessibleDescription('MusicHost invited you to join Music.');
+            if (width === 390) await guest.setViewportSize({ width: 320, height: 210 });
+            await decline.scrollIntoViewIfNeeded();
+            await expect(decline).toBeInViewport({ ratio: 1 });
             await decline.press('Enter');
-            await expect(guest.getByRole('tab', { name: '#stalemate', selected: true })).toBeFocused();
+            const lobbyTab = guest.getByRole('tab', { name: '#stalemate', selected: true });
+            await expect(lobbyTab).toBeFocused();
+            await expect(lobbyTab).toBeInViewport({ ratio: 1 });
+            if (width === 390) {
+                await guest.screenshot({ path: testInfo.outputPath('decline-restores-lobby-focus-320x210.png') });
+                await guest.setViewportSize({ width, height });
+            }
             await expect(status).toContainText('declined the Music invitation');
             await expect(announcement).toHaveText('');
             await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');

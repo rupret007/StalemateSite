@@ -2130,7 +2130,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             musicAnnouncement.textContent = message;
         }
         if (musicPanel.hidden) {
-            if (hadFocus) focusChannelTab(app.active);
+            if (hadFocus) focusChannelTab(app.active, { preventScroll: false });
             return;
         }
         if (accepted && !amOp(jam) && !jam.jam?.web && !jam.jam?.desktop && !jam.jam?.invitation) $('[data-jam-actions]').hidden = true;
