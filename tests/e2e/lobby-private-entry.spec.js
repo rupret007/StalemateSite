@@ -3,6 +3,7 @@
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
 const ROOT = '/r/45662413410ed051/lobby/';
 
 for (const width of [390, 1440]) test(`protected newcomer reaches a shared room and leaves safely at ${width}px`, async ({ browser }, testInfo) => {
@@ -15,19 +16,11 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
             hasTouch: viewWidth === 390, reducedMotion: 'reduce' });
         contexts.push(context);
         await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
-        await context.addInitScript(() => {
-            window.fixtureCaptureCalls = 0;
-            if (!navigator.mediaDevices) return; // Initial blank tabs have no media API.
-            for (const name of ['getUserMedia', 'getDisplayMedia']) {
-                Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), name, {
-                    configurable: true, value: async () => { window.fixtureCaptureCalls++; throw new Error('This newcomer walkthrough never captures media'); }
-                });
-            }
-        });
+        const sentinel = await installNoCaptureSentinel(context);
         const page = await context.newPage();
         page.on('pageerror', error => pageErrors.push(error.name));
         const entryUrl = community.origin + '/beta/?via=' + source;
-        return { page, context, entryUrl, source };
+        return { page, context, entryUrl, source, sentinel };
     }
     async function admit(visitor) {
         const { page, context, entryUrl } = visitor;
@@ -40,9 +33,11 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
         const cookie = (await context.cookies()).find(cookie => cookie.name === community.sessionCookieName);
         // Assert the application's existing betaCookie policy exactly.
         expect(cookie).toMatchObject({ secure: true, httpOnly: true, sameSite: 'Lax', path: '/' });
+        await visitor.sentinel.assertClean();
         await proceed.press('Enter');
         await expect(page.locator('[data-entry-label]').first()).toHaveText('via ' + (visitor.source === 'rad-dad' ? 'Rad Dad' : 'Stalemate'));
         expect(await page.evaluate(() => typeof navigator.mediaDevices?.getUserMedia === 'function')).toBe(true);
+        await visitor.sentinel.assertClean();
     }
     async function nick(page, name) {
         const input = page.getByRole('textbox', { name: 'Your nick', exact: true });
@@ -57,13 +52,19 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
         const navigation = page.locator(`nav [data-show="${section}"]`);
         if (await navigation.isVisible()) await navigation.click();
     }
-    const capture = (page, name) => page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`) });
+    const sentinels = [];
+    const capture = async (page, name) => {
+        for (const sentinel of sentinels) await sentinel.assertClean();
+        return page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`) });
+    };
     try {
         const host = await entry(otherWidth, width === 390 ? 'stalemate' : 'rad-dad');
+        sentinels.push(host.sentinel);
         await admit(host); await nick(host.page, 'StudioHost');
         await expect(host.page.locator('[data-connection]')).toHaveText('Connected');
         await send(host.page, 'Earlier conversation stays in its connected session.');
         const guest = await entry(width, width === 390 ? 'rad-dad' : 'stalemate');
+        sentinels.push(guest.sentinel);
         expect((await guest.context.request.get(community.origin + ROOT)).status()).toBe(401);
         expect((await guest.context.request.get(community.origin + ROOT + 'lobby.js')).status()).toBe(401);
         await guest.page.goto(guest.entryUrl + '#invite=rejected-fixture-only');
@@ -124,10 +125,11 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
         await capture(guest.page, '07-left-room');
         const access = await guest.context.newPage();
         await access.goto(guest.entryUrl);
+        await guest.sentinel.assertClean();
         await access.getByRole('button', { name: 'Leave this beta', exact: true }).press('Enter');
         await expect(access.getByRole('heading', { name: 'Your private invitation', exact: true })).toBeVisible();
         expect((await guest.context.request.get(community.origin + ROOT + 'lobby.js')).status()).toBe(401);
-        for (const visitor of [host, guest]) expect(await visitor.page.evaluate(() => window.fixtureCaptureCalls)).toBe(0);
+        for (const visitor of [host, guest]) await visitor.sentinel.assertClean();
         expect(community.diagnostics().admittedUpgrades).toBeGreaterThanOrEqual(2);
         expect(community.diagnostics().failures).toEqual([]); expect(pageErrors).toEqual([]);
         await testInfo.attach('protected-newcomer-scope', { contentType: 'application/json', body: JSON.stringify(community.diagnostics()) });
@@ -136,6 +138,34 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
         await community.close();
         const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
         if (failures.length) throw new AggregateError(failures, 'Owned newcomer contexts did not close cleanly');
+    }
+});
+
+for (const method of ['getUserMedia', 'getDisplayMedia']) test(`no-capture evidence survives beta navigation and a separate access page for ${method}`, async ({ browser }) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity();
+    const context = await browser.newContext({ ignoreHTTPSErrors: true });
+    try {
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        const page = await context.newPage();
+        await page.goto(community.origin + '/beta/');
+        await sentinel.assertClean();
+        await page.evaluate(async method => {
+            try { await navigator.mediaDevices[method]({ video: true }); } catch {}
+        }, method);
+        await page.goto(community.origin + '/beta/?after-navigation');
+        await expect(sentinel.assertClean()).rejects.toThrow('Unexpected capture attempts: 1');
+        const access = await context.newPage();
+        await access.goto(community.origin + '/beta/');
+        await access.evaluate(async method => {
+            try { await navigator.mediaDevices[method]({ video: true }); } catch {}
+        }, method);
+        await access.reload();
+        expect(sentinel.calls).toEqual([method, method]);
+        await expect(sentinel.assertClean()).rejects.toThrow('Unexpected capture attempts: 2');
+    } finally {
+        await context.close(); await community.close();
     }
 });
 
