@@ -1923,8 +1923,7 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
         }
         const invite = arcadeInvitation;
         if (!sendMatch || !invite || game !== invite.game || scope?.room !== invite.room || scope.ref !== invite.ref) return;
-        const canSeeReplacement = gameGuest && state?.replacementAvailable === true;
-        if (canSeeReplacement || state?.seat && (state.id === invite.match || gameGuest)) {
+        if (state?.seat && (state.id === invite.match || gameGuest)) {
             if (gameGuest && !gameGuestSeated) {
                 gameGuestSeated = true;
                 gameGuestReloadOffered = false;
@@ -1935,10 +1934,11 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
             }
             return finishArcadeInvitation();
         }
-        if (state?.id !== invite.match || !state.waiting || state.hasOpenSeat === false) {
+        const replacement = gameGuest && state?.replacementAvailable === true;
+        if ((!replacement && state?.id !== invite.match) || !state.waiting || state.hasOpenSeat === false) {
             return finishArcadeInvitation('This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
         }
-        if (!invite.sent) invite.sent = sendMatch({ action: 'join', id: invite.match, seat: 'next' });
+        if (invite.sent !== state.id && sendMatch({ action: 'join', id: state.id, seat: 'next' })) invite.sent = state.id;
     }
     $('[data-arcade-game]').addEventListener('change', event => {
         const game = event.target.value;
