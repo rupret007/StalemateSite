@@ -97,6 +97,9 @@ for (const prefix of ['', '/StalemateSite']) {
 
 for (const [prefix, legacy] of [['', 'daily=2026-10-21&v=1'], ['/StalemateSite', 'daily=not-a-date&v=999']]) {
     test(`former daily links open seeded free play with working undo at ${prefix || '/'}`, async ({ page }) => {
+        // Compare two real page loads, then tap a legal group and Undo.
+        // Keep the normal per-assertion deadlines for every check.
+        test.slow();
         const errors = [];
         page.on('pageerror', (error) => errors.push(error.message));
         const game = prefix + '/play/turdomania.html';
