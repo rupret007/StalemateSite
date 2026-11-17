@@ -390,6 +390,29 @@ describe('strict representation, physical corruption and resource ceilings', () 
         expect(physicalSnapshot(f.driver)).toEqual(before);
     });
 
+    it.each([4, 8])('bounded final-page probe rejects orphan after an exact full page of %i chunks', async chunks => {
+        const f = await fixture(); await write(f, 'record', 'x'.repeat((chunks - 1) * 65536 + 7));
+        const key = manifestKey(f, 'record');
+        await f.driver.transaction(tx => tx.put(partKey(key, chunks + 2), new Uint8Array([1])));
+        const before = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+    });
+
+    it.each([3, 4, 8])('bounded final-page probe rejects reordered final chunks for %i chunks', async chunks => {
+        const f = await fixture(); await write(f, 'record', 'x'.repeat((chunks - 1) * 65536 + 7));
+        const key = manifestKey(f, 'record'), prefix = key.replace(':manifest:', ':part:') + ':';
+        const before = physicalSnapshot(f.driver);
+        const storage = { transaction: callback => f.driver.transaction(raw => callback({ ...raw, list: async options => {
+            const result = await raw.list(options);
+            return options.prefix === prefix && options.startAfter === (chunks > 4 ? partKey(key, 3) : undefined)
+                ? new Map([...result].reverse()) : result;
+        } })) };
+        const store = createDurableRecordStorage({ storage, namespace: 'disk-test', maxRecordBytes: 1024 * 1024 });
+        await expect(store.transaction(tx => tx.get('record'))).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+    });
+
     it('bounds aggregate transaction writes at 16 MiB and rolls back two accepted 8 MiB records', async () => {
         const f = await fixture({ maxRecordBytes: 16 * 1024 * 1024 });
         const value = 'x'.repeat(8 * 1024 * 1024 - 2);
