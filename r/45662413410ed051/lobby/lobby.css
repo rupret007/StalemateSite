@@ -777,6 +777,10 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .conversation-starters button, .quiet-action { font-size: 11px; }
   .quick button { font-size: 12px; }
 }
+@media (max-width: 480px) and (min-height: 621px) {
+  .channel-panel:not(:has(> .game-night:not([hidden]))) .say .btn { min-height: 48px; margin-block: 2px; }
+  .channel-panel:not(:has(> .game-night:not([hidden]))) .slash { min-width: 48px; min-height: 48px; }
+}
 /* Leave the composer and invitations room on shorter phones. */
 @media (max-width: 480px) and (min-height: 741px) {
   .conversation-starters { flex-wrap: wrap; overflow: visible; }

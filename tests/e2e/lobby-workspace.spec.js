@@ -10,7 +10,7 @@ async function enter(page, baseURL) {
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
 }
 
-for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 812], [390, 844]]) {
+for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 667], [375, 812], [390, 844]]) {
     test(`workspace fills ${width}x${height} and keeps the composer visible`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
         await enter(page, baseURL);
@@ -32,6 +32,16 @@ for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [375, 812
             expect(buffer.height).toBeGreaterThan(height * 0.35);
         } else {
             expect(await page.locator('[data-text]').evaluate(el => getComputedStyle(el).fontSize)).toBe('16px');
+            if (width <= 480) {
+                const commands = await page.getByRole('button', { name: 'Commands', exact: true }).boundingBox();
+                for (const [label, target] of [['Send', send], ['Commands', commands]]) {
+                    expect(target.width, `${label} tap width`).toBeGreaterThanOrEqual(48);
+                    expect(target.height, `${label} tap height`).toBeGreaterThanOrEqual(48);
+                    expect(target.x).toBeGreaterThanOrEqual(0);
+                    expect(target.x + target.width).toBeLessThanOrEqual(width);
+                    expect(target.y + target.height).toBeLessThanOrEqual(height);
+                }
+            }
         }
         await page.screenshot({ path: testInfo.outputPath(`workspace-${width}x${height}.png`), animations: 'disabled' });
     });
