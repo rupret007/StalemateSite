@@ -97,3 +97,9 @@ Hosted run [43885398784](https://github.com/rupret007/StalemateSite/actions/runs
 - Done — Bobserver and hosted CI both use Playwright 1.64.1. Bobserver recorded native ALSA and GStreamer GL warnings before WebKit crashed as the guest confirmed sharing. A null ALSA output, software video sink and the GTK port all left failures. The two-camera scenarios now verify stable one-way WebRTC with both host tracks before the guest starts sharing. They retain all subsequent two-way video, audio, consent, layout and playback checks.
 - Evidence — All 12 phone checks passed on the Mini with one worker and no retries. GitHub CI on 3368fbb0 passed 2,343 unit and 1,045 browser tests. The Game Night storage and timing diagnostics reproduced recovery timeouts and measured one existing case at 5.6 seconds. Those measurements establish runner timing pressure. They cover a different head and do not establish a matched comparison for every unit timeout.
 - Next — Run the three reported WebKit cases on Bobserver with native capture and signaling diagnostics. Run the full gate and Karen review after that focused check passes.
+
+### Remote media attachment follow-up on 3dbe6be8
+
+- Done — Bobserver reproduced the WPE crash during the host's one-way media, before the guest enabled capture. The native log reported a 400ms GStreamer frame conversion timeout. Remote tiles now attach a playback stream built from the currently live tracks. They replace that stream once when its tracks change, avoiding the empty source and repeated attachment of the mutable signaling stream.
+- Evidence — All 12 phone checks, Chromium multi-peer playback, mic-only playback, and camera off/on with the mic kept live passed on the Mini with one worker and no retries.
+- Next — Re-run the three affected WebKit phone cases on Bobserver. Queue the full comparison and Karen review if they pass.
