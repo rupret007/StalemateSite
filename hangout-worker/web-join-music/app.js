@@ -444,7 +444,6 @@ async function startJoin(listenOnly = false) {
     if (listenOnly && resumeAudio.hidden) $("status").textContent = "Connected. You’re listening with your microphone off.";
     clearJoinFailure(failureElements(), $("status").textContent);
     $("join").hidden = true;
-    if (resumeAudio.hidden) $("leave").focus({ preventScroll: true });
     starting = false;
     refresh();
   } catch (error) {

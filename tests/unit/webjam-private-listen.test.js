@@ -16,7 +16,7 @@ function testInviteHash({ capability = Buffer.alloc(32, 1), expiresAt = Math.flo
     return `#k=${capability.toString('base64url')}&s=${'1'.repeat(64)}&g=1&e=${expiresAt}`;
 }
 
-function fixture({ firstJoinFails = false, hash = testInviteHash() } = {}) {
+function fixture({ firstJoinFails = false, hash = testInviteHash(), joinDelay } = {}) {
     const { window } = new JSDOM(html, {
         url: `https://music.example.test/join/${hash}`,
         runScripts: 'outside-only',
@@ -32,6 +32,7 @@ function fixture({ firstJoinFails = false, hash = testInviteHash() } = {}) {
         constructor(options) { this.options = options; sessions.push(this); }
         async join() {
             if (firstJoinFails && sessions.length === 1) throw new Error(JOIN_SIGNAL.HOST_NO_ANSWER);
+            if (joinDelay) await joinDelay;
             this.options.onStatus('Connected');
         }
         close() {}
@@ -63,6 +64,25 @@ it('joins to listen on an explicit action without acquiring a microphone stream'
     expect(capture).not.toHaveBeenCalled();
     expect($('listen-actions').hidden).toBe(true);
     expect($('leave').hidden).toBe(false);
+});
+
+it.each([false, true])('keeps focus when listening connects (reading Audio details: %s)', async (readingDetails) => {
+    let finish;
+    const joinDelay = new Promise(resolve => { finish = resolve; });
+    const { $, sessions, window } = fixture({ joinDelay });
+    const { document } = window;
+    $('listen').focus();
+    $('listen').click();
+    await vi.waitFor(() => expect(sessions).toHaveLength(1));
+    expect(document.activeElement).toBe($('leave'));
+    const current = readingDetails ? document.querySelector('details > summary') : $('leave');
+    current.focus();
+    expect(document.activeElement).toBe(current);
+
+    finish();
+
+    await vi.waitFor(() => expect($('status').textContent).toContain('microphone off'));
+    expect(document.activeElement).toBe(current);
 });
 
 it.each([

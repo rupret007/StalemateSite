@@ -1,5 +1,61 @@
 const { test, expect } = require('@playwright/test');
 
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+    test(`completing a listening join preserves Audio details keyboard focus at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        const origin = new URL(baseURL).origin;
+        const external = [];
+        await page.setViewportSize({ width, height });
+        await page.route('**/*', route => {
+            const address = new URL(route.request().url());
+            if (address.origin !== origin) {
+                external.push(address.origin);
+                return route.abort();
+            }
+            if (address.pathname !== '/join/session.js') return route.continue();
+            return route.fulfill({ contentType: 'text/javascript', body: `
+                export class WebJoinSession {
+                    constructor(options) { this.options = options; }
+                    join() {
+                        return new Promise(resolve => {
+                            window.finishListening = () => { this.options.onStatus('Connected'); resolve(); };
+                        });
+                    }
+                    close() {}
+                }` });
+        });
+        await page.addInitScript(() => {
+            window.micRequests = 0;
+            Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
+                configurable: true, value: async () => { window.micRequests++; throw new Error('Listen-only fixture'); }
+            });
+        });
+        const capability = Buffer.alloc(32, 17).toString('base64url');
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        const listen = page.getByRole('button', { name: 'Join to listen', exact: true });
+        const leave = page.getByRole('button', { name: 'Leave session', exact: true });
+        const details = page.getByText('Audio details', { exact: true });
+        await listen.press('Enter');
+        await expect(leave).toBeFocused();
+        const tab = process.platform === 'darwin' && page.context().browser()?.browserType().name() === 'webkit' ? 'Alt+Tab' : 'Tab';
+        await page.keyboard.press(tab);
+        await expect(details).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(page.locator('details')).toHaveAttribute('open', '');
+        await page.screenshot({ path: testInfo.outputPath('01-listening-connecting-audio-details.png') });
+        await page.waitForFunction(() => typeof window.finishListening === 'function');
+        await page.evaluate(() => window.finishListening());
+        await expect(page.locator('#status')).toHaveText('Connected. You’re listening with your microphone off.');
+        await expect(details).toBeFocused();
+        await expect(details).toBeInViewport();
+        await page.screenshot({ path: testInfo.outputPath('02-listening-connected-audio-details.png') });
+        await leave.click();
+        await expect(listen).toBeVisible();
+        expect(await page.evaluate(() => window.micRequests)).toBe(0);
+        expect(external).toEqual([]);
+    });
+}
+
 for (const width of [375, 390]) {
     for (const kind of ['missing', 'malformed', 'expired']) {
         test(`the packaged website gives ${kind} invites a usable fresh-link recovery at ${width}px without capture`, async ({ page, baseURL }) => {
