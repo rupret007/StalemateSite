@@ -185,6 +185,46 @@ describe('bounded, transient participation rollback checkpoint', () => {
         expect(state.secret).toBe('uncommitted'); expect(checkpoint.restore()).toBe(false);
     });
 
+    it('short-key memo preserves exact UTF-8 charges and restoration for repeated Unicode keys', () => {
+        const make = () => Array.from({ length: 3 }, () => ({ repeated: null, 'é': null, '🎸': null, '\ud800': null }));
+        const graph = make(), checkpoint = createParticipationCheckpoint(graph);
+        expect(checkpoint.metrics).toMatchObject({ bytes: 1220, nodes: 20, objects: 4, entries: 16 });
+        for (const row of graph) for (const key of Object.keys(row)) row[key] = 'changed';
+        checkpoint.restore(); expect(graph).toEqual(make());
+        expect(() => createParticipationCheckpoint(make(), { maxBytes: 1219 })).toThrow(/limit/);
+        expect(createParticipationCheckpoint(make(), { maxBytes: 1220 }).metrics.bytes).toBe(1220);
+    });
+    it('short-key memo is per capture and falls back for long names and overflow', () => {
+        const key = 'repeated', long = 'z'.repeat(65), rows = Array.from({ length: 4 }, () => ({ [key]: null, [long]: null }));
+        const original = String.prototype.charCodeAt;
+        let repeatedScans = 0, longScans = 0, overflowScans = 0;
+        vi.spyOn(String.prototype, 'charCodeAt').mockImplementation(function (index) {
+            if (String(this) === key) repeatedScans++;
+            if (String(this) === long) longScans++;
+            if (String(this) === 'key299') overflowScans++;
+            return original.call(this, index);
+        });
+        createParticipationCheckpoint(rows);
+        expect(repeatedScans).toBe(key.length); expect(longScans).toBe(long.length * 4);
+        createParticipationCheckpoint(rows); expect(repeatedScans).toBe(key.length * 2);
+        const unique = Object.fromEntries(Array.from({ length: 300 }, (_, i) => ['key' + i, null]));
+        expect(createParticipationCheckpoint({ first: unique, second: { ...unique } }).metrics.entries).toBe(602);
+        expect(overflowScans).toBe('key299'.length * 2);
+    });
+    it('short-key memo still checks the clock on repeated-name cache hits', () => {
+        let calls = 0, expired = false;
+        vi.spyOn(performance, 'now').mockImplementation(() => { calls++; return expired ? 51 : 0; });
+        const original = Object.getOwnPropertyDescriptor;
+        let seen = 0;
+        vi.spyOn(Object, 'getOwnPropertyDescriptor').mockImplementation((object, key) => {
+            const result = original(object, key);
+            if (key === 'repeated' && ++seen === 2) expired = true;
+            return result;
+        });
+        expect(() => createParticipationCheckpoint([{ repeated: null }, { repeated: null }])).toThrow(/limit/);
+        expect(seen).toBe(2); expect(calls).toBeGreaterThan(1);
+    });
+
     it.each([{ maxBytes: 0 }, { maxBytes: 8 * 1024 * 1024 + 1 }, { maxNodes: 100001 }, { maxMs: 51 }, { maxMs: Infinity }, { unknown: 1 }])
         ('does not let a caller widen or disable defensive ceilings: %j', options => {
             expect(() => createParticipationCheckpoint({}, options)).toThrow(/Invalid/);

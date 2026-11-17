@@ -42,6 +42,22 @@ export function createParticipationCheckpoint(roots, options = {}) {
         }
         return size;
     }
+    // Capture-local memo of short property-name sizes only. Every occurrence
+    // still pays its full byte/node charge and a fresh clock check. Do not
+    // reuse this for values, restoration, or a later checkpoint.
+    const keySizes = new Map();
+    function keySize(key) {
+        if (key.length > 64) return stringSize(key);
+        if (keySizes.has(key)) {
+            const size = keySizes.get(key);
+            if (key.length > limits.maxBytes - bytes || size > limits.maxBytes - bytes) exceeded();
+            timeCheck();
+            return size;
+        }
+        const size = stringSize(key);
+        if (keySizes.size < 256) keySizes.set(key, size);
+        return size;
+    }
     // Only trusted callers may omit objects whose internals this particular
     // operation cannot mutate. References remain reversible; opaque contents do
     // not. Never emit the supplied objects in metrics or other diagnostics.
@@ -100,7 +116,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
             if (typeof key !== 'string') unsupported();
             const descriptor = Object.getOwnPropertyDescriptor(item.value, key);
             if (!dataDescriptor(descriptor)) unsupported();
-            charge(48 + stringSize(key), 1); entries += 1;
+            charge(48 + keySize(key), 1); entries += 1;
             // getOwnPropertyDescriptor already returned a fresh private record.
             // Keep it directly rather than allocate an identical second record.
             item.properties.push([key, descriptor]);
