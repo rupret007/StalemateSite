@@ -101,7 +101,7 @@ describe('bounded explicit Keep return', () => {
     it('conditionally rejoins but sends no registration until explicit confirmation of the matching room', async () => {
         const { window, ws, join } = await returned();
         expect(window.sessionStorage.getItem(entryFunctions.KEEP_ROOM_INTENT_KEY)).toBeNull();
-        expect(ws.sent.filter(f => f.name === 'join')).toEqual([{ t: 'cmd', name: 'join', args: [room], ch: '#stalemate', roomInstance: ref }]);
+        expect(ws.sent.filter(f => f.name === 'join')).toEqual([{ t: 'cmd', name: 'join', args: [room], ch: '#stalemate', roomInstance: ref, keepReturn: true }]);
         expect(ws.sent.some(f => f.name === 'register')).toBe(false);
         expect(window.document.querySelector('[data-keep-prompt]').hidden).toBe(true);
         join();
