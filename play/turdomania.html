@@ -388,6 +388,7 @@ function posFor(c, r) { return `translate(${c * cell}px, ${(state.rows - 1 - r) 
 
 function render() {
   syncRows();
+  const animateTiles = !reduced();
   const live = new Set();
   state.board.forEach((col, c) => col.forEach((t, r) => {
     if (!t) return;
@@ -417,7 +418,7 @@ function render() {
     el.dataset.col = c; el.dataset.row = r;
     const rowEl = rowEls[state.rows - 1 - r];
     if (el.parentNode !== rowEl) {
-      const from = el.parentNode ? el.style.transform : '';
+      const from = animateTiles && el.parentNode ? el.style.transform : '';
       rowEl.appendChild(el);
       if (from) { // re-parenting drops the transition start; replay it from the old spot
         el.style.transition = 'none';
