@@ -169,7 +169,7 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             await manualSummary.press('Enter');
             await expect(manualLink).toBeHidden();
             const manualResult = host.locator('[data-jam-share-status]').and(host.getByRole('status'));
-            await expect(manualResult).toHaveText('Share rejected. Edit the paste and try again.');
+            await expect(manualResult).toHaveText('This link didn’t work. Copy a fresh browser invite in WebJam and try again.');
             await expect(manualResult).toBeVisible();
             await expect(host.locator('[data-toast]')).toContainText('Copy a fresh browser invite in WebJam and try again.');
             await expect(manualSummary).toBeFocused();

@@ -248,6 +248,7 @@ test('browser invitations reject unconfigured origins and let hosts correct reje
             await paste(host, rejected);
             const guidance = configured ? 'Copy a fresh browser invite in WebJam and try again.' : 'Browser joining is not configured';
             await expect(host.locator('[data-toast]')).toContainText(guidance);
+            await expect(host.locator('[data-jam-share-status]')).toContainText(configured ? guidance : 'Use a desktop invitation instead.');
             await expect(host.locator('[data-jam-web]')).toBeDisabled();
             expect(await host.evaluate(() => __lobby.chans.get(__lobby.active).jam.web)).toBe('');
             // A socket send is not confirmation. Retain a rejected paste so

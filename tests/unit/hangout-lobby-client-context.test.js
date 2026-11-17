@@ -748,6 +748,20 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     expect(manualStatus.getAttribute('role')).toBe('status');
     expect(manualStatus.closest('details:not([open])')).toBeNull();
     expect(manualInput.value).toBe('draft for this room');
+    for (const [reason, guidance] of [
+        ['invalid-browser-invite', 'Copy a fresh browser invite in WebJam'],
+        ['browser-unavailable', 'Use a desktop invitation instead'],
+    ]) {
+        const draft = 'https://unapproved.example/join/#fixture';
+        manualShare.open = true;
+        manualInput.value = draft;
+        manualForm.dispatchEvent(new window.Event('submit', { cancelable: true }));
+        const request = ws.sent.at(-1);
+        manualShare.open = false;
+        ws.receive({ t: 'jam-share-result', id: request.jamRequestId, status: 'rejected', reason });
+        expect(manualStatus.textContent).toContain(guidance);
+        expect(manualInput.value).toBe(draft);
+    }
 
     chooseGuest();
     selectChannel('#stalemate');

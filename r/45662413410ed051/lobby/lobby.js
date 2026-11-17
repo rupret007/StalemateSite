@@ -1667,8 +1667,16 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             || currentJam() !== pending.room || !amOp(pending.room)) return;
         if (frame.status === 'published' && pending.confirmed && $('[data-jam-link]').value === pending.value) $('[data-jam-link]').value = '';
         clearPendingJamShare();
-        $('[data-jam-share-status]').textContent = frame.status === 'rejected' ? 'Share rejected. Edit the paste and try again.'
-            : pending.confirmed ? 'Invitation shared.' : 'The result arrived without matching room state. Your paste is kept.';
+        const status = $('[data-jam-share-status]');
+        if (frame.status === 'published') {
+            status.textContent = pending.confirmed ? 'Invitation shared.' : 'The result arrived without matching room state. Your paste is kept.';
+        } else if (pending.web && frame.reason === 'invalid-browser-invite') {
+            status.textContent = 'This link didn’t work. Copy a fresh browser invite in WebJam and try again.';
+        } else if (pending.web && frame.reason === 'browser-unavailable') {
+            status.textContent = 'Browser joining is unavailable here. Use a desktop invitation instead.';
+        } else {
+            status.textContent = 'Share rejected. Edit the paste and try again.';
+        }
     }
     let musicHandoff = null, musicHandoffReport = null;
     function canHostMusicInvite(room) {

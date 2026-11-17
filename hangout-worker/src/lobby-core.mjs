@@ -1078,7 +1078,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const joinFeedback = f.t === 'cmd' && f.name === 'join' && validPmRef(f.joinRequestId) && validPmRef(f.roomInstance)
             ? { id: f.joinRequestId, status: 'rejected' } : null;
         const result = feedback ? status => { feedback.status = status; }
-            : jamFeedback ? status => { jamFeedback.status = status; }
+            : jamFeedback ? (status, reason) => { jamFeedback.status = status; if (reason) jamFeedback.reason = reason; }
                 : joinFeedback ? status => { joinFeedback.status = status; } : undefined;
         try {
         if (f.t !== 'cmd' && ['personContext', 'personPeer', 'personNamed', 'cohostAccount'].some(key => Object.hasOwn(f, key))) return stalePerson(c);
@@ -1135,7 +1135,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (feedback) out(c, { t: 'message-result', id: feedback.id, status: feedback.status });
             // Request feedback carries no room capability or authority. It is
             // staged with real output and never added to connection/storage state.
-            if (jamFeedback) out(c, { t: 'jam-share-result', id: jamFeedback.id, status: jamFeedback.status });
+            if (jamFeedback) out(c, { t: 'jam-share-result', ...jamFeedback });
             if (reportFeedback && !reportFeedback.submitted) out(c, { t: 'report-status', ...reportFeedback });
             if (joinFeedback) out(c, { t: 'room-join-result', ...joinFeedback });
         }
@@ -1936,7 +1936,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const v = which === 'web' ? validWebJoin(link, L.webJoinOrigins) : which === 'invitation' ? validWebjamInvitation(link) : validWebjamInvite(which === 'desktop' ? link : which);
             if (!v) {
                 if (which !== 'web') return bot(c, 'Paste the complete message from WebJam’s Copy Invite into the room’s invitation box (maximum 8 KB).', 'error');
-                const message = L.webJoinOrigins?.length
+                const browserAvailable = L.webJoinOrigins?.length > 0;
+                result?.('rejected', browserAvailable ? 'invalid-browser-invite' : 'browser-unavailable');
+                const message = browserAvailable
                     ? 'That browser invite can’t be used here. Copy a fresh browser invite in WebJam and try again.'
                     : 'Browser joining is not configured for this beta.';
                 return bot(c, message, 'error');
