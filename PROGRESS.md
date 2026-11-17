@@ -103,3 +103,9 @@ Hosted run [43885398784](https://github.com/rupret007/StalemateSite/actions/runs
 - Done — Bobserver reproduced the WPE crash during the host's one-way media, before the guest enabled capture. The native log reported a 400ms GStreamer frame conversion timeout. Remote tiles now attach a playback stream built from the currently live tracks. They replace that stream once when its tracks change, avoiding the empty source and repeated attachment of the mutable signaling stream.
 - Evidence — All 12 phone checks, Chromium multi-peer playback, mic-only playback, and camera off/on with the mic kept live passed on the Mini with one worker and no retries.
 - Next — Re-run the three affected WebKit phone cases on Bobserver. Queue the full comparison and Karen review if they pass.
+
+### Bobserver video codec follow-up on aedea850
+
+- Done — The standalone WebRTC receiver failed without the room app when it played video. Audio alone passed. The identical video reproduction passed with H.264, closed the receiver with VP8, and timed out with VP9. The two-camera WebKit fixture now negotiates H.264 when available. The exploratory room playback change was removed to keep the application on its previously reviewed media path.
+- Evidence — All 12 focused Mini checks passed with one worker and no retries. They still exercise the two camera feeds, the decoded video, guest pause and seek, live audio, 48px tap targets, independent mute controls, and shared phone layout. The Bobserver codec evidence is in the `WEBKIT-NATIVE-CODECS` receipt.
+- Next — Verify all three previously failing WebKit phone cases on Bobserver. If they pass, request the full comparison on this head with Karen review.

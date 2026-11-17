@@ -52,6 +52,23 @@ function useSyntheticCapture() {
     };
 }
 
+function useWebKitTestVideoCodec() {
+    const videoCodecs = RTCRtpSender.getCapabilities('video')?.codecs || [];
+    const h264 = videoCodecs.filter(codec => codec.mimeType.toLowerCase() === 'video/h264');
+    if (!h264.length || !RTCRtpTransceiver.prototype.setCodecPreferences) return;
+    // Bobserver's WebKit receiver closed on native VP8 video. Its H.264
+    // receiver decoded the same source, with no application code involved.
+    for (const method of ['createOffer', 'createAnswer']) {
+        const negotiate = RTCPeerConnection.prototype[method];
+        RTCPeerConnection.prototype[method] = function (...args) {
+            for (const transceiver of this.getTransceivers()) {
+                if (transceiver.receiver.track.kind === 'video') transceiver.setCodecPreferences(h264);
+            }
+            return negotiate.apply(this, args);
+        };
+    }
+}
+
 // Use phone-sized media fixtures in the standard Chromium and WebKit suites.
 const test = base.extend({
     launchOptions: [async ({ browserName, launchOptions }, use) => {
@@ -250,7 +267,10 @@ async function joinCameraPair(host, guest) {
 
 async function sharedPair(context, peerBrowser, origin, viewport, mode = 'paint') {
     const webkit = peerBrowser.browserType().name() === 'webkit';
-    if (webkit) await context.addInitScript(useSyntheticCapture);
+    if (webkit) {
+        await context.addInitScript(useSyntheticCapture);
+        await context.addInitScript(useWebKitTestVideoCodec);
+    }
     const host = await openHost(context, origin);
     let invite;
     if (mode === 'paint') {
@@ -273,7 +293,10 @@ async function sharedPair(context, peerBrowser, origin, viewport, mode = 'paint'
         ...contextOptions(host), viewport, permissions: ['camera', 'microphone']
     });
     try {
-        if (webkit) await guestContext.addInitScript(useSyntheticCapture);
+        if (webkit) {
+            await guestContext.addInitScript(useSyntheticCapture);
+            await guestContext.addInitScript(useWebKitTestVideoCodec);
+        }
         await routeYouTube(guestContext);
         const guest = await guestContext.newPage();
         await guest.goto(invite.href);

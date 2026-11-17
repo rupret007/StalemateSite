@@ -2526,18 +2526,14 @@
             if (id !== 'me' && app.av.sink && v.setSinkId) v.setSinkId(app.av.sink).catch(() => {});
         }
         const v = tile.querySelector('video');
-        if (id === 'me') {
-            if (v.srcObject !== (stream || null)) v.srcObject = stream || null;
-        } else {
-            // Keep signaling's mutable stream out of the player. Build a new
-            // playback stream when tracks arrive or leave so a late camera starts
-            // decoding without detaching and reattaching the same live stream.
-            const tracks = (stream?.getTracks() || []).filter(track => track.readyState === 'live');
-            const attached = v.srcObject?.getTracks() || [];
-            const changed = tracks.length !== attached.length || tracks.some(track => !attached.includes(track));
-            if (changed) v.srcObject = tracks.length ? new MediaStream(tracks) : null;
-            if (v.srcObject && (v.paused || changed)) playRemoteFace(v);
-        }
+        // A camera track that joins a stream the <video> already holds may never start decoding in
+        // WebKit (suspected on GStreamer builds, unknown on Apple's): attach again, once per new track.
+        const face = id !== 'me' && stream ? (stream.getVideoTracks().find((t) => t.readyState === 'live') || null) : null;
+        const lateFace = Boolean(face) && v.srcObject === stream && v.__hangoutFace !== face;
+        if (lateFace) v.srcObject = null;
+        if (v.srcObject !== (stream || null)) v.srcObject = stream || null;
+        v.__hangoutFace = face;
+        if (id !== 'me' && stream && (v.paused || lateFace)) playRemoteFace(v);
         const isCanvas = id === 'me' ? app.av.canvas : app.av.canvasPeers.has(id);
         const isScreen = id === 'me' ? Boolean(app.av.screen) : app.av.screenPeers.has(id);
         const camOn = id === 'me' ? app.av.cam : app.av.camPeers.has(id);
