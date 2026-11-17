@@ -13,6 +13,16 @@ self.fetch = async function (input, options) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 };
 
+// A rejected WASM startup can stay inside the worker on WebKit. Send
+// terminal rejections through the existing worker error handler so the
+// board can offer Retry without waiting for the search watchdog.
+self.addEventListener('unhandledrejection', (event) => {
+  event.preventDefault();
+  self.setTimeout(() => {
+    throw new Error('The chess computer could not load.', { cause: event.reason });
+  }, 0);
+});
+
 // The URL fragment supplied by chess-engine.js is Stockfish's supported custom
 // WASM path; it keeps its original binary URL when loaded through this worker.
 importScripts('stockfish-19-lite-single.js');

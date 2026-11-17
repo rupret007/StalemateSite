@@ -66,9 +66,11 @@ async function ready(page, path) {
     await page.goto(path);
     await page.waitForFunction(() => !!window.__turdomania);
     await page.evaluate(() => document.fonts.ready);
-    await expect(page).toHaveTitle('Turdomania');
-    await expect(page.locator('#newBtn')).toHaveText(/New board/);
-    await expect(page.locator('#levelSel')).toBeEnabled();
+    await Promise.all([
+        expect(page).toHaveTitle('Turdomania'),
+        expect(page.locator('#newBtn')).toHaveText(/New board/),
+        expect(page.locator('#levelSel')).toBeEnabled()
+    ]);
 }
 
 test('homepage and hub offer nine ordinary games at root and project paths', async ({ page }) => {
@@ -104,15 +106,19 @@ test('former daily links open seeded free play with working undo at either base 
         await ready(page, game + '?' + options);
         const ordinary = await board(page);
         await ready(page, game + '?' + legacy + '&' + options);
-        await expect(page.locator('body')).not.toHaveClass(/daily-dump/);
-        await expect(page.locator('body')).not.toContainText('Daily Dump');
-        expect(await board(page)).toEqual(ordinary);
+        const [legacyBoard] = await Promise.all([
+            board(page),
+            expect(page.locator('body')).not.toHaveClass(/daily-dump/),
+            expect(page.locator('body')).not.toContainText('Daily Dump')
+        ]);
+        expect(legacyBoard).toEqual(ordinary);
         expect(await popOne(page)).toBe(true);
-        expect((await board(page)).length).toBeLessThan(ordinary.length);
-        await expect(page.locator('#undoBtn')).toBeEnabled();
-        await activate(page, page.locator('#undoBtn'));
-        expect(await board(page)).toEqual(ordinary);
-        await expect(page.locator('#newBtn')).toBeEnabled();
+        const undo = page.locator('#undoBtn');
+        const [afterPop] = await Promise.all([board(page), expect(undo).toBeEnabled()]);
+        expect(afterPop.length).toBeLessThan(ordinary.length);
+        await activate(page, undo);
+        const [afterUndo] = await Promise.all([board(page), expect(page.locator('#newBtn')).toBeEnabled()]);
+        expect(afterUndo).toEqual(ordinary);
     }
     expect(errors).toEqual([]);
 });
