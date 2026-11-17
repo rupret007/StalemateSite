@@ -47,6 +47,7 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
     async function nick(page, name) {
         const input = page.getByRole('textbox', { name: 'Your nick', exact: true });
         await input.press('ControlOrMeta+A'); await input.press('Backspace'); await input.pressSequentially(name);
+        await expect(page.locator('[data-enter]')).toBeEnabled();
         await page.locator('[data-enter]').press('Enter');
     }
     async function send(page, message) {
@@ -163,6 +164,7 @@ for (const width of [390, 1440]) for (const retained of [false, true]) {
             await page.goto(community.origin + '/beta/?via=' + via + '#invite=' + community.invitation);
             await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
             await page.getByRole('textbox', { name: 'Your nick', exact: true }).pressSequentially(name);
+            await expect(page.locator('[data-enter]')).toBeEnabled();
             await page.locator('[data-enter]').press('Enter');
             await expect(page.locator('[data-connection]')).toHaveText('Connected');
             return { page, context };
@@ -209,7 +211,13 @@ for (const width of [390, 1440]) for (const retained of [false, true]) {
             await expect(guest.page.locator('[data-chat-context]')).toHaveText('#stalemate');
             await expect(input).toHaveValue('');
             await expect(guest.page.getByRole('log', { name: 'Conversation' })).not.toContainText(earlier);
-            await expect(guest.page.getByText('Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.', { exact: true })).toBeVisible();
+            const guidance = 'Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.';
+            await expect(guest.page.locator('#toast-message')).toHaveText(guidance);
+            await expect(guest.page.locator('#toast-message')).toBeVisible();
+            const announcement = guest.page.locator('[data-toast-announcement]');
+            await expect(announcement).toHaveText(guidance);
+            await expect(announcement).toHaveAttribute('role', 'status');
+            await expect(announcement).toHaveAttribute('aria-atomic', 'true');
             await capture(guest.page, '02-fresh-lobby-recovery');
             await rooms(guest.page);
             await search.fill('recovery-studio');
