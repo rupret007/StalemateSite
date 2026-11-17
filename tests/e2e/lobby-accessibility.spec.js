@@ -429,6 +429,152 @@ test('host command, camera and person dialogs expose visible headings as accessi
     } finally { await peer?.close(); await visitor.close(); }
 });
 
+for (const kind of ['host', 'camera', 'person']) for (const [width, height] of [[375, 667], [390, 844]]) {
+    test(`phone ${kind} dialog has full targets and a reachable close action at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        const relay = hangoutRelayWsBase(baseURL, `phone-dialog-${randomUUID()}`);
+        const viewport = { width, height };
+        const prepare = async page => {
+            await page.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
+            await page.addInitScript(() => {
+                window.captureCalls = 0;
+                for (const name of ['getUserMedia', 'getDisplayMedia']) {
+                    Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), name, {
+                        configurable: true, value: async () => { window.captureCalls++; throw new Error('Dialog inspection never captures media'); }
+                    });
+                }
+            });
+        };
+        const owner = await guest(browser, baseURL, 'DialogOwner', viewport, relay, prepare);
+        let peer;
+        try {
+            const { page } = owner;
+            await send(page, '/join #art-modal-studio');
+            await expect(page.locator('[data-chat-context]')).toHaveText('#art-modal-studio');
+            let opener, dialog, close;
+            if (kind === 'person') {
+                peer = await guest(browser, baseURL, 'DialogPeer', viewport, relay, prepare);
+                await send(peer.page, '/join #art-modal-studio');
+                await section(page, 'people');
+                opener = page.locator('[data-nicks] button[data-self="false"]');
+                await expect(opener).toHaveCount(1);
+                dialog = page.getByRole('dialog', { name: 'DialogPeer', exact: true });
+                close = page.locator('[data-sheet-close]');
+            } else if (kind === 'camera') {
+                opener = page.locator('[data-cam]');
+                dialog = page.getByRole('dialog', { name: 'Camera on?', exact: true });
+                close = page.locator('[data-cam-no]');
+            } else {
+                opener = page.locator('[data-roomtools]');
+                dialog = page.getByRole('dialog', { name: 'Commands', exact: true });
+                close = page.locator('[data-palette-close]');
+            }
+            await tabTo(page, opener); await page.keyboard.press('Enter');
+            await expect(dialog).toBeVisible();
+            const controls = dialog.locator('button:visible');
+            const geometry = await dialog.evaluate(sheet => {
+                const rect = element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; };
+                const close = sheet.querySelector('[data-palette-close], [data-sheet-close], [data-cam-no]');
+                const box = close.getBoundingClientRect();
+                const inset = 4;
+                const points = [[box.left + inset, box.top + inset], [box.right - inset, box.top + inset],
+                    [box.left + inset, box.bottom - inset], [box.right - inset, box.bottom - inset], [box.left + box.width / 2, box.top + box.height / 2]];
+                return { viewport: { width: innerWidth, height: innerHeight }, sheet: rect(sheet), close: rect(close),
+                    closeUncovered: points.every(([x, y]) => close.contains(document.elementFromPoint(x, y))),
+                    controls: [...sheet.querySelectorAll('button, label.check')].filter(element => element.getClientRects().length)
+                        .map(element => ({ name: element.textContent.trim(), bounds: rect(element) })) };
+            });
+            await attachGeometry(testInfo, `phone-${kind}-dialog-${width}`, geometry);
+            await page.screenshot({ path: testInfo.outputPath(`phone-${kind}-dialog-${width}.png`) });
+            for (const { name, bounds } of geometry.controls) {
+                expect(bounds.width, `${name} width`).toBeGreaterThanOrEqual(48);
+                expect(bounds.height, `${name} height`).toBeGreaterThanOrEqual(48);
+            }
+            expect(geometry.closeUncovered).toBe(true);
+            await expect(close).toBeInViewport({ ratio: 1 });
+            for (const button of await controls.all()) {
+                await tabTo(page, button); await expect(button).toBeInViewport({ ratio: 1 });
+                await expect(close).toBeInViewport({ ratio: 1 });
+            }
+            if (kind === 'camera') await expect(page.locator('[data-adult]')).not.toBeChecked();
+            await tabTo(page, close); await page.keyboard.press('Space');
+            await expect(dialog).toBeHidden(); await expect(opener).toBeFocused();
+            expect(await page.evaluate(() => window.captureCalls)).toBe(0);
+            expect(await peer?.page.evaluate(() => window.captureCalls) ?? 0).toBe(0);
+            expect(owner.errors).toEqual([]); expect(peer?.errors ?? []).toEqual([]);
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await page.screenshot({ path: testInfo.outputPath(`phone-${kind}-dialog-closed-${width}.png`) });
+        } finally { await peer?.close(); await owner.close(); }
+    });
+}
+
+for (const kind of ['host', 'person']) for (const height of [256, 210]) {
+    test(`compact ${kind} dialog keeps each focused action reachable at 320x${height}`, async ({ browser, baseURL }, testInfo) => {
+        // These are short layout equivalents, not a native browser-zoom claim.
+        const relay = hangoutRelayWsBase(baseURL, `compact-dialog-${randomUUID()}`);
+        const viewport = { width: 320, height };
+        const prepare = async page => {
+            await page.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
+            await page.addInitScript(() => {
+                window.captureCalls = 0;
+                for (const name of ['getUserMedia', 'getDisplayMedia']) {
+                    Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), name, {
+                        configurable: true, value: async () => { window.captureCalls++; throw new Error('Compact dialog never captures media'); }
+                    });
+                }
+            });
+        };
+        const owner = await guest(browser, baseURL, 'CompactOwner', viewport, relay, prepare);
+        let peer;
+        try {
+            const { page } = owner;
+            await send(page, '/join #art-compact-modal');
+            await expect(page.locator('[data-chat-context]')).toHaveText('#art-compact-modal');
+            let opener, dialog, close;
+            if (kind === 'person') {
+                peer = await guest(browser, baseURL, 'CompactPeer', viewport, relay, prepare);
+                await send(peer.page, '/join #art-compact-modal');
+                await section(page, 'people');
+                opener = page.locator('[data-nicks] button[data-self="false"]');
+                await expect(opener).toHaveCount(1);
+                dialog = page.getByRole('dialog', { name: 'CompactPeer', exact: true });
+                close = page.locator('[data-sheet-close]');
+            } else {
+                opener = page.locator('[data-roomtools]');
+                dialog = page.getByRole('dialog', { name: 'Commands', exact: true });
+                close = page.locator('[data-palette-close]');
+            }
+            await tabTo(page, opener); await page.keyboard.press('Enter');
+            await expect(dialog).toBeVisible();
+            const geometry = await dialog.evaluate(sheet => {
+                const panel = sheet.querySelector('.sheet-buttons');
+                const r = sheet.getBoundingClientRect();
+                return { sheet: { top: r.top, bottom: r.bottom, height: r.height },
+                    actions: { height: panel.clientHeight, contentHeight: panel.scrollHeight },
+                    controls: [...sheet.querySelectorAll('button')].filter(button => button.getClientRects().length)
+                        .map(button => ({ name: button.textContent.trim(), height: button.getBoundingClientRect().height })) };
+            });
+            await attachGeometry(testInfo, `compact-${kind}-dialog-${height}`, geometry);
+            await page.screenshot({ path: testInfo.outputPath(`compact-${kind}-dialog-${height}.png`) });
+            for (const button of await dialog.locator('button:visible:enabled').all()) {
+                await tabTo(page, button);
+                await expect(button).toBeInViewport({ ratio: 1 });
+                const bounds = await button.boundingBox();
+                expect(bounds.width).toBeGreaterThanOrEqual(48); expect(bounds.height).toBeGreaterThanOrEqual(48);
+                expect(await button.evaluate(element => {
+                    const r = element.getBoundingClientRect();
+                    return element.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+                })).toBe(true);
+            }
+            await tabTo(page, close); await close.click({ trial: true });
+            await page.screenshot({ path: testInfo.outputPath(`compact-${kind}-close-${height}.png`) });
+            await page.keyboard.press('Space'); await expect(dialog).toBeHidden(); await expect(opener).toBeFocused();
+            expect(await page.evaluate(() => window.captureCalls)).toBe(0);
+            expect(await peer?.page.evaluate(() => window.captureCalls) ?? 0).toBe(0);
+            expect(owner.errors).toEqual([]); expect(peer?.errors ?? []).toEqual([]);
+        } finally { await peer?.close(); await owner.close(); }
+    });
+}
+
 for (const [width, height] of [[375, 667], [390, 844]]) test(`phone named-room controls support error recovery and first chat at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, reducedMotion: 'reduce' });
     try {
