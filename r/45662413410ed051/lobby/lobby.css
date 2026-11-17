@@ -89,6 +89,7 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .nickrow { display: grid; gap: 8px; font: 11px var(--mono); color: var(--muted); }
 .nickbox { display: flex; gap: 8px; }
 .nickbox input { width: 0; flex: 1; font: 14px var(--mono); }
+[data-gate-status]:not(:empty) { margin-top: 8px; }
 .dice { width: 46px; min-height: 46px; flex: none; padding: 0; font-size: 0; }
 .dice::before { content: '⚄'; font: 29px/1 var(--mono); color: var(--lime); }
 .gate-hint { margin: -8px 0 0; font-size: 11px; line-height: 1.6; }

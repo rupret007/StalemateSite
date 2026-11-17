@@ -1029,10 +1029,12 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
             await page.keyboard.press('Space');
             if (taken) {
                 const message = 'That nick is taken right now.';
-                await expect(page.locator('[data-gate-status]')).toHaveText(message);
-                await page.screenshot({ path: testInfo.outputPath('01a-nickname-taken.png') });
+                const status = page.locator('[data-gate-status]');
+                await expect(status).toHaveText(message);
                 await expect(nickname).toBeFocused();
+                await expect(status).toBeInViewport({ ratio: 1 });
                 await expect(nickname).toHaveAccessibleDescription(message);
+                await page.screenshot({ path: testInfo.outputPath('01a-nickname-taken.png') });
                 await expect(nickname).toHaveValue('FirstTimeGuest');
                 await replaceText(page, 'AnotherGuest');
                 await tabTo(page, enter);
