@@ -429,6 +429,74 @@ test('host command, camera and person dialogs expose visible headings as accessi
     } finally { await peer?.close(); await visitor.close(); }
 });
 
+for (const [width, height] of [[375, 667], [390, 844]]) test(`phone Report targets keep neighboring messages separate at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const contexts = [], reportFrames = [];
+    const relay = hangoutRelayWsBase(baseURL, `report-targets-${randomUUID()}`);
+    async function enter(nickname) {
+        const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, reducedMotion: 'reduce' });
+        contexts.push(context);
+        await context.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
+        const page = await context.newPage();
+        if (nickname === 'ReportViewer') await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
+            const server = socket.connectToServer();
+            socket.onMessage(raw => {
+                const frame = JSON.parse(String(raw));
+                if (frame.t === 'report') reportFrames.push({ id: frame.id, text: frame.text, reportResult: frame.reportResult });
+                server.send(raw);
+            });
+        });
+        await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(nickname);
+        await page.locator('[data-enter]').tap();
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        return page;
+    }
+    try {
+        const prepared = await Promise.allSettled(['PosterOne', 'PosterTwo', 'ReportViewer'].map(enter));
+        const failure = prepared.find(result => result.status === 'rejected');
+        if (failure) throw failure.reason;
+        const [firstAuthor, nextAuthor, viewer] = prepared.map(result => result.value);
+        await firstAuthor.locator('[data-text]').fill('Sample one'); await firstAuthor.locator('[data-text]').press('Enter');
+        const first = viewer.locator('[data-chat-lines] > li[data-id]').filter({ hasText: 'Sample one' });
+        await expect(first).toHaveCount(1);
+        await nextAuthor.locator('[data-text]').fill('Sample two'); await nextAuthor.locator('[data-text]').press('Enter');
+        const next = viewer.locator('[data-chat-lines] > li[data-id]').filter({ hasText: 'Sample two' });
+        await expect(next).toHaveCount(1);
+        const flag = first.getByRole('button', { name: 'Report this message from PosterOne', exact: true });
+        const neighbor = next.getByRole('button', { name: 'Report this message from PosterTwo', exact: true });
+        await flag.scrollIntoViewIfNeeded();
+        const nextId = await next.getAttribute('data-id');
+        const geometry = await flag.evaluate((button, nextId) => {
+            const nextRow = [...button.closest('li').parentElement.children].find(row => row.dataset.id === nextId);
+            const a = button.getBoundingClientRect(), b = nextRow.querySelector('.flag').getBoundingClientRect();
+            const rect = r => ({ x: r.x, y: r.y, width: r.width, height: r.height });
+            const inset = 4;
+            const points = [[a.left + inset, a.top + inset], [a.right - inset, a.top + inset],
+                [a.left + inset, a.bottom - inset], [a.right - inset, a.bottom - inset], [a.left + a.width / 2, a.top + a.height / 2]];
+            return { first: rect(a), next: rect(b),
+                overlapArea: Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)),
+                firstUncovered: points.every(([x, y]) => button.contains(document.elementFromPoint(x, y))) };
+        }, nextId);
+        await attachGeometry(testInfo, `report-targets-${width}`, geometry);
+        await viewer.screenshot({ path: testInfo.outputPath(`report-targets-before-tap-${width}.png`) });
+        for (const bounds of [geometry.first, geometry.next]) {
+            expect(bounds.width).toBeGreaterThanOrEqual(48);
+            expect(bounds.height).toBeGreaterThanOrEqual(48);
+        }
+        expect(geometry.overlapArea).toBe(0);
+        expect(geometry.firstUncovered).toBe(true);
+        const firstId = await first.getAttribute('data-id');
+        await flag.tap();
+        await expect(first.locator('.flag')).toHaveText('✓');
+        await expect(first.locator('.flag')).toHaveAttribute('aria-disabled', 'true');
+        await expect(neighbor).toHaveText('🚩');
+        expect(await neighbor.getAttribute('aria-disabled')).not.toBe('true');
+        expect(reportFrames).toEqual([{ id: firstId, text: 'Sample one', reportResult: true }]);
+        contained(await composerGeometry(viewer));
+        await viewer.screenshot({ path: testInfo.outputPath(`report-correct-message-${width}.png`) });
+    } finally { await Promise.all(contexts.map(context => context.close())); }
+});
+
 for (const [width, height] of [[375, 667], [390, 844]]) test(`everyday phone chat actions are 48px targets with a visible composer at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, reducedMotion: 'reduce' });
     try {
