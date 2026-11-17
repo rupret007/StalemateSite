@@ -140,7 +140,7 @@ function stopMicMonitoring(clearHeard = false) {
   $("mic-source").hidden = true;
   $("mic-error").textContent = "";
   $("mic-retry").hidden = true;
-  $("check-mic").disabled = checkSkipped || micHeard;
+  $("check-mic").disabled = micHeard;
 }
 
 function resetMicCheck() {
@@ -187,7 +187,7 @@ const refresh = () => {
   $("skip-check").disabled = !invite || starting || !!session || checkSkipped;
   $("mic-device").disabled = starting || !!session || checkRunning;
   $("check-mic").disabled =
-    !invite || starting || !!session || checkRunning || checkSkipped || micHeard || !!stopMeter;
+    !invite || starting || !!session || checkRunning || micHeard || !!stopMeter;
 };
 
 function showMicError(error, deviceDisconnected = false) {
@@ -214,6 +214,8 @@ function showMicError(error, deviceDisconnected = false) {
 async function runMicCheck(control) {
   if (expireUnusedInvite() || !invite || checkRunning || starting || session) return;
   const followCheck = document.activeElement === control;
+  // A deliberate check replaces the earlier decision to skip it.
+  checkSkipped = false;
   resetMicCheck();
   checkRunning = true;
   $("mic-progress").textContent = "Allow microphone access in your browser.";
