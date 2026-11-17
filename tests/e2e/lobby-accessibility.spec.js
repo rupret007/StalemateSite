@@ -27,18 +27,24 @@ async function replaceText(page, value) {
 }
 async function guest(browser, baseURL, nickname, viewport, relayOverride, preparePage) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' });
-    const page = await context.newPage(), errors = [];
-    page.on('pageerror', error => errors.push(error.message));
-    await page.route(/youtube\.com|ytimg|googlevideo|goatcounter/, route => route.abort());
-    if (preparePage) await preparePage(page);
-    const relay = relayOverride || hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
-    await page.goto(`${ROOT}?preview=local-preview-key-0001&via=rad-dad&relay=${encodeURIComponent(relay)}`);
-    await tabTo(page, page.getByRole('textbox', { name: 'Your nick', exact: true }));
-    await page.keyboard.type(nickname);
-    await expect(page.locator('[data-enter]')).toBeEnabled();
-    await tabTo(page, page.locator('[data-enter]')); await page.keyboard.press('Space');
-    await expect(page.locator('[data-connection]')).toHaveText('Connected');
-    return { page, errors, close: () => context.close() };
+    try {
+        const page = await context.newPage(), errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.route(/youtube\.com|ytimg|googlevideo|goatcounter/, route => route.abort());
+        if (preparePage) await preparePage(page);
+        const relay = relayOverride || hangoutRelayWsBase(baseURL, `accessibility-${randomUUID()}`);
+        await page.goto(`${ROOT}?preview=local-preview-key-0001&via=rad-dad&relay=${encodeURIComponent(relay)}`);
+        await tabTo(page, page.getByRole('textbox', { name: 'Your nick', exact: true }));
+        await page.keyboard.type(nickname);
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        await tabTo(page, page.locator('[data-enter]')); await page.keyboard.press('Space');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        return { page, errors, close: () => context.close() };
+    } catch (error) {
+        try { await context.close(); }
+        catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Guest setup and browser cleanup failed'); }
+        throw error;
+    }
 }
 async function send(page, value) {
     await tabTo(page, page.getByRole('textbox', { name: 'Message', exact: true }));
@@ -730,7 +736,7 @@ for (const viewport of [viewports[1], invitationViewports.at(-1)]) for (const qu
     try {
         await send(host.page, '/join #closed-invite-studio');
         await expect(host.page.locator('[data-chat-context]')).toHaveText('#closed-invite-studio');
-        visitor = await guest(browser, baseURL, 'ClosingInviteGuest', viewport, relay, delayedRejection ? async page => {
+        const prepareVisitor = () => guest(browser, baseURL, 'ClosingInviteGuest', viewport, relay, delayedRejection ? async page => {
             await page.routeWebSocket(/\/sessions\/accessibility-/, socket => {
                 const server = socket.connectToServer();
                 let hold = true;
@@ -747,11 +753,23 @@ for (const viewport of [viewports[1], invitationViewports.at(-1)]) for (const qu
                 });
             });
         } : undefined);
+        if (queued) {
+            // Independent contexts keep their complete keyboard entry checks.
+            // Prepare both peers before either invitation is sent so unrelated
+            // serial setup does not consume the recovery journey's deadline.
+            const prepared = await Promise.allSettled([
+                prepareVisitor(),
+                guest(browser, baseURL, 'NextInviteHost', { width: 1280, height: 900 }, relay),
+            ]);
+            if (prepared[0].status === 'fulfilled') visitor = prepared[0].value;
+            if (prepared[1].status === 'fulfilled') nextHost = prepared[1].value;
+            const failure = prepared.find(result => result.status === 'rejected');
+            if (failure) throw failure.reason;
+        } else visitor = await prepareVisitor();
         await send(host.page, '/invite ClosingInviteGuest');
         const invitation = visitor.page.locator('[data-room-invite]');
         const action = invitation.getByRole('button', { name: 'Join', exact: true });
         if (queued) {
-            nextHost = await guest(browser, baseURL, 'NextInviteHost', { width: 1280, height: 900 }, relay);
             await send(nextHost.page, '/join #open-invite-studio');
             await expect(nextHost.page.locator('[data-chat-context]')).toHaveText('#open-invite-studio');
             await send(nextHost.page, '/invite ClosingInviteGuest');
