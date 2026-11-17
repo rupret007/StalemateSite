@@ -225,6 +225,45 @@ describe('bounded, transient participation rollback checkpoint', () => {
         expect(seen).toBe(2); expect(calls).toBeGreaterThan(1);
     });
 
+    it('flat descriptor pairs restore mixed flags, numeric keys, special names and array length last', () => {
+        const shared = { text: 'original' }, object = Object.create(null), array = [shared, 'length', 3];
+        Object.defineProperties(object, {
+            first: { value: shared, enumerable: false, writable: true, configurable: true },
+            length: { value: 'not an array length', enumerable: true, writable: true, configurable: true },
+            ['__proto__']: { value: 7, enumerable: true, writable: true, configurable: true },
+            last: { value: 4, enumerable: false, writable: false, configurable: true }
+        });
+        Object.defineProperty(array, 'extra', { value: shared, enumerable: false, configurable: true, writable: true });
+        const beforeObject = Object.getOwnPropertyDescriptors(object), beforeArray = Object.getOwnPropertyDescriptors(array);
+        const checkpoint = createParticipationCheckpoint({ object, array });
+        object.first = 'changed'; delete object.last; object.newKey = 9;
+        array.length = 1; array.extra = null; array.push('changed'); shared.text = 'changed';
+        expect(checkpoint.restore()).toBe(true);
+        expect(Object.getOwnPropertyDescriptors(object)).toEqual(beforeObject);
+        expect(Object.getOwnPropertyDescriptors(array)).toEqual(beforeArray);
+        expect(object.first).toBe(shared); expect(array.extra).toBe(shared); expect(shared.text).toBe('original');
+    });
+
+    it('flat descriptor pairs refuse a missing late property on nonextensible state without partial restoration', () => {
+        const state = Object.preventExtensions({ first: 1, middle: 2, last: 3 });
+        const checkpoint = createParticipationCheckpoint({ state });
+        state.first = 9; delete state.last;
+        expect(() => checkpoint.restore()).toThrow(/Unsupported/);
+        expect(state.first).toBe(9); expect(Object.hasOwn(state, 'last')).toBe(false);
+        expect(checkpoint.restore()).toBe(false);
+    });
+
+    it('flat descriptor pairs retain every repeated descriptor and cycle across a larger graph', () => {
+        const rows = Array.from({ length: 300 }, (_, i) => ({ a: i, b: null, c: 'length', d: false }));
+        rows[0].b = rows;
+        const checkpoint = createParticipationCheckpoint({ rows });
+        for (const row of rows) { row.a = -1; row.c = 'changed'; }
+        rows[0].b = null;
+        expect(checkpoint.restore()).toBe(true);
+        expect(rows.every((row, i) => row.a === i && row.c === 'length' && row.d === false)).toBe(true);
+        expect(rows[0].b).toBe(rows);
+    });
+
     it.each([{ maxBytes: 0 }, { maxBytes: 8 * 1024 * 1024 + 1 }, { maxNodes: 100001 }, { maxMs: 51 }, { maxMs: Infinity }, { unknown: 1 }])
         ('does not let a caller widen or disable defensive ceilings: %j', options => {
             expect(() => createParticipationCheckpoint({}, options)).toThrow(/Invalid/);

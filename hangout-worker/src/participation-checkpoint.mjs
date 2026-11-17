@@ -119,7 +119,8 @@ export function createParticipationCheckpoint(roots, options = {}) {
             charge(48 + keySize(key), 1); entries += 1;
             // getOwnPropertyDescriptor already returned a fresh private record.
             // Keep it directly rather than allocate an identical second record.
-            item.properties.push([key, descriptor]);
+            // Flat private pairs avoid a separate allocation for every property.
+            item.properties.push(key, descriptor);
             visit(descriptor.value);
         }
         if (item.kind === 'map') {
@@ -157,7 +158,8 @@ export function createParticipationCheckpoint(roots, options = {}) {
                 if (item.kind === 'map') inspected += mapSize.call(item.value);
                 if (item.kind === 'set') inspected += setSize.call(item.value);
                 if (inspected > limits.maxNodes) exceeded();
-                const wanted = new Map(item.properties), remove = [];
+                const wanted = new Map(), remove = [];
+                for (let i = 0; i < item.properties.length; i += 2) wanted.set(item.properties[i], item.properties[i + 1]);
                 for (const key of keys) {
                     timeCheck(restoreStarted);
                     if (typeof key !== 'string') unsupported();
@@ -173,7 +175,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
                     if (!current.configurable && (desired.configurable || desired.enumerable !== current.enumerable
                         || !dataDescriptor(current) || !current.writable && (desired.writable || !Object.is(current.value, desired.value)))) unsupported();
                 }
-                if (!item.extensible && item.properties.some(([key]) => !Object.hasOwn(item.value, key))) unsupported();
+                if (!item.extensible && item.properties.some((key, index) => index % 2 === 0 && !Object.hasOwn(item.value, key))) unsupported();
                 plans.push({ item, remove });
             }
             timeCheck(restoreStarted);
@@ -181,8 +183,11 @@ export function createParticipationCheckpoint(roots, options = {}) {
                 if (Object.getPrototypeOf(item.value) !== item.prototype) Object.setPrototypeOf(item.value, item.prototype);
                 for (const key of remove) if (!Reflect.deleteProperty(item.value, key)) unsupported();
                 // Array length comes last, after original indices/extra entries.
-                for (const [key, descriptor] of item.properties) if (item.kind !== 'array' || key !== 'length') Object.defineProperty(item.value, key, descriptor);
-                if (item.kind === 'array') Object.defineProperty(item.value, 'length', item.properties.find(([key]) => key === 'length')[1]);
+                for (let i = 0; i < item.properties.length; i += 2) {
+                    const key = item.properties[i], descriptor = item.properties[i + 1];
+                    if (item.kind !== 'array' || key !== 'length') Object.defineProperty(item.value, key, descriptor);
+                }
+                if (item.kind === 'array') Object.defineProperty(item.value, 'length', item.properties[item.properties.indexOf('length') + 1]);
                 if (item.kind === 'map') {
                     Map.prototype.clear.call(item.value);
                     for (const [key, value] of item.contents) Map.prototype.set.call(item.value, key, value);
