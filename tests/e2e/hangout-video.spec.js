@@ -1,3 +1,4 @@
+const { expectOrdinaryMediaLabel } = require('./support/ordinary-media-labels');
 // Room video: Webex-style basics on the peer-to-peer mesh, two real browsers over the local relay.
 const path = require('node:path');
 const fs = require('node:fs/promises');
@@ -42,12 +43,12 @@ async function join(page, url, name) {
 async function camOn(page) {
     await page.click('[data-cam]');
     await page.click('[data-ask-yes]');
-    await expect(page.locator('[data-cam]')).toHaveText('Stop video');
+    await expectOrdinaryMediaLabel(page, 'video', true);
 }
 async function micOn(page) {
     await page.click('[data-mic]');
     await page.click('[data-ask-yes]');
-    await expect(page.locator('[data-mic]')).toHaveText('Mute mic');
+    await expectOrdinaryMediaLabel(page, 'audio', true);
 }
 async function captureRtcDiagnostics(page) {
     if (!page) return { available: false };
@@ -263,12 +264,12 @@ test('host can mute, turn a camera off, spotlight, lock and take someone off fac
 
     await guestTile.locator('.more').click();
     await host.click('[data-tile-menu] button:has-text("Mute them")');
-    await expect(guest.locator('[data-mic]')).toHaveText('Unmute mic');
+    await expectOrdinaryMediaLabel(guest, 'audio', false);
     await expect(guest.locator('[data-status]')).toContainText('The host muted you');
     // Muted, never force-unmuted: the guest can come back on their own.
     await guestTile.locator('.more').click();
     await host.click('[data-tile-menu] button:has-text("Turn their camera off")');
-    await expect(guest.locator('[data-cam]')).toHaveText('Start video');
+    await expectOrdinaryMediaLabel(guest, 'video', false);
     await expect.poll(() => guest.evaluate(() => {
         const a = window.__hangout.av;
         if (a.cam) return 'cam-on';
@@ -288,7 +289,7 @@ test('host can mute, turn a camera off, spotlight, lock and take someone off fac
 
     // Muted by the host, back on by choice (no second explainer).
     await guest.click('[data-mic]');
-    await expect(guest.locator('[data-mic]')).toHaveText('Mute mic');
+    await expectOrdinaryMediaLabel(guest, 'audio', true);
     await expect.poll(() => host.evaluate((id) => {
         const av = window.__hangout.av;
         return av.micPeers.has(id) && av.peers.has(id);
@@ -610,7 +611,7 @@ test('an older camera-on publication cannot restore a newer camera-off tile', as
     await camOn(guest);
     await expect.poll(() => host.evaluate(() => window.__heldCameraOn)).toBe(true);
     await guest.click('[data-cam]');
-    await expect(guest.locator('[data-cam]')).toHaveText('Start video');
+    await expectOrdinaryMediaLabel(guest, 'video', false);
     await expect.poll(() => host.evaluate(() => window.__receivedCameraOff)).toBe(true);
     await host.evaluate(async () => {
         window.__restoreCameraDecrypt();
@@ -802,8 +803,8 @@ test('camera blocked: one tap joins with voice only and the others see an audio 
     await guest.click('[data-ask-yes]'); // camera explainer
     await expect(guest.locator('[data-ask-title]')).toHaveText('Camera’s not available');
     await guest.click('[data-ask-yes]'); // join with voice
-    await expect(guest.locator('[data-mic]')).toHaveText('Mute mic');
-    await expect(guest.locator('[data-cam]')).toHaveText('Start video');
+    await expectOrdinaryMediaLabel(guest, 'audio', true);
+    await expectOrdinaryMediaLabel(guest, 'video', false);
     await expect(guest.locator('[data-status]')).toContainText('voice only');
     expect(await guest.evaluate(() => window.__hangout.av.stream.getVideoTracks().length)).toBe(0);
     // The host sees Karen as an audio tile (initial, no video) and still sends their camera.
@@ -847,8 +848,8 @@ test('host camera-off targets only that peer; other cameras stay on', async ({ b
     const patTile = host.locator('.tile').filter({ hasText: 'Pat' });
     await patTile.locator('.more').click();
     await host.click('[data-tile-menu] button:has-text("Turn their camera off")');
-    await expect(pat.locator('[data-cam]')).toHaveText('Start video');
-    await expect(sam.locator('[data-cam]')).toHaveText('Stop video');
+    await expectOrdinaryMediaLabel(pat, 'video', false);
+    await expectOrdinaryMediaLabel(sam, 'video', true);
     await expect.poll(() => host.evaluate(() => {
         const tiles = [...document.querySelectorAll('[data-tiles] .tile:not([data-tile="me"])')];
         const samTile = tiles.find((t) => t.textContent.includes('Sam'));
@@ -877,7 +878,7 @@ test('no host or relay action can turn a guest camera on', async ({ browser }) =
     }));
     await guest.waitForTimeout(400);
     await expect.poll(camOff, { timeout: 8000 }).toBe('off');
-    await expect(guest.locator('[data-cam]')).toHaveText('Start video');
+    await expectOrdinaryMediaLabel(guest, 'video', false);
 });
 
 test('send queue: a signaling burst never loses the offer or answer', async ({ browser }) => {
@@ -951,7 +952,7 @@ test('outbound generation: delayed camera encryption cannot publish through a re
     });
     await expect.poll(() => guest.evaluate(() => window.__heldOldOutboundAv)).toBe(true);
     await guest.click('[data-cam]');
-    await expect(guest.locator('[data-cam]')).toHaveText('Start video');
+    await expectOrdinaryMediaLabel(guest, 'video', false);
     expect(await captureIsOff(guest)).toBe(true);
     await expect.poll(() => host.evaluate((id) => window.__hangout.av.camPeers.has(id), oldId)).toBe(false);
 
@@ -1014,7 +1015,7 @@ test('outbound generation: reconnect drops paced camera state while preserving o
     await expect(guest.locator('[data-log]')).toContainText('Queued before the relay reconnect');
     await guest.fill('[data-text]', 'Unsent draft stays in this tab');
     await guest.click('[data-cam]');
-    await expect(guest.locator('[data-cam]')).toHaveText('Start video');
+    await expectOrdinaryMediaLabel(guest, 'video', false);
     expect(await captureIsOff(guest)).toBe(true);
     const queuedBeforeReconnect = await guest.evaluate(() => window.__hangoutPace.queue.length);
 
@@ -1280,8 +1281,8 @@ test('iOS lock under the gesture rule: devices stay on, one tap restores camera 
         return { cam: av.cam, mic: av.mic, off: window.__offWrites.slice(), live: Boolean(sender && sender.track && sender.track.readyState === 'live') };
     });
     expect(waiting).toEqual({ cam: true, mic: true, off: [], live: false });
-    await expect(guest.locator('[data-cam]')).toHaveText('Stop video');
-    await expect(guest.locator('[data-mic]')).toHaveText('Mute mic');
+    await expectOrdinaryMediaLabel(guest, 'video', true);
+    await expectOrdinaryMediaLabel(guest, 'audio', true);
     // The peer's picture is stalled until the tap.
     // Condition, not a set time: two readings in a row of the decoded-frame counter must match.
     // A flowing 30 fps picture can never satisfy that, however the machine is loaded.
@@ -1319,7 +1320,7 @@ test('iOS lock under the gesture rule: devices stay on, one tap restores camera 
     });
     expect(restored).toEqual({ cam: true, mic: true, off: [], video: true, audio: true, playing: true, tapCaptures: ['audio', 'video'] });
     await expect(guest.locator('[data-av-resume]')).toBeHidden();
-    await expect(guest.locator('[data-cam]')).toHaveText('Stop video');
-    await expect(guest.locator('[data-mic]')).toHaveText('Mute mic');
+    await expectOrdinaryMediaLabel(guest, 'video', true);
+    await expectOrdinaryMediaLabel(guest, 'audio', true);
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });
