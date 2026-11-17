@@ -73,6 +73,77 @@ for (const [width, height] of [[375, 667], [390, 844], [1440, 900]]) {
     });
 }
 
+for (const [width, height] of [[375, 667], [390, 844], [1440, 900]]) {
+    test(`a guest can recheck after Skip check and recover permission denial at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        await page.setViewportSize({ width, height });
+        const external = await routeProtectedListen(page, baseURL, `
+            export class WebJoinSession {
+                constructor(options) { this.options = options; }
+                async join() { window.joinAttempts++; this.options.onStatus('Synthetic audio session connected.'); }
+                close() { this.options.stream.getTracks().forEach(track => track.stop()); }
+            }`);
+        await page.addInitScript(() => {
+            window.captureCalls = 0; window.joinAttempts = 0; window.captureTracks = []; window.audioContexts = [];
+            const NativeContext = window.AudioContext;
+            window.AudioContext = class extends NativeContext {
+                constructor(...args) { super(...args); window.audioContexts.push(this); }
+            };
+            const media = Object.getPrototypeOf(navigator.mediaDevices);
+            media.enumerateDevices = async () => [];
+            media.getUserMedia = async () => {
+                window.captureCalls++;
+                if (window.captureCalls === 1) throw new DOMException('Synthetic permission denial', 'NotAllowedError');
+                const context = new AudioContext();
+                const output = context.createMediaStreamDestination();
+                const tone = context.createOscillator(), gain = context.createGain();
+                gain.gain.value = 0.08;
+                tone.connect(gain).connect(output); tone.start();
+                await context.resume();
+                for (const track of output.stream.getTracks()) {
+                    const stop = track.stop.bind(track);
+                    track.stop = () => { stop(); context.close().catch(() => {}); };
+                    window.captureTracks.push(track);
+                }
+                return output.stream;
+            };
+        });
+        const capability = Buffer.alloc(32, 17).toString('base64url');
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        const join = page.getByRole('button', { name: 'Join with microphone', exact: true });
+        const check = page.getByRole('button', { name: 'Check microphone', exact: true });
+        await page.getByRole('checkbox').check();
+        await page.getByRole('button', { name: 'Skip check', exact: true }).press('Enter');
+        await expect(join).toBeEnabled();
+        expect(await page.evaluate(() => ({ captures: captureCalls, joins: joinAttempts, contexts: audioContexts.length })))
+            .toEqual({ captures: 0, joins: 0, contexts: 0 });
+        await check.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: testInfo.outputPath(`skipped-before-recheck-${width}.png`) });
+        await expect(check).toBeEnabled();
+        await check.press('Enter');
+        await expect(page.locator('#mic-error')).toContainText('Microphone access was blocked');
+        await expect(join).toBeDisabled();
+        await expect(page.locator('#mic-heard')).toBeHidden();
+        const retry = page.getByRole('button', { name: 'Try again', exact: true });
+        await expect(retry).toBeFocused();
+        expect(await page.evaluate(() => ({ captures: captureCalls, joins: joinAttempts }))).toEqual({ captures: 1, joins: 0 });
+        await page.screenshot({ path: testInfo.outputPath(`recheck-permission-denied-${width}.png`) });
+        await retry.press('Enter');
+        await expect(page.getByText('Microphone detected.', { exact: true })).toBeVisible();
+        await expect(join).toBeEnabled(); await expect(join).toBeFocused();
+        expect(await page.evaluate(() => ({ captures: captureCalls, joins: joinAttempts }))).toEqual({ captures: 2, joins: 0 });
+        await page.screenshot({ path: testInfo.outputPath(`recheck-ready-${width}.png`) });
+        await join.press('Enter');
+        await expect(page.locator('#status')).toHaveText('Synthetic audio session connected.');
+        expect(await page.evaluate(() => ({ captures: captureCalls, joins: joinAttempts }))).toEqual({ captures: 2, joins: 1 });
+        await page.getByRole('button', { name: 'Leave session', exact: true }).press('Enter');
+        await expect.poll(() => page.evaluate(() => captureTracks.every(track => track.readyState === 'ended')
+            && audioContexts.every(context => context.state === 'closed'))).toBe(true);
+        expect(external).toEqual([]);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    });
+}
+
 for (const [width, height] of [[390, 844], [1440, 900]]) {
     test(`completing a listening join preserves Audio details keyboard focus at ${width}px`, async ({ page, baseURL }, testInfo) => {
         await page.setViewportSize({ width, height });
