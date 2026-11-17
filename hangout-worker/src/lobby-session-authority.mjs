@@ -363,9 +363,18 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             const ids = [...savedBindings.keys()];
             for (let offset = 0; offset < ids.length; offset += BATCH) {
                 const batch = await records.transaction(async tx => {
+                    // Like participation cohort preparation, share decoded reads
+                    // only inside this native read-only transaction. Each binding
+                    // still gets an independent row and its own live validation.
+                    // Never reuse these rows across batches or capture fences.
+                    const rows = new Map();
+                    const current = Object.freeze({ get: async key => {
+                        if (!rows.has(key)) rows.set(key, await tx.get(key));
+                        return clone(rows.get(key));
+                    } });
                     const result = [];
                     for (const id of ids.slice(offset, offset + BATCH)) {
-                        const binding = savedBindings.get(id); result.push({ binding, active: await validateBinding(tx, binding) });
+                        const binding = savedBindings.get(id); result.push({ binding, active: await validateBinding(current, binding) });
                     }
                     return result;
                 });
