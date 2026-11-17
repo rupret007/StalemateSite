@@ -16,9 +16,9 @@ function boot(limits = {}, gameNight = false, directMusicInvites = false) {
     L = createLobby({ gameNight, directMusicInvites, now: () => clock, limits, send: (id, m) => { if (!inbox.has(id)) inbox.set(id, []); inbox.get(id).push(m); }, close: (id, code) => closed.push([id, code]) });
 }
 let n = 0;
-function join(nick, { role = 'fan', iph = 'ip1', dev, admin } = {}) {
+function join(nick, { role = 'fan', iph = 'ip1', dev, admin, account } = {}) {
     const id = `c${(n += 1)}`;
-    const r = L.connect({ id, dev: dev || `dev-${nick}`, iph, role, admin: admin ?? role !== 'fan' });
+    const r = L.connect({ id, dev: dev || `dev-${nick}`, iph, role, account, admin: admin ?? role !== 'fan' });
     if (!r.ok) return { id, refused: r };
     L.message(id, JSON.stringify({ t: 'hello', nick, age13: true }));
     return { id, nick };
@@ -493,6 +493,28 @@ describe('permissions are enforced on the server (forged commands)', () => {
         expect(got(b).some((m) => m.t === 'invite')).toBe(true);
         cmd(b, 'join', ['#watch-x']);
         expect(L._debug.channels.get('#watch-x').members.has(b.id)).toBe(true);
+    });
+    it('explains that a verified Keep return lost its original room after sign-in', () => {
+        const host = join('OldHost');
+        const replacementHost = join('ReplacementHost');
+        const returning = join('VerifiedGuest', { account: 'fixture-account' });
+        const guest = join('OtherGuest');
+        const room = '#keep-return';
+        cmd(host, 'join', [room]);
+        const roomInstance = L._debug.channels.get(room).keepRef;
+        cmd(host, 'close', [], room);
+        cmd(replacementHost, 'join', [room]);
+        expect(L._debug.channels.get(room).keepRef).not.toBe(roomInstance);
+        const sendKeepReturn = visitor => L.message(visitor.id, JSON.stringify({
+            t: 'cmd', name: 'join', args: [room], ch: LOBBY, roomInstance, keepReturn: true,
+        }));
+        sendKeepReturn(returning);
+        expect(notices(returning)).toContain('That room changed or closed while you signed in.');
+        sendKeepReturn(guest);
+        expect(notices(guest)).not.toContain('while you signed in');
+        expect(notices(guest)).toContain('Ask the host for a new invitation');
+        expect(L._debug.channels.get(room).members.has(returning.id)).toBe(false);
+        expect(L._debug.channels.get(room).members.has(guest.id)).toBe(false);
     });
     it('binds an ordinary invitation to the original room without granting access by reference alone', () => {
         const host = join('InviteHost');

@@ -385,7 +385,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-sharing-leave]').disabled = true;
     }
     function stopLocalSharing() {
-        if (!sharingControls) return;
+        // Honor a confirmed server stop even when this tab predates the sharing controls.
         app.sharingStopped = true; app.capabilities = {};
         pauseLocalMedia();
         if (pendingKeep) clearKeep('Sharing is stopped. No room action was confirmed here.');
@@ -469,7 +469,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             return toast('The room return was not confirmed by this sign-in. Choose the current room manually.');
         pendingKeep = { ...result.intent, stage: 'joining' };
         keepTimer = setTimeout(() => clearKeep(pendingKeep?.stage === 'submitted' ? 'Keeping this room was not confirmed. Check Host tools before trying again.' : 'Your room return expired. Nothing was kept.'), KEEP_ROOM_INTENT_TTL - (Date.now() - pendingKeep.at));
-        if (!cmd('join', [pendingKeep.room], '#stalemate', pendingKeep.ref)) clearKeep('The room return could not be sent. Nothing was kept.');
+        if (!send({ t: 'cmd', name: 'join', args: [pendingKeep.room], ch: '#stalemate', roomInstance: pendingKeep.ref, keepReturn: true }))
+            clearKeep('The room return could not be sent. Nothing was kept.');
     }
 
     function drawEntryChoice() {

@@ -297,7 +297,10 @@ for (const width of [375, 390]) {
             await say(peer, '/msg EndingGuest A private request awaiting a decision');
             await expect(ended.locator('[data-pmreqs]')).toContainText('ContinuingPeer');
             await channel(peer, 'guest-later'); await say(peer, '/invite EndingGuest');
-            await expect(ended.locator('[data-toast]')).toContainText('invited you');
+            const invitation = ended.locator('[data-room-invite]');
+            await expect(invitation).toBeVisible();
+            await expect(invitation).toContainText('invited you');
+            await expect(invitation.getByRole('button', { name: 'Join', exact: true })).toBeEnabled();
             await ended.fill('[data-text]', 'Unsent drawing idea — never move this into lobby chat');
             await ended.click('[data-roomtools]'); await expect(ended.locator('[data-palette]')).toBeVisible();
             fixture.end('EndingGuest');
@@ -310,6 +313,8 @@ for (const width of [375, 390]) {
             await expect(ended.locator('[data-pmreqs]')).toBeEmpty();
             await expect(ended.locator('[data-palette]')).toBeHidden();
             await expect(ended.locator('[data-toast] button')).toHaveCount(0);
+            await expect(invitation).toBeHidden();
+            await expect(invitation.getByRole('button', { name: 'Join', exact: true })).toHaveCount(0);
             await expect(ended.locator('[data-jam-link]')).toHaveValue('');
             await expect(ended.locator('[data-jam-copy-value]')).toHaveValue('');
             expect(await ended.evaluate(() => JSON.stringify([...__lobby.chans.values()]))).not.toContain(INVITE);

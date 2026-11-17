@@ -1336,6 +1336,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (intent.account) personDependency(null, chan);
         if (exactRule) personDependency(null, chan);
         const fn = handlers[name];
+        if (name === 'join') return fn(c, chan, args, roomInstance, messageResult, frame.keepReturn === true && !!c.account);
         return fn(c, chan, args, roomInstance, messageResult, boundPeer, intent.account);
     }
 
@@ -1668,7 +1669,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return closeRoom(room, c.nick, 'registration removed by owner');
         },
         help(c) { HELP.forEach((h) => bot(c, h)); },
-        join(c, _chan, [rawName, key = '', ...titleWords], roomInstance, result) {
+        join(c, _chan, [rawName, key = '', ...titleWords], roomInstance, result, keepReturn = false) {
             let name = String(rawName || '');
             if (!name.startsWith('#')) name = `#${name}`;
             name = name.toLowerCase();
@@ -1676,7 +1677,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (!/^#[a-z0-9-]{2,30}$/.test(name)) return bot(c, 'Room names look like #bobross-tuesday (letters, numbers, dashes).', 'error');
             const existing = ch(name);
             if (roomInstance !== undefined && (typeof roomInstance !== 'string' || !/^[a-f0-9]{32}$/.test(roomInstance) || !existing || existing.keepRef !== roomInstance))
-                return bot(c, 'That room changed or closed. Ask the host for a new invitation or choose another room.', 'error');
+                return bot(c, keepReturn ? 'That room changed or closed while you signed in. Choose a room to continue.'
+                    : 'That room changed or closed. Ask the host for a new invitation or choose another room.', 'error');
             if (existing) {
                 if (result && existing.members.has(c.id)) {
                     sendRoomEntry(c, existing, true);

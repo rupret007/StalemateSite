@@ -65,7 +65,7 @@ const WEB_INVITE = 'https://webjam.example/join/#k=synthetic_browser_capability&
 async function browserRoom(browser, baseURL, configured, viewport) {
     const contexts = [], external = [];
     const relay = hangoutRelayWsBase(baseURL, `${configured ? 'webjam-browser-' : 'webjam-off-'}${randomUUID()}`);
-    const join = async (nick, controls = false) => {
+    const join = async (nick, controls = false, onLobbySocket) => {
         const context = await browser.newContext({ viewport,
             ...(controls && browser.browserType().name() === 'chromium' ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
         await context.route('**/*', route => {
@@ -96,6 +96,10 @@ async function browserRoom(browser, baseURL, configured, viewport) {
             };
         });
         const page = await context.newPage();
+        if (onLobbySocket) await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
+            socket.connectToServer();
+            onLobbySocket(socket);
+        });
         await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
         try { await expect(page.locator('[data-connection]')).toHaveText('Connected'); }
@@ -302,13 +306,42 @@ test('browser invitations reject unconfigured origins and let hosts correct reje
     }
 });
 
+test('a cached browser Join action becomes inactive after a server stop on a browser-enabled room', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true);
+    try {
+        let lobbySocket;
+        const host = await f.join('ServerStopHost', false, socket => { lobbySocket = socket; });
+        await host.click('[data-start="jam"]'); await expect(host.locator('[data-jam]')).toBeVisible();
+        await paste(host, WEB_INVITE);
+        const join = host.locator('[data-jam-web]');
+        await expect(join).toBeEnabled();
+        await join.evaluate(button => { window.oldBrowserJoin = button.onclick; });
+        await host.evaluate(() => window.oldBrowserJoin());
+        expect(await host.evaluate(() => window.browserOpens.length)).toBe(1);
+        await host.evaluate(() => { window.browserOpens = []; });
+
+        lobbySocket.send(JSON.stringify({ t: 'sharing-stopped' }));
+        await expect(host.locator('[data-text]')).toBeDisabled();
+        await expect(join).toBeDisabled();
+        await expect(host.locator('[data-jam-copy-value]')).toHaveValue('');
+        await host.evaluate(() => window.oldBrowserJoin());
+        expect(await host.evaluate(() => window.browserOpens)).toEqual([]);
+        expect(await host.evaluate(() => window.audioRequests)).toBe(0);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
+
 test('a cached browser Join action stays inactive after local Stop when server withdrawal is unconfirmed', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true);
     try {
         const host = await f.join('StopBrowserHost', true);
         await host.click('[data-start="jam"]'); await expect(host.locator('[data-jam]')).toBeVisible();
-        await paste(host, WEB_INVITE); await expect(host.locator('[data-jam-web]')).toBeEnabled();
-        await host.locator('[data-jam-web]').evaluate(button => { window.oldBrowserJoin = button.onclick; });
+        await paste(host, WEB_INVITE);
+        const join = host.locator('[data-jam-web]');
+        await expect(join).toBeHidden();
+        await expect(join).toBeDisabled();
+        await expect(host.locator('[data-jam-browser-note]')).toContainText('unavailable under this community’s sharing policy');
+        await join.evaluate(button => { window.oldBrowserJoin = button.onclick; });
         await host.locator('[data-sharing-controls] summary').click();
         await expect(host.locator('[data-sharing-status]')).toContainText('Sharing is available');
         await host.click('[data-sharing-stop]'); await host.click('[data-sharing-accept]');
