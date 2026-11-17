@@ -89,7 +89,17 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             await expect(setupSteps.locator('[data-jam-direct-step]')).toBeVisible();
             await expect(setupSteps.locator('[data-jam-direct-step]')).toContainText('Invite to Music');
             await expect(setupSteps.locator('[data-jam-manual-step]')).toBeHidden();
+            const manualShare = host.locator('[data-jam-manual-share]');
+            const manualSummary = manualShare.locator('summary');
+            const manualLink = host.locator('[data-jam-link]');
+            await expect(manualSummary).toHaveText('Share an invite manually');
+            await expect(manualSummary).toBeVisible();
+            await expect(manualLink).toBeHidden();
             await capture(host, '00a-host-quick-invite-setup');
+            await manualSummary.press('Enter');
+            await expect(manualLink).toBeVisible();
+            await manualSummary.press('Enter');
+            await expect(manualLink).toBeHidden();
             const dialog = host.getByRole('dialog', { name: 'Invite a guest' });
             await inviteButton.click();
             const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });
@@ -148,8 +158,10 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             await expect(manual).toBeInViewport({ ratio: 1 });
             await capture(host, '00b-native-handoff-timeout');
             await manual.press('Enter');
-            await expect(host.locator('[data-jam-link]')).toBeFocused();
-            await expect(host.locator('[data-jam-link]')).toBeEmpty();
+            await expect(manualLink).toBeFocused();
+            await expect(manualLink).toBeInViewport({ ratio: 1 });
+            await expect(manualLink).toBeEmpty();
+            await capture(host, '00c-manual-fallback-focused');
 
             expect(await invite(2, href.replace('webjam.example', 'other-audio.example.test'))).toBe(false);
             await expect(panel).toBeHidden();

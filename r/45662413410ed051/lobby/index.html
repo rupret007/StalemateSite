@@ -321,12 +321,15 @@
                 <label class="small" data-jam-invite-copy-fallback hidden>Select this invite link, then copy it.
                     <textarea data-jam-invite-copy-value readonly aria-label="Browser invite link to copy" autocomplete="off" spellcheck="false" rows="2"></textarea>
                 </label>
-                <form class="jam-paste op-only" data-jam-form>
-                    <textarea data-jam-link placeholder="Paste a full desktop invite or browser link" aria-label="WebJam invitation" aria-describedby="jam-host-steps jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
-                    <button class="btn btn--small" type="submit">Share</button>
-                    <p class="small" id="jam-share-help">For manual sharing, copy the browser invite in WebJam. Paste that link here and click <strong>Share</strong>. Keep the Music session running. For a desktop guest, paste the full desktop invite instead.</p>
-                    <p class="small" data-jam-share-status role="status"></p>
-                </form>
+                <details class="jam-manual-share" data-jam-manual-share hidden>
+                    <summary>Share an invite manually</summary>
+                    <form class="jam-paste op-only" data-jam-form>
+                        <textarea data-jam-link placeholder="Paste a full desktop invite or browser link" aria-label="WebJam invitation" aria-describedby="jam-host-steps jam-share-help" autocomplete="off" spellcheck="false" maxlength="8192" rows="2"></textarea>
+                        <button class="btn btn--small" type="submit">Share</button>
+                        <p class="small" id="jam-share-help">For manual sharing, copy the browser invite in WebJam. Paste that link here and click <strong>Share</strong>. Keep the Music session running. For a desktop guest, paste the full desktop invite instead.</p>
+                        <p class="small" data-jam-share-status role="status"></p>
+                    </form>
+                </details>
                 <p class="small jam-platform" data-jam-platform>A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.</p>
                 <details class="jam-setup" data-jam-help>
                     <summary>Setup &amp; invitation help</summary>

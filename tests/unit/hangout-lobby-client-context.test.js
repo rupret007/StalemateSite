@@ -561,6 +561,7 @@ it('keeps browser audio guidance and actions off under the protected participati
     expect(window.open).not.toHaveBeenCalled();
     const input = document.querySelector('[data-jam-link]');
     const form = document.querySelector('[data-jam-form]');
+    expect(form.closest('details')?.open).toBe(true);
     input.value = href;
     form.dispatchEvent(new window.Event('submit', { cancelable: true }));
     expect(ws.sent.some(frame => frame.name === 'jamlink')).toBe(false);
@@ -707,6 +708,8 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     const shownSteps = [...document.querySelectorAll('[data-jam-host-steps] li:not([hidden])')].map(step => step.textContent);
     expect(shownSteps[1]).toContain('Invite to Music');
     expect(shownSteps.join(' ')).not.toContain('Copy browser invite');
+    const manualShare = document.querySelector('[data-jam-form]').closest('details');
+    expect(manualShare?.open).toBe(false);
     const chooseGuest = () => {
         invite.click();
         const people = document.querySelector('[data-invite-options]');
@@ -727,6 +730,11 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     expect(channels[0].close).toHaveBeenCalledOnce();
     channels[0].receive({ href });
     expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
+    document.querySelector('[data-music-handoff-manual]').click();
+    expect(manualShare.open).toBe(true);
+    const manualInput = document.querySelector('[data-jam-link]');
+    expect(document.activeElement).toBe(manualInput);
+    manualInput.value = 'draft for this room';
 
     chooseGuest();
     selectChannel('#stalemate');
@@ -735,6 +743,8 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     channels[1].receive({ href });
     expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
     selectChannel('#jam-rehearsal');
+    expect(manualShare.open).toBe(false);
+    expect(manualInput.value).toBe('');
 
     chooseGuest();
     expect(launch).toHaveBeenLastCalledWith(`webjam-beta://hangout-music/${request}`);

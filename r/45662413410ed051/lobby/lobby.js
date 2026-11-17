@@ -517,6 +517,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     let belowFold = 0;
     let roomApi = null;
     let jamContext = null;
+    const jamManualShare = $('[data-jam-manual-share]');
+    const jamManualSummary = $('summary', jamManualShare);
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
     let directMusicInvitesSupported = false, musicOffer = null;
@@ -1782,6 +1784,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         stopMusicHandoff(false);
         musicHandoffReport = null;
         drawMusicHandoff();
+        jamManualShare.open = true;
         $('[data-jam-link]').focus();
     });
     window.addEventListener('pagehide', () => stopMusicHandoff());
@@ -1801,6 +1804,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-jam-invite-qr-toggle]').setAttribute('aria-expanded', 'false');
         $('[data-jam-invite-qr-toggle]').textContent = 'Show QR code';
         $('[data-jam-link]').value = ''; $('[data-jam-form]').hidden = true;
+        jamManualShare.hidden = true;
         $('[data-jam-host-steps]').hidden = true;
         $('[data-jam-invite-room]').hidden = true;
         $('[data-jam-invite-music]').hidden = true;
@@ -2217,6 +2221,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         // Presence redraws keep it; switching, replacement or power loss clears it.
         if (!unchanged) {
             const draft = ownPublication ? $('[data-jam-link]').value : '';
+            if (jamContext?.room !== next?.room || jamContext?.host !== next?.host) jamManualShare.open = false;
             resetJamControls(); jamContext = next;
             if (ownPublication) {
                 pending.context = jamContext; pendingJamShare = pending;
@@ -2225,9 +2230,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
         if (!next) return;
         $('[data-jam]').hidden = false; $('[data-jam-form]').hidden = !next.host;
+        jamManualShare.hidden = !next.host;
         $('[data-jam-invite-room]').hidden = !next.host;
         const musicButton = $('[data-jam-invite-music]');
         musicButton.hidden = !next.host || !readyForMusicOffer() || typeof window.BroadcastChannel !== 'function';
+        jamManualSummary.hidden = musicButton.hidden;
+        if (next.host && musicButton.hidden) jamManualShare.open = true;
         $('[data-jam-direct-step]').hidden = musicButton.hidden;
         $('[data-jam-manual-step]').hidden = !musicButton.hidden;
         musicButton.setAttribute('aria-disabled', String(!!musicHandoff));
