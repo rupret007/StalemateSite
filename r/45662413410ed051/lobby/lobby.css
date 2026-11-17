@@ -777,7 +777,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .topic { font-size: 12px; }
   .conversation-starters button, .quiet-action { font-size: 11px; }
   .quick button { font-size: 12px; }
-  [data-room-invite] .btn { min-width: 48px; min-height: 48px; }
+  :is([data-room-invite], [data-music-invite]) .btn { min-width: 48px; min-height: 48px; }
 }
 @media (max-width: 480px) and (min-height: 621px) {
   .channel-panel:not(:has(> .game-night:not([hidden]))) .say .btn { min-height: 48px; margin-block: 2px; }

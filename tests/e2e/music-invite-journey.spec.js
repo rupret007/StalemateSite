@@ -217,6 +217,16 @@ for (const { width, height, hostSite, guestSite, delayed } of scenarios) {
             expect(await invite(4)).toBe(true);
             const accept = panel.getByRole('button', { name: 'Accept and join', exact: true });
             await expect(accept).toBeInViewport({ ratio: 1 });
+            if (width <= 480) {
+                for (const button of [accept, decline]) {
+                    await expect(button).toBeInViewport({ ratio: 1 });
+                    const bounds = await button.boundingBox();
+                    expect(bounds.width).toBeGreaterThanOrEqual(48);
+                    expect(bounds.height).toBeGreaterThanOrEqual(48);
+                }
+                await expect(guest.getByRole('textbox', { name: 'Message', exact: true })).toBeInViewport({ ratio: 1 });
+                await expect(guest.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+            }
             await expect(accept).toHaveAccessibleDescription('MusicHost invited you to join Music.');
             await capture(guest, '02-guest-receives-offer');
             await host.locator('[data-channel-key="#stalemate"]').click();
