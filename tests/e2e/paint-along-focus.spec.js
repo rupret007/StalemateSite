@@ -234,6 +234,20 @@ async function joinWithCamera(page) {
     await expect(consent).toBeHidden();
 }
 
+async function joinCameraPair(host, guest) {
+    await joinWithCamera(host);
+    // Consent dismissal precedes WebRTC setup. Confirm the first camera and
+    // mic have been negotiated before the guest turns on their own devices.
+    await expect.poll(() => guest.evaluate(() => {
+        const peers = [...window.__hangout.av.pcs.values()];
+        return peers.some(({ pc, stream }) => pc.connectionState === 'connected'
+            && pc.signalingState === 'stable'
+            && stream.getVideoTracks().some(track => track.readyState === 'live')
+            && stream.getAudioTracks().some(track => track.readyState === 'live'));
+    })).toBe(true);
+    await joinWithCamera(guest);
+}
+
 async function sharedPair(context, peerBrowser, origin, viewport, mode = 'paint') {
     const webkit = peerBrowser.browserType().name() === 'webkit';
     if (webkit) await context.addInitScript(useSyntheticCapture);
@@ -301,8 +315,7 @@ test('the Paint Along stage stays fully visible above two live tiles and open ch
     test.setTimeout(60000);
     const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
     try {
-        await joinWithCamera(host);
-        await joinWithCamera(guest);
+        await joinCameraPair(host, guest);
         for (const page of [host, guest]) {
             const tiles = page.locator('[data-tiles] .tile');
             await expect(tiles).toHaveCount(2);
@@ -359,8 +372,7 @@ test('a guest pauses, plays and seeks for everyone, including a late join', asyn
 test('music, video sound, game effects and live microphone remain independent', async ({ context, peerBrowser, baseURL, viewport }) => {
     const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
     try {
-        await joinWithCamera(host);
-        await joinWithCamera(guest);
+        await joinCameraPair(host, guest);
         const videoSound = host.locator('[data-soundtrack]');
         const music = host.locator('[data-music-toggle]');
         const micState = () => host.evaluate(() => window.__hangout.av.stream.getAudioTracks()
@@ -425,8 +437,7 @@ test('the phone layout gives camera consent priority and keeps labeled 48px cont
         await expect(camera).toHaveCSS('background-color', 'rgb(31, 122, 69)');
         expect((await camera.boundingBox()).width).toBeGreaterThan((await consent.locator('[data-consent-skip]').boundingBox()).width);
         await expectTouchTargets(consent);
-        await joinWithCamera(host);
-        await joinWithCamera(guest);
+        await joinCameraPair(host, guest);
         const tiles = host.locator('[data-tiles] .tile');
         await expect(tiles).toHaveCount(2);
         const [remote, local] = await Promise.all([tiles.first().boundingBox(), tiles.last().boundingBox()]);
@@ -462,8 +473,8 @@ test('Watch a Movie Together uses the shared phone stage and keeps video selecti
             await expect(page.locator('body')).toHaveAttribute('data-shared-layout', 'watch');
             await expect(page.locator('[data-bob]')).toBeHidden();
             await expect(page.locator('[data-canvas]')).toBeHidden();
-            await joinWithCamera(page);
         }
+        await joinCameraPair(host, guest);
         await expect(host.locator('[data-load]')).toBeVisible();
         await expect(guest.locator('[data-load]')).toBeHidden();
         await expect(host.locator('[data-bob-toggle]')).toBeVisible();
