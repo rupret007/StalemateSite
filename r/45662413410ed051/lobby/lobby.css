@@ -761,6 +761,10 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .act-paint canvas { width: min(100%, 30dvh); }
 }
 @media (max-width: 480px) {
+  .titlebar { gap: 10px; }
+  .brand { flex-shrink: 0; gap: 8px; }
+  .brand b { white-space: nowrap; }
+  .connection-tools { column-gap: 8px; row-gap: 4px; }
   input, select, textarea, .nickbox input, .directory-controls input, .directory-controls select, .act-load input, .jam-paste input { font-size: 16px; }
   .buffer, .who { font-size: 14px; }
   .ev { font-size: 12px; }

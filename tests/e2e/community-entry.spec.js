@@ -51,6 +51,20 @@ for (const { width, height, mobile } of viewports) test(`three website entrances
             await page.click('[data-enter]');
             await expect(page.locator('[data-app]')).toBeVisible();
             expect(new URL(page.url()).origin).toBe(new URL(baseURL).origin);
+            if (mobile && index < 2) {
+                const returnLink = page.getByRole('link', { name: `Back to ${site.label}` });
+                await expect(returnLink).toBeInViewport({ ratio: 1 });
+                const wordmark = page.locator('.brand b');
+                await expect(wordmark).toHaveText('HANG OUT');
+                const lines = await wordmark.evaluate(async element => {
+                    await document.fonts.ready;
+                    const range = document.createRange();
+                    range.selectNodeContents(element);
+                    return range.getClientRects().length;
+                });
+                await page.screenshot({ path: testInfo.outputPath(`header-${site.id}-${width}.png`) });
+                expect(lines).toBe(1);
+            }
             if (index === 0) {
                 await page.fill('[data-text]', 'A line sent before the other sites arrive'); await page.press('[data-text]', 'Enter');
                 await expect(page.locator('[data-buffer]')).toContainText('A line sent before the other sites arrive');
