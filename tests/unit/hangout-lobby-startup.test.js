@@ -86,6 +86,9 @@ function initialize({ privateShell = true, cachedPreview = false } = {}) {
     const app = visitor(), { window, document, main } = app;
     if (privateShell) {
         const marker = document.createElement('script'); marker.src = '/beta/bootstrap.js'; document.head.append(marker);
+        // betaFetch injects the protected page's same-origin relay even when
+        // its separate bootstrap script fails. Raw source HTML is unconfigured.
+        document.querySelector('meta[name="hangout-relay"]').content = window.location.origin.replace(/^http/, 'ws');
     }
     if (cachedPreview) window.sessionStorage.setItem('hangout-preview', 'local-preview-key-0001');
     let readyEvents = 0;
