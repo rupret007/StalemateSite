@@ -268,6 +268,8 @@ if (['chromium', 'webkit'].includes(probeBrowser)) {
     test.use({ browserName: probeBrowser });
     const actionGames = [
         ['chess', 'chess', null, '[data-chess-primary]', '[data-chess-playing]'],
+        ['crapeights', 'eights', 'arcadeCrapeights', '[data-eights-main]', '[data-eights-table]'],
+        ['turdrummy', 'rummy', 'arcadeTurdRummy', '[data-rummy-main]', '[data-rummy-table]'],
         ['turdtris', 'tris', 'arcadeTurdtris', '[data-tris-main]', '[data-tris-match]'],
         ['turdomania', 'mania', 'arcadeTurdomania', '[data-mania-main]', '[data-mania-match]'],
         ['turdrush', 'race', 'arcadeTurdRush', '[data-race-main]', '[data-race-match]'],
