@@ -429,6 +429,54 @@ test('host command, camera and person dialogs expose visible headings as accessi
     } finally { await peer?.close(); await visitor.close(); }
 });
 
+for (const [width, height] of [[375, 667], [390, 844]]) test(`phone named-room controls support error recovery and first chat at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, reducedMotion: 'reduce' });
+    try {
+        await context.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
+        const page = await context.newPage(), errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        const relay = hangoutRelayWsBase(baseURL, `phone-channel-${randomUUID()}`);
+        await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('PhoneRoomHost');
+        await page.locator('[data-enter]').tap();
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        const rooms = page.locator('nav [data-show="rooms"]');
+        if (await rooms.isVisible()) await rooms.tap();
+        const opener = page.locator('[data-start="chat"]');
+        await opener.tap();
+        const dialog = page.getByRole('dialog', { name: 'Your own #channel', exact: true });
+        const name = page.getByRole('textbox', { name: 'Channel name', exact: true });
+        const join = dialog.getByRole('button', { name: 'Join / create', exact: true });
+        const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });
+        await expect(dialog).toBeVisible(); await expect(name).toBeFocused();
+        const controls = [];
+        for (const control of [name, join, cancel]) {
+            controls.push({ name: await control.getAttribute('aria-label') || await control.getAttribute('id') || await control.innerText(), bounds: await control.boundingBox() });
+        }
+        await attachGeometry(testInfo, `phone-channel-controls-${width}`, { viewport: { width, height }, controls });
+        await page.screenshot({ path: testInfo.outputPath(`phone-channel-form-${width}.png`) });
+        for (const { name: label, bounds } of controls) {
+            expect(bounds.width, `${label} width`).toBeGreaterThanOrEqual(48);
+            expect(bounds.height, `${label} height`).toBeGreaterThanOrEqual(48);
+        }
+        await name.fill('#art-needs-an-activity'); await join.tap();
+        await expect(page.locator('[data-channel-error]')).toContainText('starts an activity room');
+        await expect(name).toBeFocused();
+        await expect(name).toHaveAttribute('aria-describedby', /channel-name-error/);
+        await expect(cancel).toBeInViewport({ ratio: 1 });
+        await page.screenshot({ path: testInfo.outputPath(`phone-channel-error-${width}.png`) });
+        await cancel.tap(); await expect(dialog).toBeHidden(); await expect(opener).toBeFocused();
+        await opener.tap(); await name.fill('#phone-studio'); await join.tap();
+        await expect(dialog).toBeHidden();
+        await expect(page.locator('[data-chat-context]')).toHaveText('#phone-studio');
+        await page.locator('[data-text]').fill('My room is ready.'); await page.locator('[data-send]').tap();
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('My room is ready.');
+        contained(await composerGeometry(page));
+        await page.screenshot({ path: testInfo.outputPath(`phone-channel-first-message-${width}.png`) });
+        expect(errors).toEqual([]);
+    } finally { await context.close(); }
+});
+
 for (const [width, height] of [[375, 667], [390, 844]]) test(`phone Report targets keep neighboring messages separate at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const contexts = [], reportFrames = [];
     const relay = hangoutRelayWsBase(baseURL, `report-targets-${randomUUID()}`);
