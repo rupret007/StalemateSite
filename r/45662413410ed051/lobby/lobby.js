@@ -3368,8 +3368,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (selectionLost) people.value = '';
 
         const emptyMusicRoster = invitingToMusic && invitePeople.size === 0;
-        const preferRoster = activityRoom(current) && canInviteByRoster() && invitePeople.size > 0;
-        people.labels[0].textContent = invitingToMusic || preferRoster ? 'Online guests' : 'Choose a current person';
+        const preferRoster = canInviteByRoster() && invitePeople.size > 0;
+        people.labels[0].textContent = 'Online guests';
         people.disabled = emptyMusicRoster;
         updateInvitePersonAction();
         $('[data-invite-form] button[type="submit"]').classList.toggle('btn--ghost', preferRoster);
