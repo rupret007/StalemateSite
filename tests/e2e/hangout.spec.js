@@ -508,12 +508,14 @@ test('guest snapshot cannot tamper with video timestamp to skew late joiner play
     await late.fill('[data-name]', 'Pat');
     await late.click('[data-enter]');
     const lateId = await late.evaluate(() => window.__hangout.myId);
+    await expect.poll(() => late.evaluate(() => Boolean(window.__hangout.state.video && window.__hangout.lastVideoSigned))).toBe(true);
     await late.evaluate(() => {
         const app = window.__hangout;
         app.snapshotDone = false;
         app.snapshotFrom = null;
         app.snapshotHasSeqProof = false;
         app.state.video = null;
+        app.lastVideoSigned = null; // Reset the signed cache with the synthetic empty playback state.
     });
     const forgedT = Date.now() - 3_600_000;
     const signedT = await guest.evaluate(async ({ to, forged }) => {
