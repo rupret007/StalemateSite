@@ -1,28 +1,42 @@
+const { resolve } = require('node:path');
 const { test, expect } = require('@playwright/test');
+
+async function routeProtectedListen(page, baseURL, sessionSource) {
+    const origin = new URL(baseURL).origin;
+    const external = [];
+    await page.route('**/*', route => {
+        const address = new URL(route.request().url());
+        if (address.origin !== origin) {
+            external.push(address.origin);
+            return route.abort();
+        }
+        if (address.pathname === '/join/') {
+            return route.fulfill({ path: resolve(__dirname, '../../hangout-worker/web-join-chess/index.html'), contentType: 'text/html' });
+        }
+        if (address.pathname === '/join/app.js') {
+            return route.fulfill({ path: resolve(__dirname, '../../hangout-worker/web-join-music/app.js'), contentType: 'text/javascript' });
+        }
+        if (address.pathname === '/join/session.js') {
+            return route.fulfill({ contentType: 'text/javascript', body: sessionSource });
+        }
+        return route.continue();
+    });
+    return external;
+}
 
 for (const [width, height] of [[390, 844], [1440, 900]]) {
     test(`completing a listening join preserves Audio details keyboard focus at ${width}px`, async ({ page, baseURL }, testInfo) => {
-        const origin = new URL(baseURL).origin;
-        const external = [];
         await page.setViewportSize({ width, height });
-        await page.route('**/*', route => {
-            const address = new URL(route.request().url());
-            if (address.origin !== origin) {
-                external.push(address.origin);
-                return route.abort();
-            }
-            if (address.pathname !== '/join/session.js') return route.continue();
-            return route.fulfill({ contentType: 'text/javascript', body: `
-                export class WebJoinSession {
-                    constructor(options) { this.options = options; }
-                    join() {
-                        return new Promise(resolve => {
-                            window.finishListening = () => { this.options.onStatus('Connected'); resolve(); };
-                        });
-                    }
-                    close() {}
-                }` });
-        });
+        const external = await routeProtectedListen(page, baseURL, `
+            export class WebJoinSession {
+                constructor(options) { this.options = options; }
+                join() {
+                    return new Promise(resolve => {
+                        window.finishListening = () => { this.options.onStatus('Connected'); resolve(); };
+                    });
+                }
+                close() {}
+            }`);
         await page.addInitScript(() => {
             window.micRequests = 0;
             Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
@@ -56,22 +70,12 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     });
 
     test(`an unverified host requires a fresh browser invite at ${width}px`, async ({ page, baseURL }, testInfo) => {
-        const origin = new URL(baseURL).origin;
-        const external = [];
         await page.setViewportSize({ width, height });
-        await page.route('**/*', route => {
-            const address = new URL(route.request().url());
-            if (address.origin !== origin) {
-                external.push(address.origin);
-                return route.abort();
-            }
-            if (address.pathname !== '/join/session.js') return route.continue();
-            return route.fulfill({ contentType: 'text/javascript', body: `
-                export class WebJoinSession {
-                    async join() { throw new Error('Host identity or invite binding did not match'); }
-                    close() {}
-                }` });
-        });
+        const external = await routeProtectedListen(page, baseURL, `
+            export class WebJoinSession {
+                async join() { throw new Error('Host identity or invite binding did not match'); }
+                close() {}
+            }`);
         const capability = Buffer.alloc(32, 17).toString('base64url');
         const expires = Math.floor(Date.now() / 1000) + 300;
         await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
