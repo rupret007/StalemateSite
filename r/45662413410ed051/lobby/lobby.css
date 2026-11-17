@@ -791,7 +791,12 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
 }
 @media (max-width: 480px) and (min-height: 621px) {
   body:not(:has(.game-night:not([hidden]))) :is(.connection-tools button, .dice, .tabs button,
-    .conversation-starters button, .quiet-action, .quick button) { min-width: 48px; min-height: 48px; }
+    .conversation-starters button, .quiet-action, .quick button, .flag) { min-width: 48px; min-height: 48px; }
+  body:not(:has(.game-night:not([hidden]))) .flag { margin-block: 0; }
+  /* Keep one full report target and a readable line without forcing chat below Send. */
+  .channel-panel:not(:has(> .game-night:not([hidden]))) > .buffer { min-height: calc(max(1lh, 48px) + 20px); }
+  /* A scroller must fit a 48px control, its focus outline and the bottom border. */
+  .channel-panel > [data-jam]:not([hidden]) { min-height: calc(48px + 4px + 1px); }
   .channel-panel:not(:has(> .game-night:not([hidden]))) > .roombar .btn { min-width: 48px; min-height: 48px; }
   .channel-panel:not(:has(> .game-night:not([hidden]))) .say .btn { min-height: 48px; margin-block: 2px; }
   .channel-panel:not(:has(> .game-night:not([hidden]))) .slash { min-width: 48px; min-height: 48px; }
