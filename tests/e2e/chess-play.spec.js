@@ -183,6 +183,9 @@ test('computer play keeps both player strips and board visible through rotation 
 });
 
 test('chess exposes intentional retry when its computer request fails', async ({ page }) => {
+    // The initial failure and the retry each have a 15s engine deadline.
+    // Leave time for the real browser actions around both attempts.
+    test.setTimeout(60_000);
     let blocked = 0;
     await page.context().route('**/stockfish-19-lite-single.wasm', route => { blocked++; return route.abort(); });
     await start(page);
