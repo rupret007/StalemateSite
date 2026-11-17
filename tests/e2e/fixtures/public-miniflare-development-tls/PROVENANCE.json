@@ -1,0 +1,9 @@
+{
+  "sourcePackage": "miniflare@5.20261019.2-beta",
+  "packageLicense": "MIT",
+  "upstream": "https://github.com/cloudflare/workers-sdk/tree/main/packages/miniflare",
+  "licenseSource": "https://github.com/cloudflare/workers-sdk/blob/main/LICENSE-MIT",
+  "publishedModuleSha256": "a3a95879efbe59e4058049fa6ceea3db08310cc95ac1a70b55271bbd5ce530a7",
+  "tlsFileSha256": "f5a8debf3c77cc48655be93b4076f397f4c5517b207dc9712a1e736f38fe4071",
+  "purpose": "Existing publicly distributed development TLS fixture, reused unchanged; not a secret or new credential. Never use except disposable loopback tests. Not included in application packages. No certificate/trust store installation or generation."
+}

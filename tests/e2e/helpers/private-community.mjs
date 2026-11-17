@@ -1,9 +1,9 @@
 // Real betaFetch/BetaSessions and loopback lobby engine; in-memory storage and
 // gateway-to-engine upgrade are fixtures. Not Cloudflare or hibernation proof.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:https';
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { betaFetch, BetaSessions } from '../../../hangout-worker/src/beta-entry.mjs';
@@ -11,19 +11,17 @@ import { BETA_COOKIE } from '../../../hangout-worker/src/beta-auth.mjs';
 import { createHangoutRelay } from '../../../scripts/hangout-relay-dev.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
-const require = createRequire(import.meta.url);
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
     '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
 
 export async function privateCommunity() {
-    // Reuse Miniflare's published development certificate under its existing MIT
-    // dependency license. Never mint, log or install a certificate or trust root.
-    const tlsSource = await readFile(require.resolve('miniflare', {
-        paths: [resolve(root, 'tests/runtime/durable-records'), root]
-    }), 'utf8');
-    const key = /var KEY = `\s*(-----BEGIN EC PRIVATE KEY-----[\s\S]*?-----END EC PRIVATE KEY-----)/.exec(tlsSource)?.[1];
-    const cert = /var CERT = `\s*(-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----)/.exec(tlsSource)?.[1];
-    assert(key && cert, 'Existing locked Miniflare development TLS fixture is required');
+    // Reuse only Miniflare's already-public development TLS pair, with its MIT
+    // notice/provenance, rather than installing its runtime for a browser test.
+    // Never mint, log or install a certificate or trust root.
+    const tlsBytes = await readFile(new URL('../fixtures/public-miniflare-development-tls/tls.json', import.meta.url));
+    assert.equal(createHash('sha256').update(tlsBytes).digest('hex'),
+        'f5a8debf3c77cc48655be93b4076f397f4c5517b207dc9712a1e736f38fe4071');
+    const { key, cert } = JSON.parse(tlsBytes);
     const records = new Map(), sockets = new Set(), failures = [];
     const storage = {
         get: async key => structuredClone(records.get(key)),
