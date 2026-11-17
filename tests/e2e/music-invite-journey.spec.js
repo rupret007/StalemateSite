@@ -142,7 +142,10 @@ for (const { width, height, hostSite, guestSite } of viewports) {
             await expect(panel).toContainText('MusicHost invited you');
             await expect(announcement).toHaveText('MusicHost invited you to join Music.');
             await expect(peer.locator('[data-music-invite]')).toBeHidden();
-            await panel.getByRole('button', { name: 'Not now' }).click();
+            const decline = panel.getByRole('button', { name: 'Not now' });
+            await expect(decline).toHaveAccessibleDescription('MusicHost invited you to join Music.');
+            await decline.press('Enter');
+            await expect(guest.getByRole('tab', { name: '#stalemate', selected: true })).toBeFocused();
             await expect(status).toContainText('declined the Music invitation');
             await expect(announcement).toHaveText('');
             await expect(guest.locator('[data-chat-context]')).toHaveText('#stalemate');
