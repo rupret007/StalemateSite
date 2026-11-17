@@ -71,10 +71,10 @@ async function ready(page, path) {
     await expect(page.locator('#levelSel')).toBeEnabled();
 }
 
-test('homepage and hub offer nine ordinary games at root and project paths', async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    for (const prefix of ['', '/StalemateSite']) {
+for (const prefix of ['', '/StalemateSite']) {
+    test(`homepage and hub offer nine ordinary games at ${prefix || '/'}`, async ({ page }) => {
+        const errors = [];
+        page.on('pageerror', (error) => errors.push(error.message));
         await page.goto(prefix + '/');
         await expect(page.locator('body')).not.toContainText('Daily Dump');
         const open = page.getByRole('link', { name: 'Open Stalemate Arcade', exact: true });
@@ -91,9 +91,9 @@ test('homepage and hub offer nine ordinary games at root and project paths', asy
         await page.waitForFunction(() => !!window.__turdomania);
         await expect(page).toHaveTitle('Turdomania');
         await expect(page.locator('#newBtn')).toBeEnabled();
-    }
-    expect(errors).toEqual([]);
-});
+        expect(errors).toEqual([]);
+    });
+}
 
 for (const [prefix, legacy] of [['', 'daily=2026-10-21&v=1'], ['/StalemateSite', 'daily=not-a-date&v=999']]) {
     test(`former daily links open seeded free play with working undo at ${prefix || '/'}`, async ({ page }) => {
