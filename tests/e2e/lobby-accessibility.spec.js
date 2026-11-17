@@ -87,7 +87,7 @@ function contained(geometry) {
     expect(log.height).toBeGreaterThanOrEqual(log.lineHeight + log.verticalPadding);
 }
 
-for (const width of [375, 1440]) test(`landmarks, visible nickname label and message-list semantics at ${width}px`, async ({ browser, baseURL }) => {
+for (const width of [375, 1440]) test(`landmarks, visible nickname label and message-list semantics at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
     try {
         const page = await context.newPage();
@@ -97,10 +97,17 @@ for (const width of [375, 1440]) test(`landmarks, visible nickname label and mes
         await expect(page.getByRole('main')).toHaveCount(1);
         await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('#stalemate');
         await expect(page.getByRole('group', { name: 'Ways to hang out' })).toContainText('Anyone can host');
+        const nickname = page.getByRole('textbox', { name: 'Your nick', exact: true });
+        const nicknameLabel = page.locator('label').filter({ hasText: /^Your nick$/ });
+        await expect(nicknameLabel).toBeVisible();
+        await expect(nicknameLabel.locator('button')).toHaveCount(0);
+        await nicknameLabel.click();
+        await expect(nickname).toBeFocused();
+        await page.screenshot({ path: testInfo.outputPath(`nickname-label-focused-${width}.png`) });
         const randomName = page.getByRole('button', { name: /^Make me a name/ });
         await expect(randomName).toBeVisible();
-        await randomName.click(); await expect(page.locator('[data-nick]')).not.toHaveValue('');
-        await page.locator('[data-nick]').fill(`SemanticGuest${width}`); await page.locator('[data-enter]').click();
+        await randomName.click(); await expect(nickname).not.toHaveValue('');
+        await nickname.fill(`SemanticGuest${width}`); await page.locator('[data-enter]').click();
         await expect(page.locator('[data-connection]')).toHaveText('Connected');
         await expect(page.getByRole('main')).toHaveCount(1);
         await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toHaveText('Community chat');
