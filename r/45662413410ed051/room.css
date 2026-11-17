@@ -452,7 +452,7 @@ body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .callbar [data-rea
     body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .callbar{flex-wrap:wrap;overflow:visible}
     body.is-host:not(.bob-mode):not(.shared-layout) [data-room-workspace]{--workspace-host-tools:4rem}
     body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .tiles[data-view=speaker] .tile--big{
-        max-height:clamp(8rem,calc(48dvh + 68px - var(--workspace-controls) - var(--workspace-host-tools,0px)),48dvh);
+        max-height:min(var(--workspace-stage-height,100dvh),clamp(8rem,calc(48dvh + 68px - var(--workspace-controls) - var(--workspace-host-tools,0px)),48dvh));
     }
     body:not(.bob-mode):not(.shared-layout) [data-room-workspace] :is(.host-call .btn,.chat .say > *){
         scroll-margin-bottom:calc(var(--workspace-controls) + 8px);

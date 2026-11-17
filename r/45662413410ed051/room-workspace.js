@@ -23,8 +23,17 @@
         if (phone.matches || document.body.classList.contains('shared-layout') || !height) {
             room.style.removeProperty('--workspace-controls');
             room.style.removeProperty('--workspace-chat-height');
+            room.style.removeProperty('--workspace-stage-height');
         } else {
             room.style.setProperty('--workspace-controls', `${height}px`);
+            const speaker = room.querySelector('.tiles[data-view=speaker] .tile--big');
+            const hostTools = room.querySelector('.host-call');
+            if (speaker && hostTools && hostTools.getClientRects().length) {
+                const available = Math.floor(speaker.getBoundingClientRect().height + controls.getBoundingClientRect().top - hostTools.getBoundingClientRect().bottom - 8);
+                room.style.setProperty('--workspace-stage-height', `${Math.max(0, available)}px`);
+            } else {
+                room.style.removeProperty('--workspace-stage-height');
+            }
             // Use actual geometry: desktop fonts and wrapped controls vary by platform.
             if (chat && chat.getClientRects().length) {
                 const available = Math.floor(controls.getBoundingClientRect().top - chat.getBoundingClientRect().top - 8);
@@ -38,6 +47,8 @@
         const observer = new ResizeObserver(reserveDesktopControls);
         observer.observe(controls);
         if (chat) observer.observe(chat);
+        const call = room.querySelector('.call');
+        if (call) observer.observe(call);
         const header = room.querySelector('.bar');
         if (header) observer.observe(header);
     }

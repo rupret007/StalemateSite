@@ -2,7 +2,7 @@ const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
-const sizes = [{ width: 375, height: 812 }, { width: 390, height: 844 }, { width: 1440, height: 900 }, { width: 1440, height: 900, chatPadding: true }];
+const sizes = [{ width: 375, height: 812 }, { width: 390, height: 844 }, { width: 1440, height: 900 }, { width: 1440, height: 900, chatPadding: true }, { width: 1440, height: 900, resize: true }];
 
 async function checkControls(page) {
     const controls = page.getByRole('group', { name: 'Call controls' });
@@ -24,7 +24,7 @@ async function checkControls(page) {
 }
 
 for (const viewport of sizes) {
-    test(`private room stage, chat and controls at ${viewport.width}x${viewport.height}${viewport.chatPadding ? " with compact chat padding" : ""}`, async ({ page, baseURL }, testInfo) => {
+    test(`private room stage, chat and controls at ${viewport.width}x${viewport.height}${viewport.chatPadding ? " with compact chat padding" : ""}${viewport.resize ? " with phone and short-window resize" : ""}`, async ({ page, baseURL }, testInfo) => {
         await page.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         if (viewport.chatPadding) await page.addInitScript(() => {
@@ -95,6 +95,14 @@ for (const viewport of sizes) {
         await expect(chat.getByRole('heading', { name: 'Chat' })).toBeFocused();
         const message = chat.getByRole('textbox', { name: 'Message' });
         await message.fill('An unsent message stays here');
+        if (viewport.resize) {
+            await page.setViewportSize({ width: 390, height: 844 });
+            await expect.poll(() => page.locator('[data-room-workspace]').evaluate(room => room.style.getPropertyValue('--workspace-chat-height'))).toBe('');
+            await expect.poll(() => page.locator('[data-room-workspace]').evaluate(room => room.style.getPropertyValue('--workspace-stage-height'))).toBe('');
+            await expect(message).toHaveValue('An unsent message stays here');
+            await page.setViewportSize({ width: 1440, height: 700 });
+            await expect(message).toHaveValue('An unsent message stays here');
+        }
         if (viewport.width > 820) {
             const footer = page.locator('#room-call-controls');
             const hostControls = page.locator('.host-call button');
