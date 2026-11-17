@@ -71,7 +71,7 @@ const GAME_GUEST_ENTRANCE = `<!doctype html>
 <label data-guest-name-field hidden>Your nickname<input data-guest-name type="text" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Use a guest name"></label>
 <p id="guest-agreement">By joining, you confirm you’re 13+ and agree to the house rules.</p>
 <button type="button" aria-describedby="guest-agreement" data-guest-join>Join game</button>
-<p class="muted">Mic and camera stay off. <a href="/beta/privacy" target="_blank" rel="noopener">House rules</a></p>
+<p class="muted">Camera and microphone stay off. <a href="/beta/privacy" target="_blank" rel="noopener">House rules</a></p>
 <p class="muted" data-guest-expiry hidden>Invite expires <time></time>.</p>
 </section><button type="button" data-guest-retry hidden>Try again</button><button type="button" data-guest-fresh hidden>Ask the host for a fresh link</button></main></body></html>`;
 const GAME_GUEST_STYLE = `

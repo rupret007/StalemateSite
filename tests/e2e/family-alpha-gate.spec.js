@@ -277,7 +277,7 @@ if (['chromium', 'webkit'].includes(probeBrowser)) {
         await expect(button).toBeEnabled();
         await expect(button).toBeInViewport({ ratio: 1 });
         const box = await button.boundingBox();
-        expect(Math.min(box?.width ?? 0, box?.height ?? 0)).toBeGreaterThanOrEqual(44);
+        expect(Math.min(box?.width ?? 0, box?.height ?? 0)).toBeGreaterThanOrEqual(48);
         await button.tap();
     }
 
@@ -294,7 +294,7 @@ if (['chromium', 'webkit'].includes(probeBrowser)) {
                     await showTable(host, table);
                     await showTable(guest, table);
                     await tapPhoneAction(host.locator(`${main}[data-command="open"]`));
-                    await guest.locator(`${main}[data-command="join"]`).tap();
+                    await tapPhoneAction(guest.locator(`${main}[data-command="join"]`));
                     await expect(host.locator(match)).toBeVisible();
                     await expect(guest.locator(match)).toBeVisible();
                     const first = (await fixture.record(game))[game].id;

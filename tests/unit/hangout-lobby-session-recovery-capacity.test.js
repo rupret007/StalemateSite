@@ -52,7 +52,7 @@ beforeAll(async () => {
     const callerGate = operation => { const task = gate.then(operation); gate = task.catch(() => {}); return task; };
     Object.assign(f, { storage, env, engine, authority, snapshot, callerGate, account });
 });
-// Keep each real SQLite issuance batch within the existing hook timeout.
+// Issue the same 1,000 real SQLite sessions in groups of 25 within the hook limit.
 const issuanceBatchSize = 25;
 for (let offset = 0; offset < 1000; offset += issuanceBatchSize) beforeAll(async () => {
     const { authority, account, issued } = f;
@@ -109,8 +109,7 @@ beforeAll(async () => { await f.persistSnapshot(true); });
 afterAll(async () => { if (f) { await f.driver.close(); await rm(f.directory, { recursive: true, force: true }); } });
 
 describe('bounded recovery of the existing maximum session and connection allowances', () => {
-    // The wall-clock watchdog allows for real SQLite fixture I/O and comparison.
-    // The recovery limits are the transaction, read-byte, and write assertions.
+    // Allow for SQLite fixture I/O while enforcing recovery transaction limits below.
     const recoveryTestTimeoutMs = 15_000;
     const verify = async count => {
         expect(f.issued).toHaveLength(1000);

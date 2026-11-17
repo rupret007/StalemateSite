@@ -39,7 +39,7 @@ it.each(games)('%s declares the tap floor for opening and rematching on a phone'
         for (const control of controls) {
             const applicable = rules.filter(rule => rule.selectorText && control.matches(rule.selectorText));
             for (const property of ['min-width', 'min-height']) {
-                expect(applicable.some(rule => rule.style.getPropertyValue(property) === '44px'), property).toBe(true);
+                expect(applicable.some(rule => rule.style.getPropertyValue(property) === '48px'), property).toBe(true);
             }
         }
     } finally {

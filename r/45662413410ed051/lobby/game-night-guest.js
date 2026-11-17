@@ -89,6 +89,7 @@ async function acceptInvitation() {
 async function describe() {
     retry.hidden = true;
     if (!hasInvitation) {
+        // An existing WebJam member can return to their room when the grant is missing.
         if (!webJam) {
             showClosedInvitation('This link is missing its Game Night invitation.');
             return;
