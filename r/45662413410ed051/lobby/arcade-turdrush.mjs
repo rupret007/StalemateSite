@@ -31,9 +31,10 @@ const markup = `
         ${buttons.map(([action, symbol, label]) => `<button type="button" class="btn btn--ghost" data-race-input="${action}" aria-label="${label}">${symbol} <small>${label.replace('Move ', '')}</small></button>`).join('')}
     </div>
 </div>
-<dialog class="sheet" aria-labelledby="race-confirm-title" data-race-confirm>
+<dialog class="sheet" aria-labelledby="race-confirm-title" aria-describedby="race-confirm-effect race-confirm-stay" data-race-confirm>
     <h3 id="race-confirm-title">Leave this race?</h3>
-    <p class="small" data-race-confirm-text></p>
+    <p class="small" id="race-confirm-effect" data-race-confirm-text></p>
+    <p class="small" id="race-confirm-stay">You’ll stay in Game Night.</p>
     <div class="arcade-card-actions">
         <button class="btn btn--small" type="button" data-race-confirm-yes>Leave race</button>
         <button class="btn btn--small btn--ghost" type="button" data-race-confirm-no>Keep running</button>
