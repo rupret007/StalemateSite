@@ -150,6 +150,13 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         }
         console.log(`Passed ${engine} ${previousWorker ? 'current client with previous Worker' : 'previous and current clients together'}, invitation and two-way room chat.`);
     }
+    async function expectRecoveryToast(page, message) {
+        await expect(page.locator('[data-toast]').getByText(message, { exact: true })).toBeVisible();
+        const announcement = page.locator('[data-toast-announcement]');
+        await expect(announcement).toHaveAttribute('role', 'status');
+        await expect(announcement).toHaveText(message);
+    }
+
     async function captureArcadeInvite(page, viewport, step, mask = []) {
         const output = process.env.ARCADE_INVITE_EVIDENCE || evidence;
         if (!output) return;
@@ -251,10 +258,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await host.getByRole('button', { name: 'Open Chess match' }).click();
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await accept.tap();
-                    const staleSeat = 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.';
-                    await expect(friend.locator('[data-toast]').getByText(staleSeat, { exact: true })).toBeVisible();
-                    await expect(friend.locator('[data-toast-announcement]')).toHaveAttribute('role', 'status');
-                    await expect(friend.locator('[data-toast-announcement]')).toHaveText(staleSeat);
+                    await expectRecoveryToast(friend, 'This game invitation no longer has an open seat. Ask the host for a fresh invitation.');
                     await expect(host.locator('[data-chess-status]')).toContainText('Waiting for an opponent');
                     await friend.locator('[data-leave]').click();
                     await expect(friend.locator('[data-game-night]')).toBeHidden();
@@ -1172,7 +1176,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         const joinOffer = player.locator('[data-game-offer]').getByRole('button', { name: 'Join Game Night', exact: true });
         async function expectRefusal() {
             await joinOffer.click();
-            await expect(player.getByText('Couldn’t join Game Night. Ask the host for a fresh invitation.', { exact: true })).toBeVisible();
+            await expectRecoveryToast(player, 'Couldn’t join Game Night. Ask the host for a fresh invitation.');
             await expect(player.locator('[data-game-night]')).toBeHidden();
         }
         assert.equal(new URL(player.url()).hash, '');
