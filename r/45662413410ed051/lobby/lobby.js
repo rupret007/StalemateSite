@@ -3287,6 +3287,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     $('[data-palette]').addEventListener('close', () => { if (!$('[data-palette]').open) paletteContext = null; });
 
     let inviteInstance = '', invitePeople = new Map(), jamInviteOpener = null, invitingToMusic = false;
+    const canInviteByRoster = () => personTargetsSupported && roomNonce(inviteInstance);
+    function updateInvitePersonAction() {
+        const selection = $('[data-invite-options]').value;
+        $('[data-invite-person-send]').disabled = !canInviteByRoster() || !invitePeople.has(selection);
+    }
+    $('[data-invite-options]').addEventListener('change', updateInvitePersonAction);
     function closeInviteDialog() {
         inviteInstance = ''; invitePeople.clear(); invitingToMusic = false;
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
@@ -3333,11 +3339,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const target = canInviteNew && (exactTable || guestLinkTarget());
         drawGuestInviteChoice(target, canInviteNew);
         const emptyMusicRoster = music && invitePeople.size === 0;
-        const canInviteByRoster = personTargetsSupported && roomNonce(inviteInstance);
-        const preferRoster = activityRoom(current) && canInviteByRoster && invitePeople.size > 0;
+        const preferRoster = activityRoom(current) && canInviteByRoster() && invitePeople.size > 0;
         people.labels[0].textContent = music || preferRoster ? 'Online guests' : 'Choose a current person';
         people.disabled = emptyMusicRoster;
-        $('[data-invite-person-send]').disabled = emptyMusicRoster || !canInviteByRoster;
+        updateInvitePersonAction();
         $('[data-invite-form] button[type="submit"]').classList.toggle('btn--ghost', preferRoster);
         const dialog = $('[data-invite-dialog]');
         if (emptyMusicRoster) {

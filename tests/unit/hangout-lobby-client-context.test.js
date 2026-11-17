@@ -773,8 +773,12 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
         invite.click();
         const people = document.querySelector('[data-invite-options]');
         expect([...people.options].map(option => option.value)).toEqual(['', guest.id]);
+        const proceed = document.querySelector('[data-invite-person-send]');
+        expect(proceed.disabled).toBe(true);
         people.value = guest.id;
-        document.querySelector('[data-invite-person-send]').click();
+        people.dispatchEvent(new window.Event('change'));
+        expect(proceed.disabled).toBe(false);
+        proceed.click();
     };
     const status = document.querySelector('[data-music-handoff-status]');
     const selectChannel = name => document.querySelector(`[data-channel-key="${name}"]`).click();
@@ -898,9 +902,20 @@ it.each([true, false])('puts the available drawing invite path first (online gue
     expect(document.activeElement).toBe(online ? people : nickname);
     expect(nicknameSend.classList.contains('btn--ghost')).toBe(online);
     expect(nickname.hidden).toBe(false);
+    const sendToGuest = dialog.querySelector('[data-invite-person-send]');
+    expect(sendToGuest.disabled).toBe(true);
     if (online) {
-        people.value = guest.id;
-        dialog.querySelector('[data-invite-person-send]').click();
+        const select = value => {
+            people.value = value;
+            people.dispatchEvent(new window.Event('change'));
+        };
+        select(guest.id);
+        expect(sendToGuest.disabled).toBe(false);
+        select('');
+        expect(sendToGuest.disabled).toBe(true);
+        expect(nicknameSend.disabled).toBe(false);
+        select(guest.id);
+        sendToGuest.click();
         expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'invite', args: [guest.nick, '#drawing-room'] });
     }
 });
