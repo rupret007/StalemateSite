@@ -95,10 +95,13 @@ test('homepage and hub offer nine ordinary games at root and project paths', asy
     expect(errors).toEqual([]);
 });
 
-test('former daily links open seeded free play with working undo at either base path', async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    for (const [prefix, legacy] of [['', 'daily=2026-10-21&v=1'], ['/StalemateSite', 'daily=not-a-date&v=999']]) {
+for (const [prefix, legacy] of [['', 'daily=2026-10-21&v=1'], ['/StalemateSite', 'daily=not-a-date&v=999']]) {
+    test(`former daily links open seeded free play with working undo at ${prefix || '/'}`, async ({ page }) => {
+        // A loaded WebKit runner needed over 30s for one path's two
+        // navigations and two real taps. Keep the action assertions unchanged.
+        test.setTimeout(45_000);
+        const errors = [];
+        page.on('pageerror', (error) => errors.push(error.message));
         const game = prefix + '/play/turdomania.html';
         const options = 'seed=12345&level=easy&reducedMotion=1';
         await ready(page, game + '?' + options);
@@ -113,9 +116,9 @@ test('former daily links open seeded free play with working undo at either base 
         await activate(page.locator('#undoBtn'));
         expect(await board(page)).toEqual(ordinary);
         await expect(page.locator('#newBtn')).toBeEnabled();
-    }
-    expect(errors).toEqual([]);
-});
+        expect(errors).toEqual([]);
+    });
+}
 
 test('ordinary Turdomania completes and preserves existing preferences and records', async ({ page }) => {
     // This run completes a whole board using real input. On CI, 23 WebKit taps
