@@ -1,3 +1,4 @@
+const { expectOrdinaryMediaLabel } = require('./support/ordinary-media-labels');
 // Go/no-go for a private Hang Out faces room (invite room, not Game Night).
 // Four people: one desktop host and three coarse-pointer phones, then a voice-only guest.
 const path = require('node:path');
@@ -143,7 +144,7 @@ async function turnCamera(page) {
     await expect(yes).toBeVisible();
     taps.push(scrub(await yes.innerText()));
     await yes.click();
-    await expect(page.locator('[data-cam]')).toHaveText('Stop video');
+    await expectOrdinaryMediaLabel(page, 'video', true);
     const id = await page.evaluate(() => window.__hangout.myId);
     return { taps, started, id };
 }
@@ -442,7 +443,7 @@ test('four people in one private Hang Out room can see each other', async ({ bro
         const voiceYes = eden.locator('[data-ask-yes]');
         voiceTaps.push(scrub(await voiceYes.innerText()));
         await voiceYes.click();
-        await expect(eden.locator('[data-mic]')).toHaveText('Mute mic');
+        await expectOrdinaryMediaLabel(eden, 'audio', true);
         await expect(eden.locator('[data-status]')).toContainText('voice only');
         await expect.poll(async () => {
             const tiles = await Promise.all(people.map(async (person) => {
@@ -467,10 +468,10 @@ test('four people in one private Hang Out room can see each other', async ({ bro
         const blairTile = host.locator('[data-tiles] .tile', { hasText: 'Blair' });
         await blairTile.locator('.more').click();
         await host.locator('[data-tile-menu] button', { hasText: 'Turn their camera off' }).click();
-        await expect(guests[0].page.locator('[data-cam]')).toHaveText('Start video');
-        await expect(guests[1].page.locator('[data-cam]')).toHaveText('Stop video');
-        await expect(drew.page.locator('[data-cam]')).toHaveText('Stop video');
-        await expect(host.locator('[data-cam]')).toHaveText('Stop video');
+        await expectOrdinaryMediaLabel(guests[0].page, 'video', false);
+        await expectOrdinaryMediaLabel(guests[1].page, 'video', true);
+        await expectOrdinaryMediaLabel(drew.page, 'video', true);
+        await expectOrdinaryMediaLabel(host, 'video', true);
         await expect.poll(async () => {
             const rows = await remoteWidths(host);
             const casey = rows.find((row) => row.name.includes('Casey'));
@@ -701,7 +702,7 @@ async function releaseRooms() {
 async function turnMic(page) {
     await page.locator('[data-mic]').click();
     await page.locator('[data-ask-yes]').click();
-    await expect(page.locator('[data-mic]')).toHaveText('Mute mic');
+    await expectOrdinaryMediaLabel(page, 'audio', true);
 }
 async function meshSnapshot(pages) {
     return Promise.all(pages.map((page) => page.evaluate(async () => {
@@ -799,7 +800,7 @@ test('camera-denied guest is heard, still sees faces, and Leave stays visible', 
     await guest.locator('[data-ask-yes]').click();
     await expect(guest.locator('[data-ask-title]')).toHaveText('Camera’s not available');
     await guest.locator('[data-ask-yes]').click();
-    await expect(guest.locator('[data-mic]')).toHaveText('Mute mic');
+    await expectOrdinaryMediaLabel(guest, 'audio', true);
     await expect(guest.locator('[data-status]')).toContainText('voice only');
     const leave = await layoutAudit(guest);
     expect(leave.controls.hangup.onScreen && leave.controls.hangup.short === 'Leave' && !leave.controls.hangup.hidden).toBe(true);

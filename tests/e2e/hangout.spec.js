@@ -1,3 +1,4 @@
+const { expectOrdinaryMediaLabel } = require('./support/ordinary-media-labels');
 // Two real browsers in one hidden room, synced over the local stand-in for the relay Worker.
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
@@ -758,7 +759,7 @@ test('mic-only peer attaches an active media element so remote audio plays', asy
 
     await guest.click('[data-mic]');
     await guest.click('[data-ask-yes]');
-    await expect(host.locator('[data-mic]')).toHaveText('Unmute mic');
+    await expectOrdinaryMediaLabel(host, 'audio', false);
 
     await expect.poll(() => host.evaluate(() => {
         const v = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
@@ -835,7 +836,7 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
 
     await host.click('[data-cam]');
     await host.click('[data-ask-yes]');
-    await expect(host.locator('[data-cam]')).toHaveText('Stop video');
+    await expectOrdinaryMediaLabel(host, 'video', true);
     const settings = await host.evaluate(() => window.__hangout.av.stream.getVideoTracks()[0].getSettings());
     expect(settings.width).toBeLessThanOrEqual(640);
     expect(settings.frameRate).toBeLessThanOrEqual(24);
