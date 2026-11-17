@@ -786,17 +786,19 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .conversation-starters button, .quiet-action { font-size: 11px; }
   .quick button { font-size: 12px; }
   body:not(:has(.game-night:not([hidden]))) :is([data-palette], [data-sheet], [data-cam-gate]) :is(.btn, .check) { min-width: 48px; min-height: 48px; }
-  /* Scroll long command lists while keeping the dialog's Close action visible. */
-  body:not(:has(.game-night:not([hidden]))) :is([data-palette], [data-sheet])[open] { display: flex; flex-direction: column; }
-  body:not(:has(.game-night:not([hidden]))) :is([data-palette], [data-sheet]) > :not(.sheet-buttons) { flex-shrink: 0; }
-  body:not(:has(.game-night:not([hidden]))) :is([data-palette], [data-sheet]) > .sheet-buttons {
-    min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
-    padding: 6px; margin-inline: -6px;
-  }
   body:not(:has(.game-night:not([hidden]))) [data-channel-dialog] :is(input, .btn) { min-width: 48px; min-height: 48px; }
   :is([data-room-invite], [data-music-invite]) .btn { min-width: 48px; min-height: 48px; }
   [data-invite-form] :is([data-invite-options], [data-invite-person-send], [data-invite-cancel]) { min-width: 48px; min-height: 48px; }
   [data-music-invite] p { flex-basis: 100px; }
+}
+@media (max-width: 480px) and (min-height: 451px) {
+  /* Taller windows can keep Close visible while command lists scroll. */
+  body:not(:has(.game-night:not([hidden]))) :is([data-palette], [data-sheet])[open] { display: flex; flex-direction: column; }
+  body:not(:has(.game-night:not([hidden]))) :is([data-palette], [data-sheet]) > :not(.sheet-buttons) { flex-shrink: 0; }
+  body:not(:has(.game-night:not([hidden]))) :is([data-palette], [data-sheet]) > .sheet-buttons {
+    min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;
+    padding: 6px; scroll-padding: 6px; margin-inline: -6px;
+  }
 }
 @media (max-width: 480px) and (min-height: 621px) {
   body:not(:has(.game-night:not([hidden]))) :is(.connection-tools button, .dice, .tabs button,
