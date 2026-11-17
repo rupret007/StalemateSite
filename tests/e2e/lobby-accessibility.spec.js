@@ -1151,6 +1151,16 @@ for (const width of [375, 390, 1440]) {
                 await expect.poll(() => actions.evaluate(row => row.scrollLeft)).toBeGreaterThan(0);
             }
             await section(visitor.page, 'rooms');
+            if (width <= 480) {
+                const directory = visitor.page.getByRole('complementary', { name: 'Rooms', exact: true });
+                const filter = directory.getByRole('combobox', { name: 'Room directory' });
+                const search = directory.getByRole('searchbox', { name: 'Find a room' });
+                await visitor.page.screenshot({ path: testInfo.outputPath(`directory-contact-targets-${width}x${viewport.height}.png`) });
+                for (const control of [filter, search]) {
+                    await expect(control).toBeInViewport({ ratio: 1 });
+                    expect(await control.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(48);
+                }
+            }
             const button = visitor.page.locator('[data-roomlist] button[data-room="#directory-room"]');
             const publicRoom = visitor.page.locator('[data-room="#directory-room"]');
             await expect(publicRoom).toHaveCount(1); await expect(publicRoom).toHaveJSProperty('tagName', 'BUTTON');

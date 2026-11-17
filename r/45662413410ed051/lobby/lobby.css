@@ -771,6 +771,14 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .brand b { white-space: nowrap; }
   .connection-tools { column-gap: 8px; row-gap: 4px; }
   input, select, textarea, .nickbox input, .directory-controls input, .directory-controls select, .act-load input, .jam-paste input { font-size: 16px; }
+  .directory-controls input, .directory-controls select { min-height: 48px; }
+  .directory-controls label:has(> select) { position: relative; }
+  .directory-controls select { appearance: none; padding-inline-end: 28px; }
+  .directory-controls label:has(> select)::after {
+    content: ''; position: absolute; inset-inline-end: 12px; top: calc(50% - 5px);
+    width: 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0;
+    transform: rotate(45deg); pointer-events: none;
+  }
   .buffer, .who { font-size: 14px; }
   .ev { font-size: 12px; }
   .lobby-welcome b, .lobby-welcome p { font-size: 14px; }
