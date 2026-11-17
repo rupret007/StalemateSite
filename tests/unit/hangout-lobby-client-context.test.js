@@ -724,8 +724,10 @@ describe('targeted Music invitation', () => {
     });
 
     it.each(['withdrawn', 'expired', 'disconnected'])('removes a %s queued Music offer', async reason => {
-        const { ws, offer, accepted, joinJam, action, dismiss, panel, flush } = await setup();
-        const next = { ...offer, id: 'c'.repeat(32), ch: '#jam-drums', roomInstance: 'd'.repeat(32), by: 'DrumHost', expires: Date.now() + 1000 };
+        const { window, ws, offer, accepted, joinJam, action, dismiss, panel, flush } = await setup();
+        const now = window.Date.now();
+        const clock = vi.spyOn(window.Date, 'now').mockReturnValue(now);
+        const next = { ...offer, id: 'c'.repeat(32), ch: '#jam-drums', roomInstance: 'd'.repeat(32), by: 'DrumHost', expires: now + 1000 };
         ws.receive(offer);
         action.click();
         ws.receive(next);
@@ -734,7 +736,10 @@ describe('targeted Music invitation', () => {
         expect(dismiss.textContent).toBe('Next invitation');
 
         if (reason === 'withdrawn') ws.receive({ t: 'music-invite-ended', id: next.id });
-        else if (reason === 'expired') flush(1000);
+        else if (reason === 'expired') {
+            clock.mockReturnValue(next.expires);
+            flush(1000);
+        }
         else ws.close(4400);
 
         if (reason !== 'disconnected') {
