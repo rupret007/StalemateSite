@@ -111,6 +111,29 @@ async function browserRoom(browser, baseURL, configured, viewport) {
     };
     return { join, external, close: () => Promise.all(contexts.map(context => context.close())) };
 }
+
+test('Music room help and share controls are at least 48 pixels on a short phone', async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 375, height: 667 });
+    try {
+        const host = await f.join('ShortPhoneMusicHost');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        const help = host.locator('[data-jam-help] summary');
+        const share = host.locator('[data-jam-form] button[type="submit"]');
+        for (const target of [help, share]) {
+            await target.scrollIntoViewIfNeeded();
+            await expect(target).toBeInViewport({ ratio: 1 });
+            const box = await target.boundingBox();
+            expect(box?.width).toBeGreaterThanOrEqual(48);
+            expect(box?.height).toBeGreaterThanOrEqual(48);
+        }
+        await host.screenshot({ path: testInfo.outputPath('music-room-share-375x667.png') });
+        await help.click();
+        await expect(host.locator('[data-jam-help]')).toHaveAttribute('open', '');
+        expect(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
 const paste = async (page, value) => {
     await page.fill('[data-jam-link]', value);
     await page.locator('[data-jam-form] button[type="submit"]').click();
@@ -154,7 +177,13 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
         await expect(host.locator('[data-jam-host-steps]')).toContainText('Music → Host');
         await expect(host.getByRole('textbox', { name: 'WebJam invitation' })).toHaveAccessibleDescription(/Copy browser invite[\s\S]*Paste that link here and click Share/);
-        await expect(host.locator('[data-jam-form] button[type="submit"]')).toBeInViewport();
+        const share = host.locator('[data-jam-form] button[type="submit"]');
+        await expect(share).toBeInViewport();
+        for (const target of [share, host.locator('[data-jam-invite-room]'), host.locator('[data-jam-help] summary')]) {
+            const box = await target.boundingBox();
+            expect(box?.width).toBeGreaterThanOrEqual(48);
+            expect(box?.height).toBeGreaterThanOrEqual(48);
+        }
         const channel = await host.evaluate(() => __lobby.active);
         await host.evaluate(() => __lobby.cmd('invite', ['BrowserGuest']));
         await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
@@ -173,6 +202,9 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await paste(host, ` \n${WEB_INVITE}\n `);
         await expect(host.locator('[data-jam-web]')).toBeEnabled();
         await expect(guest.locator('[data-jam-web]')).toBeEnabled();
+        const browserJoin = await guest.locator('[data-jam-web]').boundingBox();
+        expect(browserJoin?.width).toBeGreaterThanOrEqual(48);
+        expect(browserJoin?.height).toBeGreaterThanOrEqual(48);
         await expect(guest.locator('[data-jam-web]')).toHaveAttribute('title', /headphones and audio consent/);
         await expect(guest.locator('[data-jam-wait]')).toBeHidden();
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
