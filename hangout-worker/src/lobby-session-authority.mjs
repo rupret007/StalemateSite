@@ -245,8 +245,16 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
     return Object.freeze({
         records,
         resolveParticipationConnection: value => transact(async tx => {
+            // Read-only operation-local reuse only. transact still performs its
+            // initialization and both fresh configuredMarker fences on raw tx.
+            // Validators retain their independent rows and live clock/role checks.
+            const rows = new Map();
+            const current = Object.freeze({ get: async key => {
+                if (!rows.has(key)) rows.set(key, await tx.get(key));
+                return clone(rows.get(key));
+            } });
             const binding = bindingFrom(value);
-            return await validateBinding(tx, binding) ? participationIdentity(tx, binding.betaSid, binding.expiresAt) : null;
+            return await validateBinding(current, binding) ? participationIdentity(current, binding.betaSid, binding.expiresAt) : null;
         }),
         async resolveParticipationConnections(values) {
             ensure(Array.isArray(values) && values.length <= CONNECTION_LIMIT);

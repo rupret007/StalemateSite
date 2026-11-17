@@ -1724,3 +1724,38 @@ describe('recovery shares raw reads but never authority across the sixteen-bindi
         expect(validatedSessionReads).toBe(2); expect(fingerprint(f.driver)).toBe(before);
     });
 });
+
+describe('single participation resolver read reuse retains external transaction fences', () => {
+    it('reuses the shared session within one operation but keeps fresh marker fences', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('single-reuse');
+        f.driver.resetOperations(); const before = fingerprint(f.driver);
+        expect((await f.authority.resolveParticipationConnection(person.binding)).principalRef).toBe('s_' + person.request.sid);
+        const reads = key => f.driver.stats.operations.filter(event => event.name === 'get' && event.key.endsWith(':manifest:' + Buffer.from(key).toString('hex'))).length;
+        expect(reads('authority-session:' + person.request.sid)).toBe(1);
+        // initialized and configuredMarker on raw tx remain distinct from the
+        // internal cached validation and final fresh configuredMarker fence.
+        expect(reads(LOBBY_AUTHORITY_MARKER)).toBeGreaterThanOrEqual(4);
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('propagates a refusal at the final fresh marker fence after cached validation', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('single-fence');
+        const suffix = ':manifest:' + Buffer.from(LOBBY_AUTHORITY_MARKER).toString('hex');
+        let reads = 0; f.hooks.before = event => { if (event.name === 'get' && event.key.endsWith(suffix)) reads++; };
+        expect(await f.authority.resolveParticipationConnection(person.binding)).not.toBeNull();
+        const last = reads; expect(last).toBeGreaterThanOrEqual(4); reads = 0;
+        const before = fingerprint(f.driver);
+        f.hooks.before = event => {
+            if (event.name === 'get' && event.key.endsWith(suffix) && ++reads === last) throw Error('Synthetic final marker fence refusal');
+        };
+        await expect(f.authority.resolveParticipationConnection(person.binding)).rejects.toThrow('Synthetic final marker fence refusal');
+        delete f.hooks.before; expect(reads).toBe(last); expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('denies expiry crossing inside a single cached operation', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('single-clock');
+        const suffix = ':manifest:' + Buffer.from('authority-session:' + person.request.sid).toString('hex');
+        let advanced = false; const before = fingerprint(f.driver);
+        f.hooks.before = event => { if (!advanced && event.name === 'get' && event.key.endsWith(suffix)) { f.advance(100001); advanced = true; } };
+        expect(await f.authority.resolveParticipationConnection(person.binding)).toBeNull();
+        delete f.hooks.before; expect(advanced).toBe(true); expect(fingerprint(f.driver)).toBe(before);
+    });
+});
