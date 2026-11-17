@@ -60,11 +60,15 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
     }
     const capture = (page, name) => page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`) });
     try {
-        const host = await entry(otherWidth, width === 390 ? 'stalemate' : 'rad-dad');
+        // Independent browser contexts can open together; admission/chat still
+        // happen in order so the no-history assertion has a real earlier line.
+        const [host, guest] = await Promise.all([
+            entry(otherWidth, width === 390 ? 'stalemate' : 'rad-dad'),
+            entry(width, width === 390 ? 'rad-dad' : 'stalemate')
+        ]);
         await admit(host); await nick(host.page, 'StudioHost');
         await expect(host.page.locator('[data-connection]')).toHaveText('Connected');
         await send(host.page, 'Earlier conversation stays in its connected session.');
-        const guest = await entry(width, width === 390 ? 'rad-dad' : 'stalemate');
         expect((await guest.context.request.get(community.origin + ROOT)).status()).toBe(401);
         expect((await guest.context.request.get(community.origin + ROOT + 'lobby.js')).status()).toBe(401);
         await guest.page.goto(guest.entryUrl + '#invite=rejected-fixture-only');
@@ -123,7 +127,10 @@ for (const width of [390, 1440]) test(`protected newcomer reaches a shared room 
         await expect(guest.page.locator('[data-chat-context]')).toHaveText('#stalemate');
         await send(guest.page, 'Back in the lobby after leaving.');
         await capture(guest.page, '07-left-room');
-        const access = await guest.context.newPage();
+        for (const visitor of [host, guest]) expect(await visitor.page.evaluate(() => window.fixtureCaptureCalls)).toBe(0);
+        // Reuse the visitor's tab to leave the beta, rather than starting a third
+        // WebKit page. This still exercises the real cookie revocation and 401.
+        const access = guest.page;
         await access.goto(guest.entryUrl);
         await access.getByRole('button', { name: 'Leave this beta', exact: true }).press('Enter');
         await expect(access.getByRole('heading', { name: 'Your private invitation', exact: true })).toBeVisible();
