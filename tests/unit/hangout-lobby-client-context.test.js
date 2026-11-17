@@ -730,10 +730,12 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     expect(channels[0].close).toHaveBeenCalledOnce();
     channels[0].receive({ href });
     expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
+    const manualInput = document.querySelector('[data-jam-link]');
+    manualInput.scrollIntoView = vi.fn();
     document.querySelector('[data-music-handoff-manual]').click();
     expect(manualShare.open).toBe(true);
-    const manualInput = document.querySelector('[data-jam-link]');
     expect(document.activeElement).toBe(manualInput);
+    expect(manualInput.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
     const manualForm = manualInput.form;
     manualInput.value = 'draft for this room';
     manualForm.dispatchEvent(new window.Event('submit', { cancelable: true }));

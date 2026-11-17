@@ -1785,7 +1785,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         musicHandoffReport = null;
         drawMusicHandoff();
         jamManualShare.open = true;
-        $('[data-jam-link]').focus();
+        const input = $('[data-jam-link]');
+        input.focus({ preventScroll: true });
+        input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
     window.addEventListener('pagehide', () => stopMusicHandoff());
 
