@@ -118,6 +118,9 @@ test('former daily links open seeded free play with working undo at either base 
 });
 
 test('ordinary Turdomania completes and preserves existing preferences and records', async ({ page }) => {
+    // This run completes a whole board using real input. On CI, 23 WebKit taps
+    // alone used almost 24s. Each move still has the default assertion timeout.
+    test.setTimeout(60_000);
     await page.goto('/play/turdomania.html');
     const saved = await page.evaluate(() => {
         const fixture = {
