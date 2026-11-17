@@ -1314,6 +1314,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 Object.assign(c, m.ch);
                 const jamDraft = confirmJamShare(c);
                 if (app.active === c.name) drawChan();
+                if (inviteContext && inviteContext.kind !== 'game' && $('[data-invite-dialog]').open &&
+                    (c.name === '#stalemate' || c === inviteContext)) refreshInviteRoster();
                 // An own-share confirmation changes the room's invitation
                 // context. Keep a newer edit through that synchronous redraw,
                 // only while the same connected host still owns this editor.
@@ -3292,7 +3294,57 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const selection = $('[data-invite-options]').value;
         $('[data-invite-person-send]').disabled = !canInviteByRoster() || !invitePeople.has(selection);
     }
-    $('[data-invite-options]').addEventListener('change', updateInvitePersonAction);
+    const inviteGuestUnavailable = 'That guest is unavailable. Choose someone else or try again later.';
+    $('[data-invite-options]').addEventListener('change', () => {
+        updateInvitePersonAction();
+        const hint = $('[data-invite-error]');
+        if ($('[data-invite-options]').value && hint.textContent === inviteGuestUnavailable) hint.textContent = '';
+    });
+    function eligibleInviteGuests(current) {
+        return (app.chans.get('#stalemate')?.names || []).filter(person =>
+            personId(person.id) && person.id !== app.selfId &&
+            (invitingToMusic || !current.names.some(member => member.id === person.id)));
+    }
+    function refreshInviteRoster() {
+        const current = inviteContext, dialog = $('[data-invite-dialog]');
+        const people = $('[data-invite-options]'), sendButton = $('[data-invite-person-send]');
+        const focused = document.activeElement, selection = people.value;
+        const existing = new Map([...people.options].filter(option => option.value).map(option => [option.value, option]));
+        invitePeople.clear();
+        for (const person of eligibleInviteGuests(current)) {
+            invitePeople.set(person.id, personContext(person.id, current.name, inviteInstance, person.nick));
+            let option = existing.get(person.id);
+            if (!option) {
+                option = document.createElement('option');
+                option.value = person.id;
+                people.append(option);
+            }
+            if (option.textContent !== person.nick) option.textContent = person.nick;
+            existing.delete(person.id);
+        }
+        for (const option of existing.values()) option.remove();
+        const selectionLost = !!selection && !invitePeople.has(selection);
+        if (selectionLost) people.value = '';
+
+        const emptyMusicRoster = invitingToMusic && invitePeople.size === 0;
+        const preferRoster = activityRoom(current) && canInviteByRoster() && invitePeople.size > 0;
+        people.labels[0].textContent = invitingToMusic || preferRoster ? 'Online guests' : 'Choose a current person';
+        people.disabled = emptyMusicRoster;
+        updateInvitePersonAction();
+        $('[data-invite-form] button[type="submit"]').classList.toggle('btn--ghost', preferRoster);
+        const hint = $('[data-invite-error]');
+        if (emptyMusicRoster) {
+            hint.textContent = 'No guests are online yet. Ask your guest to open Hang Out and choose a nickname.';
+            dialog.setAttribute('aria-describedby', hint.id);
+        } else {
+            if (dialog.getAttribute('aria-describedby') === hint.id) hint.textContent = '';
+            dialog.removeAttribute('aria-describedby');
+            if (selectionLost) hint.textContent = inviteGuestUnavailable;
+        }
+        if (emptyMusicRoster && (focused === people || focused === sendButton)) $('[data-invite-cancel]').focus();
+        else if (selectionLost && focused === sendButton) people.focus();
+        return preferRoster;
+    }
     function closeInviteDialog() {
         inviteInstance = ''; invitePeople.clear(); invitingToMusic = false;
         inviteContext = null; $('[data-invite-nick]').value = ''; $('[data-invite-options]').replaceChildren();
@@ -3319,40 +3371,26 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-game-invite-picker]').hidden = !isGame;
         const people = $('[data-invite-options]');
         const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose someone online'; people.append(placeholder);
-        for (const person of app.chans.get('#stalemate')?.names || []) {
-            if (!personId(person.id) || person.id === app.selfId || !music && current.names.some(member => member.id === person.id)) continue;
-            const context = personContext(person.id, current.name, inviteInstance, person.nick);
-            invitePeople.set(person.id, context);
-            if (isGame) {
+        if (isGame) {
+            for (const person of eligibleInviteGuests(current)) {
+                const context = personContext(person.id, current.name, inviteInstance, person.nick);
+                invitePeople.set(person.id, context);
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'btn btn--ghost';
                 button.textContent = `Invite ${person.nick}`;
-                button.disabled = !personTargetsSupported || !roomNonce(inviteInstance);
+                button.disabled = !canInviteByRoster();
                 button.addEventListener('click', () => inviteCurrentPerson(context));
                 roster.append(button);
-            } else {
-                const option = document.createElement('option'); option.value = person.id; option.textContent = person.nick; people.append(option);
             }
         }
         const canInviteNew = isGame && gameGuestInvitesSupported;
         const target = canInviteNew && (exactTable || guestLinkTarget());
         drawGuestInviteChoice(target, canInviteNew);
-        const emptyMusicRoster = music && invitePeople.size === 0;
-        const preferRoster = activityRoom(current) && canInviteByRoster() && invitePeople.size > 0;
-        people.labels[0].textContent = music || preferRoster ? 'Online guests' : 'Choose a current person';
-        people.disabled = emptyMusicRoster;
-        updateInvitePersonAction();
-        $('[data-invite-form] button[type="submit"]').classList.toggle('btn--ghost', preferRoster);
-        const dialog = $('[data-invite-dialog]');
-        if (emptyMusicRoster) {
-            const hint = $('[data-invite-error]');
-            hint.textContent = 'No guests are online yet. Ask your guest to open Hang Out and choose a nickname, then reopen this list.';
-            dialog.setAttribute('aria-describedby', hint.id);
-        } else dialog.removeAttribute('aria-describedby');
-        dialog.showModal();
+        const preferRoster = !isGame && refreshInviteRoster();
+        $('[data-invite-dialog]').showModal();
         if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
-        else if (emptyMusicRoster) $('[data-invite-cancel]').focus();
+        else if (music && people.disabled) $('[data-invite-cancel]').focus();
         else (music || preferRoster ? people : $('[data-invite-nick]')).focus();
     }
     function drawGuestInviteChoice(target, canInviteNew) {
@@ -3540,7 +3578,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         // original live connection in the shared lobby's current roster.
         const person = findPerson(context.peer);
         if (!person || !personContextValid(context) || !invitingToMusic && current.names.some(member => member.id === context.peer)) {
-            $('[data-invite-error]').textContent = 'That guest is unavailable. Choose someone else or try again later.'; return;
+            $('[data-invite-error]').textContent = inviteGuestUnavailable; return;
         }
         if (invitingToMusic) {
             if (!readyForMusicOffer() || currentJam() !== current) return closeInviteDialog();

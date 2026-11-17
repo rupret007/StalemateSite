@@ -915,8 +915,22 @@ it.each([true, false])('puts the available drawing invite path first (online gue
         expect(sendToGuest.disabled).toBe(true);
         expect(nicknameSend.disabled).toBe(false);
         select(guest.id);
+        sendToGuest.focus();
+        const replacement = { ...guest, id: 'replacement-peer' };
+        ws.receive({ t: 'chan', ch: { name: '#stalemate', names: [host, replacement] } });
+        expect(people.value).toBe('');
+        expect([...people.options].map(option => option.value)).toEqual(['', replacement.id]);
+        expect(sendToGuest.disabled).toBe(true);
+        expect(document.activeElement).toBe(people);
+        expect(dialog.querySelector('[data-invite-error]').textContent).toContain('unavailable');
+        select(replacement.id);
         sendToGuest.click();
-        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'invite', args: [guest.nick, '#drawing-room'] });
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'invite', args: [guest.nick, '#drawing-room'], personPeer: replacement.id });
+    } else {
+        const updated = { ...guest, nick: 'NewSketchGuest' };
+        ws.receive({ t: 'chan', ch: { name: '#stalemate', names: [host, updated] } });
+        expect([...people.options].map(option => option.textContent)).toContain(updated.nick);
+        expect(document.activeElement).toBe(nickname);
     }
 });
 
