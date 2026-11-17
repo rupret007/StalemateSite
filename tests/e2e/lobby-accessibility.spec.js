@@ -418,6 +418,51 @@ test('host command, camera and person dialogs expose visible headings as accessi
     } finally { await peer?.close(); await visitor.close(); }
 });
 
+for (const [width, height] of [[375, 667], [390, 844]]) test(`everyday phone chat actions are 48px targets with a visible composer at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, reducedMotion: 'reduce' });
+    try {
+        const page = await context.newPage();
+        const relay = hangoutRelayWsBase(baseURL, `phone-actions-${randomUUID()}`);
+        await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        const geometry = [];
+        async function measure(controls) {
+            for (const control of await controls.all()) {
+                geometry.push({ name: await control.getAttribute('aria-label') || await control.innerText(), bounds: await control.boundingBox() });
+            }
+        }
+        await measure(page.locator('[data-reroll]'));
+        await page.screenshot({ path: testInfo.outputPath(`phone-nickname-actions-${width}.png`) });
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('PhoneTouchGuest');
+        await page.locator('[data-enter]').tap();
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        const starters = page.getByRole('region', { name: 'Conversation starters', exact: true });
+        await expect(starters.getByRole('button', { name: 'Say hello', exact: true })).toBeVisible();
+        await measure(page.locator('[data-fullscreen]:visible'));
+        await measure(page.locator('[data-channel-key]:visible'));
+        await measure(starters.locator('button:visible'));
+        await measure(page.locator('[data-quick] button:visible'));
+        await attachGeometry(testInfo, `everyday-phone-actions-${width}`, { viewport: { width, height }, controls: geometry });
+        await page.screenshot({ path: testInfo.outputPath(`phone-everyday-actions-${width}.png`) });
+        for (const { name, bounds } of geometry) {
+            expect(bounds.width, `${name} width`).toBeGreaterThanOrEqual(48);
+            expect(bounds.height, `${name} height`).toBeGreaterThanOrEqual(48);
+        }
+        contained(await composerGeometry(page));
+        for (const control of await page.locator('[data-quick] button:visible').all()) {
+            await control.scrollIntoViewIfNeeded();
+            await control.tap({ trial: true });
+            contained(await composerGeometry(page));
+        }
+        await starters.getByRole('button', { name: 'Say hello', exact: true }).tap();
+        const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+        await expect(composer).toHaveValue('Hey everyone, I’m new here. ');
+        await expect(composer).toBeFocused();
+        await page.getByRole('button', { name: 'Send', exact: true }).tap();
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('Hey everyone, I’m new here.');
+        await page.screenshot({ path: testInfo.outputPath(`phone-first-message-${width}.png`) });
+    } finally { await context.close(); }
+});
+
 for (const [width, height] of [[375, 667], [390, 844]]) test(`ordinary phone chat controls meet 48px and restore usable lobby at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, reducedMotion: 'reduce' });
     try {
