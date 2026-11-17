@@ -115,6 +115,11 @@
           <div class="gate-card">
             <div class="window-chrome"><span><i aria-hidden="true"></i> CONNECT TO THE COMMUNITY</span><span aria-hidden="true">↵</span></div>
             <h2>Pick a name. Pull up a chair.</h2>
+            <div data-startup-recovery role="status" aria-atomic="true" hidden>
+                <p data-startup-message></p>
+                <button class="btn btn--big" type="button" data-startup-reload>Reload chat</button>
+            </div>
+            <noscript><p>Chat needs JavaScript. Enable it for this site, then reload this page. Your camera and microphone are off.</p></noscript>
             <div>
                 <div class="nickrow">
                     <label for="lobby-nickname">Your nick</label>
@@ -456,6 +461,7 @@
     <script src="discovery-core.js"></script>
     <script src="lobby-room.js"></script>
     <script src="qr-lite.js"></script>
-    <script type="module" src="lobby.js"></script>
+    <script src="lobby-startup.js"></script>
+    <script type="module" data-lobby-module src="lobby.js"></script>
 </body>
 </html>
