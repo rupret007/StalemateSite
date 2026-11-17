@@ -54,6 +54,39 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         expect(await page.evaluate(() => window.micRequests)).toBe(0);
         expect(external).toEqual([]);
     });
+
+    test(`an unverified host requires a fresh browser invite at ${width}px`, async ({ page, baseURL }, testInfo) => {
+        const origin = new URL(baseURL).origin;
+        const external = [];
+        await page.setViewportSize({ width, height });
+        await page.route('**/*', route => {
+            const address = new URL(route.request().url());
+            if (address.origin !== origin) {
+                external.push(address.origin);
+                return route.abort();
+            }
+            if (address.pathname !== '/join/session.js') return route.continue();
+            return route.fulfill({ contentType: 'text/javascript', body: `
+                export class WebJoinSession {
+                    async join() { throw new Error('Host identity or invite binding did not match'); }
+                    close() {}
+                }` });
+        });
+        const capability = Buffer.alloc(32, 17).toString('base64url');
+        const expires = Math.floor(Date.now() / 1000) + 300;
+        await page.goto(`/join/#k=${capability}&s=${'22'.repeat(32)}&g=1&e=${expires}`);
+        await page.getByRole('button', { name: 'Join to listen', exact: true }).press('Enter');
+        const status = page.locator('#status');
+        await expect(status).toHaveText('WebJam couldn’t verify this invite.');
+        await expect(status).toBeFocused();
+        await expect(status).toHaveAccessibleDescription('Ask your host for a fresh browser invite and open the new link.');
+        await expect(page.locator('#error-hint')).toBeInViewport({ ratio: 1 });
+        for (const id of ['listen-actions', 'prejoin', 'join', 'retry', 'audio-options', 'leave']) {
+            await expect(page.locator('#' + id)).toBeHidden();
+        }
+        expect(external).toEqual([]);
+        await page.screenshot({ path: testInfo.outputPath('unverified-invite-fresh-link.png') });
+    });
 }
 
 for (const width of [375, 390]) {

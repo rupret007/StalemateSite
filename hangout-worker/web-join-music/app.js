@@ -335,7 +335,11 @@ function leave(message = "You left the session.", error) {
   $("latency").textContent = "Listening delay is estimated after you connect.";
   if (error) {
     const view = mapJoinError(error);
-    if (retryListening && view.kind === "interrupted") {
+    if (view.kind === "host_binding") {
+      view.headline = "WebJam couldn’t verify this invite.";
+      view.hint = "Ask your host for a fresh browser invite and open the new link.";
+      view.showRetry = false;
+    } else if (retryListening && view.kind === "interrupted") {
       view.headline = "Joining to listen was interrupted.";
       view.hint = "Check your connection, then tap Retry to listen with your microphone off.";
     } else if (retryListening && view.kind === "host_offline") {

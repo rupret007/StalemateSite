@@ -7,8 +7,8 @@
     "app.js": {
       "source": "web/join/app.js",
       "baseSha256": "ff699ff308d0e7e4d301ea30486f90bd20bc497555d206b1a08de3472c512662",
-      "sha256": "06446b830075721ebac16b6f950a502684c890b5481de8b8bd7fe311d12387b3",
-      "adaptation": "Private beta receive-only joining, retry mode, playback recovery and focus preservation after a connection completes."
+      "sha256": "b18c2f96d4ea9b1921e44a14ab7b7566cf28dba78a8c7c99d03584ae75f6b57a",
+      "adaptation": "Private beta receive-only joining, retry and playback recovery, focus preservation, and fresh-link recovery for an unverified invite."
     }
   }
 }

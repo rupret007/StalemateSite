@@ -85,6 +85,30 @@ it.each([false, true])('keeps focus when listening connects (reading Audio detai
     expect(document.activeElement).toBe(current);
 });
 
+it('asks for a fresh invite when the host cannot be verified', async () => {
+    let refuse;
+    const joinDelay = new Promise((_, reject) => { refuse = reject; });
+    const { $, capture, play, sessions, window } = fixture({ joinDelay });
+    $('listen').focus();
+    $('listen').click();
+    await vi.waitFor(() => expect(sessions).toHaveLength(1));
+    expect(window.document.activeElement).toBe($('leave'));
+
+    refuse(new Error(JOIN_SIGNAL.HOST_BINDING));
+
+    await vi.waitFor(() => expect($('status').dataset.failure).toBe('true'));
+    expect($('retry').hidden).toBe(true);
+    expect($('listen-actions').hidden).toBe(true);
+    expect($('prejoin').hidden).toBe(true);
+    expect($('error-hint').textContent).toBe('Ask your host for a fresh browser invite and open the new link.');
+    expect(window.document.activeElement).toBe($('status'));
+    $('retry').click();
+    $('listen').click();
+    expect(sessions).toHaveLength(1);
+    expect(capture).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
+});
+
 it.each([
     ['invalid', { capability: Buffer.alloc(32) }],
     ['expired', { expiresAt: 1 }],
