@@ -877,6 +877,32 @@ it('identifies emoji shortcuts as actions that send the named message', async ()
     expect(ws.sent.at(-1)).toEqual({ t: 'say', ch: '#stalemate', text: 'happy little tree 🌲' });
 });
 
+it('retries the same Away action after a socket send fails in either direction', async () => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const { document } = window;
+    const away = document.querySelector('[data-quick-cmd="away"]');
+    const send = ws.send.bind(ws);
+    const commands = () => ws.sent.filter(frame => frame.t === 'cmd' && frame.name === 'away');
+    const failSend = () => { ws.send = () => { throw new Error('socket closed during send'); }; };
+
+    failSend();
+    away.click();
+    expect(commands()).toHaveLength(0);
+    ws.send = send;
+    away.click();
+    expect(commands().at(-1)?.args).toEqual(['grabbing', 'a', 'snack']);
+    expect(document.querySelector('[data-toast]').textContent).toContain('Away status couldn’t be sent');
+
+    failSend();
+    away.click();
+    expect(commands()).toHaveLength(1);
+    ws.send = send;
+    away.click();
+    expect(commands().at(-1)?.args).toEqual([]);
+    expect(commands()).toHaveLength(2);
+});
+
 it('names the channel tab group and describes the conversation with the selected room', async () => {
     const { window, welcome, join } = await visitor();
     welcome(); join(); join('#writing-room');

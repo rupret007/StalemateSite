@@ -3548,7 +3548,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     $$('[data-quick-cmd]').forEach((b) => b.addEventListener('click', () => {
         const name = b.dataset.quickCmd;
         if (name === 'slap') { if (app.active.startsWith('pm:')) return cmd('slap'); const c = store(app.active); const others = (c && c.names || []).filter((n) => n.nick !== app.me); const who = others.length ? pick(others) : null; return who ? personCommand(personContext(who.id, c.name, c.keepRef, who.nick), 'slap', [who.nick]) : toast('Nobody here to slap. Yet.'); }
-        if (name === 'away') { app.away = !app.away; return cmd('away', app.away ? ['grabbing', 'a', 'snack'] : []); }
+        if (name === 'away') {
+            const away = !app.away;
+            if (cmd('away', away ? ['grabbing', 'a', 'snack'] : [])) app.away = away;
+            else toast('Away status couldn’t be sent. Try again when connected.');
+            return;
+        }
         return cmd(name, []);
     }));
     $('[data-leave]').addEventListener('click', () => cmd('part', [app.active]));
