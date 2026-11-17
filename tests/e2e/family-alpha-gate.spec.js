@@ -622,3 +622,29 @@ for (const [game, prefix, buttons, action, count] of [
         } finally { await fixture.close(); }
     });
 }
+
+test('Crapjack chips picker and Ready are fully visible 48px phone controls', async ({ browser, baseURL }) => {
+    const game = 'turdjack', table = { game, status: '[data-jack-status]' };
+    const fixture = await gameNight(browser, baseURL, { extraFeatures: { arcadeTurdJack: 1 }, extraGames: [game] });
+    try {
+        const [host, guest] = await room(fixture, ['ChipsHost', 'ChipsGuest']);
+        await showTable(host, table);
+        await showTable(guest, table);
+        await host.locator('[data-jack-main][data-command="open"]').tap();
+        const seat = guest.locator('[data-jack-seats] > button:visible').first();
+        await expect(seat).toBeVisible();
+        await seat.tap();
+        await host.getByRole('button', { name: 'Start table', exact: true }).tap();
+        const chips = guest.getByRole('combobox', { name: 'Play chips', exact: true });
+        const ready = guest.getByRole('button', { name: 'Ready', exact: true });
+        await expect(ready).toBeVisible();
+        await expectPhoneControl(ready);
+        await expectPhoneControl(chips);
+        const available = await chips.locator('option').allTextContents();
+        expect(available.length).toBeGreaterThanOrEqual(2);
+        await chips.selectOption({ label: available[1] });
+        await ready.tap();
+        await expect(guest.getByRole('button', { name: 'Update wager', exact: true })).toBeVisible();
+        expect(fixture.errors()).toEqual([]);
+    } finally { await fixture.close(); }
+});

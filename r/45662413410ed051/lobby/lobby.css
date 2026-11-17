@@ -858,6 +858,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   body:has(.game-night:not([hidden])) :is(.connection-tools [data-fullscreen], .slash, .roombar .btn) { min-width: 44px !important; }
   .game-night :is(.arcade-chess, .brick-race-actions, .tris-actions, .mania-actions, .rush-race-actions) .btn { min-width: 44px; min-height: 44px; }
   .game-night .arcade-card-actions > .btn,
+  .game-night .arcade-jack [data-jack-wager] select,
   .game-night .arcade-chess :is([data-chess-primary], [data-chess-start-rematch]),
   .game-night .arcade-card-table :is([data-eights-main], [data-rummy-main], [data-start-rematch]) {
     min-width: 48px;
