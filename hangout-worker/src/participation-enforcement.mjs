@@ -9,11 +9,16 @@ const validIdentity = value => value && Object.keys(value).length === 3 && ['pri
 const limits = Object.freeze({ connections: 256, checks: 2048, writes: 128, bytes: 16 * 1024 * 1024 });
 function selectedProviderRequest(request) {
     const value = { actorId: request?.actorId, action: request?.action,
-        providerReady: request?.providerReady, publicTextEligible: request?.publicTextEligible };
-    // This bridge supports eligible public-text moderation only. An ordinary
-    // chat purpose must never bypass the provider-qualified purpose check.
-    return typeof value.actorId === 'string' && value.action === 'aiPublicReview'
-        && value.providerReady === true && value.publicTextEligible === true ? Object.freeze(value) : null;
+        providerReady: request?.providerReady, publicTextEligible: request?.publicTextEligible,
+        ...(request?.peerId === undefined ? {} : { peerId: request.peerId }) };
+    // Public-text review and explicitly consented external-provider actions
+    // use the same qualified start fence. Music may bind a peer so both
+    // participants' current consent is rechecked at dispatch.
+    if (typeof value.actorId !== 'string' || value.providerReady !== true) return null;
+    if (value.action === 'aiPublicReview' && value.publicTextEligible === true && value.peerId === undefined) return Object.freeze(value);
+    if (value.action === 'externalProvider' && value.publicTextEligible === false
+        && (value.peerId === undefined || typeof value.peerId === 'string' && value.peerId.length > 0 && value.peerId.length <= 128)) return Object.freeze(value);
+    return null;
 }
 export function createParticipationEnforcement({ storage, resolveConnection, resolveConnections, validateConnection, writeEffects, readPrincipals = readParticipationPrincipals, readWithdrawn = null, readPreparation = null, dispatchStart = null, beforeCommit = async () => {}, providerQualified = () => false, now = () => Date.now() } = {}) {
     if (typeof storage?.transaction !== 'function' || [resolveConnection, validateConnection, writeEffects, readPrincipals, beforeCommit, providerQualified, now].some(fn => typeof fn !== 'function')
@@ -25,11 +30,25 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
     const check = (state, request, current = state.snapshot, at = now()) => {
         const index = state.connections.findIndex(c => c.id === request.actorId), other = state.connections.findIndex(c => c.id === request.peerId);
         if (!current?.ok || index < 0 || !state.bindings[index] || !current.subjects[index]) return false;
-        return resolveParticipation({ action: request.action, now: at, policy: current.policy, subject: current.subjects[index], binding: state.bindings[index],
+        const safeguards = { available: true, quota: true, content: true, provider: request.providerReady === true && providerQualified(request.action) === true
+            && (request.action !== 'aiPublicReview' && request.action !== 'externalProvider' || typeof dispatchStart === 'function') ? 'provider-ready' : 'off',
+            publicTextEligible: request.publicTextEligible === true };
+        const allowed = resolveParticipation({ action: request.action, now: at, policy: current.policy, subject: current.subjects[index], binding: state.bindings[index],
             authority: { global: true, room: true, actor: true },
-            safeguards: { available: true, quota: true, content: true, provider: request.providerReady === true && providerQualified(request.action) === true
-                && (request.action !== 'aiPublicReview' || typeof dispatchStart === 'function') ? 'provider-ready' : 'off', publicTextEligible: request.publicTextEligible === true },
+            safeguards,
             ...(['requestDirectContact', 'acceptDirectContact'].includes(request.action) ? { peer: { subject: current.subjects[other], binding: state.bindings[other] } } : {}) }).allowed;
+        if (!allowed || request.action !== 'externalProvider' || request.peerId === undefined) return allowed;
+        if (other < 0 || other === index || !state.bindings[other] || !current.subjects[other]) return false;
+        const directContactAllowed = (actor, peer, action) => resolveParticipation({ action, now: at, policy: current.policy,
+            subject: current.subjects[actor], binding: state.bindings[actor], authority: { global: true, room: true, actor: true },
+            safeguards: { available: true, quota: true, content: true, provider: 'off', publicTextEligible: false },
+            peer: { subject: current.subjects[peer], binding: state.bindings[peer] } }).allowed;
+        const peerProviderAllowed = resolveParticipation({ action: 'externalProvider', now: at, policy: current.policy,
+            subject: current.subjects[other], binding: state.bindings[other], authority: { global: true, room: true, actor: true },
+            safeguards: { available: true, quota: true, content: true,
+                provider: providerQualified('externalProvider') === true && typeof dispatchStart === 'function' ? 'provider-ready' : 'off', publicTextEligible: false } }).allowed;
+        return peerProviderAllowed && directContactAllowed(index, other, 'requestDirectContact')
+            && directContactAllowed(other, index, 'acceptDirectContact');
     };
     const read = async (tx, identities) => {
         const current = await readPrincipals({ tx, identities: identities.filter(Boolean), now: now() });
@@ -154,6 +173,13 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
                 const index = state.connections.findIndex(c => c.id === selected.actorId); if (index < 0) return false;
                 const identity = await resolveConnection(clone(state.connections[index]));
                 if (!validIdentity(identity) || identity.expiresAt <= now() || identity.principalRef !== state.identities[index]?.principalRef || identity.communityRef !== state.identities[index]?.communityRef) return false;
+                if (selected.peerId !== undefined) {
+                    const peerIndex = state.connections.findIndex(c => c.id === selected.peerId);
+                    if (peerIndex < 0 || !state.identities[peerIndex]) return false;
+                    const peerIdentity = await resolveConnection(clone(state.connections[peerIndex]));
+                    if (!validIdentity(peerIdentity) || peerIdentity.expiresAt <= now() || peerIdentity.principalRef !== state.identities[peerIndex].principalRef
+                        || peerIdentity.communityRef !== state.identities[peerIndex].communityRef) return false;
+                }
                 const current = await storage.transaction(tx => read(tx, state.identities));
                 return check(state, selected, current);
             } catch { return false; }
@@ -164,6 +190,8 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
             const selected = selectedProviderRequest(request); if (!selected) throw Error('participation-denied');
             const index = state.connections.findIndex(connection => connection.id === selected.actorId);
             if (index < 0 || !state.identities[index]) throw Error('participation-denied');
+            const peerIndex = selected.peerId === undefined ? -1 : state.connections.findIndex(connection => connection.id === selected.peerId);
+            if (selected.peerId !== undefined && (peerIndex < 0 || !state.identities[peerIndex] || peerIndex === index)) throw Error('participation-denied');
             // Derive the descriptor from the trusted prepared slot. Never
             // reread a caller-owned request after validation has awaited I/O.
             const actorId = state.connections[index].id;
@@ -174,8 +202,15 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
                 actorId,
                 validate: async tx => {
                     const current = await read(tx, state.identities);
+                    const checked = [index, ...(peerIndex < 0 ? [] : [peerIndex])];
+                    for (const slot of checked) {
+                        const identity = state.identities[slot];
+                        // Use the already-open transaction's validator. resolveConnection opens
+                        // its own transaction and would deadlock this read-only start fence.
+                        if (!validIdentity(identity) || identity.expiresAt <= now()
+                            || await validateConnection({ tx, connection: clone(state.connections[slot]), identity: clone(identity), at: now() }) !== true) throw Error('participation-denied');
+                    }
                     if (state.identities[index].expiresAt <= now()
-                        || await validateConnection({ tx, connection: clone(state.connections[index]), identity: clone(state.identities[index]), at: now() }) !== true
                         || !check(state, selected, current)) throw Error('participation-denied');
                     validated = { current, identity: state.identities[index] };
                     return true;
