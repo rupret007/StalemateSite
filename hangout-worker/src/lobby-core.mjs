@@ -232,6 +232,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const receiptSizes = new Map();   // exact UTF-8 record sizes; avoid re-encoding the whole queue per line
     let receiptBytes = 2;             // serialized [] plus records and commas
     let receiptRevision = 0;
+    // Receipt insertion is the hot path for chat. Track the next possible TTL
+    // boundary so fresh lines do not rescan every still-live receipt.
+    let nextReceiptExpiry = Infinity;
     const heldChannels = new Map();   // original channel object for live held-message approval; never restored
     const aiPending = new Map();      // current message + channel object identities; never persisted
     const aiReviews = new Map();      // bounded admin-only evidence, separate from chat and network snapshots
@@ -2391,7 +2394,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function rememberDelivery(line, meta) {
-        setReceipt(line.id, messageReceipt(line, meta));
+        // Retain only eligible reporting witnesses. When no other device got
+        // the line, keep a compact control receipt so staff can still delete
+        // or purge it after live-line eviction without retaining unusable
+        // report metadata.
+        const reporters = [...meta.recipients].filter((id) => conns.get(id)?.dev !== meta.authorDev);
+        setReceipt(line.id, reporters.length
+            ? messageReceipt(line, { ...meta, recipients: new Set(reporters) })
+            : { controlOnly: true, id: line.id, authorDev: meta.authorDev, ts: line.ts });
         pruneReceipts(false);
     }
 
@@ -2400,6 +2410,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (receipts.has(id)) receiptBytes += size - receiptSizes.get(id);
         else receiptBytes += size + (receipts.size ? 1 : 0);
         receipts.set(id, value); receiptSizes.set(id, size); receiptRevision += 1;
+        if (Number.isFinite(value.ts)) nextReceiptExpiry = Math.min(nextReceiptExpiry, value.ts + DAY);
     }
     function deleteReceipt(id) {
         if (!receipts.has(id)) return;
@@ -2408,14 +2419,24 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
     function pruneReceipts(pruneWitnesses = true) {
         const time = now();
+        // New receipts are fresh. Until the earliest possible expiry, the
+        // insertion path has no TTL work; disconnect cleanup still scans
+        // witnesses through the full path below.
+        if (!pruneWitnesses && time < nextReceiptExpiry) {
+            while (receipts.size > RECEIPT_MAX || receiptBytes > RECEIPT_STATE_BYTES) deleteReceipt(receipts.keys().next().value);
+            return;
+        }
+        let earliest = Infinity;
         for (const [id, r] of receipts) {
-            if (!r.recipients.length || time - r.ts >= DAY) { deleteReceipt(id); continue; }
-            if (pruneWitnesses) {
+            if (!r.controlOnly && !r.recipients.length || time - r.ts >= DAY) { deleteReceipt(id); continue; }
+            earliest = Math.min(earliest, r.ts + DAY);
+            if (pruneWitnesses && !r.controlOnly) {
                 const recipients = r.recipients.filter((recipient) => { const current = conns.get(recipient); return current && (current.nick || current.safetyOnly); });
                 if (!recipients.length) deleteReceipt(id);
                 else if (recipients.length !== r.recipients.length) setReceipt(id, { ...r, recipients });
             }
         }
+        nextReceiptExpiry = earliest;
         // A popular lobby can have many delivery witnesses per line. Cap serialized
         // metadata as well as record count so it cannot exhaust the session record.
         while (receipts.size > RECEIPT_MAX || receiptBytes > RECEIPT_STATE_BYTES) deleteReceipt(receipts.keys().next().value);
@@ -2423,11 +2444,17 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function restoreReceipts(stored) {
         receipts.clear(); receiptSizes.clear(); receiptBytes = 2; receiptRevision += 1;
+        nextReceiptExpiry = Infinity;
         // Old session records have no receipts. Invalid evidence never grants a
         // report, and need not destroy otherwise valid live chat sessions.
         if (!Array.isArray(stored) || stored.length > RECEIPT_MAX
             || encoder.encode(JSON.stringify(stored)).byteLength > RECEIPT_STATE_BYTES) return;
         for (const r of stored) {
+            if (r && typeof r === 'object' && r.controlOnly === true) {
+                if (moderationId(r.id) && r.id.startsWith('m') && moderationIdentity(r.authorDev) && moderationTime(r.ts))
+                    setReceipt(r.id, { controlOnly: true, id: r.id, authorDev: r.authorDev, ts: r.ts });
+                continue;
+            }
             if (!r || typeof r !== 'object' || Array.isArray(r) || !moderationId(r.id)
                 || !['line', 'pm'].includes(r.t) || !moderationChannel(r.ch) || !moderationNick(r.from)
                 || !moderationIdentity(r.authorDev) || !/^[a-f0-9]{64}$/.test(r.digest)
