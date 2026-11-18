@@ -1991,6 +1991,28 @@ describe('keyboard focus during status action recovery', () => {
         v.flush(4000);
         expect(v.toast.hidden).toBe(moved);
     });
+    it.each(['typing', 'returned from notice', 'discard after reading'])('keeps closed-draft recovery available without a deadline: %s', async mode => {
+        const v = await closedPrivateDraft();
+        const doc = v.window.document, before = v.ws.sent.length;
+        v.input.focus();
+        if (mode === 'returned from notice') {
+            v.discard.focus(); v.input.focus();
+            await Promise.resolve(); // Native focusout schedules the same timer.
+        }
+        v.flush(12000);
+        expect(v.toast.hidden).toBe(false);
+        expect(v.discard.isConnected).toBe(true);
+        expect(v.input.value).toBe('A private unsent draft');
+        expect(doc.activeElement).toBe(v.input);
+        const action = mode === 'discard after reading' ? v.discard
+            : [...v.toast.querySelectorAll('button')].find(button => button.textContent === 'Keep draft');
+        expect(action).toBeTruthy(); action.focus(); action.click();
+        expect(v.toast.hidden).toBe(true);
+        expect(v.input.value).toBe(mode === 'discard after reading' ? '' : 'A private unsent draft');
+        expect(doc.activeElement).toBe(v.input);
+        expect(v.ws.sent).toHaveLength(before);
+    });
+
 });
 
 
