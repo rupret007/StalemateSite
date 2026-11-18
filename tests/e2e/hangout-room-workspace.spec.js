@@ -62,14 +62,16 @@ test('canonical canvas preserves pending gestures across remote commits and canc
         f.mouse('mousedown', .123456, .234567);
         f.mouse('mousemove', .345678, .456789);
         f.incoming({ id: 'remote-first', color: '#ed2765', size: 8, pts: [[.1, .8], [.8, .1]] });
+        const preview = await f.pixels();
         f.mouse('mouseup', .345678, .456789);
         const live = await f.pixels(), vectors = structuredClone(window.__lobbyRoom.state.room.strokes);
         f.snapshot();
-        return { live, canonical: await f.pixels(), lengths: vectors.map(stroke => stroke.pts.length), local: vectors.at(-1).pts };
+        return { preview, live, canonical: await f.pixels(), lengths: vectors.map(stroke => stroke.pts.length), local: vectors.at(-1).pts };
     });
     expect(first.lengths).toEqual([2, 2]);
     expect(first.local).toEqual([[.1235, .2346], [.3457, .4568]]);
     expect(first.live).toBe(first.canonical);
+    expect(first.preview).toBe(first.canonical);
     await page.evaluate(() => {
         const f = window.canvasControls;
         f.mouse('mousedown', .6, .7); f.mouse('mousemove', .7, .6);
