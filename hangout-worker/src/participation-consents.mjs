@@ -5,6 +5,7 @@ import { PARTICIPATION_PURPOSES, validParticipationPolicy, validParticipationSub
 
 export const PARTICIPATION_LEDGER_KEY = 'participation-ledger:v1';
 export const PARTICIPATION_LEDGER_LIMITS = Object.freeze({ subjects: 64, guardians: 128, receipts: 256, pending: 128, operations: 256, bytes: 1024 * 1024 });
+const encoder = new TextEncoder();
 const clone = value => JSON.parse(JSON.stringify(value));
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const positive = value => integer(value) && value > 0;
@@ -19,10 +20,14 @@ function record(value, keys) {
         });
 }
 function array(value, valid, max) {
-    return Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype && value.length <= max
-        && Reflect.ownKeys(value).length === value.length + 1
-        && Array.from({ length: value.length }, (_, i) => Object.getOwnPropertyDescriptor(value, String(i)))
-            .every(property => property && Object.hasOwn(property, 'value') && valid(property.value));
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return false;
+    const length = value.length;
+    if (length > max || Reflect.ownKeys(value).length !== length + 1) return false;
+    for (let i = 0; i < length; i++) {
+        const property = Object.getOwnPropertyDescriptor(value, i);
+        if (!property || !Object.hasOwn(property, 'value') || !valid(property.value)) return false;
+    }
+    return true;
 }
 const purposes = value => array(value, item => PARTICIPATION_PURPOSES.includes(item), PARTICIPATION_PURPOSES.length) && new Set(value).size === value.length;
 const samePolicy = (a, b) => ['policyVersion', 'noticeDigest', 'communityRef'].every(key => a[key] === b[key]) && a.policyRevision === b.revision;
@@ -61,17 +66,25 @@ const operationKeys = ['operationRef', 'kind', 'signature', 'result', 'issuedAt'
 const validOperation = value => record(value, operationKeys) && ref(value.operationRef) && ['begin', 'complete'].includes(value.kind)
     && typeof value.signature === 'string' && value.signature.length <= 4096 && validResult(value.result)
     && integer(value.issuedAt) && integer(value.deleteAt) && value.deleteAt > value.issuedAt;
-function validState(value, limits) {
+const ledgerRows = [
+    ['subjects', item => record(item, ['record', 'deleteAt']) && validParticipationSubject(item.record) && integer(item.deleteAt)
+        && item.deleteAt >= item.record.issuedAt && (!['pending', 'authorized'].includes(item.record.state) || item.deleteAt >= item.record.expiresAt),
+    item => item.record.subjectRef],
+    ['guardians', validGuardian, item => item.guardianRef],
+    ['receipts', validReceipt, item => item.consentRef],
+    ['pending', validPending, item => item.pendingRef],
+    ['operations', validOperation, item => item.operationRef]
+];
+function validState(value, limits, subjectHeadroom = 0) {
     if (!record(value, ['version', 'revision', 'config', 'subjects', 'guardians', 'receipts', 'pending', 'operations'])
         || value.version !== 1 || !positive(value.revision) || !validConfig(value.config)) return false;
-    const kinds = { subjects: [item => record(item, ['record', 'deleteAt']) && validParticipationSubject(item.record) && integer(item.deleteAt)
-        && item.deleteAt >= item.record.issuedAt && (!['pending', 'authorized'].includes(item.record.state) || item.deleteAt >= item.record.expiresAt), item => item.record.subjectRef],
-    guardians: [validGuardian, item => item.guardianRef], receipts: [validReceipt, item => item.consentRef],
-    pending: [validPending, item => item.pendingRef], operations: [validOperation, item => item.operationRef] };
-    for (const [kind, [valid, key]] of Object.entries(kinds)) if (!array(value[kind], valid, limits[kind]) || new Set(value[kind].map(key)).size !== value[kind].length) return false;
-    if (new Set(value.subjects.map(item => item.record.principalRef)).size !== value.subjects.length) return false;
+    for (const [kind, valid, key] of ledgerRows) {
+        const rows = value[kind];
+        if (!array(rows, valid, limits[kind]) || rows.length > 1 && new Set(rows.map(key)).size !== rows.length) return false;
+    }
+    if (value.subjects.length > 1 && new Set(value.subjects.map(item => item.record.principalRef)).size !== value.subjects.length) return false;
     if (value.subjects.some(item => item.record.communityRef !== value.config.policy.communityRef)) return false;
-    return new TextEncoder().encode(JSON.stringify(value)).byteLength <= limits.bytes;
+    return encoder.encode(JSON.stringify(value)).byteLength + value.subjects.length * subjectHeadroom <= limits.bytes;
 }
 const currentPolicy = (state, now) => {
     const policy = state.config.policy;
@@ -202,7 +215,7 @@ export function expireParticipationLedgerState(value, time, limits = PARTICIPATI
     expire(state, time);
     if (JSON.stringify(state) !== before) {
         state.revision = next(state.revision);
-        if (!validState(state, limits) || new TextEncoder().encode(JSON.stringify(state)).byteLength + state.subjects.length * 64 > limits.bytes) fail('capacity-or-invalid-state');
+        if (!validState(state, limits, 64)) fail('capacity-or-invalid-state');
     }
     return state;
 }
@@ -221,18 +234,17 @@ export function createParticipationConsents({ storage, adapters, now = () => Dat
                 const stored = await tx.get(PARTICIPATION_LEDGER_KEY);
                 if (stored === undefined && !initialize) fail('not-initialized');
                 if (stored !== undefined && !validState(stored, limits)) fail('storage-corrupt');
-                const state = stored === undefined ? null : clone(stored), time = now();
+                const before = stored === undefined ? null : JSON.stringify(stored);
+                const state = before === null ? null : JSON.parse(before), time = now();
                 if (!integer(time)) fail('invalid-time');
-                const before = state && JSON.stringify(state);
                 if (state && expireStored) expire(state, time);
                 const { result, updated = state } = await operation(state, time);
                 if (updated && JSON.stringify(updated) !== before) {
                     updated.revision = updated.revision ? next(updated.revision) : 1;
-                    if (!validState(updated, limits)) fail('capacity-or-invalid-state');
                     // Small per-subject headroom is reserved before growth for
                     // bounded withdrawal status/revision changes. No intake or
                     // callback log slot is required by a rights withdrawal.
-                    if (!reducing && new TextEncoder().encode(JSON.stringify(updated)).byteLength + updated.subjects.length * 64 > limits.bytes) fail('capacity-or-invalid-state');
+                    if (!validState(updated, limits, reducing ? 0 : 64)) fail('capacity-or-invalid-state');
                     await tx.put(PARTICIPATION_LEDGER_KEY, clone(updated));
                 }
                 return result;
