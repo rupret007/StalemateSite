@@ -8,7 +8,10 @@ let now, engine, frames, writes, identities, sequence;
 function boot(persist) {
     frames = []; writes = [];
     engine = createLobby({ now: () => now, send: (recipient, frame) => frames.push({ recipient, ...frame }),
-        persist: persist || createLatestPersistenceSnapshots(writes), limits: { defaultSlow: 0 } });
+        // Default preserves every cloned write; bounded retention is supplemental only.
+        persist: persist || (process.env.DOT_SUPPLEMENTAL_PERSISTENCE === '1'
+            ? createLatestPersistenceSnapshots(writes)
+            : ((kind, value) => writes.push([kind, structuredClone(value)]))), limits: { defaultSlow: 0 } });
 }
 function guest(nick, role = 'fan', dev = `dev-${nick}`) {
     const identity = { id: `socket${++sequence}`, dev, iph: `ip-${sequence}`, role, admin: role === 'owner', account: '' };

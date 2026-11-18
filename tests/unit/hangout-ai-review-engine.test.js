@@ -10,9 +10,11 @@ function boot(options = {}) {
     clock = 1800000000000; requests = []; frames = new Map(); writes = []; seq = 0;
     engine = createLobby({ now: () => clock, reviewPublicText: (request) => { requests.push(request); },
         send: (id, frame) => { if (!frames.has(id)) frames.set(id, []); frames.get(id).push(frame); },
-        // AI-review assertions require historical snapshots only for this record.
-        // Unrelated persistence calls are counted, not retained or clone-validated.
-        persist: createAiReviewPersistenceSink(writes).persist, ...options });
+        // Default preserves the original all-write cloning/history workload.
+        // Explicit supplemental mode is NOT original qualification.
+        persist: process.env.DOT_SUPPLEMENTAL_PERSISTENCE === '1'
+            ? createAiReviewPersistenceSink(writes).persist
+            : ((kind, value) => writes.push([kind, structuredClone(value)])), ...options });
 }
 function guest(nick, role = 'fan') {
     const id = `c${++seq}`;
