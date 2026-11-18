@@ -1778,3 +1778,64 @@ for (const width of [375, 390, 1440]) for (const kind of ['art', 'jam']) test(`p
         try { await context?.close(); } finally { await community.close(); }
     }
 });
+
+
+// Synthetic composition events exercise the app contract; admission, explicit
+// keyboard joining and chat are real. These are not physical OS IME checks.
+for (const width of [390, 1440]) test(`protected nickname composition waits for an explicit join at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
+    const community = await privateCommunity(), errors = [], sockets = []; let context;
+    try {
+        context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        const page = await context.newPage();
+        page.on('pageerror', error => errors.push(error.name));
+        page.on('websocket', socket => sockets.push(socket));
+        await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        const nick = page.getByRole('textbox', { name: 'Your nick', exact: true });
+        await nick.fill('UnfinishedNick'); await nick.focus();
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        const status = await page.locator('[data-gate-status]').textContent();
+        expect(new URL(page.url()).hash).toBe('');
+        await page.screenshot({ path: testInfo.outputPath(`00-nickname-before-composition-${width}.png`) });
+        await nick.evaluate(input => {
+            input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+        });
+        await page.screenshot({ path: testInfo.outputPath(`01-nickname-after-confirmation-${width}.png`) });
+        expect(sockets).toHaveLength(0);
+        await expect(nick).toBeFocused(); await expect(nick).toHaveValue('UnfinishedNick');
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        await expect(page.locator('[data-gate-status]')).toHaveText(status);
+        await nick.evaluate(input => {
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: false, keyCode: 229, bubbles: true, cancelable: true }));
+        });
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        expect(sockets).toHaveLength(0);
+        await nick.evaluate(input => {
+            input.value = 'ChosenNick';
+            input.dispatchEvent(new CompositionEvent('compositionend', { data: 'ChosenNick', bubbles: true }));
+            input.dispatchEvent(new InputEvent('input', { inputType: 'insertCompositionText', data: 'ChosenNick', bubbles: true }));
+        });
+        await sentinel.assertClean();
+        expect(sockets).toHaveLength(0);
+        await nick.press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await expect(page.locator('[data-self-nick]')).toHaveText('ChosenNick');
+        const input = page.getByRole('textbox', { name: 'Message', exact: true });
+        await input.fill('A deliberate join uses my finished nickname.'); await input.press('Enter');
+        await expect(page.locator('[data-buffer]')).toContainText('A deliberate join uses my finished nickname.');
+        expect(sockets).toHaveLength(1);
+        await expect(input).toBeInViewport({ ratio: 1 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath(`02-nickname-explicit-join-${width}.png`) });
+        await sentinel.assertClean(); expect(errors).toEqual([]);
+    } finally {
+        if (context) await context.close();
+        await community.close();
+    }
+});

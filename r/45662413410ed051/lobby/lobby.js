@@ -734,7 +734,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         connect(nickInput.value.trim());
     });
     $('[data-enter]').disabled = !previewKey || !relayBase;
-    nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('[data-enter]').click(); });
+    // Enter can confirm an input-method candidate without asking to join.
+    nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) $('[data-enter]').click(); });
 
     let retry = 0;
     let retryTimer;
