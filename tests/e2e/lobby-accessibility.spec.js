@@ -1839,3 +1839,66 @@ for (const width of [390, 1440]) test(`protected nickname composition waits for 
         await community.close();
     }
 });
+
+// Real admitted peers publish real messages. The explicit local lobby clock
+// satisfies the existing slow mode; it does not lower rates or inject lines.
+for (const width of [375, 390, 1440]) test(`protected incoming chat keeps a focused message readable at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
+    let lobbyNow = Date.now();
+    const community = await privateCommunity({ lobbyNow: () => lobbyNow }), contexts = [], sentinels = [], errors = [];
+    async function enter(nick, source) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true, reducedMotion: 'reduce',
+            viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 } });
+        contexts.push(context);
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        sentinels.push(await installNoCaptureSentinel(context));
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        await page.goto(community.origin + '/beta/?via=' + source + '#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(nick);
+        await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        expect(new URL(page.url()).hash).toBe('');
+        return page;
+    }
+    try {
+        const reader = await enter('KeyboardReader', 'rad-dad');
+        const speaker = await enter('ReadingSpeaker', 'stalemate');
+        async function publish(text) {
+            lobbyNow += 4000; // Original three-second slow mode remains in force.
+            const input = speaker.getByRole('textbox', { name: 'Message', exact: true });
+            await input.fill(text); await input.press('Enter');
+            await expect(reader.locator('[data-buffer]')).toContainText(text);
+        }
+        const anchor = 'Reading anchor message: this is the message I want to inspect.';
+        await publish(anchor);
+        const log = reader.getByRole('log', { name: 'Conversation' });
+        const flag = log.locator('li').filter({ hasText: anchor }).getByRole('button', { name: 'Report this message from ReadingSpeaker', exact: true });
+        await tabTo(reader, flag); await expect(flag).toBeFocused(); await expect(flag).toBeInViewport({ ratio: 1 });
+        await expect.poll(() => log.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThan(60);
+        await reader.screenshot({ path: testInfo.outputPath(`00-focused-reading-${width}.png`) });
+        const incomingCount = width === 1440 ? 32 : 8;
+        for (let index = 1; index <= incomingCount; index++) await publish(`Reading follow-up ${index}: new conversation arrives while the keyboard reader keeps their place.`);
+        await reader.screenshot({ path: testInfo.outputPath(`01-incoming-while-reading-${width}.png`) });
+        await expect(flag).toBeFocused(); await expect(flag).toBeInViewport({ ratio: 1 });
+        const jump = reader.locator('[data-new-messages]');
+        await expect(jump).toBeVisible(); await expect(jump).toHaveText(`${incomingCount} new messages ↓`);
+        // Explicit keyboard activation of the existing jump returns to the tail.
+        await jump.press('Enter');
+        await expect(jump).toBeHidden(); await expect(log).toBeFocused();
+        await expect(log.getByText(`Reading follow-up ${incomingCount}:`, { exact: false })).toBeInViewport();
+        await reader.screenshot({ path: testInfo.outputPath(`02-jumped-to-latest-${width}.png`) });
+        await publish('Following resumes from the conversation container after an explicit jump.');
+        await expect(log.getByText('Following resumes from the conversation container after an explicit jump.', { exact: false })).toBeInViewport();
+        await expect(jump).toBeHidden();
+        await expect(reader.getByRole('textbox', { name: 'Message', exact: true })).toBeInViewport({ ratio: 1 });
+        expect(await reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await reader.screenshot({ path: testInfo.outputPath(`03-following-after-jump-${width}.png`) });
+        for (const sentinel of sentinels) await sentinel.assertClean();
+        expect(errors).toEqual([]);
+    } finally {
+        for (const context of contexts) await context.close();
+        await community.close();
+    }
+});

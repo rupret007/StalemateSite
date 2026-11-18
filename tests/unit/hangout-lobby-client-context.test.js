@@ -1992,3 +1992,33 @@ describe('keyboard focus during status action recovery', () => {
         expect(v.toast.hidden).toBe(moved);
     });
 });
+
+
+it.each(['message action', 'composer', 'conversation'])('incoming chat respects the current keyboard reading target: %s', async target => {
+    const v = await visitor(); v.welcome(); v.join();
+    const { window, ws, paint } = v, { document } = window;
+    window.requestAnimationFrame = callback => window.setTimeout(callback, 16);
+    window.cancelAnimationFrame = id => window.clearTimeout(id);
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    const log = document.querySelector('[data-buffer]'), lines = document.querySelector('[data-chat-lines]');
+    // jsdom has no layout. Real browser journeys separately verify geometry.
+    Object.defineProperty(log, 'scrollHeight', { get: () => lines.children.length * 48 });
+    Object.defineProperty(log, 'clientHeight', { get: () => 96 });
+    for (let index = 0; index < 3; index++) ws.receive({ t: 'line', ch: '#stalemate', id: `m-reading-${index}`,
+        from: 'ReadingFriend', text: `Connected-session reading line ${index}` });
+    log.scrollTop = log.scrollHeight - log.clientHeight;
+    const action = lines.lastElementChild.querySelector('.flag');
+    (target === 'message action' ? action : target === 'composer' ? document.querySelector('[data-text]') : log).focus();
+    paint(); const before = log.scrollTop, focused = document.activeElement;
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'm-reading-next', from: 'ReadingFriend', text: 'A new message arrives while the guest is reading.' });
+    paint();
+    expect(document.activeElement).toBe(focused);
+    if (target === 'message action') {
+        expect(log.scrollTop).toBe(before);
+        expect(document.querySelector('[data-new-messages]').hidden).toBe(false);
+        expect(document.querySelector('[data-new-messages]').textContent).toBe('1 new message ↓');
+    } else {
+        expect(log.scrollTop).toBeGreaterThan(before);
+        expect(document.querySelector('[data-new-messages]').hidden).toBe(true);
+    }
+});
