@@ -565,22 +565,25 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (app.active === channel) drawChan();
         return send({ t: 'cam', ch: channel, on: false });
     }
-    function room() {
+    function room(recovering = false) {
         if (app.sharingStopped || app.localMediaPaused) return null;
-        if (!roomApi && window.LobbyRoom) {
+        if (!roomApi && typeof window.LobbyRoom?.attach === 'function'
+            && (recovering || !activityToolsNeedsRetry || !activityRoom(store(app.active)))) {
             roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params, onCameraFailure: stopLocalCamera });
+            activityToolsNeedsRetry = false;
             drawActivityRecovery();
         }
         return roomApi;
     }
     const activityRoom = c => c && CREATIVE_ROOM_KINDS.has(c.kind)
         && connectionState === 'connected' && !sessionEnded && !app.localMediaPaused && !app.sharingStopped && !c.readOnly;
-    let activityToolsAttempt = null, activityToolsPageLeft = false;
+    let activityToolsAttempt = null, activityToolsPageLeft = false, activityToolsNeedsRetry = false;
     const activityRecovery = $('[data-activity-recovery]');
     const activityRecoveryStatus = $('[data-activity-recovery-status]');
     const activityRetry = $('[data-activity-retry]');
     function drawActivityRecovery() {
         activityRecovery.hidden = !!roomApi || !activityRoom(store(app.active));
+        if (!activityRecovery.hidden) activityToolsNeedsRetry = true;
         activityRetry.disabled = !!activityToolsAttempt;
         activityRecoveryStatus.textContent = activityToolsAttempt
             ? 'Loading activity tools… Chat still works.'
@@ -611,7 +614,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             const current = store(app.active);
             if (loaded && activityRoom(current) && typeof window.LobbyRoom?.attach === 'function') {
                 try {
-                    const api = room();
+                    const api = room(true);
                     api?.onJoin(current, current.actSnap);
                 } catch {
                     const failed = roomApi; roomApi = null;
@@ -625,7 +628,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
         }
         // The optional first-party renderer is retried only on this tap. No
-        // page reload, socket reconnect, activity replay or media consent.
+        // page reload, socket reconnect or media consent.
         if (typeof window.LobbyRoom?.attach === 'function') return finish(true);
         script.dataset.activityLoader = '';
         script.src = new URL('lobby-room.js', location.href).href;

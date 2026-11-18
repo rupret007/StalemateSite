@@ -1837,6 +1837,17 @@ describe('activity tools recovery', () => {
         expect(script()).toBe(current); expect(retry.disabled).toBe(true); expect(attach).not.toHaveBeenCalled();
         current.dispatchEvent(new window.Event('load')); expect(attach).toHaveBeenCalledTimes(1); expect(api.onJoin).toHaveBeenCalledTimes(1);
     });
+    it('keeps a late script from silently attaching to incoming activity before an explicit retry', async () => {
+        const { window, ws, retry, script, flush, attach, api } = await drawingVisitor();
+        retry.click(); flush(12000); expect(script()).toBeNull();
+        window.LobbyRoom = { attach };
+        ws.receive({ t: 'act', ch: '#drawing-recovery', kind: 'stroke', stroke: { id: 'late-script-stroke', color: '#009ee8', size: 8, pts: [[.1, .2], [.4, .5]] } });
+        expect(attach).not.toHaveBeenCalled(); expect(api.onAct).not.toHaveBeenCalled();
+        expect(window.document.querySelector('[data-activity-recovery]').hidden).toBe(false);
+        expect(window.document.querySelector('[data-act-stage]').hidden).toBe(true);
+        retry.click(); expect(script()).toBeNull(); expect(attach).toHaveBeenCalledTimes(1);
+        expect(api.onJoin.mock.calls[0][1].strokes.map(stroke => stroke.id)).toEqual(['late-script-stroke']);
+    });
     it('does not reopen a departed room when tools arrive late', async () => {
         const { window, retry, script, load, join, api, attach } = await drawingVisitor();
         retry.focus(); retry.click(); const pending = script(); join();
