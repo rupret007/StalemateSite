@@ -127,7 +127,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
             if (mapSize.call(item.value) > limits.maxNodes - nodes) exceeded();
             for (const [key, value] of Map.prototype.entries.call(item.value)) {
                 charge(32, 1); entries += 1; visit(key); visit(value);
-                item.contents.push([key, value]);
+                item.contents.push(key, value);
             }
         } else if (item.kind === 'set') {
             if (setSize.call(item.value) > limits.maxNodes - nodes) exceeded();
@@ -190,7 +190,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
                 if (item.kind === 'array') Object.defineProperty(item.value, 'length', item.properties[item.properties.indexOf('length') + 1]);
                 if (item.kind === 'map') {
                     Map.prototype.clear.call(item.value);
-                    for (const [key, value] of item.contents) Map.prototype.set.call(item.value, key, value);
+                    for (let i = 0; i < item.contents.length; i += 2) Map.prototype.set.call(item.value, item.contents[i], item.contents[i + 1]);
                 } else if (item.kind === 'set') {
                     Set.prototype.clear.call(item.value);
                     for (const value of item.contents) Set.prototype.add.call(item.value, value);
