@@ -755,3 +755,68 @@ for (const width of [390, 1440]) test(`protected activity setup failure waits fo
         if (failures.length) throw new AggregateError(failures, 'Owned setup-failure contexts did not close');
     }
 });
+
+// First-room entry uses the available real renderer. Only its first onJoin is
+// made to throw; the application must contain this optional-tool exception.
+for (const width of [375, 390, 1440]) test(`protected first activity setup failure keeps chat and offers Retry at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity(), errors = []; let context;
+    try {
+        context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        await context.addInitScript(() => {
+            const state = window.firstSetupFixture = { joins: 0, leaves: 0, fail: true }; let exported;
+            Object.defineProperty(window, 'LobbyRoom', { configurable: true, get: () => exported, set(value) {
+                exported = { ...value, attach(...options) {
+                    const api = value.attach(...options);
+                    return { ...api, onJoin(...args) {
+                        state.joins++;
+                        if (state.fail) { state.fail = false; throw new Error('Fixture: first room setup failed'); }
+                        return api.onJoin(...args);
+                    }, onLeave(...args) { state.leaves++; return api.onLeave(...args); } };
+                } };
+            } });
+        });
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('FirstSetupGuest');
+        await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        const leavesBefore = await page.evaluate(() => window.firstSetupFixture.leaves);
+        if (width < 901) await page.locator('nav [data-show="rooms"]').click();
+        await page.locator('[data-start="art"]').press('Enter');
+        await expect(page.locator('[data-chat-context]')).toHaveText(/^#art-/);
+        const retry = page.getByRole('button', { name: 'Retry activity', exact: true });
+        const recovery = page.locator('[data-activity-recovery]');
+        await expect(retry).toBeVisible(); await expect(retry).toBeInViewport({ ratio: 1 });
+        const bounds = await retry.boundingBox(); expect(bounds.width).toBeGreaterThanOrEqual(48); expect(bounds.height).toBeGreaterThanOrEqual(48);
+        expect(await page.evaluate(() => window.firstSetupFixture.leaves)).toBe(leavesBefore + 1);
+        await expect(page.locator('[data-cam]')).toBeDisabled();
+        await sentinel.assertClean(); await page.screenshot({ path: testInfo.outputPath(`01-first-setup-failed-${width}.png`) });
+        const input = page.getByRole('textbox', { name: 'Message', exact: true });
+        const message = 'Chat stays usable after the first activity setup fails.';
+        await input.fill(message); await input.press('Enter');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText(message);
+        const draft = 'My private unsent draft survives the first Retry.';
+        await input.fill(draft); await expect(recovery).toBeVisible();
+        expect(await page.evaluate(() => window.firstSetupFixture.joins)).toBe(1);
+        await page.screenshot({ path: testInfo.outputPath(`02-first-setup-chat-${width}.png`) });
+        await retry.press('Enter');
+        await expect(recovery).toBeHidden(); await expect(page.locator('[data-act-canvas]')).toBeVisible();
+        expect(await page.evaluate(() => window.firstSetupFixture.joins)).toBe(2);
+        await expect(page.locator('[data-activity] > summary')).toBeFocused();
+        await expect(input).toHaveValue(draft); await expect(input).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('log', { name: 'Conversation' })).not.toContainText(draft);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect(await page.evaluate(text => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(text), draft)).toBe(false);
+        await sentinel.assertClean(); expect(errors).toEqual([]);
+        expect(community.diagnostics().admittedUpgrades).toBe(1); expect(community.diagnostics().failures).toEqual([]);
+        await page.screenshot({ path: testInfo.outputPath(`03-first-setup-recovered-${width}.png`) });
+    } finally {
+        try { await context?.close(); } finally { await community.close(); }
+    }
+});

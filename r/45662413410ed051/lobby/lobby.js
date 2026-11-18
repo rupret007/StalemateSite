@@ -597,6 +597,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         attempt.script.onload = attempt.script.onerror = null;
         attempt.script.remove();
     }
+    function failActivitySetup() {
+        activityToolsNeedsRetry = true;
+        const failed = roomApi; roomApi = null;
+        try { failed?.onLeave(); } catch { /* Keep chat and the explicit retry available. */ }
+    }
     activityRetry.addEventListener('click', () => {
         const origin = store(app.active);
         if (activityToolsPageLeft || activityToolsAttempt || roomApi || !activityRoom(origin)) return;
@@ -619,9 +624,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 } catch {
                     // A failed room setup still needs the visitor's next tap;
                     // incoming activity must not silently attach it again.
-                    activityToolsNeedsRetry = true;
-                    const failed = roomApi; roomApi = null;
-                    try { failed?.onLeave(); } catch { /* Keep the explicit retry available. */ }
+                    failActivitySetup();
                 }
             }
             drawChan();
@@ -1711,10 +1714,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         show('chat');
         if (prev !== key) $('[data-quick]').scrollLeft = 0;
         const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
-        const r = room();
-        if (r) {
-            if ((prev !== key || freshJoin) && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
-            else if (!c || c.kind === 'lobby' || c.kind === 'jam') r.onLeave();
+        try {
+            const r = room();
+            if (r) {
+                if ((prev !== key || freshJoin) && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
+                else if (!c || c.kind === 'lobby' || c.kind === 'jam') r.onLeave();
+            }
+        } catch {
+            // Optional activity setup must not abort the room's chat join or
+            // leave its unavailable controls enabled without a recovery path.
+            failActivitySetup();
+            drawChan();
         }
     }
 
