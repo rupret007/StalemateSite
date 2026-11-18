@@ -1573,11 +1573,15 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
 
     const hhmm = (ts) => { const d = ts ? new Date(ts) : new Date(); return `[${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}]`; };
     const colorOf = (nick) => { let h = 0; for (const ch of String(nick || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360} 80% 72%)`; };
-    function revealFocusedReport(button) {
-        if (document.activeElement !== button) return;
-        requestAnimationFrame(() => {
-            if (document.activeElement === button && button.matches(':focus-visible')) {
-                button.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    let messageRevealFrame = null;
+    function revealFocusedMessage(button) {
+        if (document.activeElement !== button || messageRevealFrame !== null) return;
+        // A burst needs one nearest-edge reveal, not one layout per message.
+        messageRevealFrame = requestAnimationFrame(() => {
+            messageRevealFrame = null;
+            const focused = document.activeElement;
+            if ($('[data-chat-lines]').contains(focused) && focused.matches(':focus-visible')) {
+                focused.scrollIntoView({ block: 'nearest', inline: 'nearest' });
             }
         });
     }
@@ -1604,7 +1608,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             button.textContent = submitted ? '✓' : '🚩';
             button.title = submitted ? REPORT_QUEUED_LABEL : 'Report this message';
             if (submitted) button.setAttribute('aria-label', REPORT_QUEUED_LABEL);
-            revealFocusedReport(button);
+            revealFocusedMessage(button);
         }
     }
     function submitReport(line, button, showStatus = toast) {
@@ -1667,7 +1671,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 const r = document.createElement('button'); r.type = 'button'; r.className = 'flag'; r.textContent = '🚩'; r.setAttribute('aria-label', `Report this message from ${l.from}`);
                 if (l.reported) { r.setAttribute('aria-disabled', 'true'); r.tabIndex = -1; r.textContent = '✓'; r.title = REPORT_QUEUED_LABEL; r.setAttribute('aria-label', REPORT_QUEUED_LABEL); }
                 else if (pendingReports.has(l.id)) { r.setAttribute('aria-disabled', 'true'); r.textContent = '…'; pendingReports.get(l.id).button = r; }
-                r.addEventListener('focus', () => revealFocusedReport(r));
+                r.addEventListener('focus', () => revealFocusedMessage(r));
                 r.addEventListener('click', () => {
                     if (r.getAttribute('aria-disabled') !== 'true') submitReport(l, r);
                 });
@@ -1675,11 +1679,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             if (l.me) li.classList.add('act');
         }
-        const stick = buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
+        const readingAction = lines.contains(document.activeElement) ? document.activeElement : null;
+        const stick = !readingAction && buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
         lines.append(li);
         while (lines.children.length > 300) removeChatRow(lines.firstChild);
         if (stick) buf.scrollTop = buf.scrollHeight;
         else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
+        if (readingAction) revealFocusedMessage(readingAction);
     }
 
     function drawNewMessages() {
@@ -1694,7 +1700,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     });
     $('[data-buffer]').addEventListener('scroll', () => {
         const buf = $('[data-buffer]');
-        if (buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60) { belowFold = 0; drawNewMessages(); }
+        if (!$('[data-chat-lines]').contains(document.activeElement)
+            && buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60) { belowFold = 0; drawNewMessages(); }
     });
 
     function switchTo(key, { freshJoin = false } = {}) {
