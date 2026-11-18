@@ -149,6 +149,66 @@ it('named room dialog confirmation does not reclaim focus after the guest cancel
     expect(dialog.open).toBe(false);
 });
 
+it.each(['button', 'escape'])('cancelled named channel keeps the conversation and draft after a late acknowledgement: %s', async cancel => {
+    const { window, ws, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, dialog = doc.querySelector('[data-channel-dialog]');
+    const opener = doc.querySelector('[data-start="chat"]');
+    dialog.showModal = () => { dialog.open = true; };
+    // Native close is synchronous, but its close event is queued. Deliver the
+    // server acknowledgement before that event to cover the cancellation race.
+    dialog.close = () => { dialog.open = false; opener.focus(); };
+    opener.click();
+    const room = '#cancelled-destination';
+    doc.querySelector('[data-channel-name]').value = room;
+    dialog.querySelector('form').requestSubmit();
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room] });
+    if (cancel === 'button') doc.querySelector('[data-channel-cancel]').click();
+    else {
+        const event = new window.Event('cancel', { cancelable: true });
+        dialog.dispatchEvent(event);
+        if (!event.defaultPrevented) dialog.close();
+    }
+    const input = doc.querySelector('[data-text]');
+    input.value = 'This is still for the lobby'; input.focus();
+    const before = ws.sent.length;
+    join(room);
+    expect(doc.querySelector('[data-chat-context]').textContent).toBe('#stalemate');
+    expect(window.__lobby.active).toBe('#stalemate');
+    expect(input.value).toBe('This is still for the lobby');
+    expect(doc.activeElement).toBe(input);
+    expect(dialog.open).toBe(false);
+    expect(ws.sent).toHaveLength(before);
+    dialog.dispatchEvent(new window.Event('close'));
+    doc.querySelector('[data-send]').click();
+    expect(ws.sent.at(-1)).toMatchObject({ t: 'say', ch: '#stalemate', text: 'This is still for the lobby' });
+    // The acknowledgement still confirms membership. It does not silently
+    // activate that conversation; the visitor may deliberately open its tab.
+    const tab = doc.querySelector(`[data-channel-key="${room}"]`);
+    expect(tab).toBeTruthy(); tab.click();
+    expect(doc.querySelector('[data-chat-context]').textContent).toBe(room);
+    expect(input.value).toBe('');
+});
+
+it('cancelled named channel permits a fresh explicit request for the same name', async () => {
+    const { window, ws, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, dialog = doc.querySelector('[data-channel-dialog]');
+    const opener = doc.querySelector('[data-start="chat"]'), name = doc.querySelector('[data-channel-name]');
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; opener.focus(); dialog.dispatchEvent(new window.Event('close')); };
+    opener.click(); name.value = '#cancelled-then-requested';
+    dialog.querySelector('form').requestSubmit();
+    doc.querySelector('[data-channel-cancel]').click();
+    const input = doc.querySelector('[data-text]'); input.value = 'An original lobby draft';
+    opener.click(); name.focus();
+    dialog.querySelector('form').requestSubmit();
+    expect(ws.sent.filter(frame => frame.t === 'cmd' && frame.name === 'join' && frame.args[0] === name.value)).toHaveLength(2);
+    join(name.value);
+    expect(doc.querySelector('[data-chat-context]').textContent).toBe(name.value);
+    expect(dialog.open).toBe(false);
+    doc.querySelector('[data-channel-key="#stalemate"]').click();
+    expect(input.value).toBe('An original lobby draft');
+});
+
 it('recovers an interrupted named channel request without replaying it', async () => {
     const { window, ws, welcome, join, sockets, timers, flush } = await visitor();
     welcome(); join();
