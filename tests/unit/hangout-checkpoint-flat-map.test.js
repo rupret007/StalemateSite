@@ -66,7 +66,7 @@ it('preserves exact byte/node limits independently of flat private storage size'
     const old = baseline(graph()).metrics, next = candidate(graph()).metrics;
     expect(next).toEqual(old);
     for (const make of [baseline, candidate]) {
-        expect(make(graph(), { maxBytes: old.bytes, maxNodes: old.nodes }).metrics).toEqual(old);
+        expect(make(graph(), { maxBytes: old.bytes, maxNodes: old.nodes }).metrics).toEqual({ ...old, maxBytes: old.bytes, maxNodes: old.nodes });
         expect(() => make(graph(), { maxBytes: old.bytes - 1 })).toThrow('Participation checkpoint limit exceeded');
         expect(() => make(graph(), { maxNodes: old.nodes - 1 })).toThrow('Participation checkpoint limit exceeded');
     }
