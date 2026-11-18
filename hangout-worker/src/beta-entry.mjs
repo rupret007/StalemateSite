@@ -68,13 +68,13 @@ const GAME_GUEST_ENTRANCE = `<!doctype html>
 <title>Game Night invitation</title><link rel="stylesheet" href="/beta/style.css"><script type="module" src="${GAME_GUEST_PATH}.js"></script></head>
 <body><main class="game-invitation"><p class="eyebrow">PRIVATE GAME NIGHT</p><h1 data-guest-game>Game Night</h1>
 <p class="lede" data-guest-inviter hidden></p><p id="guest-invitation-status" data-guest-status role="status">Checking your invitation…</p>
-<section data-guest-invite aria-label="Accept the invitation" hidden>
-<label data-guest-name-field hidden>Your nickname<input data-guest-name type="text" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Use a guest name"></label>
+<section data-guest-invite aria-label="Accept the invitation" hidden><form>
+<label data-guest-name-field hidden>Your nickname<input data-guest-name type="text" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="go" placeholder="Use a guest name"></label>
 <p id="guest-agreement">By joining, you confirm you’re 13+ and agree to the house rules.</p>
-<button type="button" aria-describedby="guest-agreement" data-guest-join>Join game</button>
+<button type="submit" aria-describedby="guest-agreement" data-guest-join>Join game</button>
 <p class="muted">Camera and microphone stay off. <a href="/beta/privacy" target="_blank" rel="noopener">House rules</a></p>
 <p class="muted" data-guest-expiry hidden>Invite expires <time></time>.</p>
-</section><button type="button" data-guest-retry hidden>Try again</button><button type="button" data-guest-fresh hidden>Ask the host for a fresh link</button></main></body></html>`;
+</form></section><button type="button" data-guest-retry hidden>Try again</button><button type="button" data-guest-fresh hidden>Ask the host for a fresh link</button></main></body></html>`;
 const GAME_GUEST_STYLE = `
 .game-invitation h1 { font-size: clamp(2.6rem, 9vw, 4.5rem); }
 .game-invitation section { max-width: 32rem; }

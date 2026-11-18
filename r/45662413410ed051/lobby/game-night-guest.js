@@ -231,8 +231,10 @@ async function accept() {
     }
 }
 
-join.addEventListener('click', event => {
-    if (!watching) unlockGameNightAudio(event);
+invite.addEventListener('submit', event => {
+    event.preventDefault();
+    if (join.disabled) return;
+    if (!watching && navigator.userActivation?.isActive !== false) unlockGameNightAudio(event);
     if (waitUntil === -1) waitUntil = Date.now() + 25_000;
     if (!webJam && guestName) {
         const byChoice = guestName.value.trim();
