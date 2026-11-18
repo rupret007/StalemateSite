@@ -924,10 +924,15 @@ describe('participation-safe one-tap Music offer', () => {
         expect(window.open).not.toHaveBeenCalled();
     });
 
-    it('lets the host send an opaque one-tap offer without opening WebJam or sharing a link', async () => {
+    it('lets the host hand a native WebJam invitation to one guest without manual copying', async () => {
         const { window, ws } = await setup();
         window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
         window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+        const channels = [], launches = [];
+        window.BroadcastChannel = class {
+            constructor(name) { this.name = name; this.postMessage = vi.fn(); this.close = vi.fn(); channels.push(this); }
+        };
+        window.HTMLAnchorElement.prototype.click = function () { launches.push(this.href); };
         const self = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
         const guest = { id: 'guest-peer', nick: 'DrumGuest', prefix: '' };
         ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', band: false, verified: false, capabilities: {} });
@@ -948,11 +953,23 @@ describe('participation-safe one-tap Music offer', () => {
         const sendButton = dialog.querySelector('[data-invite-person-send]');
         expect(sendButton.disabled).toBe(false);
         sendButton.click();
+        expect(window.document.querySelector('[data-music-handoff-status]').textContent).toBe('Waiting for WebJam to return the invitation…');
+        expect(launches).toHaveLength(1);
+        const request = launches[0].split('/').at(-1);
+        expect(launches[0]).toBe(`webjam-beta://hangout-music/${request}`);
+        const expires = Math.floor((Date.now() + 600000) / 1000);
+        const href = `https://music.example.test/join/#k=${randomBytes(32).toString('base64url')}`
+            + `&s=${randomBytes(32).toString('hex')}&g=1&e=${expires}`;
+        expect(channels).toHaveLength(1);
+        channels[0].onmessage({ data: { href } });
         expect(window.document.querySelector('[data-music-handoff-status]').textContent).toBe('Sending the Music invitation…');
         const sent = ws.sent.at(-1);
         expect(sent).toMatchObject({ t: 'music-offer-create', version: 1, ch: '#jam-rehearsal', roomInstance, peer: guest.id,
-            request: expect.stringMatching(/^[a-f0-9]{32}$/) });
-        expect(sent).not.toHaveProperty('href');
+            request: expect.stringMatching(/^[a-f0-9]{32}$/), href });
+        expect(sent.request).toBe(request);
+        ws.receive({ t: 'music-offer-result', version: 1, request, status: 'queued' });
+        ws.receive({ t: 'music-offer-result', version: 1, request, status: 'sent' });
+        expect(channels[0].postMessage).toHaveBeenCalledWith({ returned: true });
         expect(sent).not.toHaveProperty('candidateCapability');
         expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
         expect(window.document.querySelector('[data-music-handoff-manual]').hidden).toBe(true);

@@ -1848,7 +1848,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             $('[data-jam-invite-music]').focus({ preventScroll: true });
         }
         const message = pending ? pending.safe ? pending.progress === 'queued' ? 'Sending the Music invitation…'
-            : 'Invitation sent. Waiting for your friend to accept.'
+            : !pending.submitted ? 'Waiting for WebJam to return the invitation…'
+                : 'Invitation sent. Waiting for your friend to accept.'
             : pending.submitted ? 'Waiting for Hang Out to confirm delivery…'
                 : 'Confirm the invitation in WebJam. If your browser asks to open WebJam, choose Open.'
             : canInvite && musicHandoff?.submitted ? 'An invitation from another Jam room is still waiting for confirmation.' : report?.message || '';
@@ -1909,9 +1910,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
 
     function startMusicHandoff(room, context) {
         const safe = sharingControls && participationSafeMusicOffersSupported;
-        if (musicHandoff || !safe && typeof window.BroadcastChannel !== 'function') return;
+        if (musicHandoff || typeof window.BroadcastChannel !== 'function') return;
         const request = crypto.randomUUID().replaceAll('-', '');
-        const channel = safe ? null : new BroadcastChannel(`webjam-music-${request}`);
+        const channel = new BroadcastChannel(`webjam-music-${request}`);
         const pending = { room, channel, request, nick: context.label, safe, submitted: false, timer: setTimeout(() => {
             if (musicHandoff !== pending) return;
             stopMusicHandoff();
@@ -1925,26 +1926,22 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         musicHandoff = pending;
         musicHandoffReport = null;
         $('[data-jam-invite-music]').setAttribute('aria-disabled', 'true');
-        if (safe) {
-            const roster = app.chans.get('#stalemate')?.names?.some(person => person.id === context.peer);
-            if (currentJam() !== room || room.keepRef !== context.instance || !canHostMusicInvite(room) || !roster
-                || !send({ t: 'music-offer-create', version: 1, request, ch: room.name, roomInstance: context.instance, peer: context.peer })) {
-                stopMusicHandoff(false);
-                musicHandoffReport = { room, safe: true, message: 'The Music invitation could not be started. Check the room and try again.' };
-            } else { pending.submitted = true; pending.progress = 'queued'; }
-            drawMusicHandoff();
-            return;
-        }
         channel.onmessage = ({ data }) => {
             if (musicHandoff !== pending || pending.submitted || typeof data?.href !== 'string') return;
             const expires = musicInviteDeadline(data.href);
             if (expires <= Date.now() || expires > Date.now() + 600000
                 || currentJam() !== room || room.keepRef !== context.instance || !canHostMusicInvite(room)
-                || !app.chans.get('#stalemate')?.names?.some(person => person.id === context.peer) || !send({ t: 'music-invite-offer', request, ch: room.name,
-                    roomInstance: context.instance, peer: context.peer, href: data.href })) {
+                || !app.chans.get('#stalemate')?.names?.some(person => person.id === context.peer)
+                || !send(safe
+                    ? { t: 'music-offer-create', version: 1, request, ch: room.name, roomInstance: context.instance,
+                        peer: context.peer, href: data.href }
+                    : { t: 'music-invite-offer', request, ch: room.name, roomInstance: context.instance,
+                        peer: context.peer, href: data.href })) {
                 stopMusicHandoff(false);
-                musicHandoffReport = { room, manual: true, message: 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
-            } else pending.submitted = true;
+                musicHandoffReport = { room, safe, manual: !safe, message: safe
+                    ? 'The Music invitation could not be started. Check the room and try again.'
+                    : 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
+            } else { pending.submitted = true; if (safe) pending.progress = 'queued'; }
             drawMusicHandoff();
         };
         const launch = document.createElement('a');
@@ -2255,7 +2252,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             && sharingState.available === true && purposes.includes('direct-contact') && purposes.includes('external-provider');
         const legacy = directMusicInvitesSupported && !sharingControls;
         return (qualified || legacy) && !gameGuest && connectionState === 'connected'
-            && !sessionEnded && !shieldActive && (!app.netLock || app.netLock === 'off') && !app.localMediaPaused && !app.sharingStopped;
+            && !sessionEnded && !shieldActive
+            && (!app.netLock || app.netLock === 'off') && !app.localMediaPaused && !app.sharingStopped;
     };
 
     function setMusicInvite(offer) {
@@ -2576,8 +2574,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         jamManualShare.hidden = !next.host;
         $('[data-jam-invite-room]').hidden = !next.host;
         const musicButton = $('[data-jam-invite-music]');
-        const safeMusicOffer = sharingControls && participationSafeMusicOffersSupported;
-        musicButton.hidden = !next.host || !readyForMusicOffer() || !safeMusicOffer && typeof window.BroadcastChannel !== 'function';
+        musicButton.hidden = !next.host || !readyForMusicOffer() || typeof window.BroadcastChannel !== 'function';
         jamManualSummary.hidden = musicButton.hidden;
         if (next.host && musicButton.hidden) jamManualShare.open = true;
         $('[data-jam-direct-step]').hidden = musicButton.hidden;
