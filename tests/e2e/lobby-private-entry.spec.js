@@ -739,6 +739,7 @@ for (const { width, delayedHostJoin } of [
         const host = await enter('SetupHost', false), guest = await enter('SetupGuest', true);
         await host.locator('[data-start="art"]').click();
         if (delayedHostJoin) await expect.poll(() => delayedHostJoins).toBe(1);
+        await expect(host.locator('[data-chat-context]')).toHaveText(/^#art-/);
         const room = await host.locator('[data-chat-context]').textContent();
         await testInfo.attach('host-room-capture', { contentType: 'application/json',
             body: JSON.stringify({ room, delayedHostJoin, delayedHostJoins, queuedFrames: heldHostFrames.length }) });
