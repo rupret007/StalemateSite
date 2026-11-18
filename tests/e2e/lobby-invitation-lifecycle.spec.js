@@ -532,8 +532,14 @@ for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionab
     }
 });
 
-for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
-    test(`a refreshed Game Night invite lets the guest fix their nickname at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+for (const { viewport, submitFromNickname } of [
+    { viewport: { width: 375, height: 667 } },
+    { viewport: { width: 390, height: 844 } },
+    { viewport: { width: 1440, height: 900 } },
+    { viewport: { width: 390, height: 844 }, submitFromNickname: true }
+]) {
+    const submitMethod = submitFromNickname ? ' and submit from the nickname field' : '';
+    test(`a refreshed Game Night invite lets the guest fix their nickname at ${viewport.width}px${submitMethod}`, async ({ browser, baseURL }, testInfo) => {
         const { betaFetch } = await import('../../hangout-worker/src/beta-entry.mjs');
         const origin = new URL(baseURL).origin;
         const guestPath = '/beta/game-night/guest';
@@ -595,9 +601,13 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }
             await page.screenshot({ path: testInfo.outputPath('nickname-correction.png') });
 
             await name.fill('AvailableName');
-            const optionTab = process.platform === 'darwin' && browser.browserType().name() === 'webkit';
-            await page.keyboard.press(optionTab ? 'Alt+Tab' : 'Tab');
-            await expect(join).toBeFocused();
+            if (submitFromNickname) {
+                await expect(name).toBeFocused();
+            } else {
+                const optionTab = process.platform === 'darwin' && browser.browserType().name() === 'webkit';
+                await page.keyboard.press(optionTab ? 'Alt+Tab' : 'Tab');
+                await expect(join).toBeFocused();
+            }
             await page.keyboard.press('Enter');
             await expect(page).toHaveURL(origin + lobbyPath + '?game-guest=1&table=' + tableId);
             expect(requestBodies).toHaveLength(2);
