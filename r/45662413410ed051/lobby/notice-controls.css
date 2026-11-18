@@ -1,0 +1,5 @@
+/* Recovery choices stay comfortable to use inside the bounded notice row. */
+.toast .btn {
+    min-width: 48px;
+    min-height: 48px;
+}

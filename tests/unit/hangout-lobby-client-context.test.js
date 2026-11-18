@@ -1991,6 +1991,42 @@ describe('keyboard focus during status action recovery', () => {
         v.flush(4000);
         expect(v.toast.hidden).toBe(moved);
     });
+    it('preserves normal notice and ownership-offer expiry without changing the draft', async () => {
+        const v = await visitor(); v.welcome(); v.join();
+        const doc = v.window.document, input = doc.querySelector('[data-text]');
+        const notice = doc.querySelector('[data-toast]'); input.value = 'Keep this unsent note'; input.focus();
+        const before = v.ws.sent.length;
+        v.ws.receive({ t: 'owner-offer', by: 'Friend', ch: '#kept-studio' });
+        expect(notice.textContent).toContain('Accept ownership'); expect(notice.hidden).toBe(false);
+        v.flush(12000); expect(notice.hidden).toBe(true);
+        v.ws.receive({ t: 'notice', from: 'StaleBot', kind: 'error', text: 'A plain status keeps its normal lifetime.' });
+        expect(notice.hidden).toBe(false); v.flush(4000); expect(notice.hidden).toBe(true);
+        expect(input.value).toBe('Keep this unsent note'); expect(doc.activeElement).toBe(input);
+        expect(v.ws.sent).toHaveLength(before);
+    });
+
+    it.each(['typing', 'returned from notice', 'discard after reading'])('keeps closed-draft recovery available without a deadline: %s', async mode => {
+        const v = await closedPrivateDraft();
+        const doc = v.window.document, before = v.ws.sent.length;
+        v.input.focus();
+        if (mode === 'returned from notice') {
+            v.discard.focus(); v.input.focus();
+            await Promise.resolve(); // Native focusout schedules the same timer.
+        }
+        v.flush(12000);
+        expect(v.toast.hidden).toBe(false);
+        expect(v.discard.isConnected).toBe(true);
+        expect(v.input.value).toBe('A private unsent draft');
+        expect(doc.activeElement).toBe(v.input);
+        const action = mode === 'discard after reading' ? v.discard
+            : [...v.toast.querySelectorAll('button')].find(button => button.textContent === 'Keep draft');
+        expect(action).toBeTruthy(); action.focus(); action.click();
+        expect(v.toast.hidden).toBe(true);
+        expect(v.input.value).toBe(mode === 'discard after reading' ? '' : 'A private unsent draft');
+        expect(doc.activeElement).toBe(v.input);
+        expect(v.ws.sent).toHaveLength(before);
+    });
+
 });
 
 
@@ -2021,4 +2057,41 @@ it.each(['message action', 'composer', 'conversation'])('incoming chat respects 
         expect(log.scrollTop).toBeGreaterThan(before);
         expect(document.querySelector('[data-new-messages]').hidden).toBe(true);
     }
+});
+
+
+it.each([
+    ['composer', true], ['conversation', true], ['composer', false], ['conversation', false],
+])('resuming %s at the latest messages=%s keeps an accurate new-message cue', async (target, atLatest) => {
+    const v = await visitor(); v.welcome(); v.join();
+    const { window, ws, paint } = v, { document } = window;
+    window.requestAnimationFrame = callback => window.setTimeout(callback, 16);
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    const log = document.querySelector('[data-buffer]');
+    // No layout/automatic scroll event in jsdom. Real browser coverage uses a
+    // short desktop transcript that fits, where setting scrollTop cannot move.
+    Object.defineProperties(log, {
+        scrollHeight: { get: () => atLatest ? 200 : 1000 },
+        clientHeight: { get: () => 300 },
+    });
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'm-resume-anchor', from: 'ReadingFriend', text: 'A message to inspect.' });
+    // Begin with the existing cue deliberately cleared, then choose the
+    // reading position. The away case must not inherit an anchor unread count.
+    document.querySelector('[data-new-messages]').click(); log.scrollTop = 0;
+    const action = document.querySelector('[data-id="m-resume-anchor"] .flag');
+    action.focus(); paint();
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'm-resume-unread', from: 'ReadingFriend', text: 'New while inspecting.' });
+    paint();
+    const cue = document.querySelector('[data-new-messages]');
+    expect(cue.hidden).toBe(false);
+    expect(cue.textContent).toBe('1 new message ↓');
+    const input = document.querySelector('[data-text]'); input.value = 'Unsent draft stays here';
+    const focused = target === 'composer' ? input : log;
+    focused.focus();
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'm-resume-following', from: 'ReadingFriend', text: 'The next message arrives.' });
+    paint();
+    expect(document.activeElement).toBe(focused);
+    expect(input.value).toBe('Unsent draft stays here');
+    expect(cue.hidden).toBe(atLatest);
+    if (!atLatest) expect(cue.textContent).toBe('2 new messages ↓');
 });

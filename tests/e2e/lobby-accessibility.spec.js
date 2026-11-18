@@ -1902,3 +1902,61 @@ for (const width of [375, 390, 1440]) test(`protected incoming chat keeps a focu
         await community.close();
     }
 });
+
+
+for (const target of ['composer', 'conversation']) test(`protected resumed ${target} clears a stale message cue when the transcript fits`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
+    let lobbyNow = Date.now();
+    const community = await privateCommunity({ lobbyNow: () => lobbyNow }), contexts = [], sentinels = [], errors = [];
+    async function enter(nick, source) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true, reducedMotion: 'reduce', viewport: { width: 1440, height: 900 } });
+        contexts.push(context);
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        sentinels.push(await installNoCaptureSentinel(context));
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        await page.goto(community.origin + '/beta/?via=' + source + '#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(nick);
+        await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        expect(new URL(page.url()).hash).toBe('');
+        return page;
+    }
+    try {
+        const reader = await enter('ReturningReader', 'rad-dad'), speaker = await enter('CueSpeaker', 'stalemate');
+        const log = reader.getByRole('log', { name: 'Conversation' });
+        const input = reader.getByRole('textbox', { name: 'Message', exact: true });
+        await tabTo(reader, input); await reader.keyboard.type('Keep this unsent draft');
+        async function publish(text) {
+            lobbyNow += 4000; // Satisfy the unchanged three-second slow mode.
+            const composer = speaker.getByRole('textbox', { name: 'Message', exact: true });
+            await composer.fill(text); await composer.press('Enter');
+            await expect(log).toContainText(text);
+        }
+        const anchor = 'Inspect this message, then return to the conversation.';
+        await publish(anchor);
+        const flag = log.locator('li').filter({ hasText: anchor }).getByRole('button', { name: 'Report this message from CueSpeaker', exact: true });
+        await tabTo(reader, flag); await expect(flag).toBeFocused();
+        await publish('A message arrives while its action has keyboard focus.');
+        const cue = reader.locator('[data-new-messages]');
+        await expect(cue).toHaveText('1 new message ↓'); await expect(cue).toBeVisible();
+        await expect.poll(() => log.evaluate(node => node.scrollHeight - node.clientHeight)).toBe(0);
+        await reader.screenshot({ path: testInfo.outputPath(`00-paused-cue-${target}-1440.png`) });
+        const resumed = target === 'composer' ? input : log;
+        await tabTo(reader, resumed); await expect(resumed).toBeFocused();
+        await publish('Normal following resumes with this visible chat line.');
+        await expect.poll(() => log.evaluate(node => node.scrollHeight - node.clientHeight)).toBe(0);
+        await reader.screenshot({ path: testInfo.outputPath(`01-resumed-cue-${target}-1440.png`) });
+        await expect(cue).toBeHidden(); await expect(resumed).toBeFocused();
+        await expect(input).toHaveValue('Keep this unsent draft');
+        await expect(input).toBeInViewport({ ratio: 1 });
+        await expect(reader.locator('[data-send]')).toBeInViewport({ ratio: 1 });
+        expect(await reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        for (const sentinel of sentinels) await sentinel.assertClean();
+        expect(errors).toEqual([]);
+    } finally {
+        for (const context of contexts) await context.close();
+        await community.close();
+    }
+});
