@@ -1878,15 +1878,16 @@ for (const width of [375, 390, 1440]) test(`protected incoming chat keeps a focu
         await tabTo(reader, flag); await expect(flag).toBeFocused(); await expect(flag).toBeInViewport({ ratio: 1 });
         await expect.poll(() => log.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThan(60);
         await reader.screenshot({ path: testInfo.outputPath(`00-focused-reading-${width}.png`) });
-        for (let index = 1; index <= 8; index++) await publish(`Reading follow-up ${index}: new conversation arrives while the keyboard reader keeps their place.`);
+        const incomingCount = width === 1440 ? 32 : 8;
+        for (let index = 1; index <= incomingCount; index++) await publish(`Reading follow-up ${index}: new conversation arrives while the keyboard reader keeps their place.`);
         await reader.screenshot({ path: testInfo.outputPath(`01-incoming-while-reading-${width}.png`) });
         await expect(flag).toBeFocused(); await expect(flag).toBeInViewport({ ratio: 1 });
         const jump = reader.locator('[data-new-messages]');
-        await expect(jump).toBeVisible(); await expect(jump).toHaveText('8 new messages ↓');
+        await expect(jump).toBeVisible(); await expect(jump).toHaveText(`${incomingCount} new messages ↓`);
         // Explicit keyboard activation of the existing jump returns to the tail.
         await jump.press('Enter');
         await expect(jump).toBeHidden(); await expect(log).toBeFocused();
-        await expect(log.getByText('Reading follow-up 8:', { exact: false })).toBeInViewport();
+        await expect(log.getByText(`Reading follow-up ${incomingCount}:`, { exact: false })).toBeInViewport();
         await reader.screenshot({ path: testInfo.outputPath(`02-jumped-to-latest-${width}.png`) });
         await publish('Following resumes from the conversation container after an explicit jump.');
         await expect(log.getByText('Following resumes from the conversation container after an explicit jump.', { exact: false })).toBeInViewport();
