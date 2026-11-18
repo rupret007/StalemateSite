@@ -162,3 +162,36 @@ it('clears the name-picker recovery hint when a later explicit roll succeeds', (
     expect(document.querySelector('[data-gate-status]').textContent).toBe('');
     expect(roll.textContent).toBe('🎲 Roll again'); expect(window.fetch).not.toHaveBeenCalled();
 });
+
+
+it('does not join while Enter confirms nickname composition, then joins the final choice', async () => {
+    const { window, document } = initialize({ cachedPreview: true });
+    const sockets = [];
+    window.WebSocket = class {
+        readyState = 0;
+        constructor() { sockets.push(this); }
+        send() {}
+        close() { this.readyState = 3; }
+    };
+    const nick = document.querySelector('[data-nick]');
+    nick.focus(); nick.value = 'UnfinishedNick';
+    const status = document.querySelector('[data-gate-status]').textContent;
+    nick.dispatchEvent(new window.CompositionEvent('compositionstart', { bubbles: true }));
+    nick.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+    await Promise.resolve(); await Promise.resolve();
+    expect(sockets).toHaveLength(0);
+    expect(document.querySelector('[data-enter]').disabled).toBe(false);
+    expect(document.querySelector('[data-gate-status]').textContent).toBe(status);
+    expect(document.activeElement).toBe(nick);
+    expect(nick.value).toBe('UnfinishedNick');
+    nick.value = 'ChosenNick';
+    nick.dispatchEvent(new window.CompositionEvent('compositionend', { data: 'ChosenNick', bubbles: true }));
+    await Promise.resolve();
+    expect(sockets).toHaveLength(0);
+    nick.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await Promise.resolve(); await Promise.resolve();
+    expect(sockets).toHaveLength(1);
+    expect(document.querySelector('[data-enter]').disabled).toBe(true);
+    expect(nick.value).toBe('ChosenNick');
+    expect(window.fetch).not.toHaveBeenCalled();
+});
