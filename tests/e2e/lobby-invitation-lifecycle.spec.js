@@ -618,3 +618,60 @@ for (const { viewport, submitFromNickname } of [
         }
     });
 }
+
+const gameGuestPath = '/beta/game-night/guest';
+const gameLobbyPath = '/r/45662413410ed051/lobby/';
+async function gameNightEntryFixture(context, origin) {
+    const { betaFetch } = await import('../../hangout-worker/src/beta-entry.mjs');
+    const sharedAssets = ['game-night.mjs', 'game-night-audio.mjs'].map(name => gameLobbyPath + name);
+    const env = {
+        HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1',
+        HANGOUT_HMAC_KEY: 'h'.repeat(40), HANGOUT_BETA_INVITE_KEY: 'i'.repeat(40), HANGOUT_PREVIEW_KEY: 'p'.repeat(40),
+        LOBBY: {}, ROOMS: {}, QUOTA: {}, BETA_SESSIONS: {},
+        ASSETS: { async fetch(request) {
+            const asset = new URL(request.url).pathname;
+            expect([gameLobbyPath + 'game-night-guest.js', ...sharedAssets]).toContain(asset);
+            return new Response(await readFile(joinPath(__dirname, '../..', asset)));
+        } }
+    };
+    await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.fallback() : route.abort());
+    const guestAssets = [gameGuestPath, gameGuestPath + '.js', '/beta/style.css', ...sharedAssets];
+    await context.route(url => guestAssets.includes(url.pathname), async route => {
+        const response = await betaFetch(new Request(route.request().url()), env);
+        await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
+    });
+}
+
+for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    test(`an expired Game Night invitation shows a message when sharing is blocked at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+        const origin = new URL(baseURL).origin;
+        const isMobile = viewport.width < 500;
+        const context = await browser.newContext({ viewport, isMobile, hasTouch: isMobile });
+        try {
+            await gameNightEntryFixture(context, origin);
+            await context.route('**/beta/game-night/invitation/details', route => route.fulfill({ status: 410, json: { error: 'expired' } }));
+            const page = await context.newPage();
+            await page.addInitScript(() => {
+                const blocked = async () => { throw new DOMException('Blocked', 'NotAllowedError'); };
+                Object.defineProperty(navigator, 'share', { value: blocked });
+                Object.defineProperty(navigator, 'clipboard', { value: { writeText: blocked } });
+            });
+            await page.goto(origin + gameGuestPath + '#invite=synthetic-expired');
+            const status = page.getByRole('status');
+            const ask = page.getByRole('button', { name: 'Ask the host for a fresh link.' });
+            await expect(status).toHaveText('This invite is no longer available. Ask your host for a new one.');
+            await expect(status).toBeFocused();
+            await expect(ask).toBeInViewport();
+            expect((await ask.boundingBox()).height).toBeGreaterThanOrEqual(48);
+            await ask.press('Enter');
+            const message = page.getByText('Could you send me a fresh Game Night link?');
+            await expect(message).toBeFocused();
+            await expect(message).toBeInViewport();
+            await expect(page.getByRole('button', { name: 'Join game' })).toBeHidden();
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await page.screenshot({ path: testInfo.outputPath('game-night-expired-share-fallback.png') });
+        } finally {
+            await context.close();
+        }
+    });
+}

@@ -6,6 +6,7 @@ const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
 const retry = document.querySelector('[data-guest-retry]');
 const askHost = document.querySelector('[data-guest-fresh]');
+const freshMessage = document.querySelector('[data-guest-fresh-message]');
 const FRESH_LINK = 'Ask the host for a fresh link.';
 const gameTitle = document.querySelector('[data-guest-game]');
 const resumeGuest = document.querySelector('[data-resume-guest]') !== null;
@@ -261,7 +262,13 @@ async function shareFreshLink() {
         try {
             await navigator.clipboard.writeText(message);
             if (askHost) askHost.textContent = 'Copied. Send it to your host.';
-        } catch { /* The button still shows the line to send. */ }
+            return;
+        } catch { /* Show the message on the page when copying is blocked. */ }
+    }
+    if (freshMessage) {
+        freshMessage.textContent = `Message your host in the app you usually use. “${message}”`;
+        freshMessage.hidden = false;
+        freshMessage.focus();
     }
 }
 
