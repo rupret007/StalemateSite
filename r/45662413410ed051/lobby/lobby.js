@@ -3239,8 +3239,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 const current = () => lifecycle === recoveryLifecycle && app.active === key && store(key) === view;
                 await copyDraft(input, current);
             }],
-            ['Discard draft', () => { if (app.active === key && store(key) === view) { input.value = ''; drafts.delete(key); recoveryDraftChanged(); } }]
-        ]);
+            ['Discard draft', () => { if (app.active === key && store(key) === view) { input.value = ''; drafts.delete(key); recoveryDraftChanged(); } }],
+            // The action wrapper dismisses the notice without changing the draft.
+            ['Keep draft', () => {}]
+        ], { persistent: true });
     }
     function pmRequest(m) {
         if (typeof m.from !== 'string' || !m.from || m.from.length > 20) return;
@@ -3983,14 +3985,14 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     }
     function scheduleToastDismiss() {
         clearTimeout(toastTimer);
-        if (toastRegion.hidden || toastRegion.contains(document.activeElement)) return;
+        if (!toastDuration || toastRegion.hidden || toastRegion.contains(document.activeElement)) return;
         toastTimer = setTimeout(() => {
             if (!toastRegion.contains(document.activeElement)) dismissToast();
         }, toastDuration);
     }
     toastRegion.addEventListener('focusin', () => clearTimeout(toastTimer));
     toastRegion.addEventListener('focusout', () => queueMicrotask(scheduleToastDismiss));
-    function toast(text, actions = []) {
+    function toast(text, actions = [], { persistent = false } = {}) {
         const hadFocus = toastRegion.contains(document.activeElement);
         const message = document.createElement('span');
         message.id = 'toast-message';
@@ -4012,7 +4014,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         // Keep focus on the stable status, never on a newly substituted action.
         if (hadFocus) toastRegion.focus({ preventScroll: true });
         toastAnnouncement.replaceChildren(text);
-        toastDuration = actions.length ? 12000 : 4000;
+        toastDuration = persistent ? 0 : actions.length ? 12000 : 4000;
         scheduleToastDismiss();
     }
     // A private first visit without its bootstrap is recoverable, not a closed
