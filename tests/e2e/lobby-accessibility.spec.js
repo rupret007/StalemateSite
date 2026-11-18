@@ -1758,8 +1758,9 @@ for (const width of [375, 390, 1440]) for (const kind of ['art', 'jam']) test(`p
         await start.press('Enter');
         await expect(page.locator('[data-chat-context]')).toHaveText(new RegExp('^#' + kind + '-'));
         const name = await page.locator('[data-chat-context]').textContent();
-        const tab = page.getByRole('tab', { name, exact: true });
+        const tab = page.getByRole('tab', { name: `${kind === 'art' ? '🖌️' : '🎸'} ${name}`, exact: true });
         await page.screenshot({ path: testInfo.outputPath(`01-created-room-${kind}-${width}.png`) });
+        await expect(tab).toHaveAttribute('data-channel-key', name);
         await expect(tab).toBeFocused(); await expect(tab).toBeInViewport({ ratio: 1 });
         await expect(tab).toHaveAttribute('aria-selected', 'true');
         await expect(page.locator(kind === 'jam' ? '[data-jam]' : '[data-act-canvas]')).toBeVisible();
