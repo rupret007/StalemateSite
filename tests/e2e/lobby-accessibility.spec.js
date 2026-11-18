@@ -1733,3 +1733,47 @@ for (const width of [375, 390]) test(`short Jam instructions and manual invite c
         await expect(page).toHaveURL(admittedURL); expect(popups).toBe(0); expect(visitor.errors).toEqual([]);
     } finally { await visitor.close(); }
 });
+
+// Actual protected admission and keyboard activation. A created room must
+// receive focus rather than leaving it in the phone's now-hidden Rooms panel.
+for (const width of [375, 390, 1440]) for (const kind of ['art', 'jam']) test(`protected keyboard room creation selects ${kind} tab at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
+    const community = await privateCommunity(), errors = []; let context;
+    try {
+        context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('KeyboardCreator');
+        await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        if (width < 901) await page.locator('nav [data-show="rooms"]').press('Enter');
+        const start = page.locator('[data-start="' + kind + '"]');
+        await tabTo(page, start); await expect(start).toBeFocused();
+        await page.screenshot({ path: testInfo.outputPath(`00-keyboard-start-${kind}-${width}.png`) });
+        await start.press('Enter');
+        await expect(page.locator('[data-chat-context]')).toHaveText(new RegExp('^#' + kind + '-'));
+        const name = await page.locator('[data-chat-context]').textContent();
+        const tab = page.getByRole('tab', { name, exact: true });
+        await page.screenshot({ path: testInfo.outputPath(`01-created-room-${kind}-${width}.png`) });
+        await expect(tab).toBeFocused(); await expect(tab).toBeInViewport({ ratio: 1 });
+        await expect(tab).toHaveAttribute('aria-selected', 'true');
+        await expect(page.locator(kind === 'jam' ? '[data-jam]' : '[data-act-canvas]')).toBeVisible();
+        const input = page.getByRole('textbox', { name: 'Message', exact: true });
+        await expect(input).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        const text = `Keyboard entry into the ${kind} room works.`;
+        await input.fill(text); await input.press('Enter');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText(text);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await sentinel.assertClean(); expect(errors).toEqual([]);
+        expect(community.diagnostics().admittedUpgrades).toBe(1); expect(community.diagnostics().failures).toEqual([]);
+        await page.screenshot({ path: testInfo.outputPath(`02-created-room-chat-${kind}-${width}.png`) });
+    } finally {
+        try { await context?.close(); } finally { await community.close(); }
+    }
+});

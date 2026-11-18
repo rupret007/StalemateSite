@@ -60,6 +60,20 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
     return { dom, window, ws, sockets, welcome, join, timers, paint, flush, advance: (ms) => { elapsed += ms; } };
 }
 
+it.each([false, true])('generated activity room focus respects a moved-focus choice: %s', async moved => {
+    const { window, ws, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, start = doc.querySelector('[data-start="art"]');
+    start.focus(); start.click();
+    const request = ws.sent.at(-1);
+    expect(request).toMatchObject({ t: 'cmd', name: 'join', args: [expect.stringMatching(/^#art-/)] });
+    const name = request.args[0], input = doc.querySelector('[data-text]');
+    if (moved) input.focus();
+    ws.receive({ t: 'join', ch: { name, kind: 'art', keepRef: 'f'.repeat(32), modes: { C: true }, names: [{ nick: 'Viewer', prefix: '@' }] } });
+    const tab = [...doc.querySelectorAll('[data-tabs] [data-channel-key]')].find(node => node.dataset.channelKey === name);
+    expect(tab).toBeTruthy();
+    expect(doc.activeElement).toBe(moved ? input : tab);
+});
+
 it('returns keyboard focus to the transcript when jumping to new chat messages', async () => {
     const { window, ws, welcome, join } = await visitor();
     welcome(); join();
