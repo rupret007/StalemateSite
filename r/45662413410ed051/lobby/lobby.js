@@ -1692,8 +1692,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const stick = !readingAction && buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
         lines.append(li);
         while (lines.children.length > 300) removeChatRow(lines.firstChild);
-        if (stick) buf.scrollTop = buf.scrollHeight;
-        else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
+        if (stick) {
+            buf.scrollTop = buf.scrollHeight;
+            // A transcript that fits cannot emit a scroll event to clear this.
+            if (belowFold) { belowFold = 0; drawNewMessages(); }
+        } else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
         if (readingAction) revealFocusedMessage(readingAction);
     }
 
