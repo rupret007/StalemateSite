@@ -143,6 +143,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     let nextRecoveryContext = 0, recoveryBytes = 2, messageEpoch = 0, recoveryLifecycle = 0;
     let messageResultsSupported = false, copyingMessage = null;
     let channelJoinInterrupted = false, channelReplyTimer;
+    const cancelledChannelJoins = new Set();
     let channelTabSequence = 0;
     function recoveryContext() {
         const view = store(app.active);
@@ -744,6 +745,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         clearTimeout(channelReplyTimer);
         app.pendingChannel = '';
     }
+    function cancelPendingChannel() {
+        if (app.pendingChannel) cancelledChannelJoins.add(app.pendingChannel);
+        clearPendingChannel();
+    }
     function drawInterruptedChannelRequest() {
         const message = connectionState === 'connected' ? 'Connected again. Choose Join / create to try this name again.'
             : connectionState === 'offline' ? 'Connection lost. Choose Cancel, then Try again. Your channel name stays here.'
@@ -831,6 +836,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         clearMessageRecovery(); messageResultsSupported = false;
         sessionEnded = false; $('[data-session-ended]').hidden = true; $('[data-text]').readOnly = false;
         const attempt = ++connectionAttempt;
+        cancelledChannelJoins.clear();
         cancelEntryCheck();
         const privateEntry = $('[data-gate-private-entry]');
         if (privateEntry) privateEntry.hidden = true;
@@ -981,6 +987,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             : endedPmLabel?.key === app.active ? endedPmLabel : null;
         clearMessageRecovery(); messageResultsSupported = false;
         sessionEnded = true; connectionAttempt++;
+        cancelledChannelJoins.clear();
         resetPendingReports();
         cancelEntryCheck();
         clearTimeout(retryTimer); cancelTransportAck();
@@ -1105,6 +1112,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             app.ws.send(payload);
             const name = obj.t === 'cmd' ? String(obj.name || '').toLowerCase()
                 : obj.t === 'say' && /^\/(?!\/)/.test(obj.text || '') ? String(obj.text).slice(1).split(/\s/, 1)[0].toLowerCase() : '';
+            if (name === 'join') {
+                const raw = obj.t === 'cmd' ? obj.args?.[0] : String(obj.text).split(/\s+/)[1];
+                const channel = String(raw || '').toLowerCase();
+                cancelledChannelJoins.delete(channel.startsWith('#') ? channel : `#${channel}`);
+            }
             if (['quit', 'exit', 'bye'].includes(name)) clearMessageRecovery();
             return true;
         } catch { return false; }
@@ -1330,6 +1342,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 break;
             }
             const c = { ...m.ch, lines: [] };
+            const cancelledJoin = cancelledChannelJoins.delete(c.name);
             let focusJoinedRoom = false;
             if (roomJoinFocus?.room === c.name && (!roomJoinFocus.instance || roomJoinFocus.instance === c.keepRef)) {
                 focusJoinedRoom = document.activeElement === roomJoinFocus.anchor;
@@ -1366,7 +1379,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             // Classic IRC: joining begins a fresh buffer; never render pre-join backlog.
             if (activityRoom(c)) c.actSnap = activitySnapshot(m.act);
-            switchTo(m.ch.name, { freshJoin: true });
+            if (cancelledJoin) {
+                // The server already confirmed membership, so keep its tab.
+                // Cancelling the pending UI must not reroute a newer draft.
+                drawTabs(); drawRooms();
+            } else switchTo(m.ch.name, { freshJoin: true });
             if (c.name === '#stalemate' && webJamReturn) {
                 const requestedReturn = webJamReturn;
                 webJamReturn = null;
@@ -3130,7 +3147,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     // Activity tiles pick a name; plain chat lets guests name their own channel.
     $$('[data-start]').forEach((b) => b.addEventListener('click', () => {
         if (b.dataset.start === 'chat') {
-            clearPendingChannel();
+            cancelPendingChannel();
             channelJoinInterrupted = false;
             $('[data-channel-error]').textContent = '';
             $('[data-channel-dialog]').showModal();
@@ -3151,11 +3168,16 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (cmd('join', [room]))
             roomJoinFocus = document.activeElement === b ? { room, anchor: b } : null;
     }));
-    $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
+    $('[data-channel-cancel]').addEventListener('click', () => {
+        cancelPendingChannel();
+        $('[data-channel-dialog]').close();
+    });
+    // Native Escape queues close, but a WebSocket message can arrive first.
+    $('[data-channel-dialog]').addEventListener('cancel', cancelPendingChannel);
     $('[data-channel-dialog]').addEventListener('close', () => {
         // A queued close event may belong to an earlier opening. Preserve the
         // current request if the visitor has already opened the dialog again.
-        if (!$('[data-channel-dialog]').open) clearPendingChannel();
+        if (!$('[data-channel-dialog]').open) cancelPendingChannel();
     });
     $('[data-channel-form]').addEventListener('submit', (e) => {
         e.preventDefault();
@@ -3167,6 +3189,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             $('[data-channel-name]').focus();
             return;
         }
+        if (app.pendingChannel && app.pendingChannel !== name) cancelPendingChannel();
         if (app.chans.has(name)) {
             const dialog = $('[data-channel-dialog]');
             const focusChat = dialog.open && dialog.contains(document.activeElement);

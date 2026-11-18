@@ -1852,6 +1852,90 @@ for (const width of [375, 390, 1440]) for (const existing of [false, true]) {
     });
 }
 
+// Delay genuine server frames, not client join handling. Native Cancel/Escape
+// must preserve the selected conversation even after membership is confirmed.
+for (const width of [375, 390, 1440]) for (const cancel of ['button', 'escape']) {
+    test(`protected cancelled named channel keeps current chat after delayed confirmation by ${cancel} at ${width}px`, async ({ browser }, testInfo) => {
+        const { privateCommunity } = await import('./helpers/private-community.mjs');
+        const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
+        const community = await privateCommunity(), errors = [], outgoing = []; let context, releaseJoin;
+        const room = '#cancelled-late-confirmation', draft = 'This newer message belongs in the lobby.';
+        try {
+            context = await browser.newContext({ ignoreHTTPSErrors: true, reducedMotion: 'reduce',
+                viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 } });
+            await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+            const sentinel = await installNoCaptureSentinel(context);
+            const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+            await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
+                const server = socket.connectToServer(), pending = []; let holding = false, released = false;
+                socket.onMessage(raw => {
+                    const frame = JSON.parse(String(raw));
+                    if ((frame.t === 'cmd' && frame.name === 'join') || frame.t === 'say') outgoing.push(frame);
+                    server.send(raw);
+                });
+                server.onMessage(raw => {
+                    const frame = JSON.parse(String(raw));
+                    if (!released && frame.t === 'join' && frame.ch?.name === room) {
+                        holding = true;
+                        releaseJoin = () => {
+                            released = true; holding = false;
+                            for (const message of pending.splice(0)) socket.send(message);
+                        };
+                    }
+                    if (holding) { expect(pending.length).toBeLessThan(256); pending.push(raw); }
+                    else socket.send(raw);
+                });
+            });
+            await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+            await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+            await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('CancelledRoomGuest');
+            await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+            const input = page.getByRole('textbox', { name: 'Message', exact: true });
+            await input.fill('An original lobby draft.');
+            await section(page, 'rooms');
+            await tabTo(page, page.locator('[data-start="chat"]')); await page.keyboard.press('Enter');
+            const dialog = page.locator('[data-channel-dialog]');
+            await expect(page.locator('[data-channel-name]')).toBeFocused();
+            await page.keyboard.type(room); await page.keyboard.press('Enter');
+            await expect.poll(() => typeof releaseJoin).toBe('function');
+            await expect(dialog).toBeVisible();
+            if (cancel === 'escape') await page.keyboard.press('Escape');
+            else { await tabTo(page, page.locator('[data-channel-cancel]')); await page.keyboard.press('Space'); }
+            await expect(dialog).toBeHidden(); await section(page, 'chat');
+            await expect(input).toHaveValue('An original lobby draft.');
+            await tabTo(page, input); await replaceText(page, draft);
+            expect(new URL(page.url()).hash).toBe('');
+            await page.screenshot({ path: testInfo.outputPath(`00-cancelled-before-ack-${cancel}-${width}.png`) });
+            releaseJoin();
+            const roomTab = page.locator(`[data-channel-key="${room}"]`);
+            await expect(roomTab).toBeVisible();
+            await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            await expect(page.locator('[data-channel-key="#stalemate"]')).toHaveAttribute('aria-selected', 'true');
+            await expect(input).toHaveValue(draft); await expect(input).toBeFocused();
+            expect(outgoing.filter(frame => frame.t === 'cmd' && frame.name === 'join' && frame.args?.[0] === room)).toHaveLength(1);
+            await page.screenshot({ path: testInfo.outputPath(`01-cancelled-after-ack-${cancel}-${width}.png`) });
+            await page.keyboard.press('Enter');
+            await expect(page.locator('[data-buffer]')).toContainText(draft);
+            expect(outgoing.filter(frame => frame.t === 'say' && frame.text === draft)).toEqual([
+                expect.objectContaining({ t: 'say', ch: '#stalemate', text: draft })
+            ]);
+            await expect(input).toHaveValue('');
+            await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await page.screenshot({ path: testInfo.outputPath(`02-cancelled-message-sent-${cancel}-${width}.png`) });
+            await tabTo(page, page.locator('[data-channel-key="#stalemate"]')); await page.keyboard.press('ArrowRight');
+            await expect(page.locator('[data-chat-context]')).toHaveText(room);
+            await expect(roomTab).toBeFocused();
+            await sentinel.assertClean(); expect(errors).toEqual([]);
+            expect(community.diagnostics().admittedUpgrades).toBe(1); expect(community.diagnostics().failures).toEqual([]);
+        } finally {
+            if (context) await context.close();
+            await community.close();
+        }
+    });
+}
+
 // Synthetic composition events exercise the app contract; admission, explicit
 // keyboard joining and chat are real. These are not physical OS IME checks.
 for (const width of [390, 1440]) test(`protected nickname composition waits for an explicit join at ${width}px`, async ({ browser }, testInfo) => {

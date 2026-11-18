@@ -209,6 +209,69 @@ it('cancelled named channel permits a fresh explicit request for the same name',
     expect(input.value).toBe('An original lobby draft');
 });
 
+it.each(['command', 'slash'])('cancelled named channel respects a fresh explicit %s join', async route => {
+    const { window, ws, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, dialog = doc.querySelector('[data-channel-dialog]');
+    const opener = doc.querySelector('[data-start="chat"]'), name = '#cancelled-explicit-route';
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; opener.focus(); dialog.dispatchEvent(new window.Event('close')); };
+    opener.click(); doc.querySelector('[data-channel-name]').value = name;
+    dialog.querySelector('form').requestSubmit();
+    doc.querySelector('[data-channel-cancel]').click();
+    if (route === 'command') expect(window.__lobby.cmd('JOIN', [name.slice(1).toUpperCase()])).toBe(true);
+    else {
+        doc.querySelector('[data-text]').value = `/join ${name.slice(1).toUpperCase()}`;
+        doc.querySelector('[data-send]').click();
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'say', ch: '#stalemate', text: `/join ${name.slice(1).toUpperCase()}` });
+    }
+    join(name);
+    expect(doc.querySelector('[data-chat-context]').textContent).toBe(name);
+    expect(window.__lobby.active).toBe(name);
+});
+
+it('cancelled named channel acknowledgement leaves a newer pending dialog and draft alone', async () => {
+    const { window, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, dialog = doc.querySelector('[data-channel-dialog]');
+    const opener = doc.querySelector('[data-start="chat"]'), name = doc.querySelector('[data-channel-name]');
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; opener.focus(); dialog.dispatchEvent(new window.Event('close')); };
+    opener.click(); name.value = '#cancelled-older-request'; dialog.querySelector('form').requestSubmit();
+    doc.querySelector('[data-channel-cancel]').click();
+    const input = doc.querySelector('[data-text]'); input.value = 'Keep the lobby draft';
+    opener.click(); name.value = '#newer-pending-request'; name.focus(); dialog.querySelector('form').requestSubmit();
+    join('#cancelled-older-request');
+    expect(window.__lobby.active).toBe('#stalemate');
+    expect(input.value).toBe('Keep the lobby draft');
+    expect(dialog.open).toBe(true);
+    expect(doc.activeElement).toBe(name);
+    expect(window.__lobby.pendingChannel).toBe('#newer-pending-request');
+    join('#newer-pending-request');
+    expect(window.__lobby.active).toBe('#newer-pending-request');
+    expect(dialog.open).toBe(false);
+    doc.querySelector('[data-channel-key="#stalemate"]').click();
+    expect(input.value).toBe('Keep the lobby draft');
+});
+
+it('cancelled named channel requests stay in the background when acknowledgements arrive out of order', async () => {
+    const { window, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, dialog = doc.querySelector('[data-channel-dialog]');
+    const opener = doc.querySelector('[data-start="chat"]'), name = doc.querySelector('[data-channel-name]');
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; opener.focus(); dialog.dispatchEvent(new window.Event('close')); };
+    for (const room of ['#cancelled-first-request', '#cancelled-second-request']) {
+        opener.click(); name.value = room; dialog.querySelector('form').requestSubmit();
+        doc.querySelector('[data-channel-cancel]').click();
+    }
+    const input = doc.querySelector('[data-text]'); input.value = 'Still in the lobby'; input.focus();
+    for (const room of ['#cancelled-second-request', '#cancelled-first-request']) {
+        join(room);
+        expect(window.__lobby.active).toBe('#stalemate');
+        expect(input.value).toBe('Still in the lobby');
+        expect(doc.activeElement).toBe(input);
+        expect(doc.querySelector(`[data-channel-key="${room}"]`)).toBeTruthy();
+    }
+});
+
 it('recovers an interrupted named channel request without replaying it', async () => {
     const { window, ws, welcome, join, sockets, timers, flush } = await visitor();
     welcome(); join();
