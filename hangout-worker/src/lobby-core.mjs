@@ -1193,7 +1193,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const host = conns.get(offer.host);
         if (offer.expires <= now()) return finishMusicInvite(room.name, 'expired');
         if (frame.t === 'music-offer-decline') return finishMusicInvite(room.name, 'declined');
-        if (offer.state !== 'offered' || !canInviteMusic(host, guest, room)
+        // A retransmitted accept must not cancel the first one while its
+        // provider start is pending.
+        if (offer.state !== 'offered') return;
+        if (!canInviteMusic(host, guest, room)
             || !participationAllows(host, 'requestDirectContact', guest) || !participationAllows(guest, 'acceptDirectContact', host)
             || !participationAllows(host, 'externalProvider') || !participationAllows(guest, 'externalProvider')) return finishMusicInvite(room.name, 'unavailable');
         if (!room.invites.has(guest.dev) && (room.invites.size >= 150 || !roomCapacity())) return finishMusicInvite(room.name, 'unavailable');
