@@ -125,3 +125,40 @@ it('keeps the unconfigured public-preview message separate from private setup fa
     expect(document.querySelector('[data-gate-copy]').textContent).toContain('Not open yet');
     expect(enter.hidden).toBe(true); expect(enter.disabled).toBe(true);
 });
+
+
+it('keeps the typed name and explains manual entry when the optional name generator is unavailable', () => {
+    const { window, document, enter } = initialize({ cachedPreview: true });
+    const nick = document.querySelector('[data-nick]'); nick.value = 'MyChosenNick';
+    document.querySelector('[data-reroll]').click();
+    expect(nick.value).toBe('MyChosenNick'); expect(document.activeElement).toBe(nick);
+    expect(nick.getAttribute('aria-describedby')).toBe('gate-status');
+    expect(document.querySelector('[data-gate-status]').textContent).toBe('Random names aren’t available right now. Type a nickname to join.');
+    expect(enter.disabled).toBe(false); expect(window.fetch).not.toHaveBeenCalled();
+});
+
+it('keeps name entry usable without exposing an exception if name generation fails', () => {
+    const { window, document, enter } = initialize({ cachedPreview: true });
+    window.StaleNames = { roll() { throw new Error('SYNTHETIC_PRIVATE_NAME_DETAIL'); } };
+    const nick = document.querySelector('[data-nick]'); nick.value = 'KeepThisName';
+    document.querySelector('[data-reroll]').click();
+    expect(nick.value).toBe('KeepThisName'); expect(document.activeElement).toBe(nick);
+    expect(nick.getAttribute('aria-describedby')).toBe('gate-status');
+    const text = document.querySelector('[data-gate-status]').textContent;
+    expect(text).toBe('Random names aren’t available right now. Type a nickname to join.');
+    expect(text).not.toContain('SYNTHETIC_PRIVATE_NAME_DETAIL');
+    expect(enter.disabled).toBe(false); expect(window.fetch).not.toHaveBeenCalled();
+});
+
+it('clears the name-picker recovery hint when a later explicit roll succeeds', () => {
+    const { window, document } = initialize({ cachedPreview: true });
+    const nick = document.querySelector('[data-nick]'), roll = document.querySelector('[data-reroll]');
+    nick.value = 'EarlierChoice'; roll.click();
+    expect(nick.getAttribute('aria-describedby')).toBe('gate-status');
+    window.StaleNames = { roll: () => ({ name: 'HappyPine', legendary: false }) };
+    roll.click();
+    expect(nick.value).toBe('HappyPine'); expect(document.activeElement).toBe(nick);
+    expect(nick.hasAttribute('aria-describedby')).toBe(false);
+    expect(document.querySelector('[data-gate-status]').textContent).toBe('');
+    expect(roll.textContent).toBe('🎲 Roll again'); expect(window.fetch).not.toHaveBeenCalled();
+});

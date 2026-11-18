@@ -590,7 +590,14 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const nickInput = $('[data-nick]');
     nickInput.value = nickInput.value || readRemembered('hangout-nick') || ''; // blank by default; remembered on this device
     $('[data-reroll]').addEventListener('click', (e) => {
-        const r = window.StaleNames.roll();
+        let r;
+        try { r = window.StaleNames.roll(); }
+        catch {
+            gateStatus('Random names aren’t available right now. Type a nickname to join.');
+            nickInput.setAttribute('aria-describedby', 'gate-status');
+            nickInput.focus();
+            return;
+        }
         nickInput.value = r.name;
         e.currentTarget.textContent = '🎲 Roll again';
         gateStatus(r.legendary ? '✨ LEGENDARY name! Keep it, it’s rare.' : '');
