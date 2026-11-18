@@ -3450,6 +3450,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (current?.kind === 'game' && name === 'mode' && ['+i', '-i'].includes(fixed?.[0])) continue;
             const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--small'; b.textContent = label;
             b.addEventListener('click', () => {
+                const focusJoinedRoom = $('[data-palette]').contains(document.activeElement);
                 $('[data-palette]').close();
                 if (ops && (!roomNonce(origin.instance) || app.chans.get(origin.channel)?.keepRef !== origin.instance)) return toast('That room changed. Choose current Host tools before trying again.');
                 const channel = ops ? origin.channel : app.active, instance = ops ? origin.instance : undefined;
@@ -3459,7 +3460,22 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 if (name === 'register' && current?.keepRef) return cmd(name, [], origin.channel, origin.instance);
                 if (name === 'cohost') { const who = prompt(`${label}: nickname`); if (!who) return; if (label.startsWith('Remove') && !confirm(`Remove ${who} as co-host?`)) return; return namedCmd(name, [label.startsWith('Remove') ? 'remove' : 'add', who.trim()], channel, instance); }
                 if (fixed) return cmd(name, fixed, channel, instance);
-                if (ask) { const v = prompt(`${label}: ${ask}`); if (v === null) return undefined; return namedCmd(name, paletteArgs(name, v), channel, instance); }
+                if (ask) {
+                    const value = prompt(`${label}: ${ask}`);
+                    if (value === null) return undefined;
+                    const args = paletteArgs(name, value);
+                    if (name === 'join' && args.length === 1) {
+                        const requested = args[0].toLowerCase();
+                        const target = requested.startsWith('#') ? requested : `#${requested}`;
+                        if (app.chans.has(target)) {
+                            // Existing membership gets no new server join ACK.
+                            switchTo(target);
+                            if (focusJoinedRoom) focusChannelTab(target, { preventScroll: false });
+                            return;
+                        }
+                    }
+                    return namedCmd(name, args, channel, instance);
+                }
                 return cmd(name, [], channel, instance);
             });
             box.append(b);
