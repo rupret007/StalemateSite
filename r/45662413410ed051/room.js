@@ -85,7 +85,11 @@
     };
     win.__hangout = app; // test hook, read-only use
 
-    function say(text) { ui.status.textContent = text; }
+    let facesStatusPeer = null;
+    function say(text, retryPeerId = null) {
+        facesStatusPeer = retryPeerId;
+        ui.status.textContent = text;
+    }
     function setGate(text) { ui.gateStatus.textContent = text; }
 
     /* Private reports are deliberately outside chat state, encrypted snapshots,
@@ -2158,6 +2162,7 @@
                     entry.restarts = 0; clearTimeout(entry.restartTimer); entry.restartTimer = 0;
                     peer.facesStopped = false;
                     paintFacesRetry();
+                    if (facesStatusPeer === id) say(`Call connection with ${peerName(id)} restored.`);
                     // Only a link that holds earns the rebuild budget back; one that flaps does not.
                     entry.steadyTimer = win.setTimeout(() => {
                         entry.steadyTimer = 0;
@@ -2235,7 +2240,7 @@
         peer.rtcEpoch = epoch === undefined ? mine + 1 : epoch;
         closePc(id);
         if (epoch === undefined) {
-            say(`Couldn’t connect faces with ${peerName(id)} yet. Trying a fresh connection; chat and draw still work.`);
+            say(`Couldn’t connect faces with ${peerName(id)} yet. Trying a fresh connection; chat and draw still work.`, id);
             send(rtcMsg(peer, id, { reset: true }));
         }
         openPc(id);
@@ -2248,7 +2253,7 @@
         peer.facesStopped = true;
         const entry = app.av.pcs.get(id);
         if (entry) { clearTimeout(entry.restartTimer); entry.restartTimer = 0; }
-        say(`Faces with ${peerName(id)} aren’t connecting. Chat and draw still work.`);
+        say(`Faces with ${peerName(id)} aren’t connecting. Chat and draw still work.`, id);
         paintFacesRetry();
     }
 

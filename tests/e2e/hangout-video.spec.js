@@ -486,6 +486,7 @@ async function exerciseFacesRetry(browser, testInfo, useKeyboard) {
     }
     const before = await framesFrom(guest);
     await expect.poll(async () => (await framesFrom(guest)) - before, { timeout: 15000 }).toBeGreaterThan(5);
+    await expect(guest.locator('[data-status]')).toHaveText('Call connection with Jeff restored.');
     expect(host.errors.concat(guest.errors)).toEqual([]);
     await guest.screenshot({ path: testInfo.outputPath('faces-retry-restored.png') });
 }
