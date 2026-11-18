@@ -1071,9 +1071,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const host = conns.get(offer.host), guest = conns.get(offer.guest);
         if (offer.version === 1 && offer.state === 'accepting' && status !== 'accepted' && guest) {
             const room = ch(roomName);
-            if (room?.keepRef === offer.instance && room.members.has(guest.id)) {
-                room.invites.delete(guest.dev);
-                leave(guest, room, 'Music invitation ended');
+            if (room?.keepRef === offer.instance) {
+                // Roll back only access this Music offer added.
+                if (offer.addedInvite) room.invites.delete(guest.dev);
+                if (offer.addedMember) leave(guest, room, 'Music invitation ended');
             }
         }
         if (host && host.id !== disconnected) out(host, offer.version === 1
@@ -1177,7 +1178,6 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const room = participationMusicRoom(frame), offer = room && musicInvites.get(room.name);
         if (!offer || offer.version !== 1 || offer.state !== 'accepting' || offer.id !== frame.id || offer.request !== frame.request
             || offer.guest !== guest.id || offer.guestActor !== musicActor(guest) || offer.instance !== room.keepRef) return;
-        room.invites.delete(guest.dev);
         finishMusicInvite(room.name, 'unavailable');
     }
 
@@ -1199,12 +1199,16 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!canInviteMusic(host, guest, room)
             || !participationAllows(host, 'requestDirectContact', guest) || !participationAllows(guest, 'acceptDirectContact', host)
             || !participationAllows(host, 'externalProvider') || !participationAllows(guest, 'externalProvider')) return finishMusicInvite(room.name, 'unavailable');
-        if (!room.invites.has(guest.dev) && (room.invites.size >= 150 || !roomCapacity())) return finishMusicInvite(room.name, 'unavailable');
+        const addedInvite = !room.invites.has(guest.dev);
+        if (addedInvite && (room.invites.size >= 150 || !roomCapacity())) return finishMusicInvite(room.name, 'unavailable');
 
         personDependency(host, room);
         personDependency(guest, room);
+        const addedMember = !room.members.has(guest.id);
         if (!enter(guest, room, { invited: true })) return finishMusicInvite(room.name, 'unavailable');
         room.invites.add(guest.dev);
+        offer.addedInvite = addedInvite;
+        offer.addedMember = addedMember;
         offer.state = 'accepting';
         offer.hostRevision = participation.revisionFor(controlled.context, host.id);
         offer.guestRevision = participation.revisionFor(controlled.context, guest.id);
