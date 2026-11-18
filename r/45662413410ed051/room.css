@@ -86,7 +86,7 @@ body.bob-mode.faces-on .call{grid-column:auto}
 .av-resume{bottom:calc(128px + env(safe-area-inset-bottom))}
 .faces-retry{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0;font-size:.9rem}
 .faces-retry[hidden]{display:none}
-.faces-retry .btn{min-height:44px}
+.faces-retry .btn{min-height:48px}
 .tiles .tile--mirror video{transform:scaleX(-1)}
 .tiles .tile--screen video,.tiles .tile--canvas video{object-fit:contain}
 .tiles .tile--nocam video{visibility:hidden}

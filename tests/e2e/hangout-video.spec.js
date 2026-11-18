@@ -385,6 +385,44 @@ test('a dropped relay connection reconnects and faces come back', async ({ brows
     await expect(host.locator('.tile:not([data-tile="me"])')).toHaveCount(1, { timeout: 20000 });
 });
 
+async function expectFacesRetryReachable(page) {
+    const retry = page.getByRole('button', { name: 'Try faces again', exact: true });
+    await expect(retry).toBeInViewport({ ratio: 1 });
+    await expect.poll(() => retry.evaluate(button => {
+        const { left, right, top, bottom, height, width } = button.getBoundingClientRect();
+        const center = (left + right) / 2;
+        return {
+            targetSize: height >= 48 && width >= 48,
+            aboveDock: bottom <= document.querySelector('.callbar').getBoundingClientRect().top,
+            acceptsPointer: [top + 3, bottom - 3].every(y => button.contains(document.elementFromPoint(center, y)))
+        };
+    })).toEqual({ targetSize: true, aboveDock: true, acceptsPointer: true });
+}
+
+for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    test(`ordinary faces recovery is unobstructed at ${viewport.width}px`, async ({ browser }, testInfo) => {
+        const page = await openBrowser(browser, viewport.width < 500 ? { ...PHONE_OPTS, viewport } : { viewport });
+        await join(page, roomUrl(), 'RecoveryGuest');
+        // Test the layout of the app's actual recovery notice with two placeholder
+        // tiles. The real failed and restored video connection is tested below.
+        await page.evaluate(() => {
+            document.body.classList.add('faces-on');
+            const tiles = document.querySelector('[data-tiles]');
+            for (const name of ['Host', 'Guest']) {
+                const tile = document.createElement('figure');
+                tile.className = 'tile tile--nocam';
+                tile.dataset.initial = name[0];
+                tiles.append(tile);
+            }
+            const notice = document.querySelector('[data-faces-stuck]');
+            notice.querySelector('span').textContent = 'Faces with Host aren’t connecting, so we stopped trying. Chat and draw still work. If anyone is on cellular data, everyone should join the same Wi-Fi, then tap “Try faces again”.';
+            notice.hidden = false;
+        });
+        await expectFacesRetryReachable(page);
+        await page.screenshot({ path: testInfo.outputPath(`faces-retry-unobstructed-${viewport.width}.png`) });
+    });
+}
+
 test('faces that never connect stop rebuilding after three tries; "Try faces again" restarts them', async ({ browser }, testInfo) => {
     const { host, guest } = await call(browser);
     // Persistent failure on the guest: every connection reports 'failed', the 2/4/8 s restart
@@ -436,6 +474,7 @@ test('faces that never connect stop rebuilding after three tries; "Try faces aga
         button.addEventListener('click', () => { window.__failFaces = false; }, { capture: true, once: true });
     });
     await retry.scrollIntoViewIfNeeded();
+    await expectFacesRetryReachable(guest);
     await guest.screenshot({ path: testInfo.outputPath('faces-retry-before-click.png') });
     await retry.click();
     await expect(stuck).toBeHidden();

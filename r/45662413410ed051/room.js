@@ -1628,7 +1628,7 @@
     ui.facesRetryBtn.textContent = 'Try faces again';
     ui.facesRetryBtn.setAttribute('data-faces-retry', '');
     ui.facesRetry.append(ui.facesRetryText, ui.facesRetryBtn);
-    ui.tiles.insertAdjacentElement('afterend', ui.facesRetry);
+    ui.tiles.insertAdjacentElement('beforebegin', ui.facesRetry);
     const stuckFaces = () => Array.from(app.av.pcs.keys()).filter((id) => relayPeers.get(id)?.facesStopped);
     function paintFacesRetry() {
         const ids = stuckFaces();
