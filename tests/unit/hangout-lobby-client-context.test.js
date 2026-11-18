@@ -1851,6 +1851,13 @@ describe('activity tools recovery', () => {
         expect(api.onJoin).toHaveBeenCalledTimes(1); expect(api.onJoin.mock.calls[0][0].keepRef).toBe('e'.repeat(32));
         expect(window.document.activeElement).toBe(input);
     });
+    it('offers a fresh explicit retry after returning from the back-forward cache', async () => {
+        const { window, retry, script, load, attach } = await drawingVisitor();
+        retry.click(); const old = script(); window.dispatchEvent(new window.Event('pagehide'));
+        window.dispatchEvent(new window.Event('pageshow')); expect(retry.disabled).toBe(false);
+        retry.click(); const fresh = script(); expect(fresh).not.toBeNull(); load(old); expect(attach).not.toHaveBeenCalled();
+        load(fresh); expect(attach).toHaveBeenCalledTimes(1);
+    });
     it('cleans up on page exit and does not attach a late response', async () => {
         const { window, retry, script, load, attach, timers } = await drawingVisitor();
         retry.click(); const pending = script(); window.dispatchEvent(new window.Event('pagehide')); load(pending);
