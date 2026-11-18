@@ -1780,6 +1780,78 @@ for (const width of [375, 390, 1440]) for (const kind of ['art', 'jam']) test(`p
 });
 
 
+// A real native dialog must hand keyboard focus into the selected room. Do not
+// repair focus with fill()/focus() after confirmation before checking the tab.
+for (const width of [375, 390, 1440]) for (const existing of [false, true]) {
+    test(`protected named room dialog opens ${existing ? 'an already joined' : 'a new'} chat with keyboard focus at ${width}px`, async ({ browser }, testInfo) => {
+        const { privateCommunity } = await import('./helpers/private-community.mjs');
+        const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
+        const community = await privateCommunity(), errors = [], requests = []; let context;
+        const room = '#named-keyboard-studio', roomDraft = 'A saved draft for this joined room.';
+        const lobbyDraft = 'Keep this draft in the lobby.';
+        try {
+            context = await browser.newContext({ ignoreHTTPSErrors: true, reducedMotion: 'reduce',
+                viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 } });
+            await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+            const sentinel = await installNoCaptureSentinel(context);
+            const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+            page.on('websocket', socket => socket.on('framesent', ({ payload }) => {
+                try { const frame = JSON.parse(String(payload)); if (frame.t === 'cmd' && frame.name === 'join' && frame.args?.[0] === room) requests.push(true); }
+                catch { /* Observe JSON commands only, never fabricate a reply. */ }
+            }));
+            await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+            await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+            await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('NamedRoomGuest');
+            await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+            const input = page.getByRole('textbox', { name: 'Message', exact: true });
+            if (existing) {
+                await input.fill('/join ' + room); await input.press('Enter');
+                await expect(page.locator('[data-chat-context]')).toHaveText(room);
+                await input.fill(roomDraft);
+                await tabTo(page, page.locator(`[data-channel-key="${room}"]`)); await page.keyboard.press('Home');
+                await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            }
+            await input.fill(lobbyDraft);
+            await section(page, 'rooms');
+            const opener = page.locator('[data-start="chat"]');
+            await tabTo(page, opener); await page.keyboard.press('Enter');
+            const dialog = page.locator('[data-channel-dialog]');
+            const name = page.locator('[data-channel-name]');
+            await expect(dialog).toBeVisible(); await expect(name).toBeFocused();
+            await page.keyboard.type(room);
+            expect(new URL(page.url()).hash).toBe('');
+            await page.screenshot({ path: testInfo.outputPath(`00-named-dialog-${existing ? 'existing' : 'new'}-${width}.png`) });
+            const previousRequests = requests.length;
+            await page.keyboard.press('Enter');
+            await expect(dialog).toBeHidden();
+            await expect(page.locator('[data-chat-context]')).toHaveText(room);
+            const selected = page.locator(`[data-channel-key="${room}"]`);
+            await page.screenshot({ path: testInfo.outputPath(`01-named-confirmed-${existing ? 'existing' : 'new'}-${width}.png`) });
+            await expect(selected).toBeFocused();
+            await expect(selected).toHaveAttribute('aria-selected', 'true');
+            await expect(selected).toBeInViewport({ ratio: 1 });
+            await expect(input).toHaveValue(existing ? roomDraft : '');
+            expect(requests.length - previousRequests).toBe(existing ? 0 : 1);
+            // Reach the composer from the handed-off tab using native keys.
+            await tabTo(page, input);
+            await replaceText(page, 'Our first deliberate message in this room.'); await page.keyboard.press('Enter');
+            await expect(page.locator('[data-buffer]')).toContainText('Our first deliberate message in this room.');
+            await expect(input).toHaveValue(''); await expect(input).toBeInViewport({ ratio: 1 });
+            await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await tabTo(page, selected); await page.keyboard.press('Home');
+            await expect(input).toHaveValue(lobbyDraft);
+            await page.screenshot({ path: testInfo.outputPath(`02-named-lobby-draft-${existing ? 'existing' : 'new'}-${width}.png`) });
+            await sentinel.assertClean(); expect(errors).toEqual([]);
+            expect(community.diagnostics().admittedUpgrades).toBe(1); expect(community.diagnostics().failures).toEqual([]);
+        } finally {
+            if (context) await context.close();
+            await community.close();
+        }
+    });
+}
+
 // Synthetic composition events exercise the app contract; admission, explicit
 // keyboard joining and chat are real. These are not physical OS IME checks.
 for (const width of [390, 1440]) test(`protected nickname composition waits for an explicit join at ${width}px`, async ({ browser }, testInfo) => {

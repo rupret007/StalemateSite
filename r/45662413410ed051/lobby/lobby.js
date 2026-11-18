@@ -1349,8 +1349,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             if (gameInvites.delete(c.name) || gameOfferAccepted || returningToGame || joiningLinkedGame) drawGameOffer();
             if (app.pendingChannel === m.ch.name) {
+                const dialog = $('[data-channel-dialog]');
+                // Closing the modal restores its Rooms opener, which becomes
+                // hidden on phones when the confirmed chat is shown.
+                focusJoinedRoom ||= dialog.open && dialog.contains(document.activeElement);
                 clearPendingChannel();
-                $('[data-channel-dialog]').close();
+                dialog.close();
             }
             app.chans.set(m.ch.name, c);
             if (invite?.arcade && invite.ref === c.keepRef && (c.kind === 'game' ||
@@ -3164,8 +3168,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             return;
         }
         if (app.chans.has(name)) {
-            $('[data-channel-dialog]').close();
+            const dialog = $('[data-channel-dialog]');
+            const focusChat = dialog.open && dialog.contains(document.activeElement);
+            dialog.close();
             switchTo(name);
+            if (focusChat) focusChannelTab(name, { preventScroll: false });
             return;
         }
         if ((/^#(?:art|watch|bobross|jam)(?:-|$)/.test(name) || gameNightSupported && gameNightRoomName(name)) && !app.rooms.some((r) => r.name === name)) {
