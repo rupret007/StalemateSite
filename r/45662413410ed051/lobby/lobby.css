@@ -829,11 +829,20 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   body:not(:has(.game-night:not([hidden]))) .flag { margin-block: 0; }
   /* Keep one full report target and a readable line without forcing chat below Send. */
   .channel-panel:not(:has(> .game-night:not([hidden]))) > .buffer { min-height: calc(max(1lh, 48px) + 20px); }
+  /* Let the drawing activity scroll so the conversation stays readable below the cameras. */
+  .channel-panel:has(> .activity[open]:not([hidden]) [data-act-stage]:not([hidden]) [data-act-paint]:not([hidden])) > .buffer {
+    min-height: 6rem;
+  }
   /* A scroller must fit a 48px control, its focus outline and the bottom border. */
   .channel-panel > [data-jam]:not([hidden]) { min-height: calc(48px + 4px + 1px); }
   .channel-panel:not(:has(> .game-night:not([hidden]))) > .roombar .btn { min-width: 48px; min-height: 48px; }
   .channel-panel:not(:has(> .game-night:not([hidden]))) .say .btn { min-height: 48px; margin-block: 2px; }
   .channel-panel:not(:has(> .game-night:not([hidden]))) .slash { min-width: 48px; min-height: 48px; }
+}
+@media (max-width: 480px) and (min-height: 721px) {
+  .channel-panel:has(> .activity[open]:not([hidden]) [data-act-stage]:not([hidden]) [data-act-paint]:not([hidden])) > .buffer {
+    min-height: 9rem;
+  }
 }
 /* Leave the composer and invitations room on shorter phones. */
 @media (max-width: 480px) and (min-height: 741px) {
