@@ -584,6 +584,10 @@ for (const { width, height, moveFocus } of [{ width: 375, height: 667, moveFocus
             await expect(page.locator('[data-connection]')).toHaveText('Connected');
             return { page, context, sentinel };
         }
+        async function rooms(page) {
+            const tab = page.locator('nav [data-show="rooms"]');
+            if (await tab.isVisible()) await tab.click();
+        }
         async function draw(page, color) {
             await page.getByRole('button', { name: color + ' brush', exact: true }).click();
             const canvas = page.locator('[data-act-canvas]'); await canvas.scrollIntoViewIfNeeded();
@@ -612,10 +616,10 @@ for (const { width, height, moveFocus } of [{ width: 375, height: 667, moveFocus
         });
         try {
             const [host, guest] = await Promise.all([enter('ToolsHost', 1440, 900, false), enter('ToolsGuest', width, height, true)]);
-            await host.page.locator('nav [data-show="rooms"]').click(); await host.page.locator('[data-start="art"]').click();
+            await rooms(host.page); await host.page.locator('[data-start="art"]').click();
             await expect(host.page.locator('[data-act-canvas]')).toBeVisible();
             const room = await host.page.locator('[data-chat-context]').innerText();
-            await guest.page.locator('nav [data-show="rooms"]').click();
+            await rooms(guest.page);
             await guest.page.getByRole('searchbox', { name: 'Find a room' }).fill(room.slice(1));
             await guest.page.locator('[data-roomlist] button[data-room="' + room + '"]').press('Enter');
             await expect(guest.page.locator('[data-chat-context]')).toHaveText(room);
