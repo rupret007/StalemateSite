@@ -1991,6 +1991,20 @@ describe('keyboard focus during status action recovery', () => {
         v.flush(4000);
         expect(v.toast.hidden).toBe(moved);
     });
+    it('preserves normal notice and ownership-offer expiry without changing the draft', async () => {
+        const v = await visitor(); v.welcome(); v.join();
+        const doc = v.window.document, input = doc.querySelector('[data-text]');
+        const notice = doc.querySelector('[data-toast]'); input.value = 'Keep this unsent note'; input.focus();
+        const before = v.ws.sent.length;
+        v.ws.receive({ t: 'owner-offer', by: 'Friend', ch: '#kept-studio' });
+        expect(notice.textContent).toContain('Accept ownership'); expect(notice.hidden).toBe(false);
+        v.flush(12000); expect(notice.hidden).toBe(true);
+        v.ws.receive({ t: 'notice', from: 'StaleBot', kind: 'info', text: 'A plain status keeps its normal lifetime.' });
+        expect(notice.hidden).toBe(false); v.flush(4000); expect(notice.hidden).toBe(true);
+        expect(input.value).toBe('Keep this unsent note'); expect(doc.activeElement).toBe(input);
+        expect(v.ws.sent).toHaveLength(before);
+    });
+
     it.each(['typing', 'returned from notice', 'discard after reading'])('keeps closed-draft recovery available without a deadline: %s', async mode => {
         const v = await closedPrivateDraft();
         const doc = v.window.document, before = v.ws.sent.length;
