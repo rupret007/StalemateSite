@@ -1789,7 +1789,7 @@ describe('browser client privacy and bounded delivery wiring', () => {
 });
 
 describe('activity tools recovery', () => {
-    async function drawingVisitor({ rendererReady = false } = {}) {
+    async function drawingVisitor({ rendererReady = false, joinInitially = true } = {}) {
         const v = await visitor();
         v.window.eval(readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8'));
         v.welcome(); v.join();
@@ -1799,7 +1799,7 @@ describe('activity tools recovery', () => {
         const api = { onJoin: vi.fn(), onLeave: vi.fn(), onChan: vi.fn(), onAct: vi.fn(), onCam: vi.fn() };
         const attach = vi.fn(() => api);
         if (rendererReady) v.window.LobbyRoom = { attach };
-        joinArt();
+        if (joinInitially) joinArt();
         const retry = v.window.document.querySelector('[data-activity-retry]');
         const script = () => v.window.document.querySelector('script[data-activity-loader]');
         const load = node => { v.window.LobbyRoom = { attach }; node.dispatchEvent(new v.window.Event('load')); };
@@ -1815,6 +1815,29 @@ describe('activity tools recovery', () => {
         ws.receive({ t: 'chan', ch: { ...room, modes: { ...room.modes, C: false } } });
         expect(window.document.querySelector('[data-cam]').disabled).toBe(true);
         expect(script()).toBeNull(); expect(api.onCam).not.toHaveBeenCalled();
+    });
+    it.each(['attach', 'onJoin'])('keeps the first room join usable after initial renderer %s fails', async failure => {
+        const { window, ws, joinArt, retry, script, api, attach } = await drawingVisitor({ rendererReady: true, joinInitially: false });
+        (failure === 'attach' ? attach : api.onJoin).mockImplementationOnce(() => { throw new Error('Fixture: first setup failed'); });
+        expect(() => joinArt()).not.toThrow();
+        const doc = window.document, input = doc.querySelector('[data-text]');
+        input.value = 'My draft survives the first setup failure';
+        ws.receive({ t: 'act', ch: '#drawing-recovery', kind: 'stroke', stroke: {
+            id: 'after-initial-failure', color: '#009ee8', size: 8, pts: [[.1, .2], [.4, .5]]
+        } });
+        expect(attach).toHaveBeenCalledTimes(1);
+        expect(api.onLeave).toHaveBeenCalledTimes(failure === 'attach' ? 0 : 1);
+        expect(doc.querySelector('[data-connection]').textContent).toBe('Connected');
+        expect(doc.querySelector('[data-activity-recovery]').hidden).toBe(false);
+        expect(doc.querySelector('[data-cam]').disabled).toBe(true);
+        expect(script()).toBeNull(); expect(api.onAct).not.toHaveBeenCalled();
+        retry.focus(); retry.click();
+        expect(attach).toHaveBeenCalledTimes(2);
+        expect(api.onJoin).toHaveBeenCalledTimes(failure === 'attach' ? 1 : 2);
+        expect(api.onJoin.mock.calls.at(-1)[1].strokes.map(stroke => stroke.id)).toEqual(['after-initial-failure']);
+        expect(doc.querySelector('[data-activity-recovery]').hidden).toBe(true);
+        expect(input.value).toBe('My draft survives the first setup failure');
+        expect(api.onCam).not.toHaveBeenCalled();
     });
     it('restores the latest room snapshot and keeps an unsent draft without autojoining', async () => {
         const { window, ws, retry, script, load, api, attach } = await drawingVisitor();
