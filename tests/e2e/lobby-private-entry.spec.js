@@ -705,6 +705,7 @@ for (const width of [390, 1440]) test(`protected activity setup failure waits fo
         await page.goto(community.origin + '/beta/?via=' + (faulty ? 'rad-dad' : 'stalemate') + '#invite=' + community.invitation);
         await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
         await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(name);
+        await expect(page.locator('[data-enter]')).toBeEnabled();
         await page.locator('[data-enter]').press('Enter');
         await expect(page.locator('[data-connection]')).toHaveText('Connected');
         return page;
