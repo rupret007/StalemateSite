@@ -2,6 +2,7 @@
 // PM consent, peer quit and background-room closure use UI commands, not injected
 // result frames or focus mocks. This is not live Cloudflare/hibernation proof.
 const { test, expect } = require('@playwright/test');
+const { writeFile } = require('node:fs/promises');
 const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
 
 async function tabTo(page, target) {
@@ -59,9 +60,11 @@ for (const width of [375, 390, 1440]) for (const mode of ['discard', 'replacemen
             await send(sender, '/query StatusRecipient');
             await recipient.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).press('Enter');
             await expect(sender.locator('[data-chat-context]')).toHaveText('PM · StatusRecipient');
+            await expect(recipient.locator('[data-chat-context]')).toHaveText('PM · StatusSender');
             const input = sender.getByRole('textbox', { name: 'Message', exact: true });
             await input.fill(draft);
             await send(recipient, '/quit');
+            await expect(recipient.locator('[data-connection]')).toHaveText('Offline');
             const status = sender.locator('[data-toast]');
             const discard = status.getByRole('button', { name: 'Discard draft', exact: true });
             await tabTo(sender, discard); await expect(discard).toBeFocused();
@@ -129,8 +132,10 @@ for (const width of [375, 390, 1440]) test(`protected private draft choices surv
         await send(sender, '/query PatientPeer');
         await recipient.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).press('Enter');
         await expect(sender.locator('[data-chat-context]')).toHaveText('PM · PatientPeer');
+        await expect(recipient.locator('[data-chat-context]')).toHaveText('PM · PatientSender');
         const input = sender.getByRole('textbox', { name: 'Message', exact: true });
         await input.fill(draft); await send(recipient, '/quit');
+        await expect(recipient.locator('[data-connection]')).toHaveText('Offline');
         const notice = sender.locator('[data-toast]');
         await expect(notice).toContainText('Private replies are not confirmed. Your draft stays here.');
         await expect(input).toBeFocused();
@@ -166,5 +171,94 @@ for (const width of [375, 390, 1440]) test(`protected private draft choices surv
         await community.close();
         const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
         if (failures.length) throw new AggregateError(failures, 'Draft-recovery contexts did not close');
+    }
+});
+
+// PM-open frames are ordered within each socket, not between two browsers.
+// A late recipient ACK can change its view between filling /quit and Enter.
+for (const width of [390, 1440]) test(`protected PM recovery waits for recipient readiness across a late open at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    let lobbyNow = Date.now(), releaseRecipientOpen, quitWrites = 0;
+    const community = await privateCommunity({ lobbyNow: () => lobbyNow }), contexts = [], sentinels = [], errors = [];
+    async function guest(nick, holdOpen = false) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true, reducedMotion: 'reduce',
+            viewport: { width, height: width === 390 ? 844 : 900 } });
+        contexts.push(context);
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        sentinels.push(await installNoCaptureSentinel(context));
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        if (holdOpen) {
+            page.on('websocket', socket => socket.on('framesent', ({ payload }) => {
+                try { const frame = JSON.parse(String(payload)); if (frame.t === 'say' && frame.text === '/quit') quitWrites++; }
+                catch { /* Observe commands only, never alter outgoing frames. */ }
+            }));
+            await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
+                const server = socket.connectToServer(), pending = []; let holding = false, released = false;
+                server.onMessage(raw => {
+                    const frame = JSON.parse(String(raw));
+                    if (!released && frame.t === 'pm-open' && frame.with === 'CausalSender') {
+                        holding = true;
+                        releaseRecipientOpen = () => {
+                            released = true; holding = false;
+                            for (const message of pending.splice(0)) socket.send(message);
+                        };
+                    }
+                    if (holding) { expect(pending.length).toBeLessThan(128); pending.push(raw); }
+                    else socket.send(raw);
+                });
+            });
+        }
+        await page.goto(community.origin + '/beta/#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(nick);
+        await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        expect(new URL(page.url()).hash).toBe('');
+        return page;
+    }
+    try {
+        const sender = await guest('CausalSender'), recipient = await guest('CausalPeer', true);
+        lobbyNow += 180000; // Preserve the real two-minute PM eligibility rule.
+        await send(sender, '/query CausalPeer');
+        await recipient.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).press('Enter');
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · CausalPeer');
+        await expect.poll(() => typeof releaseRecipientOpen).toBe('function');
+        await expect(recipient.locator('[data-chat-context]')).toHaveText('#stalemate');
+        const senderInput = sender.getByRole('textbox', { name: 'Message', exact: true });
+        const recipientInput = recipient.getByRole('textbox', { name: 'Message', exact: true });
+        const draft = 'This local draft still belongs to the original peer.';
+        await senderInput.fill(draft); await recipientInput.fill('/quit');
+        releaseRecipientOpen();
+        await expect(recipient.locator('[data-chat-context]')).toHaveText('PM · CausalSender');
+        await expect(recipientInput).toHaveValue(''); await recipientInput.press('Enter');
+        expect(quitWrites).toBe(0);
+        await expect(recipient.locator('[data-connection]')).toHaveText('Connected');
+        await expect(sender.locator('[data-toast]')).toBeHidden(); await expect(senderInput).toHaveValue(draft);
+        await recipient.screenshot({ path: testInfo.outputPath(`00-pm-late-open-no-quit-${width}.png`) });
+        const selected = recipient.locator('[data-tabs] [aria-selected="true"]');
+        await tabTo(recipient, selected); await recipient.keyboard.press('Home');
+        await expect(recipient.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await expect(recipientInput).toHaveValue('/quit');
+        await recipient.keyboard.press('ArrowRight');
+        await expect(recipient.locator('[data-chat-context]')).toHaveText('PM · CausalSender');
+        await expect(recipientInput).toHaveValue('');
+        // Keep the same UI send helper; require this browser's own view to be ready.
+        await send(recipient, '/quit');
+        await expect(recipient.locator('[data-connection]')).toHaveText('Offline'); expect(quitWrites).toBe(1);
+        const notice = sender.locator('[data-toast]');
+        await expect(notice).toContainText('Private replies are not confirmed. Your draft stays here.');
+        await expect(senderInput).toHaveValue(draft); await expect(senderInput).toBeFocused();
+        await sender.screenshot({ path: testInfo.outputPath(`01-pm-ready-real-quit-${width}.png`) });
+        const path = testInfo.outputPath(`pm-recipient-readiness-${width}.json`);
+        await writeFile(path, JSON.stringify({ width, emptyEnterQuitWrites: 0, realReadyQuitWrites: quitWrites,
+            lobbyCommandDraftPreserved: true, recipientOffline: true, senderDraftNotice: true }, null, 2));
+        await testInfo.attach('pm-recipient-readiness', { path, contentType: 'application/json' });
+        for (const sentinel of sentinels) await sentinel.assertClean();
+        expect(errors).toEqual([]);
+    } finally {
+        const closed = await Promise.allSettled(contexts.map(context => context.close()));
+        await community.close();
+        const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (failures.length) throw new AggregateError(failures, 'PM-readiness contexts did not close');
     }
 });
