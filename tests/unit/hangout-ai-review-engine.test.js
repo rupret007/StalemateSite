@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createAiReviewPersistenceSink } from './helpers/ai-review-persistence.mjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby, LOBBY } from '../../hangout-worker/src/lobby-core.mjs';
 
@@ -9,7 +10,9 @@ function boot(options = {}) {
     clock = 1800000000000; requests = []; frames = new Map(); writes = []; seq = 0;
     engine = createLobby({ now: () => clock, reviewPublicText: (request) => { requests.push(request); },
         send: (id, frame) => { if (!frames.has(id)) frames.set(id, []); frames.get(id).push(frame); },
-        persist: (key, value) => writes.push([key, structuredClone(value)]), ...options });
+        // AI-review assertions require historical snapshots only for this record.
+        // Unrelated persistence calls are counted, not retained or clone-validated.
+        persist: createAiReviewPersistenceSink(writes).persist, ...options });
 }
 function guest(nick, role = 'fan') {
     const id = `c${++seq}`;
