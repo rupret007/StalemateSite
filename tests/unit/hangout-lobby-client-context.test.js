@@ -307,6 +307,53 @@ it.each(['join', 'j'])('typed channel return /%s selects an existing tab without
     expect(ws.sent).toHaveLength(before);
 });
 
+it.each(['#menu-return-studio', 'MENU-RETURN-STUDIO'])('command menu join selects the existing %s tab and its draft without another request', async requested => {
+    const { window, ws, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, room = '#menu-return-studio';
+    join(room);
+    const input = doc.querySelector('[data-text]'); input.value = 'Draft for the existing conversation';
+    doc.querySelector('[data-channel-key="#stalemate"]').click(); input.value = 'A separate lobby draft';
+    const palette = doc.querySelector('[data-palette]'), opener = doc.querySelector('[data-palette-open]');
+    palette.showModal = () => { palette.open = true; };
+    palette.close = () => { palette.open = false; opener.focus(); palette.dispatchEvent(new window.Event('close')); };
+    window.prompt = vi.fn(() => requested);
+    opener.click();
+    const action = [...palette.querySelectorAll('button')].find(button => button.textContent === '/join');
+    action.focus(); const before = ws.sent.length; action.click();
+    expect(window.prompt).toHaveBeenCalledOnce();
+    expect(palette.open).toBe(false);
+    expect(doc.querySelector('[data-chat-context]').textContent).toBe(room);
+    expect(window.__lobby.active).toBe(room);
+    expect(input.value).toBe('Draft for the existing conversation');
+    expect(ws.sent).toHaveLength(before);
+    expect(doc.activeElement).toBe(doc.querySelector(`[data-channel-key="${room}"]`));
+    doc.querySelector('[data-channel-key="#stalemate"]').click();
+    expect(input.value).toBe('A separate lobby draft');
+});
+
+it.each([null, '#menu-new-studio'])('command menu join preserves cancellation and real membership confirmation: %s', async answer => {
+    const { window, ws, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, input = doc.querySelector('[data-text]'); input.value = 'Keep the lobby draft';
+    const palette = doc.querySelector('[data-palette]'), opener = doc.querySelector('[data-palette-open]');
+    palette.showModal = () => { palette.open = true; };
+    palette.close = () => { palette.open = false; opener.focus(); palette.dispatchEvent(new window.Event('close')); };
+    window.prompt = vi.fn(() => answer);
+    opener.click();
+    const before = ws.sent.length;
+    [...palette.querySelectorAll('button')].find(button => button.textContent === '/join').click();
+    expect(palette.open).toBe(false);
+    expect(window.__lobby.active).toBe('#stalemate');
+    expect(input.value).toBe('Keep the lobby draft');
+    if (answer === null) expect(ws.sent).toHaveLength(before);
+    else {
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [answer] });
+        join(answer);
+        expect(window.__lobby.active).toBe(answer);
+        doc.querySelector('[data-channel-key="#stalemate"]').click();
+        expect(input.value).toBe('Keep the lobby draft');
+    }
+});
+
 it('recovers an interrupted named channel request without replaying it', async () => {
     const { window, ws, welcome, join, sockets, timers, flush } = await visitor();
     welcome(); join();
