@@ -21,7 +21,8 @@ const send = async (page, text) => {
 for (const width of [375, 390, 1440]) for (const mode of ['discard', 'replacement']) {
     test(`protected status action ${mode} keeps keyboard recovery at ${width}px`, async ({ browser }, testInfo) => {
         const { privateCommunity } = await import('./helpers/private-community.mjs');
-        const community = await privateCommunity(), contexts = [], sentinels = [], errors = [];
+        let lobbyNow = Date.now();
+        const community = await privateCommunity({ lobbyNow: () => lobbyNow }), contexts = [], sentinels = [], errors = [];
         const draft = 'This unsent private draft stays with the original peer.';
         let draftSent = 0;
         async function guest(nickname, source) {
@@ -48,6 +49,8 @@ for (const width of [375, 390, 1440]) for (const mode of ['discard', 'replacemen
             const host = await guest('StatusHost', 'stalemate');
             const sender = await guest('StatusSender', 'rad-dad');
             const recipient = await guest('StatusRecipient', 'stalemate');
+            // Simulate waiting in the lobby; retain the real PM eligibility gate.
+            lobbyNow += 180000;
             const room = '#status-recovery';
             await send(host, '/join ' + room);
             await expect(host.locator('[data-chat-context]')).toHaveText(room);
