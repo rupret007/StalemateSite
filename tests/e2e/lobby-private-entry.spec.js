@@ -554,3 +554,115 @@ for (const width of [375, 390, 1440]) test(`protected nickname picker failure ex
         try { await context?.close(); } finally { await community.close(); }
     }
 });
+
+
+// Both visitors use actual private admission/relay and actual paint controls.
+// Only the guest's activity-script delivery is interrupted; no camera is used.
+for (const { width, height, moveFocus } of [{ width: 375, height: 667, moveFocus: false }, { width: 390, height: 844, moveFocus: true }, { width: 1440, height: 900, moveFocus: true }]) {
+    test(`protected activity tools retry keeps drawing and draft at ${width}px`, async ({ browser }, testInfo) => {
+        const { privateCommunity } = await import('./helpers/private-community.mjs');
+        const community = await privateCommunity(), contexts = [], errors = [], routes = new Set();
+        let requests = 0, release;
+        const delivery = new Promise(resolve => { release = resolve; });
+        async function enter(name, viewWidth, viewHeight, blocked) {
+            const context = await browser.newContext({ ignoreHTTPSErrors: true,
+                viewport: { width: viewWidth, height: viewHeight }, reducedMotion: 'reduce' });
+            contexts.push(context);
+            await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+            const sentinel = await installNoCaptureSentinel(context);
+            if (blocked) await context.route(community.origin + ROOT + 'lobby-room.js', route => {
+                requests++;
+                if (requests === 1) return route.abort('failed');
+                const pending = delivery.then(() => route.continue()); routes.add(pending);
+                return pending.finally(() => routes.delete(pending));
+            });
+            const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+            await page.goto(community.origin + '/beta/?via=' + (blocked ? 'rad-dad' : 'stalemate') + '#invite=' + community.invitation);
+            await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+            await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(name);
+            await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+            return { page, context, sentinel };
+        }
+        async function draw(page, color) {
+            await page.getByRole('button', { name: color + ' brush', exact: true }).click();
+            const canvas = page.locator('[data-act-canvas]'); await canvas.scrollIntoViewIfNeeded();
+            const geometry = await canvas.evaluate(node => {
+                const r = node.getBoundingClientRect();
+                let left = Math.max(0, r.left), top = Math.max(0, r.top), right = Math.min(innerWidth, r.right), bottom = Math.min(innerHeight, r.bottom);
+                for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+                    const style = getComputedStyle(parent), box = parent.getBoundingClientRect();
+                    if (/(auto|scroll|hidden|clip)/.test(style.overflowX)) { left = Math.max(left, box.left); right = Math.min(right, box.right); }
+                    if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) { top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom); }
+                }
+                const start = { x: left + (right - left) * .2, y: top + (bottom - top) * .2 };
+                const end = { x: left + (right - left) * .7, y: top + (bottom - top) * .6 };
+                return { width: right - left, height: bottom - top, start, end,
+                    uncovered: document.elementFromPoint(start.x, start.y) === node && document.elementFromPoint(end.x, end.y) === node };
+            });
+            expect(geometry.width).toBeGreaterThanOrEqual(64); expect(geometry.height).toBeGreaterThanOrEqual(48); expect(geometry.uncovered).toBe(true);
+            await page.mouse.move(geometry.start.x, geometry.start.y); await page.mouse.down();
+            await page.mouse.move(geometry.end.x, geometry.end.y, { steps: 6 }); await page.mouse.up();
+        }
+        const strokes = page => page.evaluate(() => window.__lobbyRoom?.state?.room?.strokes?.length || 0);
+        const pixels = page => page.locator('[data-act-canvas]').evaluate(async node => {
+            const data = node.getContext('2d').getImageData(0, 0, node.width, node.height).data;
+            const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+            return Array.from(digest, value => value.toString(16).padStart(2, '0')).join('');
+        });
+        try {
+            const [host, guest] = await Promise.all([enter('ToolsHost', 1440, 900, false), enter('ToolsGuest', width, height, true)]);
+            await host.page.locator('nav [data-show="rooms"]').click(); await host.page.locator('[data-start="art"]').click();
+            await expect(host.page.locator('[data-act-canvas]')).toBeVisible();
+            const room = await host.page.locator('[data-chat-context]').innerText();
+            await guest.page.locator('nav [data-show="rooms"]').click();
+            await guest.page.getByRole('searchbox', { name: 'Find a room' }).fill(room.slice(1));
+            await guest.page.locator('[data-roomlist] button[data-room="' + room + '"]').press('Enter');
+            await expect(guest.page.locator('[data-chat-context]')).toHaveText(room);
+            expect(await guest.page.evaluate(() => typeof window.LobbyRoom)).toBe('undefined'); expect(requests).toBe(1);
+            await draw(host.page, 'Sky blue'); await expect.poll(() => strokes(host.page)).toBe(1);
+            await expect.poll(() => guest.page.evaluate(() => window.__lobby.chans.get(window.__lobby.active).actSnap?.strokes?.length || 0)).toBe(1);
+            const input = guest.page.getByRole('textbox', { name: 'Message', exact: true }), draft = 'My unsent draft stays while the activity tools recover.';
+            await input.fill(draft);
+            await host.page.getByRole('textbox', { name: 'Message', exact: true }).fill('Chat still works while drawing tools are unavailable.');
+            await host.page.getByRole('button', { name: 'Send', exact: true }).press('Enter');
+            await expect(guest.page.getByRole('log', { name: 'Conversation' })).toContainText('Chat still works while drawing tools are unavailable.');
+            await guest.sentinel.assertClean();
+            await guest.page.screenshot({ path: testInfo.outputPath(`01-activity-tools-unavailable-${width}.png`) });
+            const recovery = guest.page.locator('[data-activity-recovery]'), retry = guest.page.getByRole('button', { name: 'Retry activity', exact: true });
+            await expect(retry).toBeVisible();
+            await expect(recovery).toContainText('Activity tools couldn’t load. Chat still works. Retry the activity.');
+            await expect(retry).toBeInViewport({ ratio: 1 });
+            const box = await retry.boundingBox(); expect(box.width).toBeGreaterThanOrEqual(48); expect(box.height).toBeGreaterThanOrEqual(48);
+            await retry.press('Enter'); await expect.poll(() => requests).toBe(2); await expect(retry).toBeDisabled();
+            await expect(recovery).toContainText('Loading activity tools… Chat still works.');
+            if (moveFocus) await input.click();
+            await draw(host.page, 'Ochre'); await expect.poll(() => strokes(host.page)).toBe(2);
+            await expect.poll(() => guest.page.evaluate(() => window.__lobby.chans.get(window.__lobby.active).actSnap?.strokes?.length || 0)).toBe(2);
+            const priorHash = await pixels(host.page); release();
+            await expect(guest.page.locator('[data-act-canvas]')).toBeVisible(); await expect(recovery).toBeHidden();
+            await expect.poll(() => strokes(guest.page)).toBe(2); await expect.poll(() => pixels(guest.page)).toBe(priorHash);
+            await expect(input).toHaveValue(draft); await expect(guest.page.locator('[data-chat-context]')).toHaveText(room);
+            if (moveFocus) await expect(input).toBeFocused(); else await expect(guest.page.locator('[data-activity] > summary')).toBeFocused();
+            expect(community.diagnostics().admittedUpgrades).toBe(2);
+            await expect(host.page.getByRole('log', { name: 'Conversation' })).not.toContainText(draft);
+            expect(await guest.page.evaluate(text => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(text), draft)).toBe(false);
+            await guest.page.screenshot({ path: testInfo.outputPath(`02-activity-tools-recovered-${width}.png`) });
+            await draw(guest.page, 'Pink'); await expect.poll(() => strokes(guest.page)).toBe(3); await expect.poll(() => strokes(host.page)).toBe(3);
+            const finalHash = await pixels(guest.page); expect(finalHash).not.toBe(priorHash); await expect.poll(() => pixels(host.page)).toBe(finalHash);
+            await expect(input).toHaveValue(draft); await input.press('Enter');
+            await expect(host.page.getByRole('log', { name: 'Conversation' })).toContainText(draft);
+            for (const visitor of [host, guest]) {
+                await visitor.sentinel.assertClean();
+                expect(await visitor.page.evaluate(() => ({ cam: window.__lobbyRoom.state.camOn, stream: !!window.__lobbyRoom.state.stream, peers: window.__lobbyRoom.state.pcs.size }))).toEqual({ cam: false, stream: false, peers: 0 });
+            }
+            expect(errors).toEqual([]); expect(community.diagnostics().failures).toEqual([]);
+            await guest.page.screenshot({ path: testInfo.outputPath(`03-both-draw-and-chat-${width}.png`) });
+        } finally {
+            release(); await Promise.allSettled([...routes]);
+            const closed = await Promise.allSettled(contexts.map(context => context.close())); await community.close();
+            const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+            if (failures.length) throw new AggregateError(failures, 'Owned activity-recovery contexts did not close');
+        }
+    });
+}
