@@ -617,6 +617,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                     const api = room(true);
                     api?.onJoin(current, current.actSnap);
                 } catch {
+                    // A failed room setup still needs the visitor's next tap;
+                    // incoming activity must not silently attach it again.
+                    activityToolsNeedsRetry = true;
                     const failed = roomApi; roomApi = null;
                     try { failed?.onLeave(); } catch { /* Keep the explicit retry available. */ }
                 }

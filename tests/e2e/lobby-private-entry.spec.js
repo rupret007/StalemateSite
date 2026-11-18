@@ -670,3 +670,87 @@ for (const { width, height, moveFocus } of [{ width: 375, height: 667, moveFocus
         }
     });
 }
+
+// Actual renderer and private admission; only one onJoin exception is injected
+// at the exported API boundary. No media or synthetic canvas pixels are used.
+for (const width of [390, 1440]) test(`protected activity setup failure waits for another Retry at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity(), contexts = [], sentinels = [], errors = [];
+    let scriptRequests = 0;
+    async function enter(name, faulty) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width: faulty ? width : 1440, height: faulty && width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        contexts.push(context);
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        sentinels.push(await installNoCaptureSentinel(context));
+        if (faulty) {
+            await context.route(community.origin + ROOT + 'lobby-room.js', route => ++scriptRequests === 1 ? route.abort('failed') : route.continue());
+            await context.addInitScript(() => {
+                const state = window.activitySetupFixture = { attaches: 0, joins: 0, leaves: 0, fail: true };
+                let exported;
+                Object.defineProperty(window, 'LobbyRoom', { configurable: true, get: () => exported, set(value) {
+                    exported = { ...value, attach(...options) {
+                        state.attaches++;
+                        const api = value.attach(...options);
+                        return { ...api, onJoin(...args) {
+                            state.joins++;
+                            if (state.fail) { state.fail = false; throw new Error('Fixture: room setup failed'); }
+                            return api.onJoin(...args);
+                        }, onLeave(...args) { state.leaves++; return api.onLeave(...args); } };
+                    } };
+                } });
+            });
+        }
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        await page.goto(community.origin + '/beta/?via=' + (faulty ? 'rad-dad' : 'stalemate') + '#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(name);
+        await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        return page;
+    }
+    try {
+        const host = await enter('SetupHost', false), guest = await enter('SetupGuest', true);
+        await host.locator('[data-start="art"]').click();
+        const room = await host.locator('[data-chat-context]').textContent();
+        const input = guest.getByRole('textbox', { name: 'Message', exact: true });
+        await input.fill('/join ' + room); await input.press('Enter');
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        const draft = 'My unsent note survives the activity setup error.';
+        await input.fill(draft);
+        const retry = guest.getByRole('button', { name: 'Retry activity', exact: true });
+        const recovery = guest.locator('[data-activity-recovery]');
+        await expect(retry).toBeVisible();
+        await retry.press('Enter');
+        await expect.poll(() => guest.evaluate(() => window.activitySetupFixture.leaves)).toBe(1);
+        await expect(retry).toBeFocused();
+        await expect(retry).toBeEnabled();
+        await expect(retry).toBeInViewport({ ratio: 1 });
+        await guest.screenshot({ path: testInfo.outputPath(`01-setup-failed-${width}.png`) });
+        // A real room update arrives while setup is unavailable. It must not
+        // mount another renderer behind the still-visible Retry control.
+        const topic = 'Activity recovery still needs a deliberate tap.';
+        await host.getByRole('textbox', { name: 'Message', exact: true }).fill('/topic ' + topic);
+        await host.getByRole('textbox', { name: 'Message', exact: true }).press('Enter');
+        await expect(guest.locator('[data-topic]')).toHaveText(topic);
+        expect(await guest.evaluate(() => window.activitySetupFixture.attaches)).toBe(1);
+        await expect(recovery).toBeVisible(); await expect(guest.locator('[data-cam]')).toBeDisabled();
+        await expect(input).toHaveValue(draft); await expect(retry).toBeFocused();
+        await guest.screenshot({ path: testInfo.outputPath(`02-no-silent-restart-${width}.png`) });
+        await retry.press('Enter');
+        await expect(recovery).toBeHidden(); await expect(guest.locator('[data-act-canvas]')).toBeVisible();
+        expect(await guest.evaluate(() => ({ attaches: window.activitySetupFixture.attaches, joins: window.activitySetupFixture.joins }))).toEqual({ attaches: 2, joins: 2 });
+        await expect(guest.locator('[data-activity] > summary')).toBeFocused();
+        await expect(input).toHaveValue(draft); await expect(input).toBeInViewport({ ratio: 1 });
+        await expect(guest.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        expect(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await guest.screenshot({ path: testInfo.outputPath(`03-deliberate-setup-retry-${width}.png`) });
+        for (const sentinel of sentinels) await sentinel.assertClean();
+        expect(errors).toEqual([]); expect(scriptRequests).toBe(2);
+        expect(community.diagnostics().admittedUpgrades).toBe(2); expect(community.diagnostics().failures).toEqual([]);
+    } finally {
+        const closed = await Promise.allSettled(contexts.map(context => context.close())); await community.close();
+        const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (failures.length) throw new AggregateError(failures, 'Owned setup-failure contexts did not close');
+    }
+});
