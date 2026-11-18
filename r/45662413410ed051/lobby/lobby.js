@@ -1582,6 +1582,15 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             const focused = document.activeElement;
             if ($('[data-chat-lines]').contains(focused) && focused.matches(':focus-visible')) {
                 focused.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                const buffer = $('[data-buffer]'), bounds = focused.getBoundingClientRect();
+                const top = buffer.getBoundingClientRect().top + buffer.clientTop;
+                const bottom = top + buffer.clientHeight;
+                // Native nearest alignment can leave a fractional edge clipped.
+                // Center only at that edge, keeping an already clear view still.
+                if (bounds.height > 0 && buffer.clientHeight > bounds.height
+                    && (bounds.top < top + 1 || bounds.bottom > bottom - 1)) {
+                    focused.scrollIntoView({ block: 'center', inline: 'nearest' });
+                }
             }
         });
     }
