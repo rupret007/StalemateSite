@@ -12,6 +12,9 @@ const phoneProject = (name, use) => ({
 
 module.exports = defineConfig({
     testDir: './tests/e2e',
+    // Both CommonJS and ESM specs load the same engine. Keep it native ESM so
+    // the CommonJS transform cannot change its exports for the ESM fixtures.
+    build: { external: ['**/hangout-worker/src/lobby-core.mjs'] },
     timeout: 30000,
     expect: {
         timeout: 5000
