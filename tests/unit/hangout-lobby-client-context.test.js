@@ -1787,3 +1787,74 @@ describe('browser client privacy and bounded delivery wiring', () => {
         expect(log.getAttribute('aria-live')).toBe('off');
     }, 15000);
 });
+
+describe('activity tools recovery', () => {
+    async function drawingVisitor() {
+        const v = await visitor();
+        v.window.eval(readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8'));
+        v.welcome(); v.join();
+        const joinArt = (name = '#drawing-recovery', ref = 'd'.repeat(32)) => v.ws.receive({ t: 'join', ch: {
+            name, kind: 'art', keepRef: ref, modes: { C: true }, names: [{ nick: 'Viewer', prefix: '@' }]
+        } });
+        joinArt();
+        const api = { onJoin: vi.fn(), onLeave: vi.fn(), onChan: vi.fn(), onAct: vi.fn(), onCam: vi.fn() };
+        const attach = vi.fn(() => api);
+        const retry = v.window.document.querySelector('[data-activity-retry]');
+        const script = () => v.window.document.querySelector('script[data-activity-loader]');
+        const load = node => { v.window.LobbyRoom = { attach }; node.dispatchEvent(new v.window.Event('load')); };
+        return { ...v, joinArt, api, attach, retry, script, load };
+    }
+    it('restores the latest room snapshot and keeps an unsent draft without autojoining', async () => {
+        const { window, ws, retry, script, load, api, attach } = await drawingVisitor();
+        const doc = window.document, input = doc.querySelector('[data-text]'); input.value = 'My unsent drawing note';
+        expect(doc.querySelector('[data-activity-recovery]').hidden).toBe(false);
+        expect(script()).toBeNull(); const sent = ws.sent.length;
+        retry.focus(); retry.click(); const pending = script();
+        expect(retry.disabled).toBe(true); expect(pending.src).toBe(new window.URL('lobby-room.js', window.location.href).href);
+        retry.click(); expect(doc.querySelectorAll('script[data-activity-loader]')).toHaveLength(1);
+        ws.receive({ t: 'act', ch: '#drawing-recovery', kind: 'stroke', stroke: { id: 'while-loading', color: '#009ee8', size: 8, pts: [[.1, .2], [.4, .5]] } });
+        input.focus(); load(pending);
+        expect(attach).toHaveBeenCalledTimes(1); expect(api.onJoin).toHaveBeenCalledTimes(1);
+        expect(api.onJoin.mock.calls[0][0].name).toBe('#drawing-recovery');
+        expect(api.onJoin.mock.calls[0][1].strokes.map(s => s.id)).toEqual(['while-loading']);
+        expect(api.onCam).not.toHaveBeenCalled(); expect(input.value).toBe('My unsent drawing note');
+        expect(doc.activeElement).toBe(input); expect(ws.sent).toHaveLength(sent);
+        expect(doc.querySelector('[data-activity-recovery]').hidden).toBe(true); expect(script()).toBeNull();
+    });
+    it('returns retry focus to the activity heading only when focus has not moved', async () => {
+        const { window, retry, script, load } = await drawingVisitor();
+        retry.focus(); retry.click();
+        expect(window.document.activeElement).toBe(window.document.querySelector('[data-activity-recovery-status]'));
+        load(script()); expect(window.document.activeElement).toBe(window.document.querySelector('[data-activity] > summary'));
+    });
+    it('bounds a stalled retry and ignores its late callback after a new explicit retry', async () => {
+        const { window, retry, script, load, flush, attach, api } = await drawingVisitor();
+        retry.focus(); retry.click(); const old = script(); flush(12000);
+        expect(script()).toBeNull(); expect(retry.disabled).toBe(false);
+        expect(window.document.querySelector('[data-activity-recovery-status]').textContent).toContain('Retry the activity.');
+        expect(window.document.activeElement).toBe(retry);
+        retry.click(); const current = script(); load(old);
+        expect(script()).toBe(current); expect(retry.disabled).toBe(true); expect(attach).not.toHaveBeenCalled();
+        current.dispatchEvent(new window.Event('load')); expect(attach).toHaveBeenCalledTimes(1); expect(api.onJoin).toHaveBeenCalledTimes(1);
+    });
+    it('does not reopen a departed room when tools arrive late', async () => {
+        const { window, retry, script, load, join, api, attach } = await drawingVisitor();
+        retry.focus(); retry.click(); const pending = script(); join();
+        const input = window.document.querySelector('[data-text]'); input.focus(); load(pending);
+        expect(window.__lobby.active).toBe('#stalemate'); expect(attach).not.toHaveBeenCalled(); expect(api.onJoin).not.toHaveBeenCalled();
+        expect(window.document.activeElement).toBe(input); expect(window.document.querySelector('[data-activity-recovery]').hidden).toBe(true);
+    });
+    it('uses the current room instance if the same room name was replaced while loading', async () => {
+        const { window, retry, script, load, joinArt, api } = await drawingVisitor();
+        retry.focus(); retry.click(); const pending = script();
+        joinArt('#drawing-recovery', 'e'.repeat(32)); const input = window.document.querySelector('[data-text]'); input.focus(); load(pending);
+        expect(api.onJoin).toHaveBeenCalledTimes(1); expect(api.onJoin.mock.calls[0][0].keepRef).toBe('e'.repeat(32));
+        expect(window.document.activeElement).toBe(input);
+    });
+    it('cleans up on page exit and does not attach a late response', async () => {
+        const { window, retry, script, load, attach, timers } = await drawingVisitor();
+        retry.click(); const pending = script(); window.dispatchEvent(new window.Event('pagehide')); load(pending);
+        expect(script()).toBeNull(); expect(attach).not.toHaveBeenCalled();
+        expect([...timers.values()].filter(task => task.delay === 12000)).toHaveLength(0);
+    });
+});
