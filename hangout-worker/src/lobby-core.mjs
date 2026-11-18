@@ -40,7 +40,6 @@ const SESSION_PREFERENCES = 50;
 const SESSION_PM_PAIRS = 2000;
 const SESSION_PM_PENDING = 1000;
 const PM_PENDING_TTL = 10 * MIN;
-const RECEIPT_SNAPSHOT_TAIL = 32;
 const encoder = new TextEncoder();
 
 export const LOBBY_LIMITS = Object.freeze({
@@ -229,7 +228,6 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const lineMeta = new Map();       // immutable author device + actual recipient connections; never sent to visitors
     const receipts = new Map();       // bounded text digests + delivery metadata; no ordinary chat or PM bodies
     const receiptSizes = new Map();   // exact UTF-8 record sizes; avoid re-encoding the whole queue per line
-    const receiptJson = new WeakMap(); // immutable receipt JSON, reused by successive session writes
     const receiptRecipientSets = new Map(); // bounded intern table for immutable, repeated delivery audiences
     const receiptAudienceBytes = new WeakMap();
     let receiptBytes = 2;             // serialized [] plus records and commas
@@ -1425,21 +1423,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             ...r, recipients: [...r.recipients], ...(r.publicOrigin ? { publicOrigin: { ...r.publicOrigin } } : {})
         })) };
     }
-    function sessionStorageSnapshot(metadata = sessionMetadata(), bytes = encoder.encode(JSON.stringify(metadata)).byteLength + ',"receipts":'.length + receiptBytes) {
-        const rows = [...receipts.values()];
-        // Pack older immutable rows in ordinary storage to avoid rebuilding
-        // their object graph on every chat write. The maximum extra bytes
-        // from escaping the archive's quotes and backslashes is receiptBytes.
-        if (!commitConfigured && rows.length > RECEIPT_SNAPSHOT_TAIL
-            && bytes + receiptBytes + ',"receiptArchive":""'.length <= SESSION_STATE_BYTES) {
-            const older = rows.splice(0, rows.length - RECEIPT_SNAPSHOT_TAIL);
-            const json = older.map(row => {
-                if (!receiptJson.has(row)) receiptJson.set(row, JSON.stringify(row));
-                return receiptJson.get(row);
-            });
-            return { ...metadata, receipts: rows, receiptArchive: `[${json.join(',')}]` };
-        }
-        return { ...metadata, receipts: rows };
+    function sessionStorageSnapshot(metadata = sessionMetadata()) {
+        // Older readers restore every witness from this single flat array.
+        return { ...metadata, receipts: [...receipts.values()] };
     }
     function restoreSessions(saved, liveIdentities = []) {
         const rejected = [], resumed = [];
@@ -1605,7 +1591,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (bytes > SESSION_STATE_BYTES) writes.push(Promise.reject(new Error('session allowance exceeded')));
             // Stored receipt records are immutable; replacement/pruning creates
             // new records, so an outstanding storage write keeps its exact snapshot.
-            else if (persistImpl || controlled) writes.push(persist('sessions', sessionStorageSnapshot(metadata, bytes)));
+            else if (persistImpl || controlled) writes.push(persist('sessions', sessionStorageSnapshot(metadata)));
         }
         const flush = () => {
             for (const [id, frame, marker] of frames) try {
@@ -2417,16 +2403,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function rememberDelivery(line, meta) {
         if (meta.recipients.size) {
-            // A delivery to the author's own device can still be deleted or
-            // purged after eviction, but that device cannot report itself.
             const recipients = receiptAudience([...meta.recipients]);
-            // Protected transactions keep the receipt shape understood by
-            // the existing strict session reader, including during rollback.
-            const controlOnly = !commitConfigured && line.t === 'line'
-                && recipients.every(id => conns.get(id)?.dev === meta.authorDev);
-            setReceipt(line.id, controlOnly
-                ? { controlOnly: true, id: line.id, authorDev: meta.authorDev, ts: line.ts, recipients }
-                : messageReceipt(line, { ...meta, recipients }));
+            setReceipt(line.id, messageReceipt(line, { ...meta, recipients }));
         }
         pruneReceipts(false);
     }
