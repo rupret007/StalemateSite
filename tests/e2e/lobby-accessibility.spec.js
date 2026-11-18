@@ -1809,7 +1809,7 @@ for (const width of [375, 390, 1440]) for (const existing of [false, true]) {
                 await input.fill('/join ' + room); await input.press('Enter');
                 await expect(page.locator('[data-chat-context]')).toHaveText(room);
                 await input.fill(roomDraft);
-                await tabTo(page, page.locator('[data-channel-key="#stalemate"]')); await page.keyboard.press('Enter');
+                await tabTo(page, page.locator(`[data-channel-key="${room}"]`)); await page.keyboard.press('Home');
                 await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
             }
             await input.fill(lobbyDraft);
@@ -1840,7 +1840,7 @@ for (const width of [375, 390, 1440]) for (const existing of [false, true]) {
             await expect(input).toHaveValue(''); await expect(input).toBeInViewport({ ratio: 1 });
             await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-            await tabTo(page, page.locator('[data-channel-key="#stalemate"]')); await page.keyboard.press('Enter');
+            await tabTo(page, selected); await page.keyboard.press('Home');
             await expect(input).toHaveValue(lobbyDraft);
             await page.screenshot({ path: testInfo.outputPath(`02-named-lobby-draft-${existing ? 'existing' : 'new'}-${width}.png`) });
             await sentinel.assertClean(); expect(errors).toEqual([]);
