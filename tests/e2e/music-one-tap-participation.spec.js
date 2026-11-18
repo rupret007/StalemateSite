@@ -1,5 +1,5 @@
-// Two real browser clients exercise lobby-core's safe offer protocol. The C3
-// adapter, participation status and Web Join issuer are synthetic test fixtures.
+// Two real browser clients exercise lobby-core's safe offer protocol. C3,
+// relay delivery and the native WebJam host callback are synthetic fixtures.
 const { randomBytes, randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { createLobby } = require('../../hangout-worker/src/lobby-core.mjs');
@@ -28,8 +28,6 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
         directMusicInvites: true,
         participation,
         effectCommit,
-        musicCapability: request => ({ href: `https://webjam.example/join/#k=${randomBytes(32).toString('base64url')}`
-            + `&s=${randomBytes(32).toString('hex')}&g=1&e=${Math.floor(request.expiresAt / 1000)}` }),
         send: (id, frame) => sockets.get(id)?.send(JSON.stringify(frame)),
         limits: { defaultSlow: 0, pmMinLobbyMs: 0, webJoinOrigins: ['https://webjam.example'] },
     });
@@ -53,8 +51,14 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
         }));
         await context.addInitScript(() => {
             window.__oneTapAcceptCount = 0;
+            window.__webJamLaunches = [];
             document.addEventListener('click', event => {
                 if (event.target.closest('[data-music-invite-action]')) window.__oneTapAcceptCount++;
+                const launcher = event.target.closest('a[href^="webjam-beta://hangout-music/"]');
+                if (launcher) {
+                    event.preventDefault();
+                    window.__webJamLaunches.push(launcher.href.split('/').at(-1));
+                }
             }, true);
         });
         const page = await context.newPage();
@@ -100,6 +104,32 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
         await roster.selectOption({ label: 'MusicGuest' });
         await dialog.getByRole('button', { name: 'Send Music invitation', exact: true }).click();
 
+        const request = await host.waitForFunction(() => window.__webJamLaunches[0] || null);
+        const hostRequest = await request.jsonValue();
+        expect(hostRequest).toMatch(/^[a-f0-9]{32}$/);
+        const callback = await host.context().newPage();
+        const callbackUrl = new URL('/__webjam-native-callback-fixture', baseURL).href;
+        await callback.route(callbackUrl, route => route.fulfill({
+            contentType: 'text/html', body: '<!doctype html><title>WebJam native callback fixture</title>'
+        }));
+        await callback.goto(callbackUrl);
+        const musicHref = `https://webjam.example/join/#k=${randomBytes(32).toString('base64url')}`
+            + `&s=${randomBytes(32).toString('hex')}&g=1&e=${Math.floor((Date.now() + 600000) / 1000)}`;
+        const returned = await callback.evaluate(({ requestId, href }) => new Promise(resolve => {
+            const channel = new BroadcastChannel(`webjam-music-${requestId}`);
+            const timer = setTimeout(() => { channel.close(); resolve(false); }, 5000);
+            channel.onmessage = ({ data }) => {
+                if (typeof data?.returned !== 'boolean') return;
+                clearTimeout(timer);
+                channel.close();
+                resolve(data.returned);
+            };
+            channel.postMessage({ href });
+        }), { requestId: hostRequest, href: musicHref });
+        expect(returned).toBe(true);
+        await expect(host.locator('[data-jam-link]')).toHaveValue('');
+        expect(await host.evaluate(() => window.__webJamLaunches)).toEqual([hostRequest]);
+
         const offer = guest.locator('[data-music-invite]');
         await expect(offer).toBeVisible();
         await expect(offer).toContainText('MusicHost invited you to join Music.');
@@ -114,7 +144,9 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
             && /^#k=[A-Za-z0-9_-]{43}&s=[a-f0-9]{64}&g=1&e=[1-9]\d{0,9}$/.test(location.hash));
         expect(validJoin).toBe(true);
         expect(await guest.evaluate(() => window.__oneTapAcceptCount)).toBe(1);
-        expect(inbound.filter(frame => frame.t === 'music-offer-create')).toHaveLength(1);
+        expect(inbound.filter(frame => frame.t === 'music-offer-create')).toEqual([
+            expect.objectContaining({ request: hostRequest, href: musicHref })
+        ]);
         expect(inbound.filter(frame => frame.t === 'music-offer-accept')).toHaveLength(1);
         expect(inbound.some(frame => frame.t === 'music-invite-offer')).toBe(false);
         await expect(offer).toContainText('audio permission stays separate');
