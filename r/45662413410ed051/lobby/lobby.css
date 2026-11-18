@@ -273,6 +273,11 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 /* A pending offer stays until answered. Let the transcript give up height so
    the composer and Send remain visible above it on a phone. */
 @media (min-height: 451px) { .irc:has(.game-offer:not([hidden])) .buffer { min-height: 48px; } }
+.irc:has(.game-offer:not([hidden])) .lobby-welcome {
+  flex-shrink: 1;
+  min-height: 0;
+  overflow: auto;
+}
 .game-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; margin-bottom: 8px; }
 .game-heading .jam-title, .game-heading .game-note { margin: 0; }
 [data-game-seat-return] { min-height: 44px; margin-block-start: 4px; }
