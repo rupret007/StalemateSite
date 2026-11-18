@@ -673,16 +673,40 @@ for (const { width, height, moveFocus } of [{ width: 375, height: 667, moveFocus
 
 // Actual renderer and private admission; only one onJoin exception is injected
 // at the exported API boundary. No media or synthetic canvas pixels are used.
-for (const width of [390, 1440]) test(`protected activity setup failure waits for another Retry at ${width}px`, async ({ browser }, testInfo) => {
+for (const { width, delayedHostJoin } of [
+    { width: 390, delayedHostJoin: false }, { width: 1440, delayedHostJoin: false },
+    { width: 390, delayedHostJoin: true }, { width: 1440, delayedHostJoin: true },
+]) test(`protected activity setup failure waits for another Retry at ${width}px${delayedHostJoin ? ' with delayed host acknowledgement' : ''}`, async ({ browser }, testInfo) => {
     const { privateCommunity } = await import('./helpers/private-community.mjs');
     const community = await privateCommunity(), contexts = [], sentinels = [], errors = [];
-    let scriptRequests = 0;
+    let scriptRequests = 0, delayedHostJoins = 0, joinReleaseTimer;
+    const heldHostFrames = [], routeErrors = [];
+    function releaseHostFrames(socket) {
+        clearTimeout(joinReleaseTimer); joinReleaseTimer = undefined;
+        for (const raw of heldHostFrames.splice(0)) socket.send(raw);
+    }
     async function enter(name, faulty) {
         const context = await browser.newContext({ ignoreHTTPSErrors: true,
             viewport: { width: faulty ? width : 1440, height: faulty && width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
         contexts.push(context);
         await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
         sentinels.push(await installNoCaptureSentinel(context));
+        if (!faulty && delayedHostJoin) await context.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
+            const server = socket.connectToServer();
+            server.onMessage(raw => {
+                const frame = JSON.parse(String(raw));
+                if (joinReleaseTimer || delayedHostJoins === 0 && frame.t === 'join' && frame.ch?.kind === 'art') {
+                    // Delay the genuine acknowledgement and following frames
+                    // together, preserving WebSocket order and permissions.
+                    if (heldHostFrames.length >= 64) { routeErrors.push('host-frame-bound'); void socket.close(); return; }
+                    heldHostFrames.push(raw);
+                    if (!joinReleaseTimer) {
+                        delayedHostJoins++;
+                        joinReleaseTimer = setTimeout(() => releaseHostFrames(socket), 1000);
+                    }
+                } else socket.send(raw);
+            });
+        });
         if (faulty) {
             await context.route(community.origin + ROOT + 'lobby-room.js', route => ++scriptRequests === 1 ? route.abort('failed') : route.continue());
             await context.addInitScript(() => {
@@ -708,12 +732,20 @@ for (const width of [390, 1440]) test(`protected activity setup failure waits fo
         await expect(page.locator('[data-enter]')).toBeEnabled();
         await page.locator('[data-enter]').press('Enter');
         await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        expect(new URL(page.url()).hash).toBe('');
         return page;
     }
     try {
         const host = await enter('SetupHost', false), guest = await enter('SetupGuest', true);
         await host.locator('[data-start="art"]').click();
+        if (delayedHostJoin) await expect.poll(() => delayedHostJoins).toBe(1);
+        await expect(host.locator('[data-chat-context]')).toHaveText(/^#art-/);
         const room = await host.locator('[data-chat-context]').textContent();
+        await testInfo.attach('host-room-capture', { contentType: 'application/json',
+            body: JSON.stringify({ room, delayedHostJoin, delayedHostJoins, queuedFrames: heldHostFrames.length }) });
+        await host.screenshot({ path: testInfo.outputPath(`00-host-room-capture-${width}.png`) });
+        // The fixture must target the newly confirmed activity, not the lobby.
+        expect(room).toMatch(/^#art-/);
         const input = guest.getByRole('textbox', { name: 'Message', exact: true });
         await input.fill('/join ' + room); await input.press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);
@@ -748,8 +780,10 @@ for (const width of [390, 1440]) test(`protected activity setup failure waits fo
         await guest.screenshot({ path: testInfo.outputPath(`03-deliberate-setup-retry-${width}.png`) });
         for (const sentinel of sentinels) await sentinel.assertClean();
         expect(errors).toEqual([]); expect(scriptRequests).toBe(2);
+        expect(routeErrors).toEqual([]);
         expect(community.diagnostics().admittedUpgrades).toBe(2); expect(community.diagnostics().failures).toEqual([]);
     } finally {
+        clearTimeout(joinReleaseTimer); heldHostFrames.length = 0;
         const closed = await Promise.allSettled(contexts.map(context => context.close())); await community.close();
         const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
         if (failures.length) throw new AggregateError(failures, 'Owned setup-failure contexts did not close');
