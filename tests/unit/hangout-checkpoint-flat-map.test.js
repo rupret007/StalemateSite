@@ -71,3 +71,36 @@ it('preserves exact byte/node limits independently of flat private storage size'
         expect(() => make(graph(), { maxNodes: old.nodes - 1 })).toThrow('Participation checkpoint limit exceeded');
     }
 });
+
+it('restores distinct nested Maps shared as keys and values across another Map and Set', () => {
+    for (const make of [baseline, candidate]) {
+        vi.spyOn(performance, 'now').mockReturnValue(0);
+        const inner = new Map([[null, 'original']]); const other = new Map([[inner, inner]]);
+        const outer = new Map([[inner, other], [other, inner]]); const roots = { inner, other, outer, set: new Set([inner, other]) };
+        const cp = make(roots);
+        inner.clear(); inner.set('changed', outer); other.clear(); outer.clear(); roots.set.clear();
+        expect(cp.restore()).toBe(true);
+        expect([...inner]).toEqual([[null, 'original']]);
+        expect(other.get(inner)).toBe(inner); expect(outer.get(inner)).toBe(other); expect(outer.get(other)).toBe(inner);
+        expect([...roots.set]).toEqual([inner, other]);
+        vi.restoreAllMocks();
+    }
+});
+it('accepts exactly 50ms and rejects greater than 50ms for capture and restore', () => {
+    for (const make of [baseline, candidate]) {
+        for (const elapsed of [50, 50.001]) {
+            let calls = 0;
+            vi.spyOn(performance, 'now').mockImplementation(() => calls++ === 0 ? 0 : elapsed);
+            if (elapsed === 50) expect(make(new Map([[null, 1]])).metrics.captureMs).toBe(50);
+            else expect(() => make(new Map([[null, 1]]))).toThrow('Participation checkpoint limit exceeded');
+            vi.restoreAllMocks();
+            vi.spyOn(performance, 'now').mockReturnValue(0);
+            const map = new Map([[null, 1]]); const cp = make(map); map.set('changed', 2);
+            vi.restoreAllMocks(); calls = 0;
+            vi.spyOn(performance, 'now').mockImplementation(() => calls++ === 0 ? 0 : elapsed);
+            if (elapsed === 50) { expect(cp.restore()).toBe(true); expect([...map]).toEqual([[null, 1]]); }
+            else expect(() => cp.restore()).toThrow('Participation checkpoint limit exceeded');
+            expect(cp.restore()).toBe(false); vi.restoreAllMocks();
+        }
+    }
+});
