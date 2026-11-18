@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
+import { randomBytes } from 'node:crypto';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { createParticipationConsents, PARTICIPATION_LEDGER_KEY } from '../../hangout-worker/src/participation-consents.mjs';
 import { PARTICIPATION_PURPOSES } from '../../hangout-worker/src/participation-policy.mjs';
@@ -27,7 +28,7 @@ function store() {
 function gate() {
     let enter, release; return { entered: new Promise(resolve => { enter = resolve; }), wait: () => { enter(); return new Promise(resolve => { release = resolve; }); }, release: () => release() };
 }
-async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICIPATION_PURPOSES, provider = false, maxFrames = 4000, musicOrigin = null } = {}) {
+async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICIPATION_PURPOSES, otherPeerPurposes = PARTICIPATION_PURPOSES, provider = false, maxFrames = 4000, musicOrigin = null } = {}) {
     let at = START, serial = 0;
     const reference = () => `synthetic_reference_${String(++serial).padStart(6, '0')}`, storage = store(), participants = new Map(), decisions = new Map(), guardians = new Map(), identities = new Map();
     const config = { policy: { version: 1, policyVersion: 'synthetic-policy-v1', revision: 1, communityRef: 'synthetic_shared_community',
@@ -53,15 +54,18 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
         expect((await ledger.complete(decision)).state).toBe('authorized');
         identities.set(name, { principalRef, communityRef: config.policy.communityRef, expiresAt: at + 500000 }); return { proof, principalRef };
     };
-    const alice = await enroll('alice', purposes), bravo = await enroll('bravo', peerPurposes), sessionBindings = new Map(), controls = { commitGate: null, writeGate: null, failWrites: false, providerReady: provider, afterValidate: null, skipValidate: false };
+    const alice = await enroll('alice', purposes), bravo = await enroll('bravo', peerPurposes), peer = await enroll('peer', otherPeerPurposes),
+        sessionBindings = new Map(), controls = { commitGate: null, writeGate: null, failWrites: false, providerReady: provider, providerStartFailure: false, afterValidate: null, skipValidate: false };
     const validateConnection = async ({ connection, identity, at: time }) => {
         const current = identities.get(connection.id), session = sessionBindings.get(connection.id);
         return !!current && !!session && current.expiresAt > time && current.principalRef === identity.principalRef && current.communityRef === identity.communityRef
             && ['dev', 'account', 'role', 'admin'].every(key => session[key] === connection[key]);
     };
     const enforcement = createParticipationEnforcement({ storage, now: () => at, resolveConnection: async connection => clone(identities.get(connection.id)), validateConnection,
-        providerQualified: () => controls.providerReady, dispatchStart: request => controls.skipValidate ? request.start() : storage.dispatchStart({
-            validate: async tx => { await request.validate(tx); controls.afterValidate?.(); }, start: request.start }),
+        providerQualified: () => controls.providerReady, dispatchStart: request => controls.providerStartFailure
+            ? Promise.reject(Error('synthetic provider start failure'))
+            : controls.skipValidate ? request.start() : storage.dispatchStart({
+                validate: async tx => { await request.validate(tx); controls.afterValidate?.(); }, start: request.start }),
         beforeCommit: async ({ costsOnly }) => { if (!costsOnly && controls.commitGate) { const held = controls.commitGate; controls.commitGate = null; await held.wait(); } },
         writeEffects: async ({ tx, effects, costsOnly }) => {
             if (!costsOnly && controls.writeGate) { const held = controls.writeGate; controls.writeGate = null; await held.wait(); }
@@ -73,15 +77,22 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
     const providerControls = { quotaGate: null };
     const moderator = createAiModerator({ enabled: provider, apiKey: 'synthetic_only', now: () => at, fetchImpl: providerFetch,
         saveUsage: async () => { if (providerControls.quotaGate) { const held = providerControls.quotaGate; providerControls.quotaGate = null; await held.wait(); } } });
+    const effectCommit = {
+        prepare: async () => Object.freeze({}),
+        commit: async (_context, effects, { participation: fence } = {}) => fence
+            ? fence.adapter.commit(fence.context, effects)
+            : { ok: false, reason: 'synthetic-effect-fence-unavailable' }
+    };
     let engine;
-    const make = () => createLobby({ now: () => at, participation: enforcement, persist: legacyPersist, directMusicInvites: !!musicOrigin,
+    const make = () => createLobby({ now: () => at, participation: enforcement, effectCommit, persist: legacyPersist, directMusicInvites: !!musicOrigin,
         send: (id, frame) => frames.push({ recipient: id, ...clone(frame) }), close: (...args) => closed.push(args),
         limits: { defaultSlow: 0, pmMinLobbyMs: 0, framesPerConnection: maxFrames, webJoinOrigins: musicOrigin ? [musicOrigin] : [] },
         reviewPublicText: provider ? request => { const task = moderator.review(request).then(result => engine.applyAiReview(request.id, result)); providerTasks.push(task); return task; } : null });
     engine = make();
     const connect = async (id, nick = id === 'alice' ? 'Alice' : 'Bravo', extra = {}) => {
-        sessionBindings.set(id, { dev: `dev-${id}`, account: id === 'alice' ? 'a'.repeat(64) : 'b'.repeat(64), role: 'fan', admin: false, ...extra });
-        const admission = await engine.connect({ id, dev: `dev-${id}`, iph: `ip-${id}`, account: id === 'alice' ? 'a'.repeat(64) : 'b'.repeat(64), ...extra });
+        const binding = { betaSid: `synthetic_beta_session_${id}`, ...extra };
+        sessionBindings.set(id, { dev: `dev-${id}`, account: id === 'alice' ? 'a'.repeat(64) : 'b'.repeat(64), role: 'fan', admin: false, ...binding });
+        const admission = await engine.connect({ id, dev: `dev-${id}`, iph: `ip-${id}`, account: id === 'alice' ? 'a'.repeat(64) : 'b'.repeat(64), ...binding });
         if (!admission?.ok) return admission;
         return engine.message(id, JSON.stringify({ t: 'hello', nick, age13: true, subjectRef: 'forged_subject_ref', consent: true }));
     };
@@ -93,12 +104,23 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
         guardians.set(proof, { operationRef: reference(), subjectRef: subject.subjectRef, principalRef: guardian.principalRef, guardianRef: guardian.guardianRef, guardianRevision: guardian.revision, expiresAt: at + 10000 });
         return ledger.change(proof, { expectedRevision: subject.revision, purposes: [...allowed] });
     };
-    return { storage, ledger, engine, enforcement, controls, frames, closed, identities, sessionBindings, validateConnection, config, alice, bravo, connect, message, cmd, withdraw, legacyPersist,
-        providerFetch, providerControls, providerTasks, moderator, make, advance: ms => { at += ms; }, now: () => at,
+    return { storage, ledger, engine, enforcement, controls, frames, closed, identities, sessionBindings, validateConnection, config, alice, bravo, peer, connect, message, cmd, withdraw, legacyPersist,
+        providerFetch, providerControls, providerTasks, musicOrigin, moderator, make, advance: ms => { at += ms; }, now: () => at,
         policyChange: async () => { config.policy = { ...config.policy, revision: 2, policyVersion: 'synthetic-policy-v2', noticeDigest: 'b'.repeat(64), decisionRef: 'synthetic_operator_change' }; return ledger.installPolicy('synthetic_operator'); } };
 }
 
 describe('controlled C3 engine integration', () => {
+    const candidate = (origin, expires) => `${origin}/join/#k=${randomBytes(32).toString('base64url')}&s=${randomBytes(32).toString('hex')}&g=1&e=${Math.floor(expires / 1000)}`;
+    const joinMusicRoom = async (f, name = '#jam-practice') => {
+        await f.cmd('alice', 'join', [name]);
+        return f.frames.find(frame => frame.recipient === 'alice' && frame.t === 'join' && frame.ch.name === name).ch.keepRef;
+    };
+    const createMusicOffer = async (f, { request = randomBytes(16).toString('hex'), room = '#jam-practice', roomInstance,
+        guest = 'bravo', href = candidate(f.musicOrigin, f.now() + 10 * 60_000) }) => {
+        await f.message('alice', { t: 'music-offer-create', version: 1, request, ch: room, roomInstance, peer: guest, href });
+        return { request, href };
+    };
+
     it('keeps direct Music invitations unavailable under the participation authority', async () => {
         const musicOrigin = 'https://music.example.test';
         const f = await setup({ musicOrigin });
@@ -120,6 +142,157 @@ describe('controlled C3 engine integration', () => {
         expect(f.frames).toContainEqual({ recipient: 'alice', t: 'music-invite-result', request, status: 'unavailable' });
         expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-invite')).toBe(false);
         expect(JSON.stringify(f.frames)).not.toContain(href);
+    });
+
+    it('offers a versioned Music invitation only to the consented peer and reveals it after that peer accepts', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        for (const recipient of ['alice', 'bravo']) {
+            const hello = f.frames.find(frame => frame.t === 'hello' && frame.recipient === recipient);
+            expect(hello.features).toHaveProperty('participationSafeMusicOffers', 1);
+            expect(hello.features).not.toHaveProperty('directMusicInvites');
+        }
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        expect(invite).toMatchObject({ version: 1, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.status === 'queued')).toBe(true);
+        expect(JSON.stringify(f.frames).includes('/join/#')).toBe(false);
+        expect(JSON.stringify(f.engine.sessionSnapshot()).includes('/join/#')).toBe(false);
+        expect(JSON.stringify([...f.storage.snapshot()]).includes('/join/#')).toBe(false);
+
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.status === 'sent')).toBe(true);
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
+
+        const accepted = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted');
+        expect(accepted.version).toBe(1);
+        expect(accepted.href).toBe(href);
+        expect(f.frames.filter(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toHaveLength(1);
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-outcome' && frame.status === 'accepted')).toBe(true);
+        expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(true);
+    });
+
+    it('keeps a completed Music admission in the reconnect snapshot without retaining its Web Join fragment', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
+
+        const fragment = href;
+        const saved = structuredClone({ net: f.engine.snapshot(), rooms: f.engine.roomSnapshot(), sessions: f.engine.sessionSnapshot() });
+        expect(saved.sessions.connections.find(connection => connection.id === 'bravo').channels).toContain(room);
+        expect(JSON.stringify(saved)).not.toContain('/join/#');
+        const resumed = f.make();
+        resumed.restore(saved.net);
+        await resumed.restoreRooms(saved.rooms);
+        const live = saved.sessions.connections.map(connection => ({ ...connection, betaSid: `synthetic_beta_session_${connection.id}` }));
+        expect(resumed.restoreSessions(saved.sessions, live).resumed).toContain('bravo');
+        expect(resumed.sessionSnapshot().connections.find(connection => connection.id === 'bravo').channels).toContain(room);
+        expect(JSON.stringify({ sessions: resumed.sessionSnapshot(), rooms: resumed.roomSnapshot(), stored: [...f.storage.snapshot()] })).not.toContain(fragment);
+    });
+
+    it('deduplicates an identical host request and rejects reuse for another peer', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo'); await f.connect('peer', 'GuestTwo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room), request = randomBytes(16).toString('hex');
+        const { href } = await createMusicOffer(f, { request, room, roomInstance, guest: 'bravo' });
+        await createMusicOffer(f, { request, room, roomInstance, guest: 'bravo', href });
+        expect(f.frames.filter(frame => frame.recipient === 'bravo' && frame.t === 'music-offer')).toHaveLength(1);
+        expect(f.frames.filter(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.request === request))
+            .toEqual(expect.arrayContaining([expect.objectContaining({ status: 'queued' }), expect.objectContaining({ status: 'queued' })]));
+        await createMusicOffer(f, { request, room, roomInstance, guest: 'peer', href });
+        expect(f.frames.filter(frame => frame.recipient === 'peer' && frame.t === 'music-offer')).toHaveLength(0);
+        expect(f.frames.at(-1)).toMatchObject({ recipient: 'alice', t: 'music-offer-result', request, status: 'unavailable' });
+    });
+
+    it('rejects off-origin, expired and overlong Web Join returns before notifying the guest', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const invalid = [
+            candidate('https://unapproved.example.test', f.now() + 5 * 60_000),
+            candidate(musicOrigin, f.now() - 1),
+            candidate(musicOrigin, f.now() + 11 * 60_000),
+        ];
+        for (const href of invalid) {
+            const request = randomBytes(16).toString('hex');
+            await createMusicOffer(f, { request, room, roomInstance, href });
+            expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer' && frame.request === request)).toBe(false);
+            expect(f.frames).toContainEqual({ recipient: 'alice', t: 'music-offer-result', version: 1,
+                request, status: 'unavailable' });
+        }
+    });
+
+    it('compensates room admission and withholds the candidate after provider dispatch failure', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        f.controls.providerStartFailure = true;
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await vi.waitFor(() => expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(false), { timeout: 2000 });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-outcome' && frame.status === 'unavailable')).toBe(true);
+        expect(JSON.stringify(f.frames)).not.toContain(href);
+        expect(JSON.stringify({ net: f.engine.snapshot(), rooms: f.engine.roomSnapshot(), sessions: f.engine.sessionSnapshot(),
+            stored: [...f.storage.snapshot()] })).not.toContain(href);
+    });
+
+    it('declines without admitting the guest to the Jam room or disclosing the candidate', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await f.message('bravo', { t: 'music-offer-decline', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-outcome' && frame.status === 'declined')).toBe(true);
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(JSON.stringify(f.frames).includes('/join/#')).toBe(false);
+        expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(false);
+    });
+
+    it('rejects a nonparticipant and an unauthorized peer without exposing the candidate', async () => {
+        const musicOrigin = 'https://music.example.test';
+        const f = await setup({ musicOrigin, provider: true, peerPurposes: ['direct-contact'] });
+        await f.connect('alice'); await f.connect('bravo'); await f.connect('peer', 'GuestTwo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request } = await createMusicOffer(f, { room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer')).toBe(false);
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.request === request && frame.status === 'unavailable')).toBe(true);
+        const { request: allowedRequest } = await createMusicOffer(f, { request: randomBytes(16).toString('hex'), room, roomInstance, guest: 'peer' });
+        const invite = f.frames.find(frame => frame.recipient === 'peer' && frame.t === 'music-offer');
+        expect(invite?.request).toBe(allowedRequest);
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request: allowedRequest, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(f.frames.some(frame => frame.recipient === 'peer' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(JSON.stringify(f.frames).includes('/join/#')).toBe(false);
+    });
+
+    it('rejects forged, stale and replayed accepts without issuing a second capability', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo'); await f.connect('peer', 'GuestTwo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        await f.message('peer', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'peer' && frame.t === 'music-offer-accepted')).toBe(false);
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance: randomBytes(16).toString('hex') });
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.status === 'sent')).toBe(false);
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.filter(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toHaveLength(1);
+        expect(JSON.stringify(f.frames)).toContain(href);
     });
 
     it('uses verified C2 subjects in actual chat/room/artifact/registration actions without ordinary persist fallback', async () => {
