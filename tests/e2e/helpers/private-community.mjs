@@ -14,7 +14,10 @@ const root = fileURLToPath(new URL('../../../', import.meta.url));
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
     '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
 
-export async function privateCommunity() {
+export async function privateCommunity({ lobbyNow } = {}) {
+    // Optional test clock exercises elapsed lobby eligibility without lowering
+    // any admission/PM limits. Beta cookie/admission time stays real.
+    assert.ok(lobbyNow === undefined || typeof lobbyNow === 'function');
     // Reuse only Miniflare's already-public development TLS pair, with its MIT
     // notice/provenance, rather than installing its runtime for a browser test.
     // Never mint, log or install a certificate or trust root.
@@ -70,7 +73,7 @@ export async function privateCommunity() {
     });
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
     origin = 'https://127.0.0.1:' + server.address().port;
-    const relay = createHangoutRelay({ origins: origin, previewKey: env.HANGOUT_PREVIEW_KEY });
+    const relay = createHangoutRelay({ origins: origin, previewKey: env.HANGOUT_PREVIEW_KEY, now: lobbyNow });
     server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
     server.on('upgrade', async (incoming, socket, head) => {
         try {

@@ -1952,3 +1952,43 @@ describe('activity tools recovery', () => {
         expect([...timers.values()].filter(task => task.delay === 12000)).toHaveLength(0);
     });
 });
+
+
+describe('keyboard focus during status action recovery', () => {
+    async function closedPrivateDraft() {
+        const v = await visitor('stalemate', { privateMessageContext: 1, privateMessagePeers: 1 });
+        v.welcome(); v.join();
+        const peer = { with: 'Friend', peer: 'friend-peer', ref: 'c'.repeat(32) };
+        v.ws.receive({ t: 'pm-open', ...peer });
+        const input = v.window.document.querySelector('[data-text]');
+        input.value = 'A private unsent draft';
+        v.ws.receive({ t: 'pm-closed', ...peer });
+        const toast = v.window.document.querySelector('[data-toast]');
+        const discard = [...toast.querySelectorAll('button')].find(button => button.textContent === 'Discard draft');
+        expect(discard).toBeTruthy();
+        return { ...v, input, toast, discard };
+    }
+
+    it('returns to the composer after discarding a closed private draft with the keyboard', async () => {
+        const v = await closedPrivateDraft();
+        const before = v.ws.sent.length;
+        v.discard.focus(); v.discard.click();
+        expect(v.input.value).toBe(''); expect(v.toast.hidden).toBe(true);
+        expect(v.window.document.activeElement).toBe(v.input);
+        expect(v.ws.sent).toHaveLength(before);
+    });
+
+    it.each([false, true])('keeps a replacement status reachable without stealing outside focus (%s)', async moved => {
+        const v = await closedPrivateDraft();
+        v.discard.focus(); if (moved) v.input.focus();
+        const before = v.ws.sent.length;
+        v.ws.receive({ t: 'notice', from: 'StaleBot', kind: 'error', text: 'The other room closed.' });
+        expect(v.discard.isConnected).toBe(false);
+        expect(v.toast.textContent).toBe('The other room closed.');
+        expect(v.window.document.activeElement).toBe(moved ? v.input : v.toast);
+        expect(v.input.value).toBe('A private unsent draft');
+        expect(v.ws.sent).toHaveLength(before);
+        v.flush(4000);
+        expect(v.toast.hidden).toBe(moved);
+    });
+});
