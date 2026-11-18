@@ -124,7 +124,7 @@ for (const width of [375, 390, 1440]) test(`protected private draft choices surv
         return page;
     }
     try {
-        const sender = await guest('PatientSender', 'rad-dad'), recipient = await guest('PatientPeer', 'stalemate');
+        const [sender, recipient] = await Promise.all([guest('PatientSender', 'rad-dad'), guest('PatientPeer', 'stalemate')]);
         lobbyNow += 180000; // Keep the real two-minute PM eligibility policy.
         await send(sender, '/query PatientPeer');
         await recipient.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).press('Enter');
@@ -162,7 +162,9 @@ for (const width of [375, 390, 1440]) test(`protected private draft choices surv
         for (const sentinel of sentinels) await sentinel.assertClean();
         expect(errors).toEqual([]);
     } finally {
-        for (const context of contexts) await context.close();
+        const closed = await Promise.allSettled(contexts.map(context => context.close()));
         await community.close();
+        const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (failures.length) throw new AggregateError(failures, 'Draft-recovery contexts did not close');
     }
 });
