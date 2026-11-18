@@ -229,11 +229,11 @@ describe('controlled C3 engine integration', () => {
         }
     });
 
-    it('compensates room admission and withholds the capability after provider dispatch failure', async () => {
+    it('compensates room admission and withholds the candidate after provider dispatch failure', async () => {
         const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
         await f.connect('alice'); await f.connect('bravo');
         const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
-        const { request } = await createMusicOffer(f, { room, roomInstance });
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
         const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
         await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
         f.controls.providerStartFailure = true;
@@ -241,6 +241,9 @@ describe('controlled C3 engine integration', () => {
         await vi.waitFor(() => expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(false), { timeout: 2000 });
         expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(false);
         expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-outcome' && frame.status === 'unavailable')).toBe(true);
+        expect(JSON.stringify(f.frames)).not.toContain(href);
+        expect(JSON.stringify({ net: f.engine.snapshot(), rooms: f.engine.roomSnapshot(), sessions: f.engine.sessionSnapshot(),
+            stored: [...f.storage.snapshot()] })).not.toContain(href);
     });
 
     it('declines without admitting the guest to the Jam room or disclosing the candidate', async () => {
