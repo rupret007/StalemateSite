@@ -364,6 +364,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     // onLeave invalidates capture/room generations as well as live tracks/PCs.
     function pauseLocalMedia() {
         app.localMediaPaused = true;
+        clearActivityAttempt();
+        activityRecovery.hidden = true;
         clearRoomInvites();
         clearGameLinks();
         clearJamInvitations();
@@ -563,15 +565,80 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (app.active === channel) drawChan();
         return send({ t: 'cam', ch: channel, on: false });
     }
-    function room() {
+    function room(recovering = false) {
         if (app.sharingStopped || app.localMediaPaused) return null;
-        if (!roomApi && window.LobbyRoom) {
+        if (!roomApi && typeof window.LobbyRoom?.attach === 'function'
+            && (recovering || !activityToolsNeedsRetry || !activityRoom(store(app.active)))) {
             roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params, onCameraFailure: stopLocalCamera });
+            activityToolsNeedsRetry = false;
+            drawActivityRecovery();
         }
         return roomApi;
     }
     const activityRoom = c => c && CREATIVE_ROOM_KINDS.has(c.kind)
         && connectionState === 'connected' && !sessionEnded && !app.localMediaPaused && !app.sharingStopped && !c.readOnly;
+    let activityToolsAttempt = null, activityToolsPageLeft = false, activityToolsNeedsRetry = false;
+    const activityRecovery = $('[data-activity-recovery]');
+    const activityRecoveryStatus = $('[data-activity-recovery-status]');
+    const activityRetry = $('[data-activity-retry]');
+    function drawActivityRecovery() {
+        activityRecovery.hidden = !!roomApi || !activityRoom(store(app.active));
+        if (!activityRecovery.hidden && typeof window.LobbyRoom?.attach !== 'function') activityToolsNeedsRetry = true;
+        activityRetry.disabled = !!activityToolsAttempt;
+        activityRecoveryStatus.textContent = activityToolsAttempt
+            ? 'Loading activity tools… Chat still works.'
+            : 'Activity tools couldn’t load. Chat still works. Retry the activity.';
+    }
+    function clearActivityAttempt() {
+        const attempt = activityToolsAttempt;
+        if (!attempt) return;
+        activityToolsAttempt = null;
+        clearTimeout(attempt.timer);
+        attempt.script.onload = attempt.script.onerror = null;
+        attempt.script.remove();
+    }
+    activityRetry.addEventListener('click', () => {
+        const origin = store(app.active);
+        if (activityToolsPageLeft || activityToolsAttempt || roomApi || !activityRoom(origin)) return;
+        const script = document.createElement('script');
+        const attempt = activityToolsAttempt = { script, origin, timer: null };
+        const returnFocus = document.activeElement === activityRetry;
+        $('[data-activity]').open = true;
+        if (returnFocus) activityRecoveryStatus.focus({ preventScroll: true });
+        drawActivityRecovery();
+        function finish(loaded) {
+            if (activityToolsAttempt !== attempt) return;
+            const ownFocus = document.activeElement === activityRecoveryStatus;
+            clearActivityAttempt();
+            if (activityToolsPageLeft) return;
+            const current = store(app.active);
+            if (loaded && activityRoom(current) && typeof window.LobbyRoom?.attach === 'function') {
+                try {
+                    const api = room(true);
+                    api?.onJoin(current, current.actSnap);
+                } catch {
+                    const failed = roomApi; roomApi = null;
+                    try { failed?.onLeave(); } catch { /* Keep the explicit retry available. */ }
+                }
+            }
+            drawChan();
+            if (ownFocus && current === origin && activityRoom(current)) {
+                if (roomApi) $('[data-activity] > summary').focus({ preventScroll: true });
+                else activityRetry.focus({ preventScroll: true });
+            }
+        }
+        // The optional first-party renderer is retried only on this tap. No
+        // page reload, socket reconnect or media consent.
+        if (typeof window.LobbyRoom?.attach === 'function') return finish(true);
+        script.dataset.activityLoader = '';
+        script.src = new URL('lobby-room.js', location.href).href;
+        script.onload = () => finish(true);
+        script.onerror = () => finish(false);
+        attempt.timer = setTimeout(() => finish(false), 12000);
+        document.head.append(script);
+    });
+    window.addEventListener('pagehide', () => { activityToolsPageLeft = true; clearActivityAttempt(); });
+    window.addEventListener('pageshow', () => { activityToolsPageLeft = false; drawActivityRecovery(); });
     function activitySnapshot(snapshot) {
         const state = window.HangoutCore.emptyState();
         // The shared decoder copies nested strokes/video. The renderer's
@@ -2805,7 +2872,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const showAct = !app.sharingStopped && !app.localMediaPaused && room && ['bobross', 'watch', 'art'].includes(c.kind);
         $('[data-activity]').hidden = !showAct;
         $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'A little paint. A little Bob Ross.' : 'Watching together' : 'Shared activity';
-        $('[data-act-stage]').hidden = !showAct;
+        $('[data-act-stage]').hidden = !showAct || !roomApi;
+        drawActivityRecovery();
         document.body.classList.toggle('am-op', !app.localMediaPaused && !!(c && amOp(c)));
         if (room) {
             const m = c.modes;
@@ -2816,7 +2884,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             cam.hidden = app.localMediaPaused || ['chat', 'game'].includes(c.kind);
             cam.setAttribute('aria-pressed', String(!!c.myCam));
             cam.textContent = c.myCam ? '📷 Camera on' : m.C ? '📷 Camera (18+)' : '📷 Cameras off here';
-            cam.disabled = !m.C && !c.myCam;
+            cam.disabled = (!m.C && !c.myCam) || (showAct && !roomApi);
         }
         const peopleHeading = $('[data-people-title]');
         peopleHeading.textContent = isPm ? 'PM' : c ? `${c.name} · ${c.count || c.names?.length || 0}` : 'People';
