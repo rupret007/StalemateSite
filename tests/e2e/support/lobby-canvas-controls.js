@@ -40,12 +40,31 @@ async function openCanvasControls(page) {
             return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)),
                 value => value.toString(16).padStart(2, '0')).join('');
         };
+        // Independent full-vector rasterization. Never calls the displayed
+        // room renderer, onJoin, or its cached backdrop.
+        const expectedPixels = async (strokes) => {
+            const reference = document.createElement('canvas');
+            reference.width = canvas.width; reference.height = canvas.height;
+            const ctx = reference.getContext('2d');
+            for (const stroke of strokes) {
+                if (!stroke.pts.length) continue;
+                ctx.strokeStyle = stroke.color;
+                ctx.lineWidth = stroke.size * (reference.width / 1200);
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+                ctx.moveTo(stroke.pts[0][0] * reference.width, stroke.pts[0][1] * reference.height);
+                for (const [x, y] of stroke.pts.slice(1)) ctx.lineTo(x * reference.width, y * reference.height);
+                ctx.stroke();
+            }
+            const data = ctx.getImageData(0, 0, reference.width, reference.height).data;
+            return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)),
+                value => value.toString(16).padStart(2, '0')).join('');
+        };
         const snapshot = () => {
             const strokes = structuredClone(window.__lobbyRoom.state.room.strokes);
             room.onJoin(channel, { strokes });
         };
         const incoming = (stroke) => room.onAct({ ch: channel.name, from: 'remote', kind: 'stroke', stroke });
-        window.canvasControls = { app, channel, room, canvas, mouse, pixels, snapshot, incoming, sent };
+        window.canvasControls = { app, channel, room, canvas, mouse, pixels, expectedPixels, snapshot, incoming, sent };
     });
 }
 

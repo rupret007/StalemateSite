@@ -5,6 +5,55 @@ const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const sizes = [{ width: 375, height: 812 }, { width: 390, height: 844 }, { width: 1440, height: 900 }, { width: 1440, height: 900, chatPadding: true }, { width: 1440, height: 900, resize: true }];
 
+for (const width of [375, 390, 1440]) test(`authoritative canvas replaces earlier pixels at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: width === 375 ? 667 : width === 390 ? 844 : 900 });
+    await openCanvasControls(page);
+    const results = await page.evaluate(async () => {
+        const f = window.canvasControls;
+        const original = [
+            { id: 'reference-prefix', color: '#c98a24', size: 8, pts: [[.1, .1], [.3, .3]] },
+            { id: 'reference-tail', color: '#009ee8', size: 8, pts: [[.4, .4], [.5, .5]] },
+        ];
+        const results = [];
+        f.room.onJoin(f.channel, { strokes: structuredClone(original) });
+        results.push({ kind: 'initial', actual: await f.pixels(), expected: await f.expectedPixels(original) });
+        for (const kind of ['coordinates', 'color', 'width', 'new-generation']) {
+            f.room.onJoin(f.channel, { strokes: structuredClone(original) });
+            const replacement = structuredClone(original);
+            if (kind === 'coordinates') replacement[0].pts = [[.6, .6], [.8, .8]];
+            if (kind === 'color' || kind === 'new-generation') replacement[0].color = '#ed2765';
+            if (kind === 'width') replacement[0].size = 16;
+            if (kind === 'new-generation') f.room.onLeave();
+            const next = kind === 'new-generation' ? { ...f.channel, keepRef: 'b'.repeat(32) } : f.channel;
+            f.room.onJoin(next, { strokes: replacement });
+            results.push({ kind, actual: await f.pixels(), expected: await f.expectedPixels(replacement) });
+        }
+        return results;
+    });
+    for (const result of results) expect(result.actual, result.kind).toBe(result.expected);
+    // Renderer-only bitmap; full private-room layout walkthroughs remain separate.
+    const bitmap = await page.locator('[data-act-canvas]').evaluate(canvas => canvas.toDataURL('image/png').split(',')[1]);
+    await testInfo.attach(`authoritative-canvas-${width}`, { body: Buffer.from(bitmap, 'base64'), contentType: 'image/png' });
+});
+
+test('canonical canvas pending preview matches fresh vector pixels before mouseup', async ({ page }) => {
+    await page.clock.install(); await openCanvasControls(page);
+    // Freeze the unflushed state; hashing must not race the normal 80ms timer.
+    // https://playwright.dev/docs/clock#tick-through-time-manually-firing-all-the-timers-consistently
+    await page.clock.pauseAt(await page.evaluate(() => new Date(Date.now() + 1000).toISOString()));
+    const result = await page.evaluate(async () => {
+        const f = window.canvasControls;
+        f.mouse('mousedown', .123456, .234567); f.mouse('mousemove', .345678, .456789);
+        const remote = { id: 'independent-remote', color: '#ed2765', size: 8, pts: [[.1, .8], [.8, .1]] };
+        f.incoming(remote);
+        const preview = { id: 'unflushed-local', color: window.HangoutCore.COLORS[2], size: 8,
+            pts: [[.1235, .2346], [.3457, .4568]] };
+        return { actual: await f.pixels(), expected: await f.expectedPixels([remote, preview]), sent: f.sent.length };
+    });
+    expect(result.sent).toBe(0);
+    expect(result.actual).toBe(result.expected);
+});
+
 test('canonical canvas preserves pending gestures across remote commits and cancels them on clear', async ({ page }) => {
     await page.clock.install();
     await openCanvasControls(page);
