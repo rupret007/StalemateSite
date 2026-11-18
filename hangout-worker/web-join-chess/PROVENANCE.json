@@ -11,8 +11,8 @@
     },
     "index.html": {
       "source": "web/join/index.html",
-      "sha256": "ba7de4588577ddb1051d5be020770c45a5078640db90b3f011f1991dead23598",
-      "adaptation": "Chess and private Music preview controls layered over the pinned Web Join page. Keeps the listen-only and Resume audio controls in the protected beta."
+      "sha256": "69ec778ca090c23e6bec73f66892331585c7d4ef87b719dfe2196e47af140254",
+      "adaptation": "Chess and private Music preview controls layered over the pinned Web Join page. Keeps the listen-only and Resume audio controls in the protected beta. Keeps microphone retry in the tab order with Safari’s restricted keyboard navigation setting."
     },
     "session.js": {
       "source": "web/join/session.js",
