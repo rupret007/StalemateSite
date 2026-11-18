@@ -1186,7 +1186,26 @@ test('a face that drops off the network past every ICE restart comes back for al
     expect(pages.flatMap((page) => page.errors)).toEqual([]);
 });
 
-test('iOS lock: ended camera and visibility restore a live peer track and playing tiles', async ({ browser }) => {
+async function expectResumeAboveTiles(page) {
+    const resume = page.locator('[data-av-resume]');
+    await expect(page.locator('[data-av-resume], [data-faces-play]')).toHaveCount(1);
+    await expect(resume).toBeVisible();
+    await resume.scrollIntoViewIfNeeded();
+    await expect(resume).toBeInViewport({ ratio: 1 });
+    await expect.poll(() => resume.evaluate(button => {
+        const { left, right, top, bottom, height, width } = button.getBoundingClientRect();
+        const x = (left + right) / 2;
+        return {
+            beforeTiles: bottom <= document.querySelector('[data-tiles]').getBoundingClientRect().top,
+            aboveDock: bottom <= document.querySelector('.callbar').getBoundingClientRect().top,
+            targetSize: height >= 48 && width >= 48,
+            acceptsPointer: [top + 3, bottom - 3].every(y => button.contains(document.elementFromPoint(x, y)))
+        };
+    })).toEqual({ beforeTiles: true, aboveDock: true, targetSize: true, acceptsPointer: true });
+    return resume;
+}
+
+test('iOS lock: ended camera and visibility restore a live peer track and playing tiles', async ({ browser }, testInfo) => {
     const { host, guest } = await call(browser);
     const stopped = await guest.evaluate(() => {
         const track = window.__hangout.av.rawCam;
@@ -1245,7 +1264,13 @@ test('iOS lock: ended camera and visibility restore a live peer track and playin
         video.pause();
         document.dispatchEvent(new Event('visibilitychange'));
     });
-    await expect(guest.locator('[data-av-resume]')).toBeVisible();
+    const resume = await expectResumeAboveTiles(guest);
+    const composer = guest.locator('[data-say]');
+    await composer.locator('input').fill('Chat still works while video is paused');
+    await guest.screenshot({ path: testInfo.outputPath('media-resume-chat-available.png') });
+    await composer.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(host.locator('[data-log]')).toContainText('Chat still works while video is paused');
+    await expect(resume).toBeVisible();
     await guest.evaluate(() => {
         delete document.querySelector('.tile:not([data-tile="me"]) video').play;
     });
@@ -1255,6 +1280,7 @@ test('iOS lock: ended camera and visibility restore a live peer track and playin
         return Boolean(video && !video.paused);
     })).toBe(true);
     await expect(guest.locator('[data-av-resume]')).toBeHidden();
+    await expect(guest.getByRole('group', { name: 'Call controls', exact: true })).toBeFocused();
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });
 
@@ -1293,8 +1319,8 @@ const framesFrom = (page) => page.evaluate(async () => {
     return frames;
 });
 
-test('iOS lock under the gesture rule: devices stay on, one tap restores camera and mic for the peer', async ({ browser }) => {
-    const { host, guest } = await call(browser, PHONE_OPTS);
+async function exerciseMediaResume(browser, testInfo, viewport) {
+    const { host, guest } = await call(browser, { ...PHONE_OPTS, viewport });
     await micOn(guest);
     await guest.evaluate(armIosGestureMedia);
     const locked = await guest.evaluate(() => {
@@ -1327,7 +1353,8 @@ test('iOS lock under the gesture rule: devices stay on, one tap restores camera 
     expect(locked).toEqual({ video: 'ended', audio: 'ended' });
 
     // The automatic re-acquire was refused, so the page asks for a tap and keeps both devices on.
-    await expect(guest.locator('[data-av-resume]')).toBeVisible();
+    await expectResumeAboveTiles(guest);
+    await guest.screenshot({ path: testInfo.outputPath(`media-resume-call-${viewport.width}.png`) });
     await expect.poll(() => guest.evaluate(() => window.__gumLog.filter((entry) => !entry.gesture).length)).toBeGreaterThan(0);
     const waiting = await guest.evaluate(() => {
         const av = window.__hangout.av;
@@ -1377,4 +1404,9 @@ test('iOS lock under the gesture rule: devices stay on, one tap restores camera 
     await expectOrdinaryMediaLabel(guest, 'video', true);
     await expectOrdinaryMediaLabel(guest, 'audio', true);
     expect(host.errors.concat(guest.errors)).toEqual([]);
-});
+}
+
+test('iOS lock under the gesture rule: devices stay on, one tap restores camera and mic for the peer',
+    ({ browser }, testInfo) => exerciseMediaResume(browser, testInfo, PHONE_OPTS.viewport));
+test('iOS lock under the gesture rule at 375px: one tap restores camera and mic above the tiles',
+    ({ browser }, testInfo) => exerciseMediaResume(browser, testInfo, { width: 375, height: 667 }));

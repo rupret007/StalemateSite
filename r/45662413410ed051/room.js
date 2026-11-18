@@ -51,7 +51,7 @@
         consentMicWrap: $('[data-consent-mic-wrap]'), consentMic: $('[data-consent-mic]'), consentError: $('[data-consent-error]'),
         consentOn: $('[data-consent-on]'), consentSkip: $('[data-consent-skip]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
-        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), facesPlay: $('[data-faces-play]'), videoStatus: $('[data-video-status]'),
+        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), avResume: $('[data-av-resume]'), videoStatus: $('[data-video-status]'),
         bobToggle: $('[data-bob-toggle]'), bob: $('[data-bob]'), bobNow: $('[data-bob-now]'), bobHold: $('[data-bob-hold]'),
         bobRewind: $('[data-bob-rewind]'), bobCatchup: $('[data-bob-catchup]'), bobNudge: $('[data-bob-nudge]'),
         bobEpisodes: $('[data-bob-episodes]'), bobPalette: $('[data-bob-palette]'), bobBrushes: $('[data-bob-brushes]'),
@@ -1609,14 +1609,6 @@
      * Media goes browser to browser (DTLS-SRTP), signaling rides the encrypted relay.
      * Every receiver has its own sender, so people only get our sharp feed when they're
      * watching us big (speaker view, pin, spotlight); everyone else gets a thumbnail. */
-    ui.avResume = doc.createElement('button');
-    ui.avResume.type = 'button';
-    // Fixed just above "Tap to play": on phones anything in the page flow sits under the call bar.
-    ui.avResume.className = 'btn faces-play av-resume';
-    ui.avResume.hidden = true;
-    ui.avResume.textContent = 'Tap to resume video';
-    ui.avResume.setAttribute('data-av-resume', '');
-    ui.tiles.insertAdjacentElement('afterend', ui.avResume);
     // Capture and play both start inside this tap: iOS refuses them anywhere else.
     ui.avResume.addEventListener('click', () => { unblockFaces(); resumeLocalMedia(true); });
     /* Faces that stopped reconnecting (rebuild budget spent, see rebuildPc): an honest line that
@@ -1633,7 +1625,7 @@
     ui.facesRetryBtn.textContent = 'Try faces again';
     ui.facesRetryBtn.setAttribute('data-faces-retry', '');
     ui.facesRetry.append(ui.facesRetryText, ui.facesRetryBtn);
-    ui.tiles.insertAdjacentElement('beforebegin', ui.facesRetry);
+    ui.avResume.insertAdjacentElement('beforebegin', ui.facesRetry);
     const stuckFaces = () => Array.from(app.av.pcs.keys()).filter((id) => relayPeers.get(id)?.facesStopped);
     function paintFacesRetry() {
         const ids = stuckFaces();
@@ -1658,7 +1650,11 @@
     function paintAvResume() {
         if (!app.av.cam || app.av.screen) avResumeWhy.video = false;
         if (!app.av.mic) avResumeWhy.audio = false;
-        ui.avResume.hidden = !(avResumeWhy.playback || avResumeWhy.video || avResumeWhy.audio);
+        const needsTap = avResumeWhy.playback || avResumeWhy.video || avResumeWhy.audio;
+        if (!needsTap && doc.activeElement === ui.avResume && !ui.room.hidden) {
+            ui.callControls.focus({ preventScroll: true });
+        }
+        ui.avResume.hidden = !needsTap;
     }
     function showAvResume(on) { avResumeWhy.playback = Boolean(on); paintAvResume(); }
     function captureNeedsTap(kind, on) { avResumeWhy[kind] = Boolean(on); paintAvResume(); }
@@ -2477,19 +2473,15 @@
         if (!video) return;
         let attempt;
         try { attempt = video.play(); } catch (error) {
-            ui.facesPlay.hidden = false;
             showAvResume(true);
             return;
         }
         if (!attempt || typeof attempt.then !== 'function') return;
         attempt.then(() => {
-            if (!remoteFacesWaiting()) ui.facesPlay.hidden = true;
-            const stillPaused = [...ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')].some((el) => el.paused);
-            if (!stillPaused) showAvResume(false);
+            if (!remoteFacesWaiting()) showAvResume(false);
         }).catch((error) => {
             // Interrupted by a re-attach (renderTile) that already started a newer play(): that one decides.
             if (error && error.name === 'AbortError' && !video.paused) return;
-            if (!error || error.name === 'NotAllowedError') ui.facesPlay.hidden = false;
             showAvResume(true);
         });
     }
@@ -2500,7 +2492,7 @@
             video.muted = false;
             playRemoteFace(video);
         }
-        if (!remoteFacesWaiting()) ui.facesPlay.hidden = true;
+        if (!remoteFacesWaiting()) showAvResume(false);
     }
 
     function bars(tier) {
@@ -3123,11 +3115,6 @@
     }
 
     ui.canvasCam.addEventListener('click', () => toggleCanvasCam());
-    ui.facesPlay.addEventListener('click', () => {
-        unblockFaces();
-        // Whichever button gets the tap, a camera or mic waiting on one comes back with it.
-        if (avResumeWhy.video || avResumeWhy.audio) resumeLocalMedia(true);
-    });
     ui.mic.addEventListener('click', () => {
         if (!ui.consent.hidden) focusConsent();
         else toggle('mic');
