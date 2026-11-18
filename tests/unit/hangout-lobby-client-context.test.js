@@ -229,6 +229,26 @@ it.each(['command', 'slash'])('cancelled named channel respects a fresh explicit
     expect(window.__lobby.active).toBe(name);
 });
 
+it.each(['command', 'slash'])('cancelled named channel respects a fresh explicit %s IRC shortcut join', async route => {
+    const { window, ws, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, dialog = doc.querySelector('[data-channel-dialog]');
+    const opener = doc.querySelector('[data-start="chat"]'), name = '#cancelled-shortcut-route';
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; opener.focus(); dialog.dispatchEvent(new window.Event('close')); };
+    opener.click(); doc.querySelector('[data-channel-name]').value = name;
+    dialog.querySelector('form').requestSubmit();
+    doc.querySelector('[data-channel-cancel]').click();
+    if (route === 'command') expect(window.__lobby.cmd('J', [name.slice(1).toUpperCase()])).toBe(true);
+    else {
+        doc.querySelector('[data-text]').value = `/j ${name.slice(1).toUpperCase()}`;
+        doc.querySelector('[data-send]').click();
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'say', ch: '#stalemate', text: `/j ${name.slice(1).toUpperCase()}` });
+    }
+    join(name);
+    expect(doc.querySelector('[data-chat-context]').textContent).toBe(name);
+    expect(window.__lobby.active).toBe(name);
+});
+
 it('cancelled named channel acknowledgement leaves a newer pending dialog and draft alone', async () => {
     const { window, welcome, join } = await visitor(); welcome(); join();
     const doc = window.document, dialog = doc.querySelector('[data-channel-dialog]');
