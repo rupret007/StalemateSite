@@ -292,6 +292,21 @@ it('cancelled named channel requests stay in the background when acknowledgement
     }
 });
 
+it.each(['join', 'j'])('typed channel return /%s selects an existing tab without waiting for another acknowledgement', async command => {
+    const { window, ws, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, room = '#shortcut-existing';
+    join(room);
+    const input = doc.querySelector('[data-text]'); input.value = 'Draft for the existing room';
+    doc.querySelector('[data-channel-key="#stalemate"]').click();
+    const before = ws.sent.length;
+    input.value = `/${command.toUpperCase()} ${room.toUpperCase()}`;
+    doc.querySelector('[data-send]').click();
+    expect(doc.querySelector('[data-chat-context]').textContent).toBe(room);
+    expect(window.__lobby.active).toBe(room);
+    expect(input.value).toBe('Draft for the existing room');
+    expect(ws.sent).toHaveLength(before);
+});
+
 it('recovers an interrupted named channel request without replaying it', async () => {
     const { window, ws, welcome, join, sockets, timers, flush } = await visitor();
     welcome(); join();

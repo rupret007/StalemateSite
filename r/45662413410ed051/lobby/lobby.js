@@ -1112,7 +1112,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             app.ws.send(payload);
             const name = obj.t === 'cmd' ? String(obj.name || '').toLowerCase()
                 : obj.t === 'say' && /^\/(?!\/)/.test(obj.text || '') ? String(obj.text).slice(1).split(/\s/, 1)[0].toLowerCase() : '';
-            if (name === 'join') {
+            if (name === 'join' || name === 'j') {
                 const raw = obj.t === 'cmd' ? obj.args?.[0] : String(obj.text).split(/\s+/)[1];
                 const channel = String(raw || '').toLowerCase();
                 cancelledChannelJoins.delete(channel.startsWith('#') ? channel : `#${channel}`);
@@ -3823,7 +3823,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (connectionState !== 'connected') return toast('Not connected yet. Your draft is still here.');
         if (!app.band && (app.netLock === 'readonly' || app.budget === 'readonly') && !text.startsWith('/')) return toast('Chat is paused. Your draft is still here.');
         // Joining an existing tab selects it without replaying a server join or clearing its history.
-        const joined = /^\/join\s+(#[a-z0-9-]{2,30})$/i.exec(text);
+        const joined = /^\/(?:join|j)\s+(#[a-z0-9-]{2,30})$/i.exec(text);
         if (joined && app.chans.has(joined[1].toLowerCase())) {
             input.value = '';
             drafts.delete(app.active);

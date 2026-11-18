@@ -1924,6 +1924,15 @@ for (const width of [375, 390, 1440]) for (const cancel of ['button', 'escape'])
             await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
             await page.screenshot({ path: testInfo.outputPath(`02-cancelled-message-sent-${cancel}-${width}.png`) });
+            // The real server does not send a new join ACK for a membership
+            // already confirmed above. The familiar /j shortcut selects locally.
+            await tabTo(page, input); await replaceText(page, '/j ' + room); await page.keyboard.press('Enter');
+            await expect(page.locator('[data-chat-context]')).toHaveText(room);
+            await expect(input).toHaveValue('');
+            expect(outgoing.filter(frame => frame.t === 'say' && /^\/j\s/i.test(frame.text))).toHaveLength(0);
+            await page.screenshot({ path: testInfo.outputPath(`03-cancelled-shortcut-return-${cancel}-${width}.png`) });
+            await tabTo(page, roomTab); await page.keyboard.press('Home');
+            await expect(page.locator('[data-chat-context]')).toHaveText('#stalemate');
             await tabTo(page, page.locator('[data-channel-key="#stalemate"]')); await page.keyboard.press('ArrowRight');
             await expect(page.locator('[data-chat-context]')).toHaveText(room);
             await expect(roomTab).toBeFocused();
