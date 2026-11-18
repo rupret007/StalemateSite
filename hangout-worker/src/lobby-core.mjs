@@ -268,6 +268,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (typeof raw !== 'string' || raw.length > L.actFrameBytes || encoder.encode(raw).byteLength > L.actFrameBytes) return true;
         try {
             const frame = JSON.parse(raw);
+            if (frame.t === 'music-offer-provider-failed') return true;
             if (frame.t === 'report' || frame.t === 'admin-refresh' || frame.t === 'cam' && !frame.on || frame.t === 'entry-source' && !normalizeEntrySource(frame.source, entrySites)) return true;
             const command = frame.t === 'cmd' ? lc(frame.name) : frame.t === 'say' && /^\//.test(frame.text || '') ? lc(frame.text.slice(1).split(' ')[0]) : '';
             return SAFE_COMMANDS.has(command);
@@ -452,7 +453,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         for (const [roomName, offer] of musicInvites) if (offer.version === 1) {
             const room = ch(roomName), host = conns.get(offer.host), guest = conns.get(offer.guest);
-            const stillAllowed = room && room.keepRef === offer.instance && !roomsBroken && net.lock === 'off' && !net.shield
+            const stillAllowed = participationMusicOpen(room) && room.keepRef === offer.instance
                 && host && guest && offer.hostActor === musicActor(host) && offer.guestActor === musicActor(guest)
                 && canInviteMusic(host, guest, room) && participationAllows(host, 'requestDirectContact', guest, false)
                 && participationAllows(guest, 'acceptDirectContact', host, false)
@@ -1009,10 +1010,14 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && room?.kind === 'jam' && room.modes.i && room.keepRef === frame.roomInstance ? room : null;
     }
 
+    function participationMusicOpen(room) {
+        return participationSafeMusicOffersConfigured && !roomsBroken && net.lock === 'off' && !net.shield
+            && room?.kind === 'jam' && room.modes.i && !room.modes.locked;
+    }
+
     function participationMusicRoom(frame) {
         const room = typeof frame.ch === 'string' && ch(frame.ch);
-        return participationSafeMusicOffersConfigured && frame.version === 1 && !roomsBroken && net.lock === 'off' && !net.shield
-            && room?.kind === 'jam' && room.modes.i && room.keepRef === frame.roomInstance ? room : null;
+        return frame.version === 1 && participationMusicOpen(room) && room.keepRef === frame.roomInstance ? room : null;
     }
 
     function musicActor(c) {
@@ -1039,7 +1044,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function musicProviderPreflight(id, raw) {
-        if (typeof raw !== 'string') return null;
+        if (!participationSafeMusicOffersConfigured || typeof raw !== 'string' || raw.length > L.frameBytes) return null;
         let frame;
         try { frame = JSON.parse(raw); } catch { return null; }
         if (frame?.t !== 'music-offer-accept' || frame.version !== 1 || !validPmRef(frame.id) || !validPmRef(frame.request)
@@ -1145,6 +1150,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const providerRequest = musicProviderRequest(guest.id, host.id);
         const validCurrentOffer = () => musicInvites.get(room.name) === offer && offer.state === 'accepting'
             && now() < offer.expires && room.keepRef === offer.instance && ch(room.name) === room
+            && participationMusicOpen(room)
             && conns.get(host.id) === host && conns.get(guest.id) === guest && room.members.has(host.id) && room.members.has(guest.id)
             && canInviteMusic(host, guest, room) && offer.hostActor === musicActor(host) && offer.guestActor === musicActor(guest)
             && participation.revisionFor(context, host.id) === offer.hostRevision
@@ -1180,7 +1186,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function abandonParticipationMusic(guest, frame) {
         if (frame.version !== 1 || Object.keys(frame).some(key => !['t', 'version', 'id', 'request', 'ch', 'roomInstance'].includes(key))) return;
-        const room = participationMusicRoom(frame), offer = room && musicInvites.get(room.name);
+        // A lock can stop a Music start without preventing its rollback.
+        const room = typeof frame.ch === 'string' && ch(frame.ch);
+        if (!room || room.keepRef !== frame.roomInstance) return;
+        const offer = musicInvites.get(room.name);
         if (!offer || offer.version !== 1 || offer.state !== 'accepting' || offer.id !== frame.id || offer.request !== frame.request
             || offer.guest !== guest.id || offer.guestActor !== musicActor(guest) || offer.instance !== room.keepRef) return;
         finishMusicInvite(room.name, 'unavailable');
