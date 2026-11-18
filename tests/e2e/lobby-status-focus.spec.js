@@ -96,3 +96,73 @@ for (const width of [375, 390, 1440]) for (const mode of ['discard', 'replacemen
         }
     });
 }
+
+
+for (const width of [375, 390, 1440]) test(`protected private draft choices survive their old deadline at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    let lobbyNow = Date.now();
+    const community = await privateCommunity({ lobbyNow: () => lobbyNow }), contexts = [], sentinels = [], errors = [];
+    const draft = 'An unsent private note stays mine until I choose.';
+    let draftSent = 0;
+    async function guest(nick, source) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true, reducedMotion: 'reduce',
+            viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 } });
+        contexts.push(context);
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        sentinels.push(await installNoCaptureSentinel(context));
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        page.on('websocket', socket => socket.on('framesent', ({ payload }) => {
+            try { const frame = JSON.parse(String(payload)); if (frame.t === 'say' && frame.text === draft) draftSent++; }
+            catch { /* Observation only; no transport mutation. */ }
+        }));
+        await page.goto(community.origin + '/beta/?via=' + source + '#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(nick);
+        await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        expect(new URL(page.url()).hash).toBe('');
+        return page;
+    }
+    try {
+        const sender = await guest('PatientSender', 'rad-dad'), recipient = await guest('PatientPeer', 'stalemate');
+        lobbyNow += 180000; // Keep the real two-minute PM eligibility policy.
+        await send(sender, '/query PatientPeer');
+        await recipient.locator('[data-pmreqs]').getByRole('button', { name: 'Accept', exact: true }).press('Enter');
+        await expect(sender.locator('[data-chat-context]')).toHaveText('PM · PatientPeer');
+        const input = sender.getByRole('textbox', { name: 'Message', exact: true });
+        await input.fill(draft); await send(recipient, '/quit');
+        const notice = sender.locator('[data-toast]');
+        await expect(notice).toContainText('Private replies are not confirmed. Your draft stays here.');
+        await expect(input).toBeFocused();
+        await sender.screenshot({ path: testInfo.outputPath(`00-draft-choices-before-deadline-${width}.png`) });
+        // Cross the actual existing12s UI deadline. No fake browser clock or
+        // injected close/result frames; transport and ACK timers remain real.
+        await sender.waitForTimeout(12200);
+        await sender.screenshot({ path: testInfo.outputPath(`01-draft-choices-after-deadline-${width}.png`) });
+        await expect(notice).toBeVisible(); await expect(input).toBeFocused();
+        await expect(input).toHaveValue(draft);
+        for (const name of ['Copy draft', 'Discard draft', 'Keep draft']) {
+            const action = notice.getByRole('button', { name, exact: true });
+            await expect(action).toBeVisible();
+            const rect = await action.boundingBox();
+            expect(rect.width).toBeGreaterThanOrEqual(48); expect(rect.height).toBeGreaterThanOrEqual(48);
+        }
+        const keep = notice.getByRole('button', { name: 'Keep draft', exact: true });
+        await tabTo(sender, keep); await expect(keep).toBeFocused(); await expect(keep).toBeInViewport({ ratio: 1 });
+        expect(await keep.evaluate(node => { const r = node.getBoundingClientRect(); return node.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
+        for (const control of [input, sender.locator('[data-send]')]) {
+            await expect(control).toBeInViewport({ ratio: 1 });
+            expect(await control.evaluate(node => { const r = node.getBoundingClientRect(); return node.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
+        }
+        await keep.press('Enter'); await expect(notice).toBeHidden(); await expect(input).toBeFocused();
+        await expect(input).toHaveValue(draft); expect(draftSent).toBe(0);
+        expect(await sender.evaluate(text => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(text), draft)).toBe(false);
+        expect(await sender.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await sender.screenshot({ path: testInfo.outputPath(`02-draft-kept-by-choice-${width}.png`) });
+        for (const sentinel of sentinels) await sentinel.assertClean();
+        expect(errors).toEqual([]);
+    } finally {
+        for (const context of contexts) await context.close();
+        await community.close();
+    }
+});
