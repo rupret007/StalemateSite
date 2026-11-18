@@ -75,7 +75,8 @@ const GAME_GUEST_ENTRANCE = `<!doctype html>
 </form>
 <p class="muted">Camera and microphone stay off. <a href="/beta/privacy" target="_blank" rel="noopener">House rules</a></p>
 <p class="muted" data-guest-expiry hidden>Invite expires <time></time>.</p>
-</section><button type="button" data-guest-retry hidden>Try again</button><button type="button" data-guest-fresh hidden>Ask the host for a fresh link</button></main></body></html>`;
+</section><button type="button" data-guest-retry hidden>Try again</button><button type="button" data-guest-fresh hidden>Ask the host for a fresh link</button>
+<p data-guest-fresh-message tabindex="-1" hidden></p></main></body></html>`;
 const GAME_GUEST_STYLE = `
 .game-invitation h1 { font-size: clamp(2.6rem, 9vw, 4.5rem); }
 .game-invitation section { max-width: 32rem; }

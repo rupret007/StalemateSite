@@ -532,6 +532,29 @@ for (const width of [375, 390, 1280]) test(`a Jam room invitation stays actionab
     }
 });
 
+const gameGuestPath = '/beta/game-night/guest';
+const gameLobbyPath = '/r/45662413410ed051/lobby/';
+async function gameNightEntryFixture(context, origin) {
+    const { betaFetch } = await import('../../hangout-worker/src/beta-entry.mjs');
+    const sharedAssets = ['game-night.mjs', 'game-night-audio.mjs'].map(name => gameLobbyPath + name);
+    const env = {
+        HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1',
+        HANGOUT_HMAC_KEY: 'h'.repeat(40), HANGOUT_BETA_INVITE_KEY: 'i'.repeat(40), HANGOUT_PREVIEW_KEY: 'p'.repeat(40),
+        LOBBY: {}, ROOMS: {}, QUOTA: {}, BETA_SESSIONS: {},
+        ASSETS: { async fetch(request) {
+            const asset = new URL(request.url).pathname;
+            expect([gameLobbyPath + 'game-night-guest.js', ...sharedAssets]).toContain(asset);
+            return new Response(await readFile(joinPath(__dirname, '../..', asset)));
+        } }
+    };
+    await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.fallback() : route.abort());
+    const guestAssets = [gameGuestPath, gameGuestPath + '.js', '/beta/style.css', ...sharedAssets];
+    await context.route(url => guestAssets.includes(url.pathname), async route => {
+        const response = await betaFetch(new Request(route.request().url()), env);
+        await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
+    });
+}
+
 for (const { viewport, submitFromNickname } of [
     { viewport: { width: 375, height: 667 } },
     { viewport: { width: 390, height: 844 } },
@@ -540,32 +563,14 @@ for (const { viewport, submitFromNickname } of [
 ]) {
     const submitMethod = submitFromNickname ? ' and submit from the nickname field' : '';
     test(`a refreshed Game Night invite lets the guest fix their nickname at ${viewport.width}px${submitMethod}`, async ({ browser, baseURL }, testInfo) => {
-        const { betaFetch } = await import('../../hangout-worker/src/beta-entry.mjs');
         const origin = new URL(baseURL).origin;
-        const guestPath = '/beta/game-night/guest';
-        const lobbyPath = '/r/45662413410ed051/lobby/';
         const tableId = '11111111-1111-4111-8111-111111111111';
         const reason = 'That nickname is taken. Choose another.';
         const requestBodies = [];
-        const env = {
-            HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1',
-            HANGOUT_HMAC_KEY: 'h'.repeat(40), HANGOUT_BETA_INVITE_KEY: 'i'.repeat(40), HANGOUT_PREVIEW_KEY: 'p'.repeat(40),
-            LOBBY: {}, ROOMS: {}, QUOTA: {}, BETA_SESSIONS: {},
-            ASSETS: { async fetch(request) {
-                const asset = new URL(request.url).pathname;
-                expect(['game-night-guest.js', 'game-night.mjs', 'game-night-audio.mjs'].map(name => lobbyPath + name)).toContain(asset);
-                return new Response(await readFile(joinPath(__dirname, '../..', asset)));
-            } }
-        };
         const isMobile = viewport.width < 500;
         const context = await browser.newContext({ viewport, isMobile, hasTouch: isMobile });
         try {
-            await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.fallback() : route.abort());
-            const guestAssets = [guestPath, guestPath + '.js', '/beta/style.css', lobbyPath + 'game-night.mjs', lobbyPath + 'game-night-audio.mjs'];
-            await context.route(url => guestAssets.includes(url.pathname), async route => {
-                const response = await betaFetch(new Request(route.request().url()), env);
-                await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
-            });
+            await gameNightEntryFixture(context, origin);
             await context.route('**/beta/game-night/invitation/details', route => route.fulfill({
                 json: { game: 'Royal Flush Chess', host: 'Fixture host', guestName: 'Suggested' }
             }));
@@ -575,9 +580,9 @@ for (const { viewport, submitFromNickname } of [
                 requestBodies.push(route.request().postDataJSON());
                 return requestBodies.length === 1
                     ? route.fulfill({ status: 422, json: { error: reason } })
-                    : route.fulfill({ json: { next: lobbyPath + '?game-guest=1', tableId } });
+                    : route.fulfill({ json: { next: gameLobbyPath + '?game-guest=1', tableId } });
             });
-            await context.route(url => url.pathname === lobbyPath && url.searchParams.has('game-guest'),
+            await context.route(url => url.pathname === gameLobbyPath && url.searchParams.has('game-guest'),
                 route => route.fulfill({ body: 'Synthetic seat destination' }));
             const page = await context.newPage();
             await page.addInitScript(() => {
@@ -586,7 +591,7 @@ for (const { viewport, submitFromNickname } of [
                         pass: 'a'.repeat(64), confirmedGame: 'Royal Flush Chess', nick: 'TakenName' } }, '');
                 }
             });
-            await page.goto(origin + guestPath);
+            await page.goto(origin + gameGuestPath);
             const name = page.getByRole('textbox', { name: 'Your nickname' });
             const join = page.getByRole('button', { name: 'Join game', exact: true });
             await expect(page.getByRole('heading', { name: 'Royal Flush Chess' })).toBeVisible();
@@ -609,10 +614,44 @@ for (const { viewport, submitFromNickname } of [
                 await expect(join).toBeFocused();
             }
             await page.keyboard.press('Enter');
-            await expect(page).toHaveURL(origin + lobbyPath + '?game-guest=1&table=' + tableId);
+            await expect(page).toHaveURL(origin + gameLobbyPath + '?game-guest=1&table=' + tableId);
             expect(requestBodies).toHaveLength(2);
             expect(requestBodies[0]).toMatchObject({ nick: 'TakenName', age13: true, attempt: 'fixture-attempt' });
             expect(requestBodies[1]).toEqual({ ...requestBodies[0], nick: 'AvailableName' });
+        } finally {
+            await context.close();
+        }
+    });
+}
+
+for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    test(`an expired Game Night invitation shows a message when sharing is blocked at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+        const origin = new URL(baseURL).origin;
+        const isMobile = viewport.width < 500;
+        const context = await browser.newContext({ viewport, isMobile, hasTouch: isMobile });
+        try {
+            await gameNightEntryFixture(context, origin);
+            await context.route('**/beta/game-night/invitation/details', route => route.fulfill({ status: 410, json: { error: 'expired' } }));
+            const page = await context.newPage();
+            await page.addInitScript(() => {
+                const blocked = async () => { throw new DOMException('Blocked', 'NotAllowedError'); };
+                Object.defineProperty(navigator, 'share', { value: blocked });
+                Object.defineProperty(navigator, 'clipboard', { value: { writeText: blocked } });
+            });
+            await page.goto(origin + gameGuestPath + '#invite=synthetic-expired');
+            const status = page.getByRole('status');
+            const ask = page.getByRole('button', { name: 'Ask the host for a fresh link.' });
+            await expect(status).toHaveText('This invite is no longer available. Ask your host for a new one.');
+            await expect(status).toBeFocused();
+            await expect(ask).toBeInViewport();
+            expect((await ask.boundingBox()).height).toBeGreaterThanOrEqual(48);
+            await ask.press('Enter');
+            const message = page.getByText('Could you send me a fresh Game Night link?');
+            await expect(message).toBeFocused();
+            await expect(message).toBeInViewport();
+            await expect(page.getByRole('button', { name: 'Join game' })).toBeHidden();
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await page.screenshot({ path: testInfo.outputPath('game-night-expired-share-fallback.png') });
         } finally {
             await context.close();
         }
