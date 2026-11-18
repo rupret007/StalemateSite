@@ -141,13 +141,18 @@ function validSessions(value, now) {
         && row.key === [row.fromId, row.toId].sort().join('|') && connections.get(row.fromId)?.dev === row.from && connections.has(row.toId)
         && !connections.get(row.fromId).safetyOnly && !connections.get(row.toId).safetyOnly;
     const reference = row => !Object.hasOwn(row, 'ref') || typeof row.ref === 'string' && /^[a-f0-9]{32}$/.test(row.ref);
-    const receipt = row => shape(row, ['t', 'id', 'ch', 'from', 'to', 'prefix', 'band', 'moderator', 'me', 'ts', 'authorDev', 'digest', 'recipients'], ['publicOrigin'])
-        && nick(row.from) && id(row.authorDev) && /^[a-f0-9]{64}$/.test(row.digest) && time(row.ts, now) && ['', '@', '+'].includes(row.prefix)
-        && ['band', 'moderator', 'me'].every(key => typeof row[key] === 'boolean')
-        && (row.t === 'line' && /^m[a-z0-9]{1,80}$/i.test(row.id) && channel(row.ch) && row.to === ''
-            || row.t === 'pm' && /^p[a-z0-9]{1,80}$/i.test(row.id) && nick(row.to) && row.ch === `pm:${row.from}>${row.to}`)
-        && names(row.recipients, 200, id) && row.recipients.length > 0
-        && (!Object.hasOwn(row, 'publicOrigin') || row.t === 'line' && validPublicReportOrigin(row.publicOrigin, now) && row.publicOrigin.at >= row.ts);
+    const receipt = row => {
+        if (row?.controlOnly === true) return shape(row, ['controlOnly', 'id', 'authorDev', 'ts'], ['recipients'])
+            && typeof row.id === 'string' && /^m[a-z0-9]{1,80}$/.test(row.id) && id(row.authorDev) && time(row.ts, now)
+            && (!Object.hasOwn(row, 'recipients') || names(row.recipients, 200, id));
+        return shape(row, ['t', 'id', 'ch', 'from', 'to', 'prefix', 'band', 'moderator', 'me', 'ts', 'authorDev', 'digest', 'recipients'], ['publicOrigin'])
+            && nick(row.from) && id(row.authorDev) && /^[a-f0-9]{64}$/.test(row.digest) && time(row.ts, now) && ['', '@', '+'].includes(row.prefix)
+            && ['band', 'moderator', 'me'].every(key => typeof row[key] === 'boolean')
+            && (row.t === 'line' && /^m[a-z0-9]{1,80}$/i.test(row.id) && channel(row.ch) && row.to === ''
+                || row.t === 'pm' && /^p[a-z0-9]{1,80}$/i.test(row.id) && nick(row.to) && row.ch === `pm:${row.from}>${row.to}`)
+            && names(row.recipients, 200, id) && row.recipients.length > 0
+            && (!Object.hasOwn(row, 'publicOrigin') || row.t === 'line' && validPublicReportOrigin(row.publicOrigin, now) && row.publicOrigin.at >= row.ts);
+    };
     return list(value.pm, 2000, row => shape(row, ['key', 'from', 'fromId', 'toId', 'state'], ['ref']) && reference(row) && row.state === 'open' && endpoints(row))
         && new Set(value.pm.map(row => row.key)).size === value.pm.length
         && list(value.pendingPm, 1000, row => shape(row, ['key', 'from', 'fromId', 'toId', 'at', 'hadFirst'], ['ref']) && reference(row) && endpoints(row) && time(row.at, now) && typeof row.hadFirst === 'boolean')

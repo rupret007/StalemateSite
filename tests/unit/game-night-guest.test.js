@@ -120,3 +120,111 @@ it('focuses retry when an invite check fails and moves focus to Join once recove
     expect(retry.hidden).toBe(true);
     expect(request.mock.calls.map(([url]) => url)).toEqual(Array(2).fill('/beta/game-night/invitation/details'));
 });
+
+it.each([false, true])('lets a refreshed guest correct a rejected nickname (details retry: %s)', async detailsRetry => {
+    document.body.innerHTML = `
+        <h1 data-guest-game>Game Night</h1>
+        <p data-guest-inviter hidden></p>
+        <p id="guest-invitation-status" data-guest-status role="status"></p>
+        <section data-guest-invite hidden>
+            <form>
+                <label hidden>Your nickname<input data-guest-name></label>
+                <button type="submit" data-guest-join>Join game</button>
+            </form>
+        </section>
+        <button data-guest-retry hidden>Try again</button>
+        <button data-guest-fresh hidden>Ask the host for a fresh link</button>
+    `;
+    const pass = 'a'.repeat(64);
+    history.replaceState({ gameNightInvite: {
+        code: 'fixture', attempt: 'resume-attempt', pass, confirmedGame: 'Royal Flush Chess', nick: 'TakenName'
+    } }, '', '/beta/game-night/guest');
+    const reason = 'That nickname is taken. Choose another.';
+    const request = vi.fn().mockResolvedValueOnce(Response.json({ error: reason }, { status: 422 }));
+    if (detailsRetry) request.mockResolvedValueOnce(Response.json({}, { status: 503 }));
+    request.mockResolvedValueOnce(Response.json({ game: 'Royal Flush Chess', host: 'Fixture host', guestName: 'Suggested' }));
+    request.mockResolvedValueOnce(Response.json({ error: 'This invite ended.' }, { status: 410 }));
+    vi.stubGlobal('fetch', request);
+    vi.stubGlobal('localStorage', { getItem: () => null });
+
+    await import('../../r/45662413410ed051/lobby/game-night-guest.js');
+
+    const status = document.querySelector('[data-guest-status]');
+    const form = document.querySelector('[data-guest-invite]');
+    const name = document.querySelector('[data-guest-name]');
+    const join = document.querySelector('[data-guest-join]');
+    const retry = document.querySelector('[data-guest-retry]');
+    if (detailsRetry) {
+        await vi.waitFor(() => expect(retry.hidden).toBe(false));
+        expect(document.activeElement).toBe(retry);
+        expect(status.textContent).toBe('Couldn’t check the invitation. Try again.');
+        retry.click();
+    }
+    await vi.waitFor(() => expect(form.hidden).toBe(false));
+    expect(name.closest('label').hidden).toBe(false);
+    expect(name.disabled).toBe(false);
+    expect(name.value).toBe('TakenName');
+    expect(document.activeElement).toBe(name);
+    expect(name.getAttribute('aria-invalid')).toBe('true');
+    expect(name.getAttribute('aria-describedby')).toBe(status.id);
+    expect(status.textContent).toBe(reason);
+    expect(retry.hidden).toBe(true);
+    expect(join.disabled).toBe(false);
+    expect(history.state.gameNightInvite.confirmedGame).toBe('');
+
+    name.value = 'AvailableName';
+    join.click();
+    await vi.waitFor(() => expect(document.querySelector('[data-guest-fresh]').hidden).toBe(false));
+    expect(name.hasAttribute('aria-invalid')).toBe(false);
+    expect(name.hasAttribute('aria-describedby')).toBe(false);
+    expect(request.mock.calls.map(([url]) => url)).toEqual([
+        '/beta/game-night/invitation/accept',
+        ...Array(detailsRetry ? 2 : 1).fill('/beta/game-night/invitation/details'),
+        '/beta/game-night/invitation/accept'
+    ]);
+    const firstAttempt = JSON.parse(request.mock.calls[0][1].body);
+    expect(firstAttempt).toMatchObject({ code: 'fixture', nick: 'TakenName', attempt: 'resume-attempt', age13: true });
+    expect(JSON.parse(request.mock.calls.at(-1)[1].body)).toEqual({ ...firstAttempt, nick: 'AvailableName' });
+});
+
+it('submits the nickname form through the existing invitation attempt only once', async () => {
+    document.body.innerHTML = `
+        <h1 data-guest-game>Game Night</h1>
+        <p data-guest-inviter hidden></p>
+        <p id="guest-invitation-status" data-guest-status role="status"></p>
+        <section data-guest-invite hidden>
+            <form>
+                <label hidden>Your nickname<input data-guest-name></label>
+                <button type="submit" data-guest-join>Join game</button>
+            </form>
+        </section>
+        <button data-guest-retry hidden>Try again</button>
+    `;
+    history.replaceState(null, '', '/beta/game-night/guest#invite=fixture');
+    const request = vi.fn()
+        .mockResolvedValueOnce(Response.json({ game: 'Royal Flush Chess', host: 'Fixture host', guestName: 'Suggested' }))
+        .mockResolvedValueOnce(Response.json({ error: 'That nickname is taken. Choose another.' }, { status: 422 }));
+    vi.stubGlobal('fetch', request);
+    vi.stubGlobal('localStorage', { getItem: () => null });
+
+    await import('../../r/45662413410ed051/lobby/game-night-guest.js');
+
+    const name = document.querySelector('[data-guest-name]');
+    const join = document.querySelector('[data-guest-join]');
+    const status = document.querySelector('[data-guest-status]');
+    await vi.waitFor(() => expect(name.value).toBe('Suggested'));
+    const { attempt } = history.state.gameNightInvite;
+    name.value = 'PlayerTwo';
+    name.focus();
+    name.form.requestSubmit(join);
+    name.form.requestSubmit(join);
+
+    await vi.waitFor(() => expect(status.textContent).toBe('That nickname is taken. Choose another.'));
+    expect(document.activeElement).toBe(name);
+    expect(request.mock.calls.map(([url]) => url)).toEqual([
+        '/beta/game-night/invitation/details', '/beta/game-night/invitation/accept'
+    ]);
+    expect(JSON.parse(request.mock.lastCall[1].body)).toMatchObject({
+        code: 'fixture', nick: 'PlayerTwo', attempt, age13: true, passHash: expect.stringMatching(/^[a-f0-9]{64}$/)
+    });
+});

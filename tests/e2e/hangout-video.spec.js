@@ -385,7 +385,45 @@ test('a dropped relay connection reconnects and faces come back', async ({ brows
     await expect(host.locator('.tile:not([data-tile="me"])')).toHaveCount(1, { timeout: 20000 });
 });
 
-test('faces that never connect stop rebuilding after three tries; "Try faces again" restarts them', async ({ browser }) => {
+async function expectFacesRetryReachable(page) {
+    const retry = page.getByRole('button', { name: 'Try faces again', exact: true });
+    await expect(retry).toBeInViewport({ ratio: 1 });
+    await expect.poll(() => retry.evaluate(button => {
+        const { left, right, top, bottom, height, width } = button.getBoundingClientRect();
+        const center = (left + right) / 2;
+        return {
+            targetSize: height >= 48 && width >= 48,
+            aboveDock: bottom <= document.querySelector('.callbar').getBoundingClientRect().top,
+            acceptsPointer: [top + 3, bottom - 3].every(y => button.contains(document.elementFromPoint(center, y)))
+        };
+    })).toEqual({ targetSize: true, aboveDock: true, acceptsPointer: true });
+}
+
+for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    test(`ordinary faces recovery is unobstructed at ${viewport.width}px`, async ({ browser }, testInfo) => {
+        const page = await openBrowser(browser, viewport.width < 500 ? { ...PHONE_OPTS, viewport } : { viewport });
+        await join(page, roomUrl(), 'RecoveryGuest');
+        // Test the layout of the app's actual recovery notice with two placeholder
+        // tiles. The real failed and restored video connection is tested below.
+        await page.evaluate(() => {
+            document.body.classList.add('faces-on');
+            const tiles = document.querySelector('[data-tiles]');
+            for (const name of ['Host', 'Guest']) {
+                const tile = document.createElement('figure');
+                tile.className = 'tile tile--nocam';
+                tile.dataset.initial = name[0];
+                tiles.append(tile);
+            }
+            const notice = document.querySelector('[data-faces-stuck]');
+            notice.querySelector('span').textContent = 'Faces with Host aren’t connecting, so we stopped trying. Chat and draw still work. If anyone is on cellular data, everyone should join the same Wi-Fi, then tap “Try faces again”.';
+            notice.hidden = false;
+        });
+        await expectFacesRetryReachable(page);
+        await page.screenshot({ path: testInfo.outputPath(`faces-retry-unobstructed-${viewport.width}.png`) });
+    });
+}
+
+async function exerciseFacesRetry(browser, testInfo, useKeyboard) {
     const { host, guest } = await call(browser);
     // Persistent failure on the guest: every connection reports 'failed', the 2/4/8 s restart
     // pacing runs fast, and each RTCPeerConnection the page builds is counted.
@@ -408,11 +446,12 @@ test('faces that never connect stop rebuilding after three tries; "Try faces aga
         for (const entry of window.__hangout.av.pcs.values()) entry.pc.onconnectionstatechange();
     });
     const stuck = guest.locator('[data-faces-stuck]');
+    const retry = guest.locator('[data-faces-retry]');
     await expect.poll(async () => { await noticeFailure(); return stuck.isVisible(); }, { timeout: 20000 }).toBe(true);
     await expect(stuck).toContainText('Faces with Jeff aren’t connecting');
     await expect(stuck).toContainText('Chat and draw still work');
     await expect(stuck).toContainText('same Wi-Fi');
-    await expect(guest.locator('[data-faces-retry]')).toHaveText('Try faces again');
+    await expect(retry).toHaveText('Try faces again');
 
     // Three fresh connections, then nothing: no timer is pending and more failure events build nothing.
     const stopped = () => guest.evaluate(() => ({
@@ -429,18 +468,33 @@ test('faces that never connect stop rebuilding after three tries; "Try faces aga
     await guest.press('[data-text]', 'Enter');
     await expect(host.locator('[data-log]')).toContainText('Still chatting without faces');
 
-    // The failure clears; the button spends a fresh budget and the faces come back.
-    await guest.evaluate(() => { window.__failFaces = false; });
-    await guest.click('[data-faces-retry]');
+    // Keep the failure active while the user reaches Retry. Clearing it early
+    // lets a native connection event hide the control before the click lands.
+    await retry.evaluate(button => {
+        button.addEventListener('click', () => { window.__failFaces = false; }, { capture: true, once: true });
+    });
+    await retry.scrollIntoViewIfNeeded();
+    await expectFacesRetryReachable(guest);
+    await guest.screenshot({ path: testInfo.outputPath('faces-retry-before-click.png') });
+    if (useKeyboard) await retry.press('Enter');
+    else await retry.click();
     await expect(stuck).toBeHidden();
+    await expect(guest.getByRole('group', { name: 'Call controls', exact: true })).toBeFocused();
     await expect.poll(() => guest.evaluate(() => window.__built)).toBe(4);
     for (const page of [host, guest]) {
         await expect.poll(() => page.evaluate(() => [...window.__hangout.av.pcs.values()][0]?.pc.connectionState), { timeout: 20000 }).toBe('connected');
     }
     const before = await framesFrom(guest);
     await expect.poll(async () => (await framesFrom(guest)) - before, { timeout: 15000 }).toBeGreaterThan(5);
+    await expect(guest.locator('[data-status]')).toHaveText('Call connection with Jeff restored.');
     expect(host.errors.concat(guest.errors)).toEqual([]);
-});
+    await guest.screenshot({ path: testInfo.outputPath('faces-retry-restored.png') });
+}
+
+test('faces that never connect stop rebuilding after three tries; "Try faces again" restarts them',
+    ({ browser }, testInfo) => exerciseFacesRetry(browser, testInfo, false));
+test('keyboard retry for failed faces restores focus to Call controls',
+    ({ browser }, testInfo) => exerciseFacesRetry(browser, testInfo, true));
 
 test('a reconnect during camera publication cannot restore a departed peer after decryption',async ({ browser }) => {
     const host = await openBrowser(browser);
@@ -1132,7 +1186,26 @@ test('a face that drops off the network past every ICE restart comes back for al
     expect(pages.flatMap((page) => page.errors)).toEqual([]);
 });
 
-test('iOS lock: ended camera and visibility restore a live peer track and playing tiles', async ({ browser }) => {
+async function expectResumeAboveTiles(page) {
+    const resume = page.locator('[data-av-resume]');
+    await expect(page.locator('[data-av-resume], [data-faces-play]')).toHaveCount(1);
+    await expect(resume).toBeVisible();
+    await resume.scrollIntoViewIfNeeded();
+    await expect(resume).toBeInViewport({ ratio: 1 });
+    await expect.poll(() => resume.evaluate(button => {
+        const { left, right, top, bottom, height, width } = button.getBoundingClientRect();
+        const x = (left + right) / 2;
+        return {
+            beforeTiles: bottom <= document.querySelector('[data-tiles]').getBoundingClientRect().top,
+            aboveDock: bottom <= document.querySelector('.callbar').getBoundingClientRect().top,
+            targetSize: height >= 48 && width >= 48,
+            acceptsPointer: [top + 3, bottom - 3].every(y => button.contains(document.elementFromPoint(x, y)))
+        };
+    })).toEqual({ beforeTiles: true, aboveDock: true, targetSize: true, acceptsPointer: true });
+    return resume;
+}
+
+test('iOS lock: ended camera and visibility restore a live peer track and playing tiles', async ({ browser }, testInfo) => {
     const { host, guest } = await call(browser);
     const stopped = await guest.evaluate(() => {
         const track = window.__hangout.av.rawCam;
@@ -1191,7 +1264,13 @@ test('iOS lock: ended camera and visibility restore a live peer track and playin
         video.pause();
         document.dispatchEvent(new Event('visibilitychange'));
     });
-    await expect(guest.locator('[data-av-resume]')).toBeVisible();
+    const resume = await expectResumeAboveTiles(guest);
+    const composer = guest.locator('[data-say]');
+    await composer.locator('input').fill('Chat still works while video is paused');
+    await guest.screenshot({ path: testInfo.outputPath('media-resume-chat-available.png') });
+    await composer.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(host.locator('[data-log]')).toContainText('Chat still works while video is paused');
+    await expect(resume).toBeVisible();
     await guest.evaluate(() => {
         delete document.querySelector('.tile:not([data-tile="me"]) video').play;
     });
@@ -1201,6 +1280,7 @@ test('iOS lock: ended camera and visibility restore a live peer track and playin
         return Boolean(video && !video.paused);
     })).toBe(true);
     await expect(guest.locator('[data-av-resume]')).toBeHidden();
+    await expect(guest.getByRole('group', { name: 'Call controls', exact: true })).toBeFocused();
     expect(host.errors.concat(guest.errors)).toEqual([]);
 });
 
@@ -1239,8 +1319,8 @@ const framesFrom = (page) => page.evaluate(async () => {
     return frames;
 });
 
-test('iOS lock under the gesture rule: devices stay on, one tap restores camera and mic for the peer', async ({ browser }) => {
-    const { host, guest } = await call(browser, PHONE_OPTS);
+async function exerciseMediaResume(browser, testInfo, viewport) {
+    const { host, guest } = await call(browser, { ...PHONE_OPTS, viewport });
     await micOn(guest);
     await guest.evaluate(armIosGestureMedia);
     const locked = await guest.evaluate(() => {
@@ -1273,7 +1353,8 @@ test('iOS lock under the gesture rule: devices stay on, one tap restores camera 
     expect(locked).toEqual({ video: 'ended', audio: 'ended' });
 
     // The automatic re-acquire was refused, so the page asks for a tap and keeps both devices on.
-    await expect(guest.locator('[data-av-resume]')).toBeVisible();
+    await expectResumeAboveTiles(guest);
+    await guest.screenshot({ path: testInfo.outputPath(`media-resume-call-${viewport.width}.png`) });
     await expect.poll(() => guest.evaluate(() => window.__gumLog.filter((entry) => !entry.gesture).length)).toBeGreaterThan(0);
     const waiting = await guest.evaluate(() => {
         const av = window.__hangout.av;
@@ -1323,4 +1404,9 @@ test('iOS lock under the gesture rule: devices stay on, one tap restores camera 
     await expectOrdinaryMediaLabel(guest, 'video', true);
     await expectOrdinaryMediaLabel(guest, 'audio', true);
     expect(host.errors.concat(guest.errors)).toEqual([]);
-});
+}
+
+test('iOS lock under the gesture rule: devices stay on, one tap restores camera and mic for the peer',
+    ({ browser }, testInfo) => exerciseMediaResume(browser, testInfo, PHONE_OPTS.viewport));
+test('iOS lock under the gesture rule at 375px: one tap restores camera and mic above the tiles',
+    ({ browser }, testInfo) => exerciseMediaResume(browser, testInfo, { width: 375, height: 667 }));

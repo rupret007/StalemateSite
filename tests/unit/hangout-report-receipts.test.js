@@ -50,6 +50,23 @@ describe('durable delivery receipts without a saved chat backlog', () => {
         expect(frames.filter((f) => f.t === 'line')).toEqual([]);
     });
 
+    it('keeps more than 32 durable receipts readable by the previous flat-array reader', () => {
+        const sender = guest('Sender');
+        const first = say(sender, 'Solo delivery still needs a moderation receipt');
+        const witness = guest('Witness');
+        const lines = Array.from({ length: 35 }, (_, index) => say(sender, `Retained delivery ${index}`));
+        const sessions = writes.findLast(([kind]) => kind === 'sessions')[1];
+        expect(sessions).not.toHaveProperty('receiptArchive');
+        expect(sessions.receipts.map(row => row.id)).toEqual([first, ...lines].map(line => line.id));
+        expect(sessions.receipts[0]).toMatchObject({ t: 'line', id: first.id, ch: '#stalemate',
+            authorDev: 'dev-Sender', from: 'Sender', recipients: [sender], digest: expect.stringMatching(/^[a-f0-9]{64}$/) });
+        expect(JSON.stringify(sessions)).not.toContain(first.text);
+        wake({ ...snapshot(), sessions });
+        report(witness, lines[0]);
+        expect(engine.adminState().reports).toEqual([expect.objectContaining({ id: lines[0].id, text: lines[0].text })]);
+        expect(frames.filter(frame => frame.t === 'line')).toEqual([]);
+    });
+
     it('rejects fabricated text, another message ID and forged author/channel fields', () => {
         const sender = guest('Sender'); const witness = guest('Witness');
         const line = say(sender, 'Actual delivered sentence'); const other = say(sender, 'Another delivered sentence');

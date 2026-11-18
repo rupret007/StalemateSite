@@ -24,7 +24,7 @@ async function fixture({ inboundBeforeCapture = false, holdCapture = false, rece
         window.setTimeout = (fn, delay) => { timers.set(++timerId, { fn, at: clock.at + delay }); return timerId; };
         window.clearTimeout = id => timers.delete(id);
     }
-    window.HTMLCanvasElement.prototype.getContext = () => ({ clearRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} });
+    window.HTMLCanvasElement.prototype.getContext = () => ({ clearRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, drawImage() {} });
     window.HTMLCanvasElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1200, height: 720 });
     window.HangoutVideo = { isPhoneDevice: () => false };
     const selectVideo = vi.fn(async () => ({ getCurrentTime: () => 0, getPlayerState: () => 2, seekTo() {}, playVideo() {}, pauseVideo() {} }));

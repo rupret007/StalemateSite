@@ -6,6 +6,7 @@ const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
 const retry = document.querySelector('[data-guest-retry]');
 const askHost = document.querySelector('[data-guest-fresh]');
+const freshMessage = document.querySelector('[data-guest-fresh-message]');
 const FRESH_LINK = 'Ask the host for a fresh link.';
 const gameTitle = document.querySelector('[data-guest-game]');
 const resumeGuest = document.querySelector('[data-resume-guest]') !== null;
@@ -33,7 +34,8 @@ const pass = restored?.pass ?? Array.from(crypto.getRandomValues(new Uint8Array(
 let watching = restored?.watch === true;
 let chosenName = typeof restored?.nick === 'string' ? restored.nick : undefined;
 let suggestedName = '';
-const confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
+let nicknameError = '';
+let confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
 const hasInvitation = typeof code === 'string' && (webJam ? /^[A-Za-z0-9_-]{32,128}$/.test(code) : code.length > 0 && code.length <= 250);
 
 async function sha256(value) {
@@ -132,9 +134,12 @@ async function describe() {
             suggestedName = defaultName ?? '';
             guestName.value = chosenName ?? suggestedName;
             guestName.closest('label').hidden = false;
+            guestName.disabled = false;
         }
         invite.hidden = false;
-        if (document.activeElement === document.body || document.activeElement === retry) join.focus({ preventScroll: true });
+        join.disabled = false;
+        if (nicknameError) showNicknameError();
+        else if (document.activeElement === document.body || document.activeElement === retry) join.focus({ preventScroll: true });
     } catch (error) {
         status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE : 'Couldn’t check the invitation. Try again.';
         retry.hidden = error.status === 410;
@@ -149,10 +154,24 @@ async function describe() {
     }
 }
 
+function showNicknameError() {
+    status.textContent = nicknameError;
+    guestName.setAttribute('aria-invalid', 'true');
+    guestName.setAttribute('aria-describedby', status.id);
+    guestName.focus();
+}
+
 async function accept() {
     retry.hidden = true;
     join.disabled = true;
-    if (guestName) guestName.disabled = true;
+    if (guestName) {
+        guestName.disabled = true;
+        if (nicknameError) {
+            nicknameError = '';
+            guestName.removeAttribute('aria-invalid');
+            guestName.removeAttribute('aria-describedby');
+        }
+    }
     status.textContent = watching ? 'Opening the table…' : 'Joining the game…';
     try {
         const { next, tableId } = await acceptInvitation();
@@ -168,6 +187,17 @@ async function accept() {
         clearInvitation();
         location.replace(gameDestination(tableId));
     } catch (error) {
+        if (error.status === 422 && guestName) {
+            // The guest must be able to edit this name before another accept,
+            // including after reloading while the original accept was pending.
+            nicknameError = error.message;
+            confirmedGame = '';
+            retainInvitation(confirmedGame);
+            if (invite.hidden) {
+                await describe();
+                return;
+            }
+        }
         const tableFull = webJam && error.status === 409 && error.tableFull;
         const closed = tableFull || error.status === 410;
         status.textContent = 'Couldn’t join just now. Try again.';
@@ -196,14 +226,16 @@ async function accept() {
             join.disabled = false;
             if (guestName) guestName.disabled = false;
             join.textContent = watching ? 'Watch game' : 'Join game';
-            if (error.status === 422 && guestName) guestName.focus({ preventScroll: true });
+            if (nicknameError) showNicknameError();
             else if (document.activeElement === document.body) join.focus({ preventScroll: true });
         }
     }
 }
 
-join.addEventListener('click', event => {
-    if (!watching) unlockGameNightAudio(event);
+invite.addEventListener('submit', event => {
+    event.preventDefault();
+    if (join.disabled) return;
+    if (!watching && navigator.userActivation?.isActive !== false) unlockGameNightAudio(event);
     if (waitUntil === -1) waitUntil = Date.now() + 25_000;
     if (!webJam && guestName) {
         const byChoice = guestName.value.trim();
@@ -230,7 +262,13 @@ async function shareFreshLink() {
         try {
             await navigator.clipboard.writeText(message);
             if (askHost) askHost.textContent = 'Copied. Send it to your host.';
-        } catch { /* The button still shows the line to send. */ }
+            return;
+        } catch { /* Show the message on the page when copying is blocked. */ }
+    }
+    if (freshMessage) {
+        freshMessage.textContent = `Message your host in the app you usually use. “${message}”`;
+        freshMessage.hidden = false;
+        freshMessage.focus();
     }
 }
 

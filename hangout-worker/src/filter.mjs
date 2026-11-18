@@ -119,21 +119,26 @@ export function checkText(raw, lists = defaultLists(), { handles = true } = {}) 
     if (THREAT.test(text)) return { verdict: 'block', reason: 'threat', text };
     if (/(.)\1{14,}/u.test(text)) return { verdict: 'block', reason: 'spam', text };
     const allow = lists.allow || [];
-    const blockHit = hasWord(text, lists.block || []) || hasWord(squash(text), lists.block || []);
+    const block = lists.block || [], hold = lists.hold || [];
+    const blockHit = block.length && (hasWord(text, block) || hasWord(squash(text), block));
     if (blockHit && !allow.includes(blockHit)) return { verdict: 'block', reason: `word:${blockHit}`, text };
     const forms = variants(text);
     if (forms.some((f) => SEXUAL.test(f))) return { verdict: 'block', reason: 'sexual', text };
+    let presetHold;
     for (const f of forms) {
         for (const m of presetMatcher.getAllMatches(f)) {
             const w = wordOf(m);
-            if (allow.includes(w) || MILD_OK.includes(w)) continue;
-            if ((lists.hold || []).includes(w)) continue; // handled below
+            if (allow.includes(w)) continue;
+            if (hold.includes(w)) {
+                if (f === text) presetHold ??= w;
+                continue;
+            }
+            if (MILD_OK.includes(w)) continue;
             return { verdict: 'block', reason: `preset:${w}`, text };
         }
     }
     if (DIRECTED.test(text) || forms.some((f) => CUNT_AT.test(f))) return { verdict: 'hold', reason: 'insult-at-person', text };
-    const presetHold = presetMatcher.getAllMatches(text).map(wordOf).find((w) => (lists.hold || []).includes(w) && !allow.includes(w));
-    const holdHit = presetHold || hasWord(text, lists.hold || []) || hasWord(squash(text), lists.hold || []);
+    const holdHit = presetHold || (hold.length && (hasWord(text, hold) || hasWord(squash(text), hold)));
     if (holdHit && !allow.includes(holdHit)) return { verdict: 'hold', reason: `hold:${holdHit}`, text };
     return { verdict: 'ok', reason: null, text };
 }

@@ -713,7 +713,10 @@ for (const width of [390, 1440]) test(`protected activity setup failure waits fo
     try {
         const host = await enter('SetupHost', false), guest = await enter('SetupGuest', true);
         await host.locator('[data-start="art"]').click();
-        const room = await host.locator('[data-chat-context]').textContent();
+        const hostChannel = host.locator('[data-chat-context]');
+        // The room switch happens when the relay acknowledges creation.
+        await expect(hostChannel).toHaveText(/^#art-[a-z0-9-]+$/);
+        const room = await hostChannel.textContent();
         const input = guest.getByRole('textbox', { name: 'Message', exact: true });
         await input.fill('/join ' + room); await input.press('Enter');
         await expect(guest.locator('[data-chat-context]')).toHaveText(room);

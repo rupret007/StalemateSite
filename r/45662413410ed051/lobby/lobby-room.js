@@ -41,6 +41,10 @@
         let videoPublishTimer;
         let live = null;
         let pendingPts = [];
+        // Cache only within this room generation. Authoritative snapshots and
+        // teardown must not reuse pixels from a previous retained drawing.
+        let canvasBase = null, canvasBaseChannel = null, canvasBaseLastId = null, canvasBaseCount = 0, canvasBasePrefix = '';
+        let canvasBaseGeneration = -1;
         let flushTimer = 0;
         let roomGeneration = 0, captureVersion = 0, turnClient = null, turnInit = null;
         let cameraFailureNotice = '';
@@ -186,8 +190,15 @@
             return !item.failed; // Queued locally, not acknowledged by the server.
         }
 
+        function resetCanvasBase() {
+            if (canvasBase) { canvasBase.width = 0; canvasBase.height = 0; }
+            canvasBase = null; canvasBaseChannel = null; canvasBaseLastId = null;
+            canvasBaseCount = 0; canvasBasePrefix = ''; canvasBaseGeneration = -1;
+        }
+
         function teardown() {
             roomGeneration += 1; captureVersion += 1;
+            resetCanvasBase();
             localSample = null;
             clearTimeout(activity.timer); activity.timer = 0; activity.queue = []; activity.bytes = 0;
             cancelStroke();
@@ -296,10 +307,10 @@
             if (!m.ch || m.ch !== app.active || m.ch !== state.ch) return;
             observeTimestamp(m.ts);
             if (m.kind === 'stroke' && m.from !== state.myId && H.apply(state.room, { type: 'stroke', stroke: m.stroke }) === 'draw') {
-                const s = state.room.strokes.find((x) => x.id === m.stroke.id);
-                drawStroke(s);
+                redraw(m.stroke.id);
             }
             if (m.kind === 'clear') {
+                cancelStroke();
                 H.apply(state.room, { type: 'clear' });
                 redraw();
             }
@@ -380,10 +391,12 @@
         }
 
         function addPt(x, y) {
-            const px = Math.max(0, Math.min(1, x));
-            const py = Math.max(0, Math.min(1, y));
-            live.pts.push([px, py]);
-            pendingPts.push([px, py]);
+            if (live.pts.length >= H.LIMITS.strokeTotalPoints) return;
+            const normalized = H.cleanStroke({ id: live.id, color: live.color, size: live.size, pts: [[x, y]] });
+            if (!normalized) return;
+            const point = normalized.pts[0];
+            live.pts.push(point);
+            pendingPts.push(point);
             drawStroke(live, Math.max(0, live.pts.length - 2));
             if (pendingPts.length >= 16) flushStroke();
             else if (!flushTimer) {
@@ -402,6 +415,9 @@
             }
             H.apply(state.room, { type: 'stroke', stroke: { id: live.id, color: live.color, size: live.size, pts: pendingPts } });
             pendingPts = [];
+            // Match snapshot rendering after normalization. Segment-by-segment
+            // antialiasing and repainting a growing path produce different pixels.
+            redraw(live.id);
         }
 
         function drawStroke(stroke, from = 0) {
@@ -420,10 +436,43 @@
             ctx.stroke();
         }
 
-        function redraw() {
+        // Inside one live generation strokes only gain points. A new snapshot
+        // goes through teardown and invalidates this append-only prefix cache.
+        function strokesPrefixFingerprint(strokes) {
+            let out = '';
+            for (let i = 0; i < strokes.length - 1; i += 1) out += strokes[i].id + ':' + strokes[i].pts.length + '|';
+            return out;
+        }
+
+        function redraw(changedStrokeId) {
             const ctx = ui.canvas.getContext('2d');
             ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
-            state.room.strokes.forEach((s) => drawStroke(s));
+            const strokes = state.room.strokes, last = strokes.at(-1);
+            if (!last) { resetCanvasBase(); return; }
+            const baseUsable = canvasBase && canvasBaseGeneration === roomGeneration
+                && canvasBaseChannel === state.ch && canvasBaseCount === strokes.length
+                && canvasBaseLastId === last.id && canvasBase.width === ui.canvas.width && canvasBase.height === ui.canvas.height;
+            // Reuse only an unchanged prefix within this generation. Reconnects
+            // and authoritative snapshots repaint from their newly ingested data.
+            if (baseUsable && (changedStrokeId === last.id || canvasBasePrefix === strokesPrefixFingerprint(strokes))) {
+                ctx.drawImage(canvasBase, 0, 0);
+            } else {
+                for (const stroke of strokes.slice(0, -1)) drawStroke(stroke);
+                canvasBase ||= document.createElement('canvas');
+                canvasBase.width = ui.canvas.width;
+                canvasBase.height = ui.canvas.height;
+                canvasBase.getContext('2d').drawImage(ui.canvas, 0, 0);
+                canvasBaseChannel = state.ch;
+                canvasBaseGeneration = roomGeneration;
+                canvasBaseLastId = last.id;
+                canvasBaseCount = strokes.length;
+                canvasBasePrefix = strokesPrefixFingerprint(strokes);
+            }
+            drawStroke(last);
+            // A remote commit can arrive between this gesture's paced flushes.
+            if (currentStroke() && pendingPts.length) {
+                drawStroke(live, Math.max(0, live.pts.length - pendingPts.length - 1));
+            }
         }
 
         /* ---- synced video ---- */

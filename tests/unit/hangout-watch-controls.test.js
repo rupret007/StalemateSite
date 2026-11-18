@@ -14,7 +14,7 @@ async function fixture({ startsPlaying = true, sharedPlaying = true } = {}) {
     w.setInterval = fn => { intervals.push(fn); return intervals.length; }; w.clearInterval = () => {};
     w.HangoutVideo = { isPhoneDevice: () => false };
     w.eval(read('bob-ross.js'));
-    w.HTMLCanvasElement.prototype.getContext = () => ({ clearRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} });
+    w.HTMLCanvasElement.prototype.getContext = () => ({ clearRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, drawImage() {} });
     const player = { getCurrentTime: () => pos, getPlayerState: () => playing ? 1 : 2,
         seekTo(value) { pos = value; }, playVideo() { if (startsPlaying) { playing = true; callbacks.onStateChange({ target: player, data: 1 }); } },
         pauseVideo() { playing = false; callbacks.onStateChange({ target: player, data: 2 }); } };

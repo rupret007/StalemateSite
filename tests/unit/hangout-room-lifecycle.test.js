@@ -16,7 +16,7 @@ function fixture() {
     const { window } = dom, timers = new Map(), sent = [], peers = []; let timerId = 0;
     window.setTimeout = (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId; };
     window.clearTimeout = id => timers.delete(id);
-    window.HTMLCanvasElement.prototype.getContext = () => ({ clearRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} });
+    window.HTMLCanvasElement.prototype.getContext = () => ({ clearRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, drawImage() {} });
     window.HangoutVideo = { isPhoneDevice: () => false };
     window.eval(youtube);
     window.HangoutYouTube.create = () => ({ cancel() {} });

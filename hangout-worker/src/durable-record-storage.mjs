@@ -3,7 +3,7 @@
 // production activation, remote authority, key management or provider starts.
 export const DURABLE_RECORD_CEILINGS = Object.freeze({ chunkBytes: 65536, recordBytes: 16 * 1024 * 1024,
     transactionReadBytes: 32 * 1024 * 1024, transactionWriteBytes: 16 * 1024 * 1024, rowOperations: 4096, listPage: 4, nodes: 100000, depth: 64 });
-const enc = new TextEncoder(), dec = new TextDecoder('utf-8', { fatal: true });
+const enc = new TextEncoder(), dec = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const fail = reason => { throw Error(reason); };
 const digest = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(n => n.toString(16).padStart(2, '0')).join('');
 const exact = (value, keys) => value && Object.getPrototypeOf(value) === Object.prototype
@@ -43,6 +43,24 @@ function encode(value, limit) {
     const snapshot = visit(value, 0), bytes = enc.encode(JSON.stringify(snapshot));
     if (bytes.byteLength > limit) fail('record-capacity');
     return bytes;
+}
+
+function decode(bytes, limit) {
+    const json = dec.decode(bytes), value = JSON.parse(json);
+    // JSON.parse has already produced a tree of own data properties. Check
+    // the same node and depth ceilings without taking a descriptor snapshot.
+    let nodes = 0;
+    function check(item, depth) {
+        if (++nodes > DURABLE_RECORD_CEILINGS.nodes || depth > DURABLE_RECORD_CEILINGS.depth) fail('record-capacity');
+        if (typeof item === 'number' && (!Number.isFinite(item) || Object.is(item, -0))) fail('record-format');
+        if (item && typeof item === 'object') for (const key of Object.keys(item)) check(item[key], depth + 1);
+    }
+    check(value, 0);
+    // Preserve canonical encoding even in the presence of inherited hooks.
+    const inheritedSerializer = Object.hasOwn(Object.prototype, 'toJSON') || Object.hasOwn(Array.prototype, 'toJSON');
+    const canonical = inheritedSerializer ? dec.decode(encode(value, limit)) : JSON.stringify(value);
+    if (canonical !== json) fail('storage-corrupt');
+    return value;
 }
 
 export function createDurableRecordStorage({ storage, namespace, maxRecordBytes } = {}) {
@@ -109,20 +127,8 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                         if (!(extra instanceof Map) || extra.size) fail('storage-corrupt');
                     }
                     if (await digest(bytes) !== meta.sha256) fail('storage-corrupt');
-                    let value;
-                    try { value = JSON.parse(dec.decode(bytes)); } catch { fail('storage-corrupt'); }
-                    try {
-                        // The raw bytes already passed the manifest integrity hash.
-                        // Require their exact canonical representation, not merely
-                        // another digest match. Keep all encoder resource checks.
-                        const canonical = encode(value, maxRecordBytes);
-                        if (canonical.byteLength !== bytes.byteLength) fail('storage-corrupt');
-                        for (let i = 0; i < bytes.byteLength; i += 1) {
-                            if (canonical[i] !== bytes[i]) fail('storage-corrupt');
-                        }
-                    }
+                    try { return decode(bytes, maxRecordBytes); }
                     catch { fail('storage-corrupt'); }
-                    return value;
                 };
                 const run = task => {
                     if (!active || failure || busy) {
