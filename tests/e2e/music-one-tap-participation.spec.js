@@ -2,12 +2,14 @@
 // relay delivery and the native WebJam host callback are synthetic fixtures.
 const { randomBytes, randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
-const { createLobby } = require('../../hangout-worker/src/lobby-core.mjs');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const LOBBY = '/r/45662413410ed051/lobby/';
 
 test('a guest joins the invited Music session with one accept tap', async ({ browser, baseURL }) => {
+    // Use native ESM like protected fixtures, avoiding CommonJS collection
+    // transforms for the same engine that those fixtures import.
+    const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
     const relay = hangoutRelayWsBase(baseURL, `webjam-browser-one-tap-${randomUUID()}`);
     const contexts = [];
     const sockets = new Map();
