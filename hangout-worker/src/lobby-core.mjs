@@ -4,7 +4,7 @@
 import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRateLimits } from './community-state.mjs';
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
 import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
-import { messageReceipt, receiptDigest } from './message-receipts.mjs';
+import { messageReceipt, receiptDigest, storedReceipts, RECEIPT_MAX, RECEIPT_STATE_BYTES } from './message-receipts.mjs';
 import { discordCallLink, gameNightInvite, gameNightLabels, gameNightRoomName, newGameNightRoomName, webJamRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { personRoomProjection } from './lobby-effect-records.mjs';
 import { TRANSPORT_CONTROL_BLOCK } from './transport-budget.mjs';
@@ -40,8 +40,7 @@ const SESSION_PREFERENCES = 50;
 const SESSION_PM_PAIRS = 2000;
 const SESSION_PM_PENDING = 1000;
 const PM_PENDING_TTL = 10 * MIN;
-const RECEIPT_MAX = 1000;
-const RECEIPT_STATE_BYTES = 1024 * 1024;
+const RECEIPT_SNAPSHOT_TAIL = 32;
 const encoder = new TextEncoder();
 
 export const LOBBY_LIMITS = Object.freeze({
@@ -144,7 +143,7 @@ const PERSON_COMMANDS = new Set(['msg', 'query', 'whois', 'ignore', 'unignore', 
 const NAMED_PERSON_COMMANDS = new Set([...PERSON_COMMANDS, 'accept', 'decline', 'report', 'mode']);
 const PERSON_ROOM_COMMANDS = new Set(['slap', 'kick', 'ban', 'invite', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer']);
 
-export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = () => {}, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, webJamChess = false, directMusicInvites = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = null, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, webJamChess = false, directMusicInvites = false, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
     if (typeof incidentSources !== 'boolean') throw Error('incident-source-configuration');
     const L = { ...LOBBY_LIMITS, ...limits };
     const entrySites = L.entrySites || ENTRY_SITES;
@@ -190,7 +189,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (commitConfigured) throw new Error('Controlled effect transaction required');
         const required = kind === 'moderation-queue' || kind === 'net';
         let task;
-        try { task = persistImpl(kind, value); }
+        try { task = persistImpl?.(kind, value); }
         catch (error) { if (!required) throw error; task = Promise.reject(error); }
         if (required && evidenceWrites) evidenceWrites.push(task);
         // Outside a durable command, keep the original promise available to an
@@ -230,6 +229,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const lineMeta = new Map();       // immutable author device + actual recipient connections; never sent to visitors
     const receipts = new Map();       // bounded text digests + delivery metadata; no ordinary chat or PM bodies
     const receiptSizes = new Map();   // exact UTF-8 record sizes; avoid re-encoding the whole queue per line
+    const receiptJson = new WeakMap(); // immutable receipt JSON, reused by successive session writes
+    const receiptRecipientSets = new Map(); // bounded intern table for immutable, repeated delivery audiences
+    const receiptAudienceBytes = new WeakMap();
     let receiptBytes = 2;             // serialized [] plus records and commas
     let receiptRevision = 0;
     // Receipt insertion is the hot path for chat. Track the next possible TTL
@@ -344,6 +346,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         participationBusy = true; pendingCommits += 1;
         let checkpoint, stage, result, failure = '', restoreFailed = false;
         const oldReceiptBytes = receiptBytes;
+        const oldReceiptExpiry = nextReceiptExpiry;
         const oldLastStatSave = lastStatSave;
         try {
             checkpoint = createParticipationCheckpoint({ conns, channels, pm, musicInvites, devStats, ipRooms, net, reports, held, lines, lineMeta,
@@ -369,6 +372,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 try {
                     checkpoint.restore(); net.budget = spent.budget;
                     receiptBytes = oldReceiptBytes;
+                    nextReceiptExpiry = oldReceiptExpiry;
                     lastStatSave = oldLastStatSave;
                     devStats.clear(); for (const row of spent.devices) devStats.set(...row);
                     ipRooms.clear(); for (const row of spent.ips) ipRooms.set(...row);
@@ -1417,7 +1421,25 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             .map(([key, p]) => ({ key, from: p.from, fromId: p.fromId, toId: p.toId, at: p.at, hadFirst: !!p.first || !!p.lostFirst, ...(p.ref ? { ref: p.ref } : {}) })) };
     }
     function sessionSnapshot() {
-        return { ...sessionMetadata(), receipts: [...receipts.values()].map((r) => ({ ...r, recipients: [...r.recipients] })) };
+        return { ...sessionMetadata(), receipts: [...receipts.values()].map(r => ({
+            ...r, recipients: [...r.recipients], ...(r.publicOrigin ? { publicOrigin: { ...r.publicOrigin } } : {})
+        })) };
+    }
+    function sessionStorageSnapshot(metadata = sessionMetadata(), bytes = encoder.encode(JSON.stringify(metadata)).byteLength + ',"receipts":'.length + receiptBytes) {
+        const rows = [...receipts.values()];
+        // Pack older immutable rows in ordinary storage to avoid rebuilding
+        // their object graph on every chat write. The maximum extra bytes
+        // from escaping the archive's quotes and backslashes is receiptBytes.
+        if (!commitConfigured && rows.length > RECEIPT_SNAPSHOT_TAIL
+            && bytes + receiptBytes + ',"receiptArchive":""'.length <= SESSION_STATE_BYTES) {
+            const older = rows.splice(0, rows.length - RECEIPT_SNAPSHOT_TAIL);
+            const json = older.map(row => {
+                if (!receiptJson.has(row)) receiptJson.set(row, JSON.stringify(row));
+                return receiptJson.get(row);
+            });
+            return { ...metadata, receipts: rows, receiptArchive: `[${json.join(',')}]` };
+        }
+        return { ...metadata, receipts: rows };
     }
     function restoreSessions(saved, liveIdentities = []) {
         const rejected = [], resumed = [];
@@ -1494,7 +1516,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             }
         }
         restorePendingPm(saved.pendingPm, records);
-        restoreReceipts(saved.receipts);
+        restoreReceipts(storedReceipts(saved));
         for (const c of conns.values()) {
             const hadPeers = c.ignoredPeerIds.size > 0;
             for (const id of c.ignoredPeerIds) if (!conns.has(id)) c.ignoredPeerIds.delete(id);
@@ -1583,7 +1605,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (bytes > SESSION_STATE_BYTES) writes.push(Promise.reject(new Error('session allowance exceeded')));
             // Stored receipt records are immutable; replacement/pruning creates
             // new records, so an outstanding storage write keeps its exact snapshot.
-            else writes.push(persist('sessions', { ...metadata, receipts: [...receipts.values()] }));
+            else if (persistImpl || controlled) writes.push(persist('sessions', sessionStorageSnapshot(metadata, bytes)));
         }
         const flush = () => {
             for (const [id, frame, marker] of frames) try {
@@ -2394,22 +2416,35 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function rememberDelivery(line, meta) {
-        // Retain only eligible reporting witnesses. When no other device got
-        // the line, keep a compact control receipt so staff can still delete
-        // or purge it after live-line eviction without retaining unusable
-        // report metadata.
-        const reporters = [...meta.recipients].filter((id) => conns.get(id)?.dev !== meta.authorDev);
-        setReceipt(line.id, reporters.length
-            ? messageReceipt(line, { ...meta, recipients: new Set(reporters) })
-            : { controlOnly: true, id: line.id, authorDev: meta.authorDev, ts: line.ts });
+        if (meta.recipients.size) {
+            // A delivery to the author's own device can still be deleted or
+            // purged after eviction, but that device cannot report itself.
+            const recipients = receiptAudience([...meta.recipients]);
+            const controlOnly = line.t === 'line' && recipients.every(id => conns.get(id)?.dev === meta.authorDev);
+            setReceipt(line.id, controlOnly
+                ? { controlOnly: true, id: line.id, authorDev: meta.authorDev, ts: line.ts, recipients }
+                : messageReceipt(line, { ...meta, recipients }));
+        }
         pruneReceipts(false);
     }
 
-    function setReceipt(id, value) {
-        const size = encoder.encode(JSON.stringify(value)).byteLength;
+    function receiptAudience(ids) {
+        const key = JSON.stringify(ids);
+        let recipients = receiptRecipientSets.get(key);
+        if (!recipients) {
+            recipients = Object.freeze(ids);
+            receiptRecipientSets.set(key, recipients);
+            receiptAudienceBytes.set(recipients, encoder.encode(key).byteLength);
+            if (receiptRecipientSets.size > 64) receiptRecipientSets.delete(receiptRecipientSets.keys().next().value);
+        }
+        return recipients;
+    }
+    function setReceipt(id, value, size = encoder.encode(JSON.stringify({ ...value, recipients: [] })).byteLength
+        + receiptAudienceBytes.get(value.recipients) - 2) {
         if (receipts.has(id)) receiptBytes += size - receiptSizes.get(id);
         else receiptBytes += size + (receipts.size ? 1 : 0);
-        receipts.set(id, value); receiptSizes.set(id, size); receiptRevision += 1;
+        if (value.publicOrigin) Object.freeze(value.publicOrigin);
+        receipts.set(id, Object.freeze(value)); receiptSizes.set(id, size); receiptRevision += 1;
         if (Number.isFinite(value.ts)) nextReceiptExpiry = Math.min(nextReceiptExpiry, value.ts + DAY);
     }
     function deleteReceipt(id) {
@@ -2422,21 +2457,30 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         // New receipts are fresh. Until the earliest possible expiry, the
         // insertion path has no TTL work; disconnect cleanup still scans
         // witnesses through the full path below.
-        if (!pruneWitnesses && time < nextReceiptExpiry) {
-            while (receipts.size > RECEIPT_MAX || receiptBytes > RECEIPT_STATE_BYTES) deleteReceipt(receipts.keys().next().value);
-            return;
-        }
-        let earliest = Infinity;
-        for (const [id, r] of receipts) {
-            if (!r.controlOnly && !r.recipients.length || time - r.ts >= DAY) { deleteReceipt(id); continue; }
-            earliest = Math.min(earliest, r.ts + DAY);
-            if (pruneWitnesses && !r.controlOnly) {
-                const recipients = r.recipients.filter((recipient) => { const current = conns.get(recipient); return current && (current.nick || current.safetyOnly); });
-                if (!recipients.length) deleteReceipt(id);
-                else if (recipients.length !== r.recipients.length) setReceipt(id, { ...r, recipients });
+        if (pruneWitnesses || time >= nextReceiptExpiry) {
+            const audiences = new Map();
+            let earliest = Infinity;
+            for (const [id, r] of receipts) {
+                if (time - r.ts >= DAY) { deleteReceipt(id); continue; }
+                if (pruneWitnesses && r.recipients.length) {
+                    if (!audiences.has(r.recipients)) {
+                        const live = r.recipients.filter(id => {
+                            const current = conns.get(id);
+                            return current && (current.nick || current.safetyOnly);
+                        });
+                        audiences.set(r.recipients, live.length === r.recipients.length ? r.recipients : receiptAudience(live));
+                    }
+                    const recipients = audiences.get(r.recipients);
+                    if (!recipients.length) { deleteReceipt(id); continue; }
+                    if (recipients !== r.recipients) {
+                        const size = receiptSizes.get(id) - receiptAudienceBytes.get(r.recipients) + receiptAudienceBytes.get(recipients);
+                        setReceipt(id, { ...r, recipients }, size);
+                    }
+                }
+                earliest = Math.min(earliest, r.ts + DAY);
             }
+            nextReceiptExpiry = earliest;
         }
-        nextReceiptExpiry = earliest;
         // A popular lobby can have many delivery witnesses per line. Cap serialized
         // metadata as well as record count so it cannot exhaust the session record.
         while (receipts.size > RECEIPT_MAX || receiptBytes > RECEIPT_STATE_BYTES) deleteReceipt(receipts.keys().next().value);
@@ -2450,24 +2494,31 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!Array.isArray(stored) || stored.length > RECEIPT_MAX
             || encoder.encode(JSON.stringify(stored)).byteLength > RECEIPT_STATE_BYTES) return;
         for (const r of stored) {
-            if (r && typeof r === 'object' && r.controlOnly === true) {
-                if (moderationId(r.id) && r.id.startsWith('m') && moderationIdentity(r.authorDev) && moderationTime(r.ts))
-                    setReceipt(r.id, { controlOnly: true, id: r.id, authorDev: r.authorDev, ts: r.ts });
+            if (r?.controlOnly === true) {
+                if (!moderationId(r.id) || !r.id.startsWith('m') || !moderationIdentity(r.authorDev) || !moderationTime(r.ts)) continue;
+                // Older control receipts recorded no audience. They retain
+                // only the moderation action until they expire.
+                const recipients = r.recipients === undefined ? []
+                    : Array.isArray(r.recipients) && r.recipients.length <= SESSION_CONNECTIONS && r.recipients.every(moderationIdentity)
+                        && new Set(r.recipients).size === r.recipients.length ? r.recipients : null;
+                if (!recipients) continue;
+                const live = recipients.filter(id => conns.get(id)?.dev === r.authorDev);
+                if (!recipients.length || live.length)
+                    setReceipt(r.id, { controlOnly: true, id: r.id, authorDev: r.authorDev, ts: r.ts, recipients: receiptAudience(live) });
                 continue;
             }
             if (!r || typeof r !== 'object' || Array.isArray(r) || !moderationId(r.id)
                 || !['line', 'pm'].includes(r.t) || !moderationChannel(r.ch) || !moderationNick(r.from)
                 || !moderationIdentity(r.authorDev) || !/^[a-f0-9]{64}$/.test(r.digest)
                 || Object.hasOwn(r, 'publicOrigin') && (r.t !== 'line' || !r.id.startsWith('m') || !r.ch.startsWith('#') || !validPublicReportOrigin(r.publicOrigin, now()) || r.publicOrigin.at < r.ts)
-                || !moderationTime(r.ts) || typeof r.prefix !== 'string' || !['', '@', '+'].includes(r.prefix)
-                || ['band', 'moderator', 'me'].some((key) => typeof r[key] !== 'boolean')
-                || typeof r.to !== 'string' || (r.t === 'pm' ? !moderationNick(r.to) || r.ch !== `pm:${r.from}>${r.to}` || !r.id.startsWith('p') : !!r.to || !r.ch.startsWith('#') || !r.id.startsWith('m'))
+                || !moderationTime(r.ts) || !['', '@', '+'].includes(r.prefix) || ['band', 'moderator', 'me'].some(key => typeof r[key] !== 'boolean')
+                || (r.t === 'pm' ? !moderationNick(r.to) || r.ch !== `pm:${r.from}>${r.to}` || !r.id.startsWith('p')
+                    : r.to !== '' || !r.ch.startsWith('#') || !r.id.startsWith('m'))
                 || !Array.isArray(r.recipients) || !r.recipients.length || r.recipients.length > SESSION_CONNECTIONS
                 || r.recipients.some((id) => !moderationIdentity(id)) || new Set(r.recipients).size !== r.recipients.length) continue;
             const eligible = r.recipients.filter((id) => conns.has(id));
-            if (eligible.length) setReceipt(r.id, { t: r.t, id: r.id, ch: r.ch, from: r.from, to: r.to,
-                prefix: r.prefix, band: r.band, moderator: r.moderator, me: r.me, ts: r.ts,
-                authorDev: r.authorDev, digest: r.digest, recipients: eligible,
+            if (eligible.length) setReceipt(r.id, { t: r.t, id: r.id, ch: r.ch, from: r.from, to: r.to, prefix: r.prefix, band: r.band, moderator: r.moderator,
+                me: r.me, ts: r.ts, authorDev: r.authorDev, digest: r.digest, recipients: receiptAudience(eligible),
                 ...(r.publicOrigin ? { publicOrigin: { ...r.publicOrigin } } : {}) });
         }
     }
@@ -2591,7 +2642,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         let meta = lineMeta.get(id);
         if (!l) {
             const receipt = receipts.get(id);
-            if (receipt && now() - receipt.ts < DAY && typeof text === 'string' && moderationText(text, L.maxChars)
+            if (receipt && !receipt.controlOnly && now() - receipt.ts < DAY && typeof text === 'string' && moderationText(text, L.maxChars)
                 && receipt.digest === receiptDigest(receipt, receipt.authorDev, text)) {
                 l = { ...receipt, text };
                 meta = { authorDev: receipt.authorDev, recipients: new Set(receipt.recipients),
@@ -2793,7 +2844,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         approveGameMedia: (scope, ...args) => execute(approveGameMedia, [scope.actor, scope, ...args]),
         completePrivateReportAction: (...args) => execute(completePrivateReportAction, args, true), tick: (...args) => execute(tick, args, false),
         roomSnapshot, restoreRooms: (...args) => commitConfigured ? controlledRun(restoreRooms, args) : restoreRooms(...args),
-        sessionSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog,
+        sessionSnapshot, sessionStorageSnapshot, restoreSessions, abuseSnapshot, restoreAbuse, snapshot, restore, restoreLog,
         restoreModerationQueue: (...args) => commitConfigured ? controlledRun(restoreModerationQueue, args, true) : restoreModerationQueue(...args),
         restoreAiReviews: (...args) => commitConfigured ? controlledRun(restoreAiReviews, args, true) : restoreAiReviews(...args),
         applyAiReview: (...args) => commitConfigured ? controlledRun(applyAiReview, args, true) : applyAiReview(...args),

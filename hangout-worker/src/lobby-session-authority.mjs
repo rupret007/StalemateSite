@@ -12,6 +12,7 @@ import { initializeLobbyEffects, readLobbyState, writeLobbyEffects, pruneLobbyEf
 import { lobbyIncidentSourceMode } from './lobby-incident-sources.mjs';
 import { validPrivateReportState } from './private-reports.mjs';
 import { createLobby } from './lobby-core.mjs';
+import { storedReceipts } from './message-receipts.mjs';
 import { accessPartitionedParticipationSelf, maintainPartitionedParticipation, PARTICIPATION_PARTITION_BOUNDS, PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 
 export const LOBBY_AUTHORITY_MODE = 'lobby-v1';
@@ -141,7 +142,12 @@ export async function migrateLobbySessionAuthority({ storage, env, registrySnaps
         // as empty. Preserve that legacy contract ONLY during owner migration;
         // a present malformed row and any missing new-format row still refuse.
         const optional = async (key, fallback) => { const value = await raw.get(key); return value === undefined ? fallback : value; };
-        const abuse = await optional('abuse', fresh.abuseSnapshot()), sessions = await optional('sessions', fresh.sessionSnapshot());
+        const abuse = await optional('abuse', fresh.abuseSnapshot());
+        let sessions = await optional('sessions', fresh.sessionSnapshot());
+        if (sessions && Object.hasOwn(sessions, 'receiptArchive')) {
+            const { receiptArchive, ...metadata } = sessions;
+            sessions = { ...metadata, receipts: storedReceipts(sessions) };
+        }
         const moderationQueue = await optional('moderation-queue', { reports: [], held: [] }), aiReviews = await optional('ai-reviews', []);
         const roomIndex = await raw.get('room-index'), legacyRooms = await raw.get('rooms'); let rooms;
         if (roomIndex !== undefined) {
@@ -247,11 +253,12 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         resolveParticipationConnection: value => transact(async tx => {
             // Read-only operation-local reuse only. transact still performs its
             // initialization and both fresh configuredMarker fences on raw tx.
-            // Validators retain their independent rows and live clock/role checks.
+            // These validators only read transaction-local rows. Each call
+            // still checks its own descriptor and the live clock and roles.
             const rows = new Map();
             const current = Object.freeze({ get: async key => {
                 if (!rows.has(key)) rows.set(key, await tx.get(key));
-                return clone(rows.get(key));
+                return rows.get(key);
             } });
             const binding = bindingFrom(value);
             return await validateBinding(current, binding) ? participationIdentity(current, binding.betaSid, binding.expiresAt) : null;
@@ -262,12 +269,12 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             return records.transaction(async tx => {
                 // Preparation only: native reads are shared inside this one
                 // read-only transaction, never across actions or commit fences.
-                // Each validator still sees an independent row and checks its
-                // own descriptor, current role and live clock on every call.
+                // Each validator checks its own descriptor, current role and
+                // live clock against the transaction-local rows.
                 const rows = new Map();
                 const current = Object.freeze({ get: async key => {
                     if (!rows.has(key)) rows.set(key, await tx.get(key));
-                    return clone(rows.get(key));
+                    return rows.get(key);
                 } });
                 await initialized(current); ensure((await configuredMarker(current)).inviteVersion === betaVersion(env));
                 const identities = [];

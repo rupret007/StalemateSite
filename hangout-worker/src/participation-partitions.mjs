@@ -1,5 +1,6 @@
 // Server-only C2 record partitions in ONE serializable rollback transaction
 // domain. No production route, migration, remote guardian or provider adapter.
+import { createHash } from 'node:crypto';
 import { createParticipationConsents, PARTICIPATION_LEDGER_KEY, readParticipationPrincipals,
     validParticipationLedgerState, alignParticipationLedgerPolicy, expireParticipationLedgerState, accessParticipationSelf } from './participation-consents.mjs';
 
@@ -20,11 +21,11 @@ const exact = (value, keys) => value && [Object.prototype, null].includes(Object
         const descriptor = Object.getOwnPropertyDescriptor(value, key); return descriptor?.enumerable && Object.hasOwn(descriptor, 'value');
     });
 const fail = reason => { throw Object.assign(new Error(reason), { partitionReason: reason }); };
-const digest = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(n => n.toString(16).padStart(2, '0')).join('');
-const indexKey = async (prefix, value) => `${prefix}${await digest(value)}`;
-async function routeFor(principalRef, communityRef) {
+const digest = value => createHash('sha256').update(value).digest('hex');
+const indexKey = (prefix, value) => `${prefix}${digest(value)}`;
+function routeFor(principalRef, communityRef) {
     if (!ref(principalRef) || !ref(communityRef)) fail('not-authorized');
-    const hash = await digest(`${communityRef}\0${principalRef}`);
+    const hash = digest(`${communityRef}\0${principalRef}`);
     return { principalRef, communityRef, partitionKey: `${PARTS}${hash}`, anchorKey: `${ANCHORS}${hash}` };
 }
 const matchesRoute = (value, route) => value.principalRef === route.principalRef && value.communityRef === route.communityRef && value.partitionKey === route.partitionKey;
@@ -50,19 +51,20 @@ function boundedRecordTransaction(tx) {
 const referenceKey = (space, reference) => indexKey(`${UNIQUE}${space}:`, reference);
 const referenceValue = (space, reference, deleteAt, route) => ({ version: 1, space, reference, principalRef: route.principalRef,
     communityRef: route.communityRef, partitionKey: route.partitionKey, deleteAt });
-async function references(state, route) {
-    const rows = new Map(), add = async (space, reference, deleteAt) => {
-        const key = await referenceKey(space, reference); if (rows.has(key)) fail('reference-conflict'); rows.set(key, referenceValue(space, reference, deleteAt, route));
+function references(state, route) {
+    const rows = new Map(), add = (space, reference, deleteAt) => {
+        const key = referenceKey(space, reference); if (rows.has(key)) fail('reference-conflict'); rows.set(key, referenceValue(space, reference, deleteAt, route));
     };
-    for (const row of state?.pending || []) await add('pending', row.pendingRef, row.deleteAt);
-    for (const row of state?.guardians || []) await add('guardian', row.guardianRef, row.deleteAt);
-    for (const row of state?.receipts || []) { await add('consent', row.consentRef, row.deleteAt); await add('decision', `${row.verifierRef}\0${row.decisionRef}`, row.deleteAt); }
+    for (const row of state?.pending || []) add('pending', row.pendingRef, row.deleteAt);
+    for (const row of state?.guardians || []) add('guardian', row.guardianRef, row.deleteAt);
+    for (const row of state?.receipts || []) { add('consent', row.consentRef, row.deleteAt); add('decision', `${row.verifierRef}\0${row.decisionRef}`, row.deleteAt); }
     return rows;
 }
 async function syncReferences(tx, previous, next, route, at) {
-    const old = await references(previous, route), current = await references(next, route);
+    const old = references(previous, route), current = references(next, route);
     for (const key of new Set([...old.keys(), ...current.keys()])) {
-        const before = old.get(key), after = current.get(key), unchanged = JSON.stringify(before) === JSON.stringify(after);
+        const before = old.get(key), after = current.get(key);
+        const unchanged = before && after && before.space === after.space && before.reference === after.reference && before.deleteAt === after.deleteAt;
         if (unchanged && before.deleteAt <= at) continue;
         const saved = await tx.get(key), expected = before || after;
         if (saved !== undefined && (!validReference(saved) || saved.space !== expected.space || saved.reference !== expected.reference)) fail('storage-corrupt');
@@ -79,6 +81,13 @@ async function root(tx) {
     if (!validParticipationLedgerState(value, PARTICIPATION_RECORD_LIMITS) || kinds.some(kind => value[kind].length)) fail('policy-unavailable');
     return value;
 }
+function alignPartition(state, policy, at) {
+    const { config } = policy;
+    // Both records have already been validated in this transaction. Callers
+    // that run ledger transitions take their own copy before modifying it.
+    if (state && integer(at) && config.policy.issuedAt <= at && JSON.stringify(state.config) === JSON.stringify(config)) return state;
+    return alignParticipationLedgerPolicy(state, config, at, PARTICIPATION_RECORD_LIMITS);
+}
 async function loadPartition(tx, route, policy, at) {
     if (route.communityRef !== policy.config.policy.communityRef) fail('not-authorized');
     const state = await tx.get(route.partitionKey), anchor = await tx.get(route.anchorKey);
@@ -87,14 +96,14 @@ async function loadPartition(tx, route, policy, at) {
         || state.config.policy.communityRef !== route.communityRef
         || state.subjects.some(item => item.record.principalRef !== route.principalRef || item.record.subjectRef !== anchor.subjectRef)) fail('storage-corrupt');
     if (state.subjects.length) {
-        const index = await tx.get(await indexKey(SUBJECTS, anchor.subjectRef));
+        const index = route.subjectIndex?.subjectRef === anchor.subjectRef ? route.subjectIndex : await tx.get(indexKey(SUBJECTS, anchor.subjectRef));
         if (!validAnchor(index, route) || index.subjectRef !== anchor.subjectRef) fail('storage-corrupt');
         const subject = state.subjects[0].record, receipt = state.receipts.find(item => item.consentRef === subject.consentRefs[0]);
         const guardian = state.guardians.find(item => item.guardianRef === receipt?.guardianRef);
         if (subject.state === 'authorized' && subject.expiresAt > at && receipt?.state === 'active' && guardian?.state === 'verified') {
             for (const [space, reference, deleteAt] of [['guardian', guardian.guardianRef, guardian.deleteAt], ['consent', receipt.consentRef, receipt.deleteAt],
                 ['decision', `${receipt.verifierRef}\0${receipt.decisionRef}`, receipt.deleteAt]]) {
-                const saved = await tx.get(await referenceKey(space, reference));
+                const saved = await tx.get(referenceKey(space, reference));
                 if (!validReference(saved) || saved.space !== space || saved.reference !== reference || saved.deleteAt !== deleteAt || !matchesRoute(saved, route)) fail('storage-corrupt');
             }
         }
@@ -104,7 +113,7 @@ async function loadPartition(tx, route, policy, at) {
 
 async function validateOperationReferences(tx, state, route, now) {
     for (const old of state?.operations || []) if (old.deleteAt > now()) {
-        const saved = await tx.get(await indexKey(OPERATIONS, old.operationRef));
+        const saved = await tx.get(indexKey(OPERATIONS, old.operationRef));
         if (!validOperation(saved) || saved.operationRef !== old.operationRef || saved.kind !== old.kind
             || saved.deleteAt !== old.deleteAt || !matchesRoute(saved, route)) fail('storage-corrupt');
     }
@@ -113,7 +122,7 @@ async function validateOperationReferences(tx, state, route, now) {
 // The factory and internal retention share route/deadline-protected reference,
 // subject-index and partition reconciliation in their supplied transaction.
 async function writePartition({ tx, loaded, value, route, now, admitSubject = null, releaseSubject = null, operation = null, operationKey = null, authorization = null }) {
-    if (JSON.stringify(value) === JSON.stringify(loaded.state)) {
+    if (value === loaded.state || value.revision === loaded.state?.revision && JSON.stringify(value) === JSON.stringify(loaded.state)) {
         await syncReferences(tx, loaded.state, value, route, now()); return false;
     }
     const subject = value.subjects[0]?.record, oldSubject = loaded.state?.subjects[0]?.record;
@@ -123,17 +132,18 @@ async function writePartition({ tx, loaded, value, route, now, admitSubject = nu
     }
     await syncReferences(tx, loaded.state, value, route, now());
     if (oldSubject && oldSubject.subjectRef !== subject?.subjectRef) {
-        const key = await indexKey(SUBJECTS, oldSubject.subjectRef), previous = await tx.get(key);
+        const key = indexKey(SUBJECTS, oldSubject.subjectRef), previous = await tx.get(key);
         if (!validAnchor(previous, route) || previous.subjectRef !== oldSubject.subjectRef) fail('storage-corrupt'); await tx.delete(key);
     }
-    if (subject) {
-        const key = await indexKey(SUBJECTS, subject.subjectRef), previous = await tx.get(key);
+    // An unchanged subject's index and anchor were verified by loadPartition.
+    if (subject && oldSubject?.subjectRef !== subject.subjectRef) {
+        const key = indexKey(SUBJECTS, subject.subjectRef), previous = await tx.get(key);
         if (previous !== undefined && (!validAnchor(previous, route) || previous.subjectRef !== subject.subjectRef)) fail('reference-conflict');
         const anchor = { version: 1, principalRef: route.principalRef, communityRef: route.communityRef, partitionKey: route.partitionKey, subjectRef: subject.subjectRef };
         await tx.put(key, anchor); await tx.put(route.anchorKey, anchor);
     }
     for (const old of loaded.state?.operations || []) if (!value.operations.some(item => item.operationRef === old.operationRef)) {
-        const key = await indexKey(OPERATIONS, old.operationRef), previous = await tx.get(key);
+        const key = indexKey(OPERATIONS, old.operationRef), previous = await tx.get(key);
         if (previous === undefined) { if (old.deleteAt > now()) fail('storage-corrupt'); continue; }
         if (!validOperation(previous) || previous.operationRef !== old.operationRef) fail('storage-corrupt');
         if (matchesRoute(previous, route) && previous.deleteAt === old.deleteAt) await tx.delete(key);
@@ -173,12 +183,12 @@ export async function maintainPartitionedParticipation({ tx, now, communityRef }
     if (!validPartitionKey(key) || key <= after || !validParticipationLedgerState(state, PARTICIPATION_RECORD_LIMITS)) fail('storage-corrupt');
     const principal = state.subjects[0]?.record.principalRef;
     const anchor = principal ? null : await bounded.get(`${ANCHORS}${key.slice(PARTS.length)}`);
-    const route = await routeFor(principal || anchor?.principalRef, communityRef);
+    const route = routeFor(principal || anchor?.principalRef, communityRef);
     if (route.partitionKey !== key) fail('storage-corrupt');
     const loaded = await loadPartition(bounded, route, policy, now);
     if (!loaded.state) fail('storage-corrupt');
     await validateOperationReferences(bounded, loaded.state, route, () => now);
-    const value = expireParticipationLedgerState(alignParticipationLedgerPolicy(loaded.state, policy.config, now, PARTICIPATION_RECORD_LIMITS), now, PARTICIPATION_RECORD_LIMITS);
+    const value = expireParticipationLedgerState(alignPartition(loaded.state, policy, now), now, PARTICIPATION_RECORD_LIMITS);
     // No production allocator is installed here. Expired row deletion is not
     // an invented quota release or a new policy/guardian decision.
     const deleted = await writePartition({ tx: bounded, loaded, value, route, now: () => now });
@@ -189,9 +199,9 @@ export async function maintainPartitionedParticipation({ tx, now, communityRef }
 // Caller-only controls composed inside the actual native authority transaction.
 // No partition allocation, verifier/guardian adapter or nested transaction.
 export async function accessPartitionedParticipationSelf({ tx, identity, now, request } = {}) {
-    const bounded = boundedRecordTransaction(tx), policy = await root(bounded), route = await routeFor(identity?.principalRef, identity?.communityRef);
+    const bounded = boundedRecordTransaction(tx), policy = await root(bounded), route = routeFor(identity?.principalRef, identity?.communityRef);
     const loaded = await loadPartition(bounded, route, policy, now);
-    let value = loaded.state === undefined ? undefined : alignParticipationLedgerPolicy(loaded.state, policy.config, now, PARTICIPATION_RECORD_LIMITS);
+    let value = loaded.state === undefined ? undefined : alignPartition(loaded.state, policy, now);
     const result = await accessParticipationSelf({ tx: { get: async () => clone(value), put: async (_, next) => { value = clone(next); } },
         identity, now, request, limits: PARTICIPATION_RECORD_LIMITS });
     if (request !== undefined && loaded.state !== undefined && JSON.stringify(value) !== JSON.stringify(loaded.state)) {
@@ -206,7 +216,7 @@ export async function readPartitionedParticipationWithdrawals({ tx, identities, 
     const policy = await root(tx), withdrawn = [], cache = new Map();
     for (const identity of identities) {
         if (!exact(identity, ['principalRef', 'communityRef', 'expiresAt']) || !integer(identity.expiresAt) || identity.expiresAt <= now) fail('not-authorized');
-        const route = await routeFor(identity.principalRef, identity.communityRef);
+        const route = routeFor(identity.principalRef, identity.communityRef);
         if (!cache.has(route.partitionKey)) {
             const { state } = await loadPartition(tx, route, policy, now);
             cache.set(route.partitionKey, !!state?.subjects.some(row => row.record.state === 'withdrawn' && row.deleteAt > now));
@@ -226,11 +236,11 @@ async function projectParticipation({ tx, identities, now } = {}, includeWithdra
         let denial = '';
         for (const identity of identities) {
             if (!exact(identity, ['principalRef', 'communityRef', 'expiresAt']) || !integer(identity.expiresAt) || identity.expiresAt <= now) fail('not-authorized');
-            const route = await routeFor(identity.principalRef, identity.communityRef);
+            const route = routeFor(identity.principalRef, identity.communityRef);
             if (!cache.has(route.partitionKey)) {
                 const { state } = await loadPartition(tx, route, policy, now);
-                const aligned = alignParticipationLedgerPolicy(state, policy.config, now, PARTICIPATION_RECORD_LIMITS);
-                const result = await readParticipationPrincipals({ tx: { get: async () => clone(aligned) }, identities: [identity], now, limits: PARTICIPATION_RECORD_LIMITS });
+                const aligned = alignPartition(state, policy, now);
+                const result = await readParticipationPrincipals({ tx: { get: async () => aligned }, identities: [identity], now, limits: PARTICIPATION_RECORD_LIMITS });
                 if (!result.ok) {
                     if (!includeWithdrawn) fail(result.reason);
                     denial ||= result.reason;
@@ -242,7 +252,7 @@ async function projectParticipation({ tx, identities, now } = {}, includeWithdra
             subjects.push(clone(current.subject)); withdrawn.push(current.withdrawn);
         }
         // Empty reads must also reject an inactive policy, without initializing it.
-        const checked = await readParticipationPrincipals({ tx: { get: async () => clone(policy) }, identities: [], now, limits: PARTICIPATION_RECORD_LIMITS });
+        const checked = await readParticipationPrincipals({ tx: { get: async () => policy }, identities: [], now, limits: PARTICIPATION_RECORD_LIMITS });
         if (!checked.ok) {
             if (!includeWithdrawn) fail(checked.reason);
             denial ||= checked.reason;
@@ -271,24 +281,23 @@ export function createPartitionedParticipationConsents({ storage, adapters, admi
     };
     const authenticate = async (name, data) => { try { return clone(await adapters[name](data)); } catch { fail('not-authorized'); } };
     const fresh = authorization => { if (!integer(authorization?.expiresAt) || authorization.expiresAt <= now()) fail('not-authorized'); };
-    const subjectRoute = async auth => {
+    const subjectRoute = async (tx, auth) => {
         if (!ref(auth?.subjectRef)) fail('not-authorized');
-        const key = await indexKey(SUBJECTS, auth.subjectRef), index = await storage.transaction(tx => tx.get(key));
-        const route = await routeFor(index?.principalRef, index?.communityRef);
+        const index = await tx.get(indexKey(SUBJECTS, auth.subjectRef));
+        const route = routeFor(index?.principalRef, index?.communityRef);
         if (!validAnchor(index, route) || index.subjectRef !== auth.subjectRef) fail('storage-corrupt');
-        return { ...route, subjectIndex: key };
+        return { ...route, subjectIndex: index };
     };
-    const ledgerFor = (route, authorization, authMethod, operation = null, maintenance = false) => {
+    const ledgerFor = (routeOrResolver, authorization, authMethod, operation = null, maintenance = false) => {
         const partitionStorage = { transaction: fn => storage.transaction(async originalTx => {
             const tx = boundedRecordTransaction(originalTx);
+            // Resolve subject indexes inside the same transaction that checks
+            // the anchor and applies the change.
+            const route = typeof routeOrResolver === 'function' ? await routeOrResolver(tx) : routeOrResolver;
             const policy = await root(tx), loaded = await loadPartition(tx, route, policy, now()); fresh(authorization);
-            if (route.subjectIndex) {
-                const index = await tx.get(route.subjectIndex);
-                if (!validAnchor(index, route) || index.subjectRef !== authorization.subjectRef) fail('storage-corrupt');
-            }
-            let value = alignParticipationLedgerPolicy(loaded.state, policy.config, now(), PARTICIPATION_RECORD_LIMITS);
+            let value = alignPartition(loaded.state, policy, now());
             await validateOperationReferences(tx, loaded.state, route, now);
-            const operationKey = operation && await indexKey(OPERATIONS, authorization.operationRef);
+            const operationKey = operation && indexKey(OPERATIONS, authorization.operationRef);
             if (operation) {
                 const existing = await tx.get(operationKey);
                 if (existing !== undefined && (!validOperation(existing) || existing.operationRef !== authorization.operationRef)) fail('storage-corrupt');
@@ -297,14 +306,14 @@ export function createPartitionedParticipationConsents({ storage, adapters, admi
                 if (local && (!existing || !matchesRoute(existing, route) || existing.deleteAt !== local.deleteAt || existing.kind !== local.kind)) fail('storage-corrupt');
             }
             if (operation === 'complete' && authorization.status === 'approved') {
-                const reference = `${authorization.verifierRef}\0${authorization.decisionRef}`, key = await referenceKey('decision', reference), saved = await tx.get(key);
+                const reference = `${authorization.verifierRef}\0${authorization.decisionRef}`, key = referenceKey('decision', reference), saved = await tx.get(key);
                 if (saved !== undefined && (!validReference(saved) || saved.reference !== reference || saved.space !== 'decision')) fail('storage-corrupt');
                 if (saved?.deleteAt > now() && !matchesRoute(saved, route)) fail('reused-decision');
             }
             const result = await fn({
-                get: async key => { if (key !== PARTICIPATION_LEDGER_KEY) fail('invalid-storage-key'); return clone(value); },
+                get: async key => { if (key !== PARTICIPATION_LEDGER_KEY) fail('invalid-storage-key'); return value; },
                 put: async (key, next) => {
-                    if (key !== PARTICIPATION_LEDGER_KEY || !validParticipationLedgerState(next, PARTICIPATION_RECORD_LIMITS)) fail('storage-corrupt'); value = clone(next);
+                    if (key !== PARTICIPATION_LEDGER_KEY || !validParticipationLedgerState(next, PARTICIPATION_RECORD_LIMITS)) fail('storage-corrupt'); value = next;
                 }
             });
             fresh(authorization);
@@ -319,8 +328,25 @@ export function createPartitionedParticipationConsents({ storage, adapters, admi
             await writePartition({ tx, loaded, value, route, now, admitSubject, releaseSubject, operation, operationKey, authorization });
             currentTime(); return result;
         }) };
-        const cached = { ...adapters, [['begin', 'lookup', 'selfWithdraw'].includes(authMethod) ? 'authenticateParticipant' : authMethod === 'complete' ? 'verifyConsent' : 'authenticateGuardian']: async () => clone(authorization) };
+        const cached = { ...adapters, [['begin', 'lookup', 'selfWithdraw'].includes(authMethod) ? 'authenticateParticipant' : authMethod === 'complete' ? 'verifyConsent' : 'authenticateGuardian']: async () => authorization };
         return createParticipationConsents({ storage: partitionStorage, adapters: cached, now, randomRef, limits: PARTICIPATION_RECORD_LIMITS });
+    };
+    const subjectOperation = async (auth, method, proof, request) => {
+        let routeError;
+        const resolveRoute = async tx => {
+            routeError = undefined;
+            try {
+                const route = await subjectRoute(tx, auth);
+                if (method === 'complete' && auth.principalRef !== route.principalRef) fail('not-authorized');
+                return route;
+            } catch (error) {
+                routeError = error;
+                throw error;
+            }
+        };
+        const result = await ledgerFor(resolveRoute, auth, method, method === 'complete' ? method : null)[method](proof, request);
+        if (routeError) throw routeError;
+        return result;
     };
     return Object.freeze({
         installPolicy: guarded(async proof => {
@@ -335,29 +361,27 @@ export function createPartitionedParticipationConsents({ storage, adapters, admi
         }),
         begin: guarded(async (proof, request) => {
             const auth = await authenticate('authenticateParticipant', { proof, purpose: 'begin', request });
-            const route = await routeFor(auth?.principalRef, auth?.communityRef);
+            const route = routeFor(auth?.principalRef, auth?.communityRef);
             if (!ref(auth?.operationRef)) fail('not-authorized');
             return ledgerFor(route, auth, 'begin', 'begin').begin(proof, request);
         }),
         complete: guarded(async proof => {
-            const auth = await authenticate('verifyConsent', { proof }), route = await subjectRoute(auth);
-            if (auth.principalRef !== route.principalRef) fail('not-authorized');
+            const auth = await authenticate('verifyConsent', { proof });
             if (!ref(auth?.operationRef)) fail('not-authorized');
-            return ledgerFor(route, auth, 'complete', 'complete').complete(proof);
+            return subjectOperation(auth, 'complete', proof);
         }),
         lookup: guarded(async proof => {
-            const auth = await authenticate('authenticateParticipant', { proof, purpose: 'lookup' }), route = await routeFor(auth?.principalRef, auth?.communityRef);
+            const auth = await authenticate('authenticateParticipant', { proof, purpose: 'lookup' }), route = routeFor(auth?.principalRef, auth?.communityRef);
             return ledgerFor(route, auth, 'lookup').lookup(proof);
         }),
         selfWithdraw: guarded(async (proof, request) => {
             const auth = await authenticate('authenticateParticipant', { proof, purpose: 'self-withdraw', request });
-            const route = await routeFor(auth?.principalRef, auth?.communityRef);
+            const route = routeFor(auth?.principalRef, auth?.communityRef);
             return ledgerFor(route, auth, 'selfWithdraw').selfWithdraw(proof, request);
         }),
         change: guarded(async (proof, request) => {
             const auth = await authenticate('authenticateGuardian', { proof, request });
-            const route = await subjectRoute(auth);
-            return ledgerFor(route, auth, 'change').change(proof, request);
+            return subjectOperation(auth, 'change', proof, request);
         }),
         sweep: guarded(async (proof, { cursor = '', limit = PARTICIPATION_PARTITION_BOUNDS.maintenancePage } = {}) => {
             if (!Number.isInteger(limit) || limit < 1 || limit > PARTICIPATION_PARTITION_BOUNDS.maintenancePage || typeof cursor !== 'string'
@@ -379,7 +403,7 @@ export function createPartitionedParticipationConsents({ storage, adapters, admi
                 if (!validParticipationLedgerState(state, PARTICIPATION_RECORD_LIMITS)) fail('storage-corrupt');
                 const principalRef = state.subjects[0]?.record.principalRef;
                 const anchor = principalRef ? null : await storage.transaction(tx => tx.get(`${ANCHORS}${key.slice(PARTS.length)}`));
-                const route = await routeFor(principalRef || anchor?.principalRef, state.config.policy.communityRef);
+                const route = routeFor(principalRef || anchor?.principalRef, state.config.policy.communityRef);
                 if (route.partitionKey !== key || auth.communityRef !== route.communityRef) fail('storage-corrupt');
                 results.push(await ledgerFor(route, auth, 'maintenance', null, true).sweep());
             }

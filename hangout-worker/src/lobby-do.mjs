@@ -435,7 +435,7 @@ export class HangoutLobby {
         if (this.participationMode) await confirmRestore(this.engine.refreshParticipation());
         const currentRooms = this.engine.roomSnapshot();
         if (JSON.stringify(currentRooms) !== roomsBeforeResume) await this.persistRequired('rooms', currentRooms);
-        const currentSessions = this.engine.sessionSnapshot();
+        const currentSessions = this.engine.sessionStorageSnapshot();
         if (JSON.stringify(savedSessions) !== JSON.stringify(currentSessions)) await this.persistRequired('sessions', currentSessions);
         if (recovered) {
             const resumed = new Set(restored.resumed);
