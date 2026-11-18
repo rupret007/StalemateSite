@@ -2884,7 +2884,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             cam.hidden = app.localMediaPaused || ['chat', 'game'].includes(c.kind);
             cam.setAttribute('aria-pressed', String(!!c.myCam));
             cam.textContent = c.myCam ? '📷 Camera on' : m.C ? '📷 Camera (18+)' : '📷 Cameras off here';
-            cam.disabled = (!m.C && !c.myCam) || (showAct && !roomApi);
+            cam.disabled = (!m.C && !c.myCam) || (showAct && !roomApi
+                && (activityToolsNeedsRetry || typeof window.LobbyRoom?.attach !== 'function'));
         }
         const peopleHeading = $('[data-people-title]');
         peopleHeading.textContent = isPm ? 'PM' : c ? `${c.name} · ${c.count || c.names?.length || 0}` : 'People';

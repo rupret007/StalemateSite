@@ -1806,10 +1806,14 @@ describe('activity tools recovery', () => {
         return { ...v, joinArt, api, attach, retry, script, load };
     }
     it('attaches an already available renderer on the first deliberate room join without a recovery click', async () => {
-        const { window, attach, api, script } = await drawingVisitor({ rendererReady: true });
+        const { window, ws, attach, api, script } = await drawingVisitor({ rendererReady: true });
         expect(attach).toHaveBeenCalledTimes(1); expect(api.onJoin).toHaveBeenCalledTimes(1);
         expect(api.onJoin.mock.calls[0][0].name).toBe('#drawing-recovery');
         expect(window.document.querySelector('[data-activity-recovery]').hidden).toBe(true);
+        expect(window.document.querySelector('[data-cam]').disabled).toBe(false);
+        const room = window.__lobby.chans.get('#drawing-recovery');
+        ws.receive({ t: 'chan', ch: { ...room, modes: { ...room.modes, C: false } } });
+        expect(window.document.querySelector('[data-cam]').disabled).toBe(true);
         expect(script()).toBeNull(); expect(api.onCam).not.toHaveBeenCalled();
     });
     it('restores the latest room snapshot and keeps an unsent draft without autojoining', async () => {
