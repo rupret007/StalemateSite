@@ -102,6 +102,53 @@ it('returns keyboard focus to the transcript when jumping to new chat messages',
     expect(transcript.textContent).toContain('New line below the fold');
 });
 
+it.each([false, true])('named room dialog confirmation focuses the selected chat tab (already joined: %s)', async existing => {
+    const { window, ws, welcome, join } = await visitor();
+    welcome(); join();
+    const doc = window.document, room = '#named-focus-studio';
+    if (existing) {
+        join(room);
+        doc.querySelector('[data-text]').value = 'An unsent note for the joined room';
+        doc.querySelector('[data-channel-key="#stalemate"]').click();
+    }
+    const dialog = doc.querySelector('[data-channel-dialog]');
+    const opener = doc.querySelector('[data-start="chat"]');
+    // jsdom has no native modal implementation. Model only open/close and
+    // native opener restoration; real browser tests exercise the actual dialog.
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; opener.focus(); dialog.dispatchEvent(new window.Event('close')); };
+    opener.focus(); opener.click();
+    const name = doc.querySelector('[data-channel-name]'); name.value = room; name.focus();
+    const before = ws.sent.length;
+    dialog.querySelector('form').requestSubmit();
+    if (!existing) {
+        expect(ws.sent.at(-1)).toMatchObject({ t: 'cmd', name: 'join', args: [room] });
+        expect(dialog.open).toBe(true);
+        expect(doc.activeElement).toBe(name);
+        join(room);
+    } else expect(ws.sent).toHaveLength(before);
+    expect(dialog.open).toBe(false);
+    expect(doc.querySelector('[data-chat-context]').textContent).toBe(room);
+    expect(doc.activeElement).toBe(doc.querySelector(`[data-channel-key="${room}"]`));
+    expect(doc.querySelector('[data-text]').value).toBe(existing ? 'An unsent note for the joined room' : '');
+});
+
+it('named room dialog confirmation does not reclaim focus after the guest cancels', async () => {
+    const { window, welcome, join } = await visitor(); welcome(); join();
+    const doc = window.document, dialog = doc.querySelector('[data-channel-dialog]');
+    const opener = doc.querySelector('[data-start="chat"]');
+    dialog.showModal = () => { dialog.open = true; };
+    dialog.close = () => { dialog.open = false; opener.focus(); dialog.dispatchEvent(new window.Event('close')); };
+    opener.click();
+    doc.querySelector('[data-channel-name]').value = '#cancelled-focus-studio';
+    dialog.querySelector('form').requestSubmit();
+    dialog.close();
+    const input = doc.querySelector('[data-text]'); input.value = 'Keep my newer draft'; input.focus();
+    join('#cancelled-focus-studio');
+    expect(doc.activeElement).toBe(input);
+    expect(dialog.open).toBe(false);
+});
+
 it('recovers an interrupted named channel request without replaying it', async () => {
     const { window, ws, welcome, join, sockets, timers, flush } = await visitor();
     welcome(); join();
