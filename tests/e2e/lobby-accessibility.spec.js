@@ -1945,7 +1945,7 @@ for (const target of ['composer', 'conversation']) test(`protected resumed ${tar
         await reader.screenshot({ path: testInfo.outputPath(`00-paused-cue-${target}-1440.png`) });
         const resumed = target === 'composer' ? input : log;
         await tabTo(reader, resumed); await expect(resumed).toBeFocused();
-        await publish('This message is already visible as normal following resumes.');
+        await publish('Normal following resumes with this visible chat line.');
         await expect.poll(() => log.evaluate(node => node.scrollHeight - node.clientHeight)).toBe(0);
         await reader.screenshot({ path: testInfo.outputPath(`01-resumed-cue-${target}-1440.png`) });
         await expect(cue).toBeHidden(); await expect(resumed).toBeFocused();
