@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { randomBytes } from 'node:crypto';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs';
@@ -1086,6 +1087,144 @@ describe('targeted Music invitation', () => {
         expect(panel.hidden).toBe(true);
         expect(ws.sent.at(-1)).toEqual({ t: 'music-invite-decline', ch: offer.ch, roomInstance: offer.roomInstance, id: offer.id });
         expect(window.open).not.toHaveBeenCalled();
+    });
+});
+
+describe('participation-safe one-tap Music offer', () => {
+    async function setup() {
+        const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, revision: 1, state: 'authorized',
+            available: true, purposes: ['direct-contact', 'external-provider'], canStop: true }) }));
+        const fixture = await visitor('rad-dad', { entrySources: 1, personTargets: 1, participationSafeMusicOffers: 1 },
+            { beta: true, participation: true, secureOrigin: true, fetch });
+        await vi.waitFor(() => expect(fixture.window.document.querySelector('[data-sharing-status]').textContent).toContain('Sharing is available'), { timeout: 1000 });
+        fixture.welcome(); fixture.join();
+        expect(fixture.window.document.querySelector('[data-connection]').dataset.state).toBe('connected');
+        expect(fixture.window.document.querySelector('[data-sharing-status]').textContent).toContain('Approved: direct contact, external services.');
+        return fixture;
+    }
+    const invite = () => ({ t: 'music-offer', version: 1, id: randomBytes(16).toString('hex'),
+        request: randomBytes(16).toString('hex'), ch: '#jam-rehearsal', roomInstance: randomBytes(16).toString('hex'),
+        origin: 'https://music.example.test', by: 'GuitarHost', expires: Math.floor((Date.now() + 60000) / 1000) * 1000 });
+    const joinJam = (fixture, offer) => fixture.ws.receive({ t: 'join', ch: {
+        name: offer.ch, keepRef: offer.roomInstance, kind: 'jam', title: 'Rehearsal', topic: '', modes: { i: true },
+        count: 2, names: [{ nick: 'Viewer', prefix: '' }, { nick: 'GuitarHost', prefix: '@' }],
+    } });
+
+    it('opens the accepted Music destination from the same tap and keeps the fragment out of storage', async () => {
+        const fixture = await setup(), { window, ws } = fixture, offer = invite();
+        const popup = { closed: false, opener: window, document: { title: '', body: { textContent: '' } },
+            location: { replace: vi.fn() }, close: vi.fn(function () { this.closed = true; }) };
+        window.open = vi.fn(() => popup);
+        ws.receive(offer);
+        expect(ws.sent.at(-1)).toEqual({ t: 'music-offer-seen', version: 1, id: offer.id, request: offer.request,
+            ch: offer.ch, roomInstance: offer.roomInstance });
+        const action = window.document.querySelector('[data-music-invite-action]');
+        expect(action.textContent).toBe('Accept and open Music');
+        action.click();
+        expect(window.open).toHaveBeenCalledTimes(1);
+        expect(window.open).toHaveBeenCalledWith('about:blank', '_blank');
+        expect(popup.opener).toBeNull();
+        expect(ws.sent.filter(frame => frame.t === 'music-offer-accept')).toEqual([{
+            t: 'music-offer-accept', version: 1, id: offer.id, request: offer.request, ch: offer.ch, roomInstance: offer.roomInstance,
+        }]);
+
+        joinJam(fixture, offer);
+        const expiry = Math.floor(offer.expires / 1000);
+        const href = `https://music.example.test/join/#k=${randomBytes(32).toString('base64url')}&s=${randomBytes(32).toString('hex')}&g=1&e=${expiry}`;
+        ws.receive({ t: 'music-offer-accepted', version: 1, id: offer.id, request: offer.request,
+            ch: offer.ch, roomInstance: offer.roomInstance, href, expires: offer.expires });
+        expect(popup.location.replace).toHaveBeenCalledTimes(1);
+        expect(popup.location.replace.mock.calls[0][0]).toMatch(/^https:\/\/music\.example\.test\/join\/#k=/);
+        expect(window.open).toHaveBeenCalledTimes(1);
+        expect(window.document.querySelector('[data-music-invite-status]').textContent).toContain('audio permission stays separate');
+        expect(window.document.body.innerHTML).not.toContain('/join/#k=');
+        expect([...Array(window.sessionStorage.length)].map((_, i) => window.sessionStorage.getItem(window.sessionStorage.key(i))).join(' ')).not.toContain('/join/#k=');
+        expect([...Array(window.localStorage.length)].map((_, i) => window.localStorage.getItem(window.localStorage.key(i))).join(' ')).not.toContain('/join/#k=');
+    });
+
+    it('shows an unconfirmed state when issuer dispatch stalls and still follows a late success', async () => {
+        const fixture = await setup(), { window, ws, flush } = fixture, offer = invite();
+        const popup = { closed: false, opener: window, document: { title: '', body: { textContent: '' } },
+            location: { replace: vi.fn() }, close: vi.fn(function () { this.closed = true; }) };
+        window.open = vi.fn(() => popup);
+        ws.receive(offer);
+        window.document.querySelector('[data-music-invite-action]').click();
+        ws.receive({ t: 'music-offer-joining', version: 1, id: offer.id, request: offer.request,
+            ch: offer.ch, roomInstance: offer.roomInstance });
+        flush(10000);
+        expect(window.document.querySelector('[data-music-invite-status]').textContent)
+            .toBe('The room hasn’t confirmed your reply. Wait here or ask the host for a new invitation.');
+        expect(popup.closed).toBe(false);
+
+        joinJam(fixture, offer);
+        const expiry = Math.floor(offer.expires / 1000);
+        const href = `https://music.example.test/join/#k=${randomBytes(32).toString('base64url')}&s=${randomBytes(32).toString('hex')}&g=1&e=${expiry}`;
+        ws.receive({ t: 'music-offer-accepted', version: 1, id: offer.id, request: offer.request,
+            ch: offer.ch, roomInstance: offer.roomInstance, href, expires: offer.expires });
+        expect(popup.location.replace).toHaveBeenCalledOnce();
+        expect(window.document.querySelector('[data-music-invite-status]').textContent).toContain('audio permission stays separate');
+    });
+
+    it('declines without opening a tab or sending acceptance', async () => {
+        const { window, ws } = await setup(), offer = invite();
+        window.open = vi.fn();
+        ws.receive(offer);
+        window.document.querySelector('[data-music-invite-dismiss]').click();
+        expect(ws.sent.at(-1)).toEqual({ t: 'music-offer-decline', version: 1, id: offer.id,
+            request: offer.request, ch: offer.ch, roomInstance: offer.roomInstance });
+        expect(ws.sent.some(frame => frame.t === 'music-offer-accept')).toBe(false);
+        expect(window.open).not.toHaveBeenCalled();
+    });
+
+    it('lets the host hand a native WebJam invitation to one guest without manual copying', async () => {
+        const { window, ws } = await setup();
+        window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+        window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+        const channels = [], launches = [];
+        window.BroadcastChannel = class {
+            constructor(name) { this.name = name; this.postMessage = vi.fn(); this.close = vi.fn(); channels.push(this); }
+        };
+        window.HTMLAnchorElement.prototype.click = function () { launches.push(this.href); };
+        const self = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
+        const guest = { id: 'guest-peer', nick: 'DrumGuest', prefix: '' };
+        ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', band: false, verified: false, capabilities: {} });
+        ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', modes: {}, names: [self, guest] } });
+        const roomInstance = randomBytes(16).toString('hex');
+        ws.receive({ t: 'join', ch: { name: '#jam-rehearsal', keepRef: roomInstance, kind: 'jam', title: 'Rehearsal',
+            modes: { i: true }, names: [self] } });
+        window.__lobby.active = '#jam-rehearsal';
+        const button = window.document.querySelector('[data-jam-invite-music]');
+        expect(button.hidden).toBe(false);
+        button.click();
+        const dialog = window.document.querySelector('[data-invite-dialog]');
+        expect(dialog.open).toBe(true);
+        const roster = dialog.querySelector('[data-invite-options]');
+        expect([...roster.options].map(option => option.value)).toContain(guest.id);
+        roster.value = guest.id;
+        roster.dispatchEvent(new window.Event('change'));
+        const sendButton = dialog.querySelector('[data-invite-person-send]');
+        expect(sendButton.disabled).toBe(false);
+        sendButton.click();
+        expect(window.document.querySelector('[data-music-handoff-status]').textContent).toBe('Waiting for WebJam to return the invitation…');
+        expect(launches).toHaveLength(1);
+        const request = launches[0].split('/').at(-1);
+        expect(launches[0]).toBe(`webjam-beta://hangout-music/${request}`);
+        const expires = Math.floor((Date.now() + 600000) / 1000);
+        const href = `https://music.example.test/join/#k=${randomBytes(32).toString('base64url')}`
+            + `&s=${randomBytes(32).toString('hex')}&g=1&e=${expires}`;
+        expect(channels).toHaveLength(1);
+        channels[0].onmessage({ data: { href } });
+        expect(window.document.querySelector('[data-music-handoff-status]').textContent).toBe('Sending the Music invitation…');
+        const sent = ws.sent.at(-1);
+        expect(sent).toMatchObject({ t: 'music-offer-create', version: 1, ch: '#jam-rehearsal', roomInstance, peer: guest.id,
+            request: expect.stringMatching(/^[a-f0-9]{32}$/), href });
+        expect(sent.request).toBe(request);
+        ws.receive({ t: 'music-offer-result', version: 1, request, status: 'queued' });
+        ws.receive({ t: 'music-offer-result', version: 1, request, status: 'sent' });
+        expect(channels[0].postMessage).toHaveBeenCalledWith({ returned: true });
+        expect(sent).not.toHaveProperty('candidateCapability');
+        expect(ws.sent.some(frame => frame.t === 'music-invite-offer')).toBe(false);
+        expect(window.document.querySelector('[data-music-handoff-manual]').hidden).toBe(true);
     });
 });
 

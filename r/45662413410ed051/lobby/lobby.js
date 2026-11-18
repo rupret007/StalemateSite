@@ -328,6 +328,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             + (value.state === 'withdrawn' && sharingCleanup !== 'confirmed' ? ' The permission withdrawal is saved. Local media is off; server cleanup is unconfirmed. Retry stopping live sharing; close this tab if your browser still indicates capture.' : ''));
         $('[data-sharing-stop]').textContent = value.state === 'withdrawn' && sharingCleanup !== 'confirmed' ? 'Retry stopping live sharing' : 'Stop all my sharing';
         $('[data-sharing-stop]').disabled = !value.canStop || value.state === 'withdrawn' && sharingCleanup === 'confirmed';
+        drawJam();
     }
     async function sharingRequest(stop = false) {
         if (!sharingControls || sharingBusy) return;
@@ -528,7 +529,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const jamManualSummary = $('summary', jamManualShare);
     let pendingJamShare = null;
     let jamShareResultsSupported = false, jamShareTimer;
-    let directMusicInvitesSupported = false, musicOffer = null;
+    let directMusicInvitesSupported = false, participationSafeMusicOffersSupported = false, musicOffer = null;
     let gameNightSupported = false, gameOpenSupported = false, gameGuestInvitesSupported = false, discordLinksSupported = false, shieldActive = false, gameEditorRoom = null;
     const gameShareButton = $('[data-game-share]'), gameShareDialog = $('[data-game-share-dialog]'), gameShareValue = $('[data-game-share-value]');
     const arcadeTableDefs = {
@@ -1212,6 +1213,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             messageResultsSupported = m.features?.messageResults === 1;
             jamShareResultsSupported = m.features?.jamShareResults === 1;
             directMusicInvitesSupported = m.features?.directMusicInvites === 1;
+            participationSafeMusicOffersSupported = m.features?.participationSafeMusicOffers === 1;
             gameNightSupported = m.features?.gameNight === 1;
             gameOpenSupported = m.features?.gameOpen === 1;
             gameGuestInvitesSupported = m.features?.gameGuestInvites === 1;
@@ -1514,7 +1516,14 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             receiveMusicInvite(m); break;
         case 'music-invite-result':
         case 'music-invite-outcome':
+        case 'music-offer-result':
+        case 'music-offer-outcome':
             receiveMusicHandoffStatus(m); break;
+        case 'music-offer':
+        case 'music-offer-joining':
+        case 'music-offer-accepted':
+        case 'music-offer-ended':
+            receiveParticipationMusicOffer(m); break;
         case 'invite':
             if (jamRoomName(m.ch) || gameNightSupported && gameNightRoomName(m.ch) && roomNonce(m.roomInstance)) {
                 if (!app.chans.has(m.ch)) {
@@ -1878,8 +1887,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (oldFocus === cancel && cancel.hidden || oldFocus === manual && manual.hidden) {
             $('[data-jam-invite-music]').focus({ preventScroll: true });
         }
-        const message = pending ? pending.submitted ? 'Waiting for Hang Out to confirm delivery…'
-            : 'Confirm the invitation in WebJam. If your browser asks to open WebJam, choose Open.'
+        const message = pending ? pending.safe ? pending.progress === 'queued' ? 'Sending the Music invitation…'
+            : !pending.submitted ? 'Waiting for WebJam to return the invitation…'
+                : 'Invitation sent. Waiting for your friend to accept.'
+            : pending.submitted ? 'Waiting for Hang Out to confirm delivery…'
+                : 'Confirm the invitation in WebJam. If your browser asks to open WebJam, choose Open.'
             : canInvite && musicHandoff?.submitted ? 'An invitation from another Jam room is still waiting for confirmation.' : report?.message || '';
         if (status.textContent !== message) status.textContent = message;
     }
@@ -1889,14 +1901,16 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const { channel, timer } = musicHandoff;
         musicHandoff = null;
         clearTimeout(timer);
-        if (typeof returned === 'boolean') channel.postMessage({ returned });
-        channel.close();
+        if (typeof returned === 'boolean') channel?.postMessage({ returned });
+        channel?.close();
         $('[data-jam-invite-music]').removeAttribute('aria-disabled');
     }
 
     function receiveMusicHandoffStatus(frame) {
-        if (frame.t === 'music-invite-result') {
-            const pending = musicHandoff?.submitted && musicHandoff.request === frame.request ? musicHandoff : null;
+        if (frame.t === 'music-invite-result' || frame.t === 'music-offer-result') {
+            if (frame.t === 'music-offer-result' && frame.version !== 1) return;
+            const pending = musicHandoff?.request === frame.request
+                && (frame.t === 'music-offer-result' ? musicHandoff.safe : !musicHandoff.safe) ? musicHandoff : null;
             const report = musicHandoffReport;
             const attempt = pending || (report?.awaitingReceipt && report.request === frame.request ? report : null);
             if (!attempt) return;
@@ -1905,12 +1919,21 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 else musicHandoffReport = null;
                 return drawMusicHandoff();
             }
+            if (frame.t === 'music-offer-result' && frame.status === 'queued' && pending) {
+                pending.progress = 'queued';
+                return drawMusicHandoff();
+            }
             const sent = frame.status === 'sent';
-            musicHandoffReport = { room: attempt.room, request: attempt.request, nick: attempt.nick, manual: !sent,
-                message: sent ? `Music invitation sent to ${attempt.nick}. Waiting for a reply.` : 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
+            musicHandoffReport = { room: attempt.room, request: attempt.request, nick: attempt.nick, safe: attempt.safe === true,
+                manual: attempt.safe !== true && !sent,
+                message: sent ? `Music invitation sent to ${attempt.nick}. Waiting for a reply.` : attempt.safe
+                    ? 'The Music invitation could not be confirmed. Check the room and try again.'
+                    : 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
             if (pending) stopMusicHandoff(sent);
         } else {
             const report = musicHandoffReport;
+            if (frame.t === 'music-offer-outcome' && frame.version !== 1) return;
+            if (frame.t === 'music-offer-outcome' && report?.safe !== true) return;
             if (!report || frame.request !== report.request) return;
             const message = {
                 accepted: `${report.nick} accepted and joined the Jam room.`,
@@ -1926,16 +1949,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     }
 
     function startMusicHandoff(room, context) {
+        const safe = sharingControls && participationSafeMusicOffersSupported;
         if (musicHandoff || typeof window.BroadcastChannel !== 'function') return;
         const request = crypto.randomUUID().replaceAll('-', '');
         const channel = new BroadcastChannel(`webjam-music-${request}`);
-        const pending = { room, channel, request, nick: context.label, submitted: false, timer: setTimeout(() => {
+        const pending = { room, channel, request, nick: context.label, safe, submitted: false, timer: setTimeout(() => {
             if (musicHandoff !== pending) return;
             stopMusicHandoff();
             musicHandoffReport = pending.submitted
-                ? { room, request, nick: pending.nick, awaitingReceipt: true,
+                ? { room, request, nick: pending.nick, safe, awaitingReceipt: true,
                     message: 'Hang Out did not confirm delivery. Check with your bandmate before sending again.' }
-                : { room, manual: true,
+                : { room, safe, manual: !safe,
                     message: 'WebJam didn’t return an invitation. Check that your private rehearsal build is open and hosting Music.' };
             drawMusicHandoff();
         }, 90000) };
@@ -1947,11 +1971,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             const expires = musicInviteDeadline(data.href);
             if (expires <= Date.now() || expires > Date.now() + 600000
                 || currentJam() !== room || room.keepRef !== context.instance || !canHostMusicInvite(room)
-                || !app.chans.get('#stalemate')?.names?.some(person => person.id === context.peer) || !send({ t: 'music-invite-offer', request, ch: room.name,
-                    roomInstance: context.instance, peer: context.peer, href: data.href })) {
+                || !app.chans.get('#stalemate')?.names?.some(person => person.id === context.peer)
+                || !send(safe
+                    ? { t: 'music-offer-create', version: 1, request, ch: room.name, roomInstance: context.instance,
+                        peer: context.peer, href: data.href }
+                    : { t: 'music-invite-offer', request, ch: room.name, roomInstance: context.instance,
+                        peer: context.peer, href: data.href })) {
                 stopMusicHandoff(false);
-                musicHandoffReport = { room, manual: true, message: 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
-            } else pending.submitted = true;
+                musicHandoffReport = { room, safe, manual: !safe, message: safe
+                    ? 'The Music invitation could not be started. Check the room and try again.'
+                    : 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
+            } else { pending.submitted = true; if (safe) pending.progress = 'queued'; }
             drawMusicHandoff();
         };
         const launch = document.createElement('a');
@@ -2256,10 +2286,18 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const musicStatus = $('[data-music-invite-status]');
     const musicAnnouncement = $('[data-music-invite-announcement]');
     const waitingMusicOffers = new Map();
-    const readyForMusicOffer = () => directMusicInvitesSupported && !sharingControls && !gameGuest && connectionState === 'connected'
-        && !sessionEnded && !shieldActive && (!app.netLock || app.netLock === 'off') && !app.localMediaPaused && !app.sharingStopped;
+    const readyForMusicOffer = () => {
+        const purposes = Array.isArray(sharingState?.purposes) ? sharingState.purposes : [];
+        const qualified = participationSafeMusicOffersSupported && sharingControls && sharingState?.state === 'authorized'
+            && sharingState.available === true && purposes.includes('direct-contact') && purposes.includes('external-provider');
+        const legacy = directMusicInvitesSupported && !sharingControls;
+        return (qualified || legacy) && !gameGuest && connectionState === 'connected'
+            && !sessionEnded && !shieldActive
+            && (!app.netLock || app.netLock === 'off') && !app.localMediaPaused && !app.sharingStopped;
+    };
 
     function setMusicInvite(offer) {
+        if (musicOffer !== offer) closePendingMusicWindow(musicOffer);
         clearTimeout(musicOffer?.expiryTimer);
         clearTimeout(musicOffer?.replyTimer);
         musicOffer = offer;
@@ -2272,8 +2310,18 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         drawMusicInvite();
     }
 
+    function closePendingMusicWindow(offer) {
+        if (!offer) return;
+        const popup = offer?.pendingWindow;
+        offer.pendingWindow = null;
+        if (!popup || offer.state === 'accepted') return;
+        try { if (!popup.closed) popup.close(); } catch { /* A closed browser tab is already safe. */ }
+    }
+
     function removeWaitingMusicInvite(id) {
-        clearTimeout(waitingMusicOffers.get(id)?.expiryTimer);
+        const offer = waitingMusicOffers.get(id);
+        clearTimeout(offer?.expiryTimer);
+        closePendingMusicWindow(offer);
         return waitingMusicOffers.delete(id);
     }
 
@@ -2288,6 +2336,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (!musicOffer || musicOffer.state === 'ended') return;
         clearTimeout(musicOffer.expiryTimer);
         clearTimeout(musicOffer.replyTimer);
+        closePendingMusicWindow(musicOffer);
         musicOffer.state = 'ended';
         delete musicOffer.href;
         drawJam();
@@ -2300,6 +2349,73 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (url.protocol !== 'https:' || url.pathname !== '/join/' || url.username || url.password || url.search) return 0;
         const match = /^#k=[A-Za-z0-9_-]{43}&s=[a-f0-9]{64}&g=[1-9]\d{0,9}&e=([1-9]\d{0,12})$/.exec(url.hash);
         return match ? Number(match[1]) * 1000 : 0;
+    }
+
+    function receiveParticipationMusicOffer(frame) {
+        if (!participationSafeMusicOffersSupported || !sharingControls || !readyForMusicOffer()
+            || frame.version !== 1 || !roomNonce(frame.id) || !roomNonce(frame.request)) return;
+        if (frame.t === 'music-offer') {
+            const remaining = frame.expires - Date.now();
+            let origin;
+            try { const parsed = new URL(frame.origin); if (parsed.protocol === 'https:' && parsed.origin === frame.origin) origin = parsed.origin; } catch { /* unavailable below */ }
+            if (Object.keys(frame).some(key => !['t', 'version', 'id', 'request', 'ch', 'roomInstance', 'origin', 'by', 'expires'].includes(key))
+                || !jamRoomName(frame.ch) || !roomNonce(frame.roomInstance) || !origin || typeof frame.by !== 'string'
+                || !Number.isSafeInteger(frame.expires) || remaining <= 0 || remaining > 600000
+                || musicOffer?.id === frame.id || waitingMusicOffers.has(frame.id)) return;
+            const offer = { id: frame.id, request: frame.request, room: frame.ch, instance: frame.roomInstance,
+                origin, from: frame.by, expires: frame.expires, state: 'offer', safe: true };
+            const waiting = nextMusicInvite();
+            if (!musicOffer || musicOffer.state === 'ended' && !waiting) setMusicInvite(offer);
+            else if (waitingMusicOffers.size < 4) {
+                waitingMusicOffers.set(offer.id, offer);
+                offer.expiryTimer = setTimeout(() => {
+                    if (removeWaitingMusicInvite(offer.id)) drawMusicInvite();
+                }, remaining);
+            } else return;
+            if (!send({ t: 'music-offer-seen', version: 1, id: offer.id, request: offer.request,
+                ch: offer.room, roomInstance: offer.instance })) {
+                offer.sendFailed = true;
+            }
+            drawMusicInvite();
+            return;
+        }
+        const offer = musicOffer?.id === frame.id ? musicOffer : waitingMusicOffers.get(frame.id);
+        if (!offer || !offer.safe || frame.request !== offer.request || frame.ch !== offer.room || frame.roomInstance !== offer.instance
+            || Object.keys(frame).some(key => !['t', 'version', 'id', 'request', 'ch', 'roomInstance', 'href', 'expires', 'status'].includes(key))) return;
+        if (frame.t === 'music-offer-joining') {
+            if (offer.state === 'joining') {
+                clearTimeout(offer.replyTimer);
+                offer.replyTimer = setTimeout(() => {
+                    if (musicOffer !== offer || offer.state !== 'joining') return;
+                    offer.state = 'unconfirmed';
+                    drawMusicInvite();
+                }, 10000);
+            }
+            return;
+        }
+        if (frame.t === 'music-offer-ended') {
+            clearTimeout(offer.replyTimer);
+            closePendingMusicWindow(offer);
+            offer.state = 'ended';
+            offer.expires = frame.status === 'expired' ? 0 : offer.expires;
+            drawMusicInvite();
+            return;
+        }
+        if (frame.t !== 'music-offer-accepted' || !['joining', 'unconfirmed'].includes(offer.state)) return;
+        const jam = app.chans.get(frame.ch);
+        let hrefOrigin = '';
+        try { hrefOrigin = new URL(frame.href).origin; } catch { /* invalid invitation below */ }
+        if (frame.expires !== offer.expires || hrefOrigin !== offer.origin || musicInviteDeadline(frame.href) !== offer.expires
+            || jam?.keepRef !== offer.instance || !jam.names?.some(n => n.nick === app.me) || jam.kind !== 'jam'
+            || offer.expires <= Date.now() || !offer.pendingWindow || offer.pendingWindow.closed) return endMusicInvite();
+        const popup = offer.pendingWindow;
+        try { popup.location.replace(frame.href); }
+        catch { closePendingMusicWindow(offer); return endMusicInvite(); }
+        offer.pendingWindow = null;
+        clearTimeout(offer.replyTimer);
+        offer.state = 'accepted';
+        if (app.active !== jam.name) switchTo(jam.name);
+        drawMusicInvite();
     }
 
     function receiveMusicInvite(frame) {
@@ -2347,9 +2463,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const acceptedElsewhere = accepted && !inOfferRoom;
         const hadFocus = musicPanel.contains(document.activeElement);
         musicPanel.hidden = !musicOffer || (accepted && (!readyForMusicOffer() || (acceptedElsewhere && !waiting)));
+        const safeAccepted = accepted && musicOffer.safe === true;
         const message = musicPanel.hidden ? ''
             : ended ? (musicOffer.expires <= Date.now() ? 'This Music invitation expired. Ask the host for a new one.' : 'This Music invitation ended. Ask the host for a new one.')
             : acceptedElsewhere ? 'Another Music invitation is waiting.'
+            : safeAccepted ? 'You’re in the Jam room. WebJam opened in a new tab. Use its Start control if prompted; audio permission stays separate.'
             : accepted ? 'You’re in the Jam room. Open WebJam in a new tab, then come back here to chat.'
             : unconfirmed ? 'The room hasn’t confirmed your reply. Wait here or ask the host for a new invitation.'
             : joining ? 'Waiting for the room to confirm you joined.'
@@ -2364,19 +2482,51 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             return;
         }
         if (accepted && inOfferRoom && !amOp(jam) && !jam.jam?.web && !jam.jam?.desktop && !jam.jam?.invitation) $('[data-jam-actions]').hidden = true;
-        musicAction.textContent = accepted ? 'Open WebJam in browser' : joining ? 'Joining…' : 'Accept and join';
+        musicAction.textContent = accepted ? 'Open WebJam in browser' : joining ? 'Joining…' : musicOffer.safe ? 'Accept and open Music' : 'Accept and join';
         musicDismiss.textContent = state === 'offer' ? 'Not now' : !joining && waiting ? 'Next invitation' : 'Dismiss';
         musicAction.setAttribute('aria-disabled', String(joining));
         musicDismiss.setAttribute('aria-disabled', String(joining));
         const actionUnavailable = ended || unconfirmed || acceptedElsewhere;
         if (actionUnavailable && document.activeElement === musicAction) musicDismiss.focus();
-        musicAction.hidden = actionUnavailable;
+        musicAction.hidden = actionUnavailable || safeAccepted;
     }
 
     musicAction.addEventListener('click', () => {
         const offer = musicOffer;
         if (!offer || !readyForMusicOffer() || musicPanel.hidden) return;
         if (offer.expires <= Date.now()) return endMusicInvite();
+        if (offer.safe && offer.state === 'offer') {
+            let popup;
+            try {
+                popup = window.open('about:blank', '_blank');
+                if (popup) {
+                    popup.opener = null;
+                    popup.document.title = 'Joining shared Music…';
+                    popup.document.body.textContent = 'Joining shared Music…';
+                }
+            } catch { popup = null; }
+            if (!popup) {
+                offer.sendFailed = true;
+                musicStatus.textContent = 'Your browser blocked the Music tab. Allow pop-ups for this private site, then ask the host to send a new invitation.';
+                musicAnnouncement.textContent = musicStatus.textContent;
+                return;
+            }
+            offer.pendingWindow = popup;
+            if (send({ t: 'music-offer-accept', version: 1, id: offer.id, request: offer.request,
+                ch: offer.room, roomInstance: offer.instance })) {
+                offer.state = 'joining';
+                offer.replyTimer = setTimeout(() => {
+                    if (musicOffer !== offer || offer.state !== 'joining') return;
+                    offer.state = 'unconfirmed';
+                    drawMusicInvite();
+                }, 10000);
+            } else {
+                closePendingMusicWindow(offer);
+                offer.sendFailed = true;
+            }
+            drawMusicInvite();
+            return;
+        }
         if (offer.state === 'accepted' && currentJam()?.keepRef === offer.instance) {
             return window.open(offer.href, '_blank', 'noopener,noreferrer');
         }
@@ -2394,7 +2544,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     musicDismiss.addEventListener('click', () => {
         if (musicOffer?.state === 'joining') return;
         if (musicOffer?.state === 'offer' && readyForMusicOffer() && musicOffer.expires > Date.now()
-            && !send({ t: 'music-invite-decline', ch: musicOffer.room, roomInstance: musicOffer.instance, id: musicOffer.id })) {
+            && !send(musicOffer.safe ? { t: 'music-offer-decline', version: 1, id: musicOffer.id, request: musicOffer.request,
+                ch: musicOffer.room, roomInstance: musicOffer.instance }
+                : { t: 'music-invite-decline', ch: musicOffer.room, roomInstance: musicOffer.instance, id: musicOffer.id })) {
             musicOffer.sendFailed = true;
             return drawMusicInvite();
         }
@@ -3567,7 +3719,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-invite-form]').hidden = isGame;
         $$('[data-invite-named]').forEach(control => { control.hidden = music; });
         $('[data-invite-nick]').disabled = music;
-        $('[data-invite-person-send]').textContent = music ? 'Continue in WebJam' : 'Invite selected person';
+        $('[data-invite-person-send]').textContent = music
+            ? participationSafeMusicOffersSupported && sharingControls ? 'Send Music invitation' : 'Continue in WebJam'
+            : 'Invite selected person';
         $('[data-game-invite-picker]').hidden = !isGame;
         const people = $('[data-invite-options]');
         const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose someone online'; people.append(placeholder);
