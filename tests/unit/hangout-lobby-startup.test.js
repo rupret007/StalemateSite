@@ -164,7 +164,7 @@ it('clears the name-picker recovery hint when a later explicit roll succeeds', (
 });
 
 
-it('does not join while Enter confirms nickname composition, then joins the final choice', async () => {
+it.each([{ isComposing: true }, { isComposing: false, keyCode: 229 }])('does not join while Enter confirms nickname composition, then joins the final choice (%j)', async composition => {
     const { window, document } = initialize({ cachedPreview: true });
     const sockets = [];
     window.WebSocket = class {
@@ -177,7 +177,7 @@ it('does not join while Enter confirms nickname composition, then joins the fina
     nick.focus(); nick.value = 'UnfinishedNick';
     const status = document.querySelector('[data-gate-status]').textContent;
     nick.dispatchEvent(new window.CompositionEvent('compositionstart', { bubbles: true }));
-    nick.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+    nick.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', ...composition, bubbles: true, cancelable: true }));
     await Promise.resolve(); await Promise.resolve();
     expect(sockets).toHaveLength(0);
     expect(document.querySelector('[data-enter]').disabled).toBe(false);
