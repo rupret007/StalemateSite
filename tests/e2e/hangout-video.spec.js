@@ -385,7 +385,7 @@ test('a dropped relay connection reconnects and faces come back', async ({ brows
     await expect(host.locator('.tile:not([data-tile="me"])')).toHaveCount(1, { timeout: 20000 });
 });
 
-test('faces that never connect stop rebuilding after three tries; "Try faces again" restarts them', async ({ browser }) => {
+test('faces that never connect stop rebuilding after three tries; "Try faces again" restarts them', async ({ browser }, testInfo) => {
     const { host, guest } = await call(browser);
     // Persistent failure on the guest: every connection reports 'failed', the 2/4/8 s restart
     // pacing runs fast, and each RTCPeerConnection the page builds is counted.
@@ -408,11 +408,12 @@ test('faces that never connect stop rebuilding after three tries; "Try faces aga
         for (const entry of window.__hangout.av.pcs.values()) entry.pc.onconnectionstatechange();
     });
     const stuck = guest.locator('[data-faces-stuck]');
+    const retry = guest.locator('[data-faces-retry]');
     await expect.poll(async () => { await noticeFailure(); return stuck.isVisible(); }, { timeout: 20000 }).toBe(true);
     await expect(stuck).toContainText('Faces with Jeff aren’t connecting');
     await expect(stuck).toContainText('Chat and draw still work');
     await expect(stuck).toContainText('same Wi-Fi');
-    await expect(guest.locator('[data-faces-retry]')).toHaveText('Try faces again');
+    await expect(retry).toHaveText('Try faces again');
 
     // Three fresh connections, then nothing: no timer is pending and more failure events build nothing.
     const stopped = () => guest.evaluate(() => ({
@@ -429,9 +430,14 @@ test('faces that never connect stop rebuilding after three tries; "Try faces aga
     await guest.press('[data-text]', 'Enter');
     await expect(host.locator('[data-log]')).toContainText('Still chatting without faces');
 
-    // The failure clears; the button spends a fresh budget and the faces come back.
-    await guest.evaluate(() => { window.__failFaces = false; });
-    await guest.click('[data-faces-retry]');
+    // Keep the failure active while the user reaches Retry. Clearing it early
+    // lets a native connection event hide the control before the click lands.
+    await retry.evaluate(button => {
+        button.addEventListener('click', () => { window.__failFaces = false; }, { capture: true, once: true });
+    });
+    await retry.scrollIntoViewIfNeeded();
+    await guest.screenshot({ path: testInfo.outputPath('faces-retry-before-click.png') });
+    await retry.click();
     await expect(stuck).toBeHidden();
     await expect.poll(() => guest.evaluate(() => window.__built)).toBe(4);
     for (const page of [host, guest]) {
@@ -440,6 +446,7 @@ test('faces that never connect stop rebuilding after three tries; "Try faces aga
     const before = await framesFrom(guest);
     await expect.poll(async () => (await framesFrom(guest)) - before, { timeout: 15000 }).toBeGreaterThan(5);
     expect(host.errors.concat(guest.errors)).toEqual([]);
+    await guest.screenshot({ path: testInfo.outputPath('faces-retry-restored.png') });
 });
 
 test('a reconnect during camera publication cannot restore a departed peer after decryption',async ({ browser }) => {
