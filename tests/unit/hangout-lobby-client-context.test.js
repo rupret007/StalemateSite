@@ -1176,6 +1176,66 @@ describe('participation-safe one-tap Music offer', () => {
         expect(window.open).not.toHaveBeenCalled();
     });
 
+    describe('Music popup recovery', () => {
+        it.each(['blocked', 'throws'])('keeps the blocked-tab guidance through a redraw and retries the same invitation: %s', async mode => {
+            const { window, ws } = await setup(), offer = invite();
+            const { document } = window;
+            const action = document.querySelector('[data-music-invite-action]');
+            const status = document.querySelector('[data-music-invite-status]');
+            const announcement = document.querySelector('[data-music-invite-announcement]');
+            const popup = { closed: false, opener: window, document: { title: '', body: { textContent: '' } },
+                location: { replace: vi.fn() }, close: vi.fn(function () { this.closed = true; }) };
+            window.open = vi.fn(() => {
+                if (mode === 'throws') throw new Error('Popup unavailable');
+                return null;
+            });
+            ws.receive(offer);
+            action.focus(); action.click();
+            const blockedGuidance = status.textContent;
+            expect(blockedGuidance).toContain('Your browser blocked the Music tab. Allow pop-ups');
+            expect(announcement.textContent).toBe(blockedGuidance);
+            expect(ws.sent.filter(frame => frame.t === 'music-offer-accept')).toHaveLength(0);
+            expect(document.activeElement).toBe(action);
+
+            // Selecting the current channel causes a genuine client redraw.
+            // A blocked popup is not a failed socket write or a consumed offer.
+            document.querySelector('[data-channel-key="#stalemate"]').click();
+            expect(status.textContent).toBe(blockedGuidance);
+            expect(announcement.textContent).toBe(blockedGuidance);
+            expect(action.hidden).toBe(false);
+
+            window.open.mockImplementation(() => popup);
+            action.click();
+            expect(ws.sent.filter(frame => frame.t === 'music-offer-accept')).toEqual([{
+                t: 'music-offer-accept', version: 1, id: offer.id, request: offer.request,
+                ch: offer.ch, roomInstance: offer.roomInstance,
+            }]);
+            expect(status.textContent).toBe('Waiting for the room to confirm you joined.');
+            expect(announcement.textContent).toBe(status.textContent);
+        });
+
+        it('shows connection recovery if the retried tab opens but its acceptance cannot be sent', async () => {
+            const { window, ws } = await setup(), offer = invite();
+            const { document } = window;
+            const action = document.querySelector('[data-music-invite-action]');
+            const status = document.querySelector('[data-music-invite-status]');
+            const popup = { closed: false, opener: window, document: { title: '', body: { textContent: '' } },
+                location: { replace: vi.fn() }, close: vi.fn(function () { this.closed = true; }) };
+            window.open = vi.fn(() => null);
+            ws.receive(offer); action.click();
+            expect(status.textContent).toContain('Allow pop-ups');
+
+            window.open.mockImplementation(() => popup);
+            ws.send = () => { throw new Error('Socket write unavailable'); };
+            action.click();
+            expect(status.textContent).toBe('Your reply didn’t send. Check your connection and try again.');
+            expect(document.querySelector('[data-music-invite-announcement]').textContent).toBe(status.textContent);
+            expect(popup.close).toHaveBeenCalledOnce();
+            expect(popup.closed).toBe(true);
+            expect(ws.sent.filter(frame => frame.t === 'music-offer-accept')).toHaveLength(0);
+        });
+    });
+
     it('lets the host hand a native WebJam invitation to one guest without manual copying', async () => {
         const { window, ws } = await setup();
         window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };

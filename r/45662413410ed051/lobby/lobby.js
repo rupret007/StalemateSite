@@ -2471,6 +2471,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             : accepted ? 'You’re in the Jam room. Open WebJam in a new tab, then come back here to chat.'
             : unconfirmed ? 'The room hasn’t confirmed your reply. Wait here or ask the host for a new invitation.'
             : joining ? 'Waiting for the room to confirm you joined.'
+            : musicOffer.popupBlocked ? 'Your browser blocked the Music tab. Allow pop-ups for this private site, then choose Accept and open Music again.'
             : musicOffer.sendFailed ? 'Your reply didn’t send. Check your connection and try again.'
             : `${musicOffer.from} invited you to join Music.`;
         if (musicStatus.textContent !== message) {
@@ -2496,6 +2497,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (!offer || !readyForMusicOffer() || musicPanel.hidden) return;
         if (offer.expires <= Date.now()) return endMusicInvite();
         if (offer.safe && offer.state === 'offer') {
+            offer.popupBlocked = false;
+            offer.sendFailed = false;
             let popup;
             try {
                 popup = window.open('about:blank', '_blank');
@@ -2506,9 +2509,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 }
             } catch { popup = null; }
             if (!popup) {
-                offer.sendFailed = true;
-                musicStatus.textContent = 'Your browser blocked the Music tab. Allow pop-ups for this private site, then ask the host to send a new invitation.';
-                musicAnnouncement.textContent = musicStatus.textContent;
+                offer.popupBlocked = true;
+                drawMusicInvite();
                 return;
             }
             offer.pendingWindow = popup;
