@@ -2039,6 +2039,9 @@ it.each([
         clientHeight: { get: () => 300 },
     });
     ws.receive({ t: 'line', ch: '#stalemate', id: 'm-resume-anchor', from: 'ReadingFriend', text: 'A message to inspect.' });
+    // Begin with the existing cue deliberately cleared, then choose the
+    // reading position. The away case must not inherit an anchor unread count.
+    document.querySelector('[data-new-messages]').click(); log.scrollTop = 0;
     const action = document.querySelector('[data-id="m-resume-anchor"] .flag');
     action.focus(); paint();
     ws.receive({ t: 'line', ch: '#stalemate', id: 'm-resume-unread', from: 'ReadingFriend', text: 'New while inspecting.' });
