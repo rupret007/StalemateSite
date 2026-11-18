@@ -2022,3 +2022,37 @@ it.each(['message action', 'composer', 'conversation'])('incoming chat respects 
         expect(document.querySelector('[data-new-messages]').hidden).toBe(true);
     }
 });
+
+
+it.each([
+    ['composer', true], ['conversation', true], ['composer', false], ['conversation', false],
+])('resuming %s at the latest messages=%s keeps an accurate new-message cue', async (target, atLatest) => {
+    const v = await visitor(); v.welcome(); v.join();
+    const { window, ws, paint } = v, { document } = window;
+    window.requestAnimationFrame = callback => window.setTimeout(callback, 16);
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    const log = document.querySelector('[data-buffer]');
+    // No layout/automatic scroll event in jsdom. Real browser coverage uses a
+    // short desktop transcript that fits, where setting scrollTop cannot move.
+    Object.defineProperties(log, {
+        scrollHeight: { get: () => atLatest ? 200 : 1000 },
+        clientHeight: { get: () => 300 },
+    });
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'm-resume-anchor', from: 'ReadingFriend', text: 'A message to inspect.' });
+    const action = document.querySelector('[data-id="m-resume-anchor"] .flag');
+    action.focus(); paint();
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'm-resume-unread', from: 'ReadingFriend', text: 'New while inspecting.' });
+    paint();
+    const cue = document.querySelector('[data-new-messages]');
+    expect(cue.hidden).toBe(false);
+    expect(cue.textContent).toBe('1 new message ↓');
+    const input = document.querySelector('[data-text]'); input.value = 'Unsent draft stays here';
+    const focused = target === 'composer' ? input : log;
+    focused.focus();
+    ws.receive({ t: 'line', ch: '#stalemate', id: 'm-resume-following', from: 'ReadingFriend', text: 'The next message arrives.' });
+    paint();
+    expect(document.activeElement).toBe(focused);
+    expect(input.value).toBe('Unsent draft stays here');
+    expect(cue.hidden).toBe(atLatest);
+    if (!atLatest) expect(cue.textContent).toBe('2 new messages ↓');
+});
