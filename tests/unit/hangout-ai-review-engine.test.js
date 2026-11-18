@@ -1,5 +1,5 @@
-import { createAiReviewPersistenceSink } from './helpers/ai-review-persistence.mjs';
 // @vitest-environment node
+import { createAiReviewPersistenceSink } from './helpers/ai-review-persistence.mjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby, LOBBY } from '../../hangout-worker/src/lobby-core.mjs';
 
