@@ -3955,10 +3955,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         }
     }
     function dismissToast() {
+        const hadFocus = toastRegion.contains(document.activeElement);
         clearTimeout(toastTimer);
         toastRegion.hidden = true;
         toastRegion.replaceChildren();
         toastAnnouncement.replaceChildren();
+        if (hadFocus) $('[data-text]').focus({ preventScroll: true });
     }
     function scheduleToastDismiss() {
         clearTimeout(toastTimer);
@@ -3970,6 +3972,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     toastRegion.addEventListener('focusin', () => clearTimeout(toastTimer));
     toastRegion.addEventListener('focusout', () => queueMicrotask(scheduleToastDismiss));
     function toast(text, actions = []) {
+        const hadFocus = toastRegion.contains(document.activeElement);
         const message = document.createElement('span');
         message.id = 'toast-message';
         message.textContent = text;
@@ -3987,6 +3990,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             toastRegion.append(' ', button);
         }
         toastRegion.hidden = false;
+        // Keep focus on the stable status, never on a newly substituted action.
+        if (hadFocus) toastRegion.focus({ preventScroll: true });
         toastAnnouncement.replaceChildren(text);
         toastDuration = actions.length ? 12000 : 4000;
         scheduleToastDismiss();
