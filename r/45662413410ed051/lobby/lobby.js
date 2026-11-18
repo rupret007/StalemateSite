@@ -3460,7 +3460,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (selectionLost) people.value = '';
 
         const emptyMusicRoster = invitingToMusic && invitePeople.size === 0;
-        const preferRoster = canInviteByRoster() && invitePeople.size > 0;
+        // Standalone Jam rooms start with nickname entry and still offer the online roster.
+        const preferRoster = (current.kind !== 'jam' || betaShell) && canInviteByRoster() && invitePeople.size > 0;
         people.labels[0].textContent = 'Online guests';
         people.disabled = emptyMusicRoster;
         updateInvitePersonAction();
