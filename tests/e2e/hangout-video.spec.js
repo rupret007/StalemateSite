@@ -423,7 +423,7 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }
     });
 }
 
-test('faces that never connect stop rebuilding after three tries; "Try faces again" restarts them', async ({ browser }, testInfo) => {
+async function exerciseFacesRetry(browser, testInfo, useKeyboard) {
     const { host, guest } = await call(browser);
     // Persistent failure on the guest: every connection reports 'failed', the 2/4/8 s restart
     // pacing runs fast, and each RTCPeerConnection the page builds is counted.
@@ -476,8 +476,10 @@ test('faces that never connect stop rebuilding after three tries; "Try faces aga
     await retry.scrollIntoViewIfNeeded();
     await expectFacesRetryReachable(guest);
     await guest.screenshot({ path: testInfo.outputPath('faces-retry-before-click.png') });
-    await retry.click();
+    if (useKeyboard) await retry.press('Enter');
+    else await retry.click();
     await expect(stuck).toBeHidden();
+    await expect(guest.getByRole('group', { name: 'Call controls', exact: true })).toBeFocused();
     await expect.poll(() => guest.evaluate(() => window.__built)).toBe(4);
     for (const page of [host, guest]) {
         await expect.poll(() => page.evaluate(() => [...window.__hangout.av.pcs.values()][0]?.pc.connectionState), { timeout: 20000 }).toBe('connected');
@@ -486,7 +488,12 @@ test('faces that never connect stop rebuilding after three tries; "Try faces aga
     await expect.poll(async () => (await framesFrom(guest)) - before, { timeout: 15000 }).toBeGreaterThan(5);
     expect(host.errors.concat(guest.errors)).toEqual([]);
     await guest.screenshot({ path: testInfo.outputPath('faces-retry-restored.png') });
-});
+}
+
+test('faces that never connect stop rebuilding after three tries; "Try faces again" restarts them',
+    ({ browser }, testInfo) => exerciseFacesRetry(browser, testInfo, false));
+test('keyboard retry for failed faces restores focus to Call controls',
+    ({ browser }, testInfo) => exerciseFacesRetry(browser, testInfo, true));
 
 test('a reconnect during camera publication cannot restore a departed peer after decryption',async ({ browser }) => {
     const host = await openBrowser(browser);

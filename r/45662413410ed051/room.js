@@ -43,6 +43,7 @@
         reportStatus: $('[data-report-status]'), reportAvailability: $('[data-report-availability]'), reportSend: $('[data-report-send]'),
         reportRetry: $('[data-report-retry]'), reportNew: $('[data-report-new]'), reportClose: $('[data-report-close]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
+        callControls: $('#room-call-controls'),
         chatToggle: $('[data-chat-toggle]'), more: $('[data-more]'), modePill: $('[data-mode-pill]'), watchTitle: $('[data-watch-title]'), watchToggle: $('[data-watch-toggle]'),
         soundtrack: $('[data-soundtrack]'), soundtrackPop: $('[data-soundtrack-pop]'), soundtrackVol: $('[data-soundtrack-vol]'), soundtrackMute: $('[data-soundtrack-mute]'),
         consent: $('[data-consent]'), consentTitle: $('[data-consent-title]'), consentVideo: $('[data-consent-video]'), consentPlaceholder: $('[data-consent-placeholder]'),
@@ -1632,6 +1633,9 @@
     const stuckFaces = () => Array.from(app.av.pcs.keys()).filter((id) => relayPeers.get(id)?.facesStopped);
     function paintFacesRetry() {
         const ids = stuckFaces();
+        if (!ids.length && ui.facesRetry.contains(doc.activeElement) && !ui.room.hidden) {
+            ui.callControls.focus({ preventScroll: true });
+        }
         ui.facesRetry.hidden = !ids.length;
         if (ids.length) ui.facesRetryText.textContent = `Faces with ${ids.map(peerName).join(', ')} aren’t connecting, so we stopped trying. Chat and draw still work.${turnStatus === 'ready' ? '' : ' If anyone is on cellular data, everyone should join the same Wi-Fi, then tap “Try faces again”.'}`;
     }
