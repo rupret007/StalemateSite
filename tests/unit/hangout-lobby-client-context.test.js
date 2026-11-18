@@ -1881,6 +1881,31 @@ describe('activity tools recovery', () => {
         retry.click(); const fresh = script(); expect(fresh).not.toBeNull(); load(old); expect(attach).not.toHaveBeenCalled();
         load(fresh); expect(attach).toHaveBeenCalledTimes(1);
     });
+    it('requires another deliberate retry after renderer room setup throws', async () => {
+        const { window, ws, retry, script, load, api, attach } = await drawingVisitor();
+        const doc = window.document, input = doc.querySelector('[data-text]');
+        input.value = 'Keep my draft while activity setup fails';
+        api.onJoin.mockImplementationOnce(() => { throw new Error('Fixture: room setup failed'); });
+        retry.focus(); retry.click(); load(script());
+        expect(api.onLeave).toHaveBeenCalledTimes(1);
+        ws.receive({ t: 'act', ch: '#drawing-recovery', kind: 'stroke', stroke: {
+            id: 'arrived-after-setup-failure', color: '#009ee8', size: 8, pts: [[.1, .2], [.4, .5]]
+        } });
+        expect(attach).toHaveBeenCalledTimes(1);
+        expect(api.onAct).not.toHaveBeenCalled();
+        expect(doc.querySelector('[data-activity-recovery]').hidden).toBe(false);
+        expect(doc.querySelector('[data-cam]').disabled).toBe(true);
+        expect(doc.activeElement).toBe(retry);
+        expect(input.value).toBe('Keep my draft while activity setup fails');
+        expect(api.onCam).not.toHaveBeenCalled();
+        retry.click();
+        expect(attach).toHaveBeenCalledTimes(2);
+        expect(api.onJoin).toHaveBeenCalledTimes(2);
+        expect(api.onJoin.mock.calls[1][1].strokes.map(stroke => stroke.id)).toEqual(['arrived-after-setup-failure']);
+        expect(doc.querySelector('[data-activity-recovery]').hidden).toBe(true);
+        expect(input.value).toBe('Keep my draft while activity setup fails');
+        expect(api.onCam).not.toHaveBeenCalled();
+    });
     it('cleans up on page exit and does not attach a late response', async () => {
         const { window, retry, script, load, attach, timers } = await drawingVisitor();
         retry.click(); const pending = script(); window.dispatchEvent(new window.Event('pagehide')); load(pending);
