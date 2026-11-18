@@ -1,17 +1,11 @@
 // Physical record mapping only. The caller supplies ONE rollback-capable async
 // transaction domain shared by authority, consent and effects. No provisioning,
 // production activation, remote authority, key management or provider starts.
-import { createHash } from 'node:crypto';
-
 export const DURABLE_RECORD_CEILINGS = Object.freeze({ chunkBytes: 65536, recordBytes: 16 * 1024 * 1024,
     transactionReadBytes: 32 * 1024 * 1024, transactionWriteBytes: 16 * 1024 * 1024, rowOperations: 4096, listPage: 4, nodes: 100000, depth: 64 });
 const enc = new TextEncoder(), dec = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const fail = reason => { throw Error(reason); };
-async function digest(bytes) {
-    // Most records fit one chunk. Hash those without a worker-thread handoff.
-    if (bytes.byteLength <= DURABLE_RECORD_CEILINGS.chunkBytes) return createHash('sha256').update(bytes).digest('hex');
-    return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(n => n.toString(16).padStart(2, '0')).join('');
-}
+const digest = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(n => n.toString(16).padStart(2, '0')).join('');
 const exact = (value, keys) => value && Object.getPrototypeOf(value) === Object.prototype
     && Reflect.ownKeys(value).length === keys.length && keys.every(key => {
         const d = Object.getOwnPropertyDescriptor(value, key); return d?.enumerable && Object.hasOwn(d, 'value');
