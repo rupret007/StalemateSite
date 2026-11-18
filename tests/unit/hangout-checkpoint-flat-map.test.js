@@ -104,3 +104,21 @@ it('accepts exactly 50ms and rejects greater than 50ms for capture and restore',
         }
     }
 });
+
+it('noncollection object/array capture keeps baseline metrics, clock cadence and in-place restoration', () => {
+    function run(make) {
+        const ticks = []; vi.spyOn(performance, 'now').mockImplementation(() => { ticks.push(0); return 0; });
+        const leaf = Object.create(null); leaf.value = 7;
+        const array = [leaf, undefined]; array.length = 5;
+        const roots = { leaf, array }; roots.self = roots;
+        Object.defineProperty(roots, 'hidden', { value: leaf, writable: true, enumerable: false, configurable: true });
+        const cp = make(roots); const metrics = cp.metrics;
+        leaf.value = 9; array.splice(0, 2); array.push('later'); roots.hidden = null; delete roots.self;
+        const restored = cp.restore();
+        expect(restored).toBe(true); expect(roots.self).toBe(roots); expect(roots.hidden).toBe(leaf);
+        expect(leaf.value).toBe(7); expect(array).toHaveLength(5); expect(array[0]).toBe(leaf);
+        expect(1 in array).toBe(true); expect(2 in array).toBe(false); expect(cp.restore()).toBe(false);
+        vi.restoreAllMocks(); return { metrics, ticks };
+    }
+    expect(run(candidate)).toEqual(run(baseline));
+});

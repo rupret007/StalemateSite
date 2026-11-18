@@ -104,7 +104,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
         if (!kind) unsupported();
         if (kind === 'array' && value.length > limits.maxNodes) exceeded();
         charge(64, 1);
-        const record = { value, prototype, kind, extensible: Object.isExtensible(value), properties: [], contents: [] };
+        const record = { value, prototype, kind, extensible: Object.isExtensible(value), properties: [], contents: kind === 'map' || kind === 'set' ? [] : null };
         seen.set(value, record); records.push(record); pending.push(record);
     }
     visit(roots);
