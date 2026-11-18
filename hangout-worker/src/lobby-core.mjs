@@ -2420,7 +2420,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             // A delivery to the author's own device can still be deleted or
             // purged after eviction, but that device cannot report itself.
             const recipients = receiptAudience([...meta.recipients]);
-            const controlOnly = line.t === 'line' && recipients.every(id => conns.get(id)?.dev === meta.authorDev);
+            // Protected transactions keep the receipt shape understood by
+            // the existing strict session reader, including during rollback.
+            const controlOnly = !commitConfigured && line.t === 'line'
+                && recipients.every(id => conns.get(id)?.dev === meta.authorDev);
             setReceipt(line.id, controlOnly
                 ? { controlOnly: true, id: line.id, authorDev: meta.authorDev, ts: line.ts, recipients }
                 : messageReceipt(line, { ...meta, recipients }));
