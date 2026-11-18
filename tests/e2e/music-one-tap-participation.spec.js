@@ -6,7 +6,7 @@ const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 
 const LOBBY = '/r/45662413410ed051/lobby/';
 
-test('a guest joins the invited Music session with one accept tap', async ({ browser, baseURL }) => {
+async function withMusicOffer(browser, baseURL, exercise, viewport = { width: 390, height: 844 }) {
     // Use native ESM like protected fixtures, avoiding CommonJS collection
     // transforms for the same engine that those fixtures import.
     const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
@@ -35,7 +35,7 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
     });
 
     async function enter(nick) {
-        const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+        const context = await browser.newContext({ viewport });
         contexts.push(context);
         await context.route(url => url.pathname === LOBBY, async route => {
             const response = await route.fetch();
@@ -93,7 +93,8 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
     try {
         const host = await enter('MusicHost');
         const guest = await enter('MusicGuest');
-        await host.locator('.phonetabs [data-show="rooms"]').click();
+        const roomsTab = host.locator('.phonetabs [data-show="rooms"]');
+        if (await roomsTab.isVisible()) await roomsTab.click();
         await host.getByRole('button', { name: /^jam \(webjam\)/i }).click();
         await expect(host.locator('[data-jam]')).toBeVisible();
         const invite = host.locator('[data-jam-invite-music]');
@@ -137,6 +138,15 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
         await expect(offer).toContainText('MusicHost invited you to join Music.');
         const accept = offer.getByRole('button', { name: 'Accept and open Music', exact: true });
         await expect(accept).toBeVisible();
+        await exercise({ host, guest, offer, accept, inbound, musicHref, hostRequest });
+    } finally {
+        for (const identity of identities.values()) await engine.disconnect(identity.id);
+        await Promise.all(contexts.map(context => context.close()));
+    }
+}
+
+test('a guest joins the invited Music session with one accept tap', async ({ browser, baseURL }) => {
+    await withMusicOffer(browser, baseURL, async ({ guest, offer, accept, inbound, musicHref, hostRequest }) => {
         const popupPromise = guest.waitForEvent('popup');
         await accept.click();
         const popup = await popupPromise;
@@ -152,8 +162,34 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
         expect(inbound.filter(frame => frame.t === 'music-offer-accept')).toHaveLength(1);
         expect(inbound.some(frame => frame.t === 'music-invite-offer')).toBe(false);
         await expect(offer).toContainText('audio permission stays separate');
-    } finally {
-        for (const identity of identities.values()) await engine.disconnect(identity.id);
-        await Promise.all(contexts.map(context => context.close()));
-    }
+    });
 });
+
+for (const width of [390, 1440]) {
+    test(`a withdrawn Music offer becomes dismissible at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        await withMusicOffer(browser, baseURL, async ({ host, guest, offer, accept, inbound }) => {
+            await accept.focus();
+            // A real host departure makes lobby-core emit its actual terminal
+            // frame; no invented room fields or client state are injected.
+            await host.locator('[data-leave]').click();
+            await expect(offer).toContainText('This Music invitation ended. Ask the host for a new one.');
+            await expect(accept).toBeHidden();
+            const dismiss = offer.getByRole('button', { name: 'Dismiss', exact: true });
+            await expect(dismiss).toBeVisible();
+            await expect(dismiss).toHaveAttribute('aria-disabled', 'false');
+            await expect(dismiss).toBeFocused();
+            expect(inbound.filter(frame => frame.t === 'music-offer-accept')).toHaveLength(0);
+            expect(await guest.evaluate(() => window.__oneTapAcceptCount)).toBe(0);
+            expect(guest.context().pages()).toHaveLength(1);
+            await guest.screenshot({ path: testInfo.outputPath(`music-offer-ended-${width}.png`) });
+
+            await dismiss.click();
+            await expect(offer).toBeHidden();
+            await expect(guest.locator('[data-tabs] [data-channel-key="#stalemate"]')).toBeFocused();
+            await guest.locator('[data-text]').fill('Still here after the Music invitation ended.');
+            await guest.locator('[data-text]').press('Enter');
+            await expect(host.locator('[data-buffer]')).toContainText('Still here after the Music invitation ended.');
+            await guest.screenshot({ path: testInfo.outputPath(`music-offer-dismissed-chat-${width}.png`) });
+        }, { width, height: width === 390 ? 844 : 900 });
+    });
+}

@@ -1236,6 +1236,93 @@ describe('participation-safe one-tap Music offer', () => {
         });
     });
 
+    describe('Music ended-offer recovery', () => {
+        const ended = (offer, status = 'unavailable') => ({
+            t: 'music-offer-ended', version: 1, id: offer.id, request: offer.request, status,
+        });
+        const popupFor = window => ({ closed: false, opener: window,
+            document: { title: '', body: { textContent: '' } }, location: { replace: vi.fn() },
+            close: vi.fn(function () { this.closed = true; }) });
+
+        it.each(['unavailable', 'expired', 'declined'])('handles the server terminal frame while joining: %s', async status => {
+            const { window, ws } = await setup(), offer = invite(), popup = popupFor(window);
+            const { document } = window;
+            const action = document.querySelector('[data-music-invite-action]');
+            const dismiss = document.querySelector('[data-music-invite-dismiss]');
+            window.open = vi.fn(() => popup);
+            ws.receive(offer); action.focus(); action.click();
+            expect(popup.closed).toBe(false);
+            expect(action.getAttribute('aria-disabled')).toBe('true');
+
+            // Match finishMusicInvite's real wire frame: no ch/roomInstance.
+            ws.receive(ended(offer, status));
+            expect(popup.close).toHaveBeenCalledOnce();
+            expect(popup.closed).toBe(true);
+            expect(popup.location.replace).not.toHaveBeenCalled();
+            expect(action.hidden).toBe(true);
+            expect(dismiss.getAttribute('aria-disabled')).toBe('false');
+            expect(document.activeElement).toBe(dismiss);
+            expect(document.querySelector('[data-music-invite-status]').textContent)
+                .toBe(`This Music invitation ${status === 'expired' ? 'expired' : 'ended'}. Ask the host for a new one.`);
+            dismiss.click();
+            expect(document.querySelector('[data-music-invite]').hidden).toBe(true);
+        });
+
+        it.each(['wrong id', 'wrong request', 'unknown status', 'wrong room', 'wrong instance', 'extra href'])('ignores an unrelated or malformed terminal frame: %s', async reason => {
+            const { window, ws } = await setup(), offer = invite(), popup = popupFor(window);
+            const { document } = window;
+            const action = document.querySelector('[data-music-invite-action]');
+            window.open = vi.fn(() => popup);
+            ws.receive(offer); action.focus(); action.click();
+            const frame = ended(offer);
+            const other = value => (value[0] === 'a' ? 'b' : 'a') + value.slice(1);
+            if (reason === 'wrong id') frame.id = other(offer.id);
+            if (reason === 'wrong request') frame.request = other(offer.request);
+            if (reason === 'unknown status') frame.status = 'accepted';
+            if (reason === 'wrong room') Object.assign(frame, { ch: '#jam-unrelated', roomInstance: offer.roomInstance });
+            if (reason === 'wrong instance') Object.assign(frame, { ch: offer.ch, roomInstance: other(offer.roomInstance) });
+            if (reason === 'extra href') frame.href = 'not-a-capability';
+            ws.receive(frame);
+            expect(popup.close).not.toHaveBeenCalled();
+            expect(popup.closed).toBe(false);
+            expect(popup.location.replace).not.toHaveBeenCalled();
+            expect(action.hidden).toBe(false);
+            expect(action.getAttribute('aria-disabled')).toBe('true');
+            expect(document.activeElement).toBe(action);
+            expect(document.querySelector('[data-music-invite-status]').textContent)
+                .toBe('Waiting for the room to confirm you joined.');
+        });
+
+        it('frees ended waiting offers without replacing the active invite or blocking a fresh one', async () => {
+            const { window, ws } = await setup(), active = invite();
+            const { document } = window;
+            const dismiss = document.querySelector('[data-music-invite-dismiss]');
+            const status = document.querySelector('[data-music-invite-status]');
+            window.open = vi.fn();
+            ws.receive(active);
+            const waiting = Array.from({ length: 4 }, (_, i) => ({ ...invite(), ch: `#jam-waiting-${i}`, by: `QueuedHost${i}` }));
+            for (const offer of waiting) ws.receive(offer);
+            expect(ws.sent.filter(frame => frame.t === 'music-offer-seen')).toHaveLength(5);
+            dismiss.focus();
+            for (const offer of waiting) ws.receive(ended(offer));
+            expect(status.textContent).toBe('GuitarHost invited you to join Music.');
+            expect(document.activeElement).toBe(dismiss);
+
+            const fresh = { ...invite(), ch: '#jam-fresh', by: 'NewHost' };
+            ws.receive(fresh);
+            expect(ws.sent.filter(frame => frame.t === 'music-offer-seen' && frame.id === fresh.id)).toHaveLength(1);
+            dismiss.click();
+            expect(status.textContent).toBe('NewHost invited you to join Music.');
+            expect(document.activeElement).toBe(document.querySelector('[data-music-invite-action]'));
+            expect(ws.sent.filter(frame => frame.t === 'music-offer-decline')).toEqual([{
+                t: 'music-offer-decline', version: 1, id: active.id, request: active.request,
+                ch: active.ch, roomInstance: active.roomInstance,
+            }]);
+            expect(ws.sent.some(frame => frame.t === 'music-offer-accept')).toBe(false);
+            expect(window.open).not.toHaveBeenCalled();
+        });
+    });
+
     it('lets the host hand a native WebJam invitation to one guest without manual copying', async () => {
         const { window, ws } = await setup();
         window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };

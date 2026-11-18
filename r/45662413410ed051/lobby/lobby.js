@@ -2380,8 +2380,23 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             return;
         }
         const offer = musicOffer?.id === frame.id ? musicOffer : waitingMusicOffers.get(frame.id);
-        if (!offer || !offer.safe || frame.request !== offer.request || frame.ch !== offer.room || frame.roomInstance !== offer.instance
+        if (!offer || !offer.safe || frame.request !== offer.request
             || Object.keys(frame).some(key => !['t', 'version', 'id', 'request', 'ch', 'roomInstance', 'href', 'expires', 'status'].includes(key))) return;
+        if (frame.t === 'music-offer-ended') {
+            // The server's terminal frame is correlated by offer and request,
+            // without room fields. Validate any supplied room context too.
+            if (!['expired', 'declined', 'unavailable'].includes(frame.status)
+                || Object.keys(frame).some(key => !['t', 'version', 'id', 'request', 'ch', 'roomInstance', 'status'].includes(key))
+                || frame.ch !== undefined && frame.ch !== offer.room
+                || frame.roomInstance !== undefined && frame.roomInstance !== offer.instance) return;
+            if (offer !== musicOffer) {
+                removeWaitingMusicInvite(offer.id);
+                return drawMusicInvite();
+            }
+            if (frame.status === 'expired') offer.expires = 0;
+            return endMusicInvite();
+        }
+        if (frame.ch !== offer.room || frame.roomInstance !== offer.instance) return;
         if (frame.t === 'music-offer-joining') {
             if (offer.state === 'joining') {
                 clearTimeout(offer.replyTimer);
@@ -2391,14 +2406,6 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                     drawMusicInvite();
                 }, 10000);
             }
-            return;
-        }
-        if (frame.t === 'music-offer-ended') {
-            clearTimeout(offer.replyTimer);
-            closePendingMusicWindow(offer);
-            offer.state = 'ended';
-            offer.expires = frame.status === 'expired' ? 0 : offer.expires;
-            drawMusicInvite();
             return;
         }
         if (frame.t !== 'music-offer-accepted' || !['joining', 'unconfirmed'].includes(offer.state)) return;
