@@ -1999,7 +1999,7 @@ describe('keyboard focus during status action recovery', () => {
         v.ws.receive({ t: 'owner-offer', by: 'Friend', ch: '#kept-studio' });
         expect(notice.textContent).toContain('Accept ownership'); expect(notice.hidden).toBe(false);
         v.flush(12000); expect(notice.hidden).toBe(true);
-        v.ws.receive({ t: 'notice', from: 'StaleBot', kind: 'info', text: 'A plain status keeps its normal lifetime.' });
+        v.ws.receive({ t: 'notice', from: 'StaleBot', kind: 'error', text: 'A plain status keeps its normal lifetime.' });
         expect(notice.hidden).toBe(false); v.flush(4000); expect(notice.hidden).toBe(true);
         expect(input.value).toBe('Keep this unsent note'); expect(doc.activeElement).toBe(input);
         expect(v.ws.sent).toHaveLength(before);
