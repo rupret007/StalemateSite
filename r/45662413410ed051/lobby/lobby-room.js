@@ -41,11 +41,10 @@
         let videoPublishTimer;
         let live = null;
         let pendingPts = [];
-        // Cached backdrop holding every stroke but the last. Not reset on
-        // teardown so a re-join with an unchanged snapshot (reconnect, or the
-        // canonical re-ingest used to verify the live render) can reuse it
-        // instead of repainting the whole retained history from scratch.
+        // Cache only within this room generation. Authoritative snapshots and
+        // teardown must not reuse pixels from a previous retained drawing.
         let canvasBase = null, canvasBaseChannel = null, canvasBaseLastId = null, canvasBaseCount = 0, canvasBasePrefix = '';
+        let canvasBaseGeneration = -1;
         let flushTimer = 0;
         let roomGeneration = 0, captureVersion = 0, turnClient = null, turnInit = null;
         let cameraFailureNotice = '';
@@ -191,8 +190,15 @@
             return !item.failed; // Queued locally, not acknowledged by the server.
         }
 
+        function resetCanvasBase() {
+            if (canvasBase) { canvasBase.width = 0; canvasBase.height = 0; }
+            canvasBase = null; canvasBaseChannel = null; canvasBaseLastId = null;
+            canvasBaseCount = 0; canvasBasePrefix = ''; canvasBaseGeneration = -1;
+        }
+
         function teardown() {
             roomGeneration += 1; captureVersion += 1;
+            resetCanvasBase();
             localSample = null;
             clearTimeout(activity.timer); activity.timer = 0; activity.queue = []; activity.bytes = 0;
             cancelStroke();
@@ -430,10 +436,8 @@
             ctx.stroke();
         }
 
-        // Fingerprint of every stroke but the last: (id, point count) pairs are
-        // enough to prove the content is unchanged, because this app only ever
-        // appends points to an existing stroke (never rewrites one in place), so
-        // the same id at the same length always carries the same pixels.
+        // Inside one live generation strokes only gain points. A new snapshot
+        // goes through teardown and invalidates this append-only prefix cache.
         function strokesPrefixFingerprint(strokes) {
             let out = '';
             for (let i = 0; i < strokes.length - 1; i += 1) out += strokes[i].id + ':' + strokes[i].pts.length + '|';
@@ -444,15 +448,12 @@
             const ctx = ui.canvas.getContext('2d');
             ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
             const strokes = state.room.strokes, last = strokes.at(-1);
-            // Nothing to draw or cache; leave any existing backdrop untouched so
-            // a later redraw with matching content can still reuse it.
-            if (!last) return;
-            const baseUsable = canvasBase && canvasBaseChannel === state.ch && canvasBaseCount === strokes.length
+            if (!last) { resetCanvasBase(); return; }
+            const baseUsable = canvasBase && canvasBaseGeneration === roomGeneration
+                && canvasBaseChannel === state.ch && canvasBaseCount === strokes.length
                 && canvasBaseLastId === last.id && canvasBase.width === ui.canvas.width && canvasBase.height === ui.canvas.height;
-            // Either the caller tells us only the last stroke moved (the common,
-            // interactive case), or the full prefix fingerprint still matches a
-            // snapshot we already rendered (e.g. a reconnect re-ingesting the
-            // same history) — both let us skip rebuilding every prior stroke.
+            // Reuse only an unchanged prefix within this generation. Reconnects
+            // and authoritative snapshots repaint from their newly ingested data.
             if (baseUsable && (changedStrokeId === last.id || canvasBasePrefix === strokesPrefixFingerprint(strokes))) {
                 ctx.drawImage(canvasBase, 0, 0);
             } else {
@@ -462,6 +463,7 @@
                 canvasBase.height = ui.canvas.height;
                 canvasBase.getContext('2d').drawImage(ui.canvas, 0, 0);
                 canvasBaseChannel = state.ch;
+                canvasBaseGeneration = roomGeneration;
                 canvasBaseLastId = last.id;
                 canvasBaseCount = strokes.length;
                 canvasBasePrefix = strokesPrefixFingerprint(strokes);
