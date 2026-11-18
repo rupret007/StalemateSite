@@ -61,7 +61,9 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
 }
 
 it.each([false, true])('generated activity room focus respects a moved-focus choice: %s', async moved => {
-    const { window, ws, welcome, join } = await visitor(); welcome(); join();
+    const { window, ws, welcome, join } = await visitor();
+    window.eval(readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8'));
+    welcome(); join();
     const doc = window.document, start = doc.querySelector('[data-start="art"]');
     start.focus(); start.click();
     const request = ws.sent.at(-1);
