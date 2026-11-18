@@ -1512,6 +1512,47 @@ it.each(['on time', 'late receipt', 'late rejection', 'outcome before receipt'])
     expect(JSON.stringify({ ...window.sessionStorage, ...window.localStorage })).not.toContain(href);
 });
 
+it.each([
+    ['jam', 'room button', 'nickname'],
+    ['jam', 'Host tools', 'nickname'],
+    ['chat', 'Host tools', 'roster'],
+    ['art', 'Host tools', 'roster'],
+    ['jam', 'Music button', 'roster'],
+])('keeps the intended invitation entry focused for %s via %s', async (kind, entry, expected) => {
+    const { window, ws } = await visitor('rad-dad', { personTargets: 1, directMusicInvites: 1 }, { secureOrigin: true });
+    const { document } = window;
+    window.HangoutCore = { emptyState: () => ({ strokes: [], video: null }), apply() {} };
+    window.BroadcastChannel = class {};
+    window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+    const host = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
+    const guest = { id: 'guest-peer', nick: 'InviteFriend', prefix: '' };
+    const room = kind === 'jam' ? '#jam-keyboard' : `#keyboard-${kind}`;
+    ws.receive({ t: 'welcome', id: host.id, nick: host.nick, role: 'fan', capabilities: {} });
+    ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', modes: {}, names: [host, guest] } });
+    ws.receive({ t: 'join', ch: { name: room, kind, keepRef: 'd'.repeat(32), modes: { i: true, C: true }, names: [host] } });
+    if (entry === 'Host tools') {
+        document.querySelector('[data-roomtools]').click();
+        const commands = document.querySelector('[data-palette]');
+        [...commands.querySelectorAll('button')].find(button => button.textContent === 'Invite guest').click();
+    } else {
+        const opener = document.querySelector(entry === 'Music button' ? '[data-jam-invite-music]' : '[data-jam-invite-room]');
+        expect(opener.hidden).toBe(false);
+        opener.focus(); opener.click();
+    }
+    const dialog = document.querySelector('[data-invite-dialog]');
+    const roster = dialog.querySelector('[data-invite-options]');
+    const nickname = dialog.querySelector('[data-invite-nick]');
+    expect(dialog.open).toBe(true);
+    expect(document.activeElement).toBe(expected === 'nickname' ? nickname : roster);
+    expect([...roster.options].map(option => option.value)).toEqual(['', guest.id]);
+    expect(roster.value).toBe('');
+    expect(dialog.querySelector('[data-invite-person-send]').disabled).toBe(true);
+    expect(nickname.hidden).toBe(entry === 'Music button');
+    expect(ws.sent.some(frame => frame.t === 'music-offer-create'
+        || frame.t === 'music-invite-offer' || frame.t === 'cmd' && frame.name === 'invite')).toBe(false);
+});
+
 it.each([true, false])('puts the available drawing invite path first (online guest: %s)', async online => {
     const { window, ws } = await visitor('rad-dad', { personTargets: 1 });
     const { document } = window;

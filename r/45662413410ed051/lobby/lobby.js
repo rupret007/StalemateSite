@@ -3754,7 +3754,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-invite-dialog]').showModal();
         if (isGame) (target ? createGuestLink : roster.querySelector('button:enabled') || $('[data-game-invite-cancel]')).focus();
         else if (music && people.disabled) $('[data-invite-cancel]').focus();
-        else (music || preferRoster ? people : $('[data-invite-nick]')).focus();
+        // A room-only Jam invitation keeps its nickname entry ready. Music
+        // uses the online picker; chat and art keep their roster-first flow.
+        else (music || preferRoster && current.kind !== 'jam' ? people : $('[data-invite-nick]')).focus();
     }
     function drawGuestInviteChoice(target, canInviteNew) {
         const inviteHint = $('[data-game-invite-empty]');
