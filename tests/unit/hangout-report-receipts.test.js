@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createLatestPersistenceSnapshots } from './helpers/latest-persistence-snapshots.mjs';
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby, REPORT_ALREADY_QUEUED_NOTICE, REPORT_QUEUED_LABEL, REPORT_QUEUED_NOTICE } from '../../hangout-worker/src/lobby-core.mjs';
@@ -7,7 +8,7 @@ let now, engine, frames, writes, identities, sequence;
 function boot(persist) {
     frames = []; writes = [];
     engine = createLobby({ now: () => now, send: (recipient, frame) => frames.push({ recipient, ...frame }),
-        persist: persist || ((kind, value) => writes.push([kind, structuredClone(value)])), limits: { defaultSlow: 0 } });
+        persist: persist || createLatestPersistenceSnapshots(writes), limits: { defaultSlow: 0 } });
 }
 function guest(nick, role = 'fan', dev = `dev-${nick}`) {
     const identity = { id: `socket${++sequence}`, dev, iph: `ip-${sequence}`, role, admin: role === 'owner', account: '' };
