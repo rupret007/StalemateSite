@@ -3123,7 +3123,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         // Distinct private rooms can share the same generated display words.
         const suffix = code ? `-${code.slice(0, 4)}x${code.slice(4, 8)}` : '';
         count(`room-start-${kind}`);
-        cmd('join', [`#${kind}-${label}${suffix}`]);
+        const room = `#${kind}-${label}${suffix}`;
+        if (cmd('join', [room]))
+            roomJoinFocus = document.activeElement === b ? { room, anchor: b } : null;
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
     $('[data-channel-dialog]').addEventListener('close', () => {
