@@ -165,6 +165,36 @@ describe('independent lobby effect commit fence', () => {
         await engine.message('legacy', JSON.stringify({ t: 'hello', nick: 'Legacy', age13: true }));
         expect(send.mock.calls.some(([, frame]) => frame.t === 'welcome')).toBe(true); expect(persist).toHaveBeenCalled();
     });
+
+    it('requires a persistence handler when durable storage is requested', () => {
+        expect(() => createLobby({ storageRequired: true })).toThrow('A lobby persistence handler is required');
+        expect(() => createLobby({ persist: null })).toThrow('A lobby persistence handler is required');
+    });
+
+    it.each(['synchronous', 'asynchronous'])('reports a %s session write failure after pending writes settle', async failure => {
+        let finishAbuse;
+        const abuse = new Promise(resolve => { finishAbuse = resolve; });
+        const send = vi.fn(), error = new Error('session write failed');
+        const persist = vi.fn(kind => {
+            if (kind === 'abuse') return abuse;
+            if (kind !== 'sessions') return;
+            if (failure === 'synchronous') throw error;
+            return Promise.reject(error);
+        });
+        const engine = createLobby({ storageRequired: true, now: () => START, send, persist });
+        engine.connect({ id: 'legacy', dev: 'dev-legacy', iph: 'ip-legacy' });
+        send.mockClear();
+        const pending = engine.message('legacy', JSON.stringify({ t: 'hello', nick: 'Legacy', age13: true }));
+        await Promise.resolve();
+        expect(persist.mock.calls.map(([kind]) => kind)).toEqual(expect.arrayContaining(['abuse', 'sessions']));
+        expect(send).not.toHaveBeenCalled();
+        finishAbuse();
+        await pending;
+        const frames = send.mock.calls.map(([, frame]) => frame);
+        expect(frames.some(frame => frame.t === 'welcome')).toBe(false);
+        expect(frames.some(frame => frame.t === 'net' && frame.lock === 'readonly')).toBe(true);
+        expect(frames.some(frame => frame.t === 'notice' && frame.text.includes('Storage is unavailable'))).toBe(true);
+    });
 });
 
 describe('C3 commit transaction composition', () => {

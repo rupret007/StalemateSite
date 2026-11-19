@@ -143,7 +143,12 @@ const PERSON_COMMANDS = new Set(['msg', 'query', 'whois', 'ignore', 'unignore', 
 const NAMED_PERSON_COMMANDS = new Set([...PERSON_COMMANDS, 'accept', 'decline', 'report', 'mode']);
 const PERSON_ROOM_COMMANDS = new Set(['slap', 'kick', 'ban', 'invite', 'op', 'deop', 'voice', 'devoice', 'cohost', 'transfer']);
 
-export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = null, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, webJamChess = false, directMusicInvites = false, musicProvider = null, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+// Snapshot readers and standalone engines can operate entirely in memory.
+const volatilePersist = () => {};
+
+export function createLobby({ now = () => Date.now(), send: sendImpl = () => {}, close: closeImpl = () => {}, persist: persistImpl = volatilePersist, storageRequired = false, deferPresence: deferPresenceImpl = null, participation = null, effectCommit = null, incidentSources = false, gameNight = false, webJamChess = false, directMusicInvites = false, musicProvider = null, reviewPublicText = null, aiModerationStatus = () => ({ enabled: false, mode: 'review-only', state: 'disabled' }), limits = LOBBY_LIMITS } = {}) {
+    if (typeof persistImpl !== 'function' || (storageRequired && persistImpl === volatilePersist))
+        throw new TypeError('A lobby persistence handler is required');
     if (typeof incidentSources !== 'boolean') throw Error('incident-source-configuration');
     const L = { ...LOBBY_LIMITS, ...limits };
     const entrySites = L.entrySites || ENTRY_SITES;
@@ -190,21 +195,24 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     };
     const close = (id, code, reason) => controlled ? controlled.closes.push([id, code, reason]) : closeImpl(id, code, reason);
     const deferPresence = typeof deferPresenceImpl === 'function' ? marker => controlled ? controlled.presence.push(marker) : deferPresenceImpl(marker) : null;
-    const persist = (kind, value) => {
+    const persist = (kind, value, writes) => {
         if (controlled) {
             controlled.effectBytes += encoder.encode(JSON.stringify(value)).byteLength;
             if (controlled.effects.length >= 128 || controlled.effectBytes > 16 * 1024 * 1024) { controlled.capacity = true; return; }
             controlled.effects.push([kind, structuredClone(value)]); return;
         }
         if (commitConfigured) throw new Error('Controlled effect transaction required');
-        const required = kind === 'moderation-queue' || kind === 'net';
+        const evidence = kind === 'moderation-queue' || kind === 'net';
+        const pending = writes || (evidence ? evidenceWrites : null);
         let task;
-        try { task = persistImpl?.(kind, value); }
-        catch (error) { if (!required) throw error; task = Promise.reject(error); }
-        if (required && evidenceWrites) evidenceWrites.push(task);
-        // Outside a durable command, keep the original promise available to an
-        // awaiting caller while handling a connection/heartbeat write rejection.
-        else if (required && task && typeof task.catch === 'function') task.catch(storageUnavailable);
+        try { task = persistImpl(kind, value); }
+        catch (error) {
+            if (!pending && !evidence) throw error;
+            task = Promise.reject(error);
+        }
+        if (pending) pending.push(task);
+        // Evidence writes can also run outside the buffered command path.
+        else if (evidence && task && typeof task.catch === 'function') task.catch(storageUnavailable);
         return task;
     };
     const net = {
@@ -2115,7 +2123,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (bytes > SESSION_STATE_BYTES) writes.push(Promise.reject(new Error('session allowance exceeded')));
             // Stored receipt records are immutable; replacement/pruning creates
             // new records, so an outstanding storage write keeps its exact snapshot.
-            else if (persistImpl || controlled) writes.push(persist('sessions', sessionStorageSnapshot(metadata)));
+            else if (persistImpl !== volatilePersist || controlled) persist('sessions', sessionStorageSnapshot(metadata), writes);
         }
         const flush = () => {
             for (const [id, frame, marker] of frames) try {

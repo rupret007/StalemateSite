@@ -348,6 +348,7 @@ export class HangoutLobby {
             keepAlive: task => this.state.waitUntil?.(task)
         } : null;
         this.engine = createLobby({
+            storageRequired: true,
             musicProvider,
             incidentSources: !!this.incidentSourceMode,
             gameNight: env.HANGOUT_BETA_MODE === 'protected',
