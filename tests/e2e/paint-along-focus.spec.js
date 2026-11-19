@@ -352,12 +352,18 @@ test('the Paint Along stage stays fully visible above two live tiles and open ch
                 videos.filter(video => video.videoWidth > 0).length
             ), { timeout: 20000 }).toBe(2);
         }
-        for (const size of [viewport, { width: 375, height: 667 }]) {
+        for (const size of [viewport, { width: 375, height: 667 }, { width: 375, height: 657 }]) {
             await host.setViewportSize(size);
             await expectPhoneStage(host);
             await host.locator('[data-chat-toggle]').click();
             await expect(host.locator('.chat')).toBeVisible();
             await expectPhoneStage(host);
+            await expect(host.getByRole('textbox', { name: 'Message', exact: true })).toBeInViewport({ ratio: 1 });
+            await expect(host.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+            const composer = await host.locator('[data-say]').boundingBox();
+            const dock = await host.getByRole('group', { name: 'Call controls', exact: true }).boundingBox();
+            expect(composer.y + composer.height).toBeLessThanOrEqual(dock.y);
+            await host.screenshot({ path: test.info().outputPath(`paint-stage-chat-${size.width}x${size.height}.png`) });
             if (size.width === 390) await saveShot(host, 'paint-along-two-tiles.png');
             await host.locator('[data-chat-toggle]').click();
         }
