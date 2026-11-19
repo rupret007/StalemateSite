@@ -6,6 +6,13 @@ export const MUSIC_PURPOSE = 'private-music-turn-v1';
 export const musicRef = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
 export const musicDigest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 
+export function equalMusicProof(left, right) {
+    if (!musicDigest(left) || !musicDigest(right)) return false;
+    let different = 0;
+    for (let i = 0; i < left.length; i++) different |= left.charCodeAt(i) ^ right.charCodeAt(i);
+    return different === 0;
+}
+
 export function privateMusicOrigin(env) {
     if (env.HANGOUT_BETA_MODE !== 'protected' || env.HANGOUT_SESSION_AUTHORITY !== 'lobby-v1'
         || env.HANGOUT_PARTICIPATION_AUTHORITY !== 'c3-v1' || env.HANGOUT_OPEN === '0'

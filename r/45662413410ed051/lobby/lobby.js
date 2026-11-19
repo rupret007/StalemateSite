@@ -1895,7 +1895,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             const sent = frame.status === 'sent';
             musicHandoffReport = { room: attempt.room, request: attempt.request, nick: attempt.nick, safe: attempt.safe === true,
-                manual: attempt.safe !== true && !sent,
+                protectedMusic: attempt.protectedMusic === true, manual: attempt.safe !== true && !sent,
                 message: sent ? `Music invitation sent to ${attempt.nick}. Waiting for a reply.` : attempt.safe
                     ? 'The Music invitation could not be confirmed. Check the room and try again.'
                     : 'The Music invitation couldn’t be sent. Try again or share a link instead.' };
@@ -1906,7 +1906,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (frame.t === 'music-offer-outcome' && report?.safe !== true) return;
             if (!report || frame.request !== report.request) return;
             const message = {
-                accepted: `${report.nick} accepted and joined the Jam room.`,
+                accepted: report.protectedMusic ? `${report.nick} accepted the Music invitation.`
+                    : `${report.nick} accepted and joined the Jam room.`,
                 declined: `${report.nick} declined the Music invitation.`,
                 expired: `The Music invitation to ${report.nick} expired.`,
                 unavailable: `The Music invitation to ${report.nick} ended. You can send a new one.`,
@@ -1927,7 +1928,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (musicHandoff !== pending) return;
             stopMusicHandoff();
             musicHandoffReport = pending.submitted
-                ? { room, request, nick: pending.nick, safe, awaitingReceipt: true,
+                ? { room, request, nick: pending.nick, safe, protectedMusic: pending.protectedMusic, awaitingReceipt: true,
                     message: 'Hang Out did not confirm delivery. Check with your bandmate before sending again.' }
                 : { room, safe, manual: !safe,
                     message: 'WebJam didn’t return an invitation. Check that your private rehearsal build is open and hosting Music.' };

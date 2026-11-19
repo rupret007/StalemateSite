@@ -1,5 +1,5 @@
-// Production composition only. This does not install a policy, enroll a person,
-// verify guardianship or enable provider dispatch.
+// Production composition. Only the separately bound private Music issuer can
+// use the external-provider start fence in this composition.
 import { createParticipationEnforcement } from './participation-enforcement.mjs';
 import { readPartitionedParticipationPrincipals, readPartitionedParticipationWithdrawals, readPartitionedParticipationPreparation } from './participation-partitions.mjs';
 
@@ -30,7 +30,7 @@ export function createLobbyParticipation({ env, authority, dispatchStart = null,
         readPreparation: readPartitionedParticipationPreparation,
         writeEffects: input => authority.writeParticipationEffects(input),
         ...(dispatchStart === null ? {} : { dispatchStart }),
-        providerQualified: (action, scope) => action === 'externalProvider' && scope === 'music' && musicProvider !== null,
+        providerQualified: (action, scope) => action === 'externalProvider' && scope === 'music' && typeof musicProvider?.issue === 'function',
         now
     });
 }

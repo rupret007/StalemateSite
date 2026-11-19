@@ -1,4 +1,4 @@
-import { MUSIC_PURPOSE, musicDigest, musicRef, musicResponse } from './private-music.mjs';
+import { MUSIC_PURPOSE, equalMusicProof, musicDigest, musicRef, musicResponse } from './private-music.mjs';
 // Hang Out lobby engine: an old-school IRC network in one authoritative place (one Durable Object, one writer,
 // so no netsplits and no "first in gets @"). Pure logic, no I/O: the Worker DO and the local dev relay both
 // drive it, and unit tests drive it directly. Every permission is checked here, never in the browser.
@@ -1141,15 +1141,16 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
         let hostKey, lease, offer;
         if (native) {
-            const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body.proof))),
-                byte => byte.toString(16).padStart(2, '0')).join('');
             const match = [...musicHosts].find(([, value]) => value.webjam.slice(-32) === id && value.webjam === body.webjam
-                && value.generation === body.generation && value.proofHash === hash);
+                && value.generation === body.generation);
             if (!match) return denied();
             [hostKey, lease] = match;
+            const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body.proof))),
+                byte => byte.toString(16).padStart(2, '0')).join('');
+            if (!equalMusicProof(lease.proofHash, hash)) return denied();
         } else {
             if (!['page', 'check', 'join', 'stop'].includes(op)) return denied();
-            const matches = value => value?.state === 'handed' && value.guestActor === site.sid && (op === 'page' || value.id === id && value.guestProof === body.proof);
+            const matches = value => value?.state === 'handed' && value.guestActor === site.sid && (op === 'page' || value.id === id && equalMusicProof(value.guestProof, body.proof));
             offer = [...musicInvites.values()].find(matches);
             if (!offer) return denied();
             hostKey = offer.hostLease;
@@ -1464,7 +1465,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const href = typeof frame.href === 'string' && validWebJoin(frame.href, L.webJoinOrigins);
         if (!href) return result('unavailable');
         const url = new URL(href);
-        const fragment = /^#k=[A-Za-z0-9_-]{43}&s=([a-f0-9]{64})&g=([1-9]\d{0,9})&e=([1-9]\d{0,12})$/.exec(url.hash);
+        const fragment = /^#k=[A-Za-z0-9_-]{43}&s=[a-f0-9]{64}&g=([1-9]\d{0,9})&e=([1-9]\d{0,12})$/.exec(url.hash);
         const expires = fragment ? Number(fragment[2]) * 1000 : 0;
         const time = now();
         if (url.pathname !== '/join/' || url.username || url.password || !fragment || Number(fragment[1]) > 0xffffffff
