@@ -2372,6 +2372,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         try { popup.location.replace(frame.href); }
         catch { closePendingMusicWindow(offer); return endMusicInvite(); }
         offer.pendingWindow = null;
+        // Keep the accepted link so a guest who closed the WebJam tab can
+        // open it again from here, exactly as the plain Music invite does.
+        offer.href = frame.href;
         clearTimeout(offer.replyTimer);
         offer.state = 'accepted';
         if (app.active !== jam.name) switchTo(jam.name);
@@ -2448,7 +2451,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         musicDismiss.setAttribute('aria-disabled', String(joining));
         const actionUnavailable = ended || unconfirmed || acceptedElsewhere;
         if (actionUnavailable && document.activeElement === musicAction) musicDismiss.focus();
-        musicAction.hidden = actionUnavailable || safeAccepted;
+        musicAction.hidden = actionUnavailable;
     }
 
     musicAction.addEventListener('click', () => {

@@ -150,6 +150,16 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
         expect(inbound.filter(frame => frame.t === 'music-offer-accept')).toHaveLength(1);
         expect(inbound.some(frame => frame.t === 'music-invite-offer')).toBe(false);
         await expect(offer).toContainText('audio permission stays separate');
+        // A guest who closed the WebJam tab can open the accepted link again
+        // from the lobby, exactly as the plain Music invite allows.
+        const reopen = offer.getByRole('button', { name: 'Open WebJam in browser', exact: true });
+        await expect(reopen).toBeVisible();
+        const reopenPromise = guest.context().waitForEvent('page');
+        await reopen.click();
+        const reopened = await reopenPromise;
+        await expect(reopened).toHaveTitle('WebJam private join fixture');
+        expect(await reopened.evaluate(() => location.hash)).toBe(new URL(musicHref).hash);
+        expect(inbound.filter(frame => frame.t === 'music-offer-accept')).toHaveLength(1);
     } finally {
         for (const identity of identities.values()) await engine.disconnect(identity.id);
         await Promise.all(contexts.map(context => context.close()));

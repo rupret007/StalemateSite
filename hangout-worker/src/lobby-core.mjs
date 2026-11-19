@@ -264,11 +264,20 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const connectionView = c => ({ id: c.id, dev: c.dev, account: c.account, role: c.role, admin: c.admin, ...connectionBinding(c) });
     const SAFE_COMMANDS = new Set(['help', 'h', '?', 'list', 'names', 'who', 'whois', 'w', 'part', 'leave', 'quit', 'exit', 'bye',
         'ignore', 'unignore', 'block', 'unblock', 'decline', 'deny', 'pm', 'admin-refresh', 'dismiss', 'aidismiss', 'privatereport', 'delete', 'purge', 'mute', 'gban', 'shield', 'shieldoff', 'lobby', 'filter', 'slow', 'camoff', 'log']);
+    // The Music handshake must never be dropped while the room is busy. A
+    // dropped acknowledgement leaves the offer stuck at "queued" and the
+    // guest's later accept is then answered with silence, which is worse than
+    // waiting. These frames are validated on their own terms, they only ever
+    // touch a Jam room (whose activity is never captured anyway), and the
+    // safety queue keeps them in order.
+    const SAFE_MUSIC_FRAMES = new Set(['music-offer-create', 'music-offer-seen', 'music-offer-accept', 'music-offer-decline',
+        'music-invite-offer', 'music-invite-accept', 'music-invite-decline']);
     function safetyMessage(raw) {
         if (typeof raw !== 'string' || raw.length > L.actFrameBytes || encoder.encode(raw).byteLength > L.actFrameBytes) return true;
         try {
             const frame = JSON.parse(raw);
             if (frame.t === 'music-offer-provider-failed') return true;
+            if (SAFE_MUSIC_FRAMES.has(frame.t)) return true;
             if (frame.t === 'report' || frame.t === 'admin-refresh' || frame.t === 'cam' && !frame.on || frame.t === 'entry-source' && !normalizeEntrySource(frame.source, entrySites)) return true;
             const command = frame.t === 'cmd' ? lc(frame.name) : frame.t === 'say' && /^\//.test(frame.text || '') ? lc(frame.text.slice(1).split(' ')[0]) : '';
             return SAFE_COMMANDS.has(command);
@@ -1206,10 +1215,18 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         const host = conns.get(offer.host);
         if (offer.expires <= now()) return finishMusicInvite(room.name, 'expired');
-        if (frame.t === 'music-offer-decline') return finishMusicInvite(room.name, 'declined');
         // A retransmitted accept must not cancel the first one while its
-        // provider start is pending.
-        if (offer.state !== 'offered') return;
+        // provider start is pending, and a decline that arrives after the
+        // guest accepted must not cancel the accept already in flight.
+        if (offer.state === 'accepting') return;
+        if (frame.t === 'music-offer-decline') return finishMusicInvite(room.name, 'declined');
+        if (offer.state !== 'offered') {
+            // The guest never acknowledged this offer, so it can never be
+            // accepted. Release it with an honest answer instead of leaving
+            // the guest waiting for a reply that will never come.
+            if (offer.state === 'queued') return finishMusicInvite(room.name, 'unavailable');
+            return;
+        }
         if (!canInviteMusic(host, guest, room)
             || !participationAllows(host, 'requestDirectContact', guest) || !participationAllows(guest, 'acceptDirectContact', host)
             || !participationAllows(host, 'externalProvider') || !participationAllows(guest, 'externalProvider')) return finishMusicInvite(room.name, 'unavailable');

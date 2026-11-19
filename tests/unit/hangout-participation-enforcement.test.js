@@ -174,6 +174,44 @@ describe('controlled C3 engine integration', () => {
         expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(true);
     });
 
+    it('queues the one-tap Music handshake while the room is busy instead of dropping it', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        expect(invite).toBeTruthy();
+        // Hold the room inside a controlled commit so the guest's handshake
+        // frames arrive while the engine is busy. Dropping them would leave
+        // the offer stuck and the guest's accept silently unanswered.
+        const held = gate(); f.controls.commitGate = held;
+        const busy = f.cmd('alice', 'join', ['#art-busy-while-offering']);
+        await held.entered;
+        const seen = f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        const accept = f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        held.release();
+        await busy; await seen; await accept;
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
+        expect(f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted').href).toBe(href);
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.status === 'sent')).toBe(true);
+        expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(true);
+    });
+
+    it('answers an accept for an offer the guest never acknowledged instead of leaving it unanswered', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        // The acknowledgement never arrived, so this offer can never be
+        // accepted. The guest must be told rather than left waiting.
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(f.frames).toContainEqual({ recipient: 'bravo', t: 'music-offer-ended', version: 1,
+            id: invite.id, request, status: 'unavailable' });
+        expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(false);
+    });
+
     it('keeps a completed Music admission in the reconnect snapshot without retaining its Web Join fragment', async () => {
         const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
         await f.connect('alice'); await f.connect('bravo');

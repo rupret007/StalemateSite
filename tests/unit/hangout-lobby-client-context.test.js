@@ -890,6 +890,29 @@ describe('participation-safe one-tap Music offer', () => {
         expect([...Array(window.localStorage.length)].map((_, i) => window.localStorage.getItem(window.localStorage.key(i))).join(' ')).not.toContain('/join/#k=');
     });
 
+    it('keeps the accepted one-tap Music link so a guest who closed the tab can open it again', async () => {
+        const fixture = await setup(), { window, ws } = fixture, offer = invite();
+        const popup = { closed: false, opener: window, document: { title: '', body: { textContent: '' } },
+            location: { replace: vi.fn() }, close: vi.fn(function () { this.closed = true; }) };
+        window.open = vi.fn(() => popup);
+        ws.receive(offer);
+        const action = window.document.querySelector('[data-music-invite-action]');
+        action.click();
+        joinJam(fixture, offer);
+        const expiry = Math.floor(offer.expires / 1000);
+        const href = `https://music.example.test/join/#k=${randomBytes(32).toString('base64url')}&s=${randomBytes(32).toString('hex')}&g=1&e=${expiry}`;
+        ws.receive({ t: 'music-offer-accepted', version: 1, id: offer.id, request: offer.request,
+            ch: offer.ch, roomInstance: offer.roomInstance, href, expires: offer.expires });
+        // The accepted link stays reachable from the lobby, exactly as the
+        // plain Music invite keeps it, and it is never written to the page.
+        expect(action.hidden).toBe(false);
+        expect(action.textContent).toBe('Open WebJam in browser');
+        action.click();
+        expect(window.open).toHaveBeenCalledTimes(2);
+        expect(window.open).toHaveBeenLastCalledWith(href, '_blank', 'noopener,noreferrer');
+        expect(window.document.body.innerHTML).not.toContain('/join/#k=');
+    });
+
     it('shows an unconfirmed state when issuer dispatch stalls and still follows a late success', async () => {
         const fixture = await setup(), { window, ws, flush } = fixture, offer = invite();
         const popup = { closed: false, opener: window, document: { title: '', body: { textContent: '' } },
