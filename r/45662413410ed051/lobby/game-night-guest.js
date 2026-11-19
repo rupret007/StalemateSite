@@ -251,24 +251,31 @@ function offerFreshLink() {
     askHost.textContent = FRESH_LINK;
 }
 
+let freshLinkRequestPending = false;
 async function shareFreshLink() {
+    if (freshLinkRequestPending) return;
+    freshLinkRequestPending = true;
+    const startingFocus = document.activeElement;
     const message = 'Could you send me a fresh Game Night link?';
     const payload = { title: 'Game Night', text: message };
-    if (typeof navigator.share === 'function') {
-        try { await navigator.share(payload); return; }
-        catch (error) { if (error?.name === 'AbortError') return; }
-    }
-    if (typeof navigator.clipboard?.writeText === 'function') {
-        try {
-            await navigator.clipboard.writeText(message);
-            if (askHost) askHost.textContent = 'Copied. Send it to your host.';
-            return;
-        } catch { /* Show the message on the page when copying is blocked. */ }
-    }
-    if (freshMessage) {
+    try {
+        if (typeof navigator.share === 'function') {
+            try { await navigator.share(payload); return; }
+            catch (error) { if (error?.name === 'AbortError') return; }
+        }
+        if (typeof navigator.clipboard?.writeText === 'function') {
+            try {
+                await navigator.clipboard.writeText(message);
+                if (askHost) askHost.textContent = 'Copied. Send it to your host.';
+                return;
+            } catch { /* Show the message on the page when copying is blocked. */ }
+        }
+        if (!freshMessage) return;
         freshMessage.textContent = `Message your host in the app you usually use. “${message}”`;
         freshMessage.hidden = false;
-        freshMessage.focus();
+        if (document.hasFocus() && document.activeElement === startingFocus) freshMessage.focus();
+    } finally {
+        freshLinkRequestPending = false;
     }
 }
 

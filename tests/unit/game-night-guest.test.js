@@ -8,6 +8,42 @@ afterEach(() => {
     document.body.replaceChildren();
 });
 
+it.each(['duplicate activation', 'focus departure'])('keeps the expired-invite share orderly during %s', async (scenario) => {
+    document.body.innerHTML = `
+        <h1 data-guest-game>Game Night</h1>
+        <p data-guest-status role="status"></p>
+        <section data-guest-invite hidden><button data-guest-join>Join game</button></section>
+        <button data-guest-retry hidden>Try again</button>
+        <button data-guest-fresh hidden>Ask the host for a fresh link</button>
+        <p data-guest-fresh-message tabindex="-1" hidden></p>
+        <button id="other-control">Other action</button>
+    `;
+    history.replaceState(null, '', '/beta/game-night/guest');
+    let failShare;
+    const pendingShare = new Promise((resolve, reject) => { failShare = reject; });
+    const share = vi.fn(() => pendingShare);
+    const writeText = vi.fn().mockRejectedValue(new DOMException('Blocked', 'NotAllowedError'));
+    vi.stubGlobal('navigator', Object.assign(Object.create(window.navigator), { share, clipboard: { writeText } }));
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    await import('../../r/45662413410ed051/lobby/game-night-guest.js');
+
+    const ask = document.querySelector('[data-guest-fresh]');
+    const message = document.querySelector('[data-guest-fresh-message]');
+    const other = document.getElementById('other-control');
+    expect(ask.hidden).toBe(false);
+    ask.focus();
+    ask.click();
+    if (scenario === 'duplicate activation') ask.click();
+    else other.focus();
+    failShare(new DOMException('Share unavailable', 'NotAllowedError'));
+    await vi.waitFor(() => expect(message.hidden).toBe(false));
+    expect(document.activeElement).toBe(scenario === 'focus departure' ? other : message);
+    expect(share).toHaveBeenCalledTimes(1);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(fetch).not.toHaveBeenCalled();
+});
+
 it('tells a returning guest to wait when reconnects are limited, then handles an expired seat', async () => {
     document.body.innerHTML = `
         <main data-resume-guest>
