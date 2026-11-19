@@ -1354,6 +1354,9 @@ async function exerciseMediaResume(browser, testInfo, viewport) {
 
     // The automatic re-acquire was refused, so the page asks for a tap and keeps both devices on.
     await expectResumeAboveTiles(guest);
+    const status = guest.locator('[data-status]');
+    await expect(status).toHaveText(/bring your camera .* mic back\./);
+    const pausedHint = await status.textContent();
     await guest.screenshot({ path: testInfo.outputPath(`media-resume-call-${viewport.width}.png`) });
     await expect.poll(() => guest.evaluate(() => window.__gumLog.filter((entry) => !entry.gesture).length)).toBeGreaterThan(0);
     const waiting = await guest.evaluate(() => {
@@ -1401,6 +1404,8 @@ async function exerciseMediaResume(browser, testInfo, viewport) {
     });
     expect(restored).toEqual({ cam: true, mic: true, off: [], video: true, audio: true, playing: true, tapCaptures: ['audio', 'video'] });
     await expect(guest.locator('[data-av-resume]')).toBeHidden();
+    await expect(status).not.toHaveText(pausedHint);
+    await guest.screenshot({ path: testInfo.outputPath(`media-resume-cleared-${viewport.width}.png`) });
     await expectOrdinaryMediaLabel(guest, 'video', true);
     await expectOrdinaryMediaLabel(guest, 'audio', true);
     expect(host.errors.concat(guest.errors)).toEqual([]);

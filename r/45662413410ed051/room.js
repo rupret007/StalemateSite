@@ -1646,11 +1646,14 @@
     });
 
     // The button stays up while remote playback or the local camera/mic still needs a tap.
+    const localMediaTapHint = 'Tap the resume button to bring your camera or mic back.';
     const avResumeWhy = { playback: false, video: false, audio: false };
     function paintAvResume() {
         if (!app.av.cam || app.av.screen) avResumeWhy.video = false;
         if (!app.av.mic) avResumeWhy.audio = false;
-        const needsTap = avResumeWhy.playback || avResumeWhy.video || avResumeWhy.audio;
+        const capturePaused = avResumeWhy.video || avResumeWhy.audio;
+        if (!capturePaused && ui.status.textContent === localMediaTapHint) say('');
+        const needsTap = avResumeWhy.playback || capturePaused;
         if (!needsTap && doc.activeElement === ui.avResume && !ui.room.hidden) {
             ui.callControls.focus({ preventScroll: true });
         }
@@ -2913,7 +2916,7 @@
         }
         if (playJob) await playJob;
         else if (doc.visibilityState === 'visible') await resumeRemotePlayback();
-        if (!busyCam && !busyMic && (avResumeWhy.video || avResumeWhy.audio)) say('Tap “Tap to resume video” to bring your camera and mic back.');
+        if (!busyCam && !busyMic && (avResumeWhy.video || avResumeWhy.audio)) say(localMediaTapHint);
         layout();
     }
     async function resumeRemotePlayback() {
