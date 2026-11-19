@@ -14,7 +14,7 @@ export function participationConfigurationValid(env) {
     try { lobbyParticipationMode(env); return true; } catch { return false; }
 }
 
-export function createLobbyParticipation({ env, authority, dispatchStart = null, now = () => Date.now() } = {}) {
+export function createLobbyParticipation({ env, authority, dispatchStart = null, musicProvider = null, now = () => Date.now() } = {}) {
     if (!lobbyParticipationMode(env)) return null;
     if (!authority || typeof authority.records?.transaction !== 'function'
         || ['resolveParticipationConnection', 'validateParticipationConnection', 'writeParticipationEffects'].some(name => typeof authority[name] !== 'function')
@@ -30,9 +30,7 @@ export function createLobbyParticipation({ env, authority, dispatchStart = null,
         readPreparation: readPartitionedParticipationPreparation,
         writeEffects: input => authority.writeParticipationEffects(input),
         ...(dispatchStart === null ? {} : { dispatchStart }),
-        // Supplying an owner fence does not qualify provider, quota, result or
-        // child-data integration. Production provider admission stays off.
-        providerQualified: () => false,
+        providerQualified: (action, scope) => action === 'externalProvider' && scope === 'music' && musicProvider !== null,
         now
     });
 }
