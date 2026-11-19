@@ -154,7 +154,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const musicInvites = new Map();
     const musicOfferRequests = new Map();
     const musicHosts = new Map();
-    const stoppedMusicHosts = new Map();
+    const stoppedMusicHosts = new WeakSet();
     const musicWork = new Map(); // irreversibly consumed issuance attempts, independent of room rollback
     const musicScope = musicProvider ? { providerScope: 'music' } : {};
 
@@ -1067,7 +1067,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function currentMusicHost(lease) {
         const room = ch(lease.room), host = conns.get(lease.host), guest = conns.get(lease.guest);
-        return !participationBroken && !stoppedMusicHosts.has(lease.id) && participationMusicOpen(room) && room.keepRef === lease.instance
+        return !participationBroken && !stoppedMusicHosts.has(lease) && participationMusicOpen(room) && room.keepRef === lease.instance
             && lease.expires > now() && host?.expiresAt > now() && guest?.expiresAt > now()
             && musicActor(host) === lease.hostActor && musicActor(guest) === lease.guestActor
             && canInviteMusic(host, guest, room)
@@ -1158,7 +1158,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             && (native || musicInvites.get(lease.room) === offer && offer.state === 'handed' && offer.expires > now()
                 && (musicWork.get(offer.id)?.phase !== 'issued' || ch(lease.room).members.has(guest.id)));
         const close = () => {
-            if (lease.expires > now()) stoppedMusicHosts.set(lease.id, lease.expires);
+            stoppedMusicHosts.add(lease);
             retireMusicWork(lease.id);
             const activeOffer = musicInvites.get(lease.room);
             if (activeOffer?.hostLease === hostKey) retireMusicWork(activeOffer.id);
@@ -3145,7 +3145,6 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (offer.expires <= t) finishMusicInvite(room, 'expired');
         }
         for (const [key, lease] of musicHosts) if (lease.expires <= t) finishMusicHost(key);
-        for (const [id, expiry] of stoppedMusicHosts) if (expiry <= t) stoppedMusicHosts.delete(id);
         for (const [id, attempt] of musicWork) if (attempt.claim.expires + 60_000 <= t) musicWork.delete(id);
         pruneMusicOfferRequests();
         rates.prune();
@@ -3261,7 +3260,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return controlledRun(message, [...args, true], safetyMessage(args[1]));
         }, flushPresence, musicAccess,
         retireMusic: () => {
-            for (const lease of musicHosts.values()) stoppedMusicHosts.set(lease.id, lease.expires);
+            for (const lease of musicHosts.values()) stoppedMusicHosts.add(lease);
             for (const id of musicWork.keys()) retireMusicWork(id);
         },
         transportControlReady, reserveTransportControl: (...args) => execute(reserveTransportControl, args, true),
