@@ -285,7 +285,7 @@ body:is(.bob-mode,.shared-layout) .callbar [data-mic][aria-pressed=true],body:is
 body:is(.bob-mode,.shared-layout) .callbar [data-mic][aria-pressed=false],body:is(.bob-mode,.shared-layout) .callbar [data-cam][aria-pressed=false]{background:var(--off);border-color:var(--off);color:#fff}
 body.shared-layout.consent-open .callbar :is([data-mic],[data-cam])[aria-pressed=false]{background:var(--raised);border-color:var(--line)}
 body:is(.bob-mode,.shared-layout) .callbar [data-cam]:disabled{opacity:.6;cursor:not-allowed}
-body:is(.bob-mode,.shared-layout) .callbar [data-chat-toggle][aria-pressed=true]{background:#24302a;border-color:var(--lime);color:var(--cream)}
+body:is(.bob-mode,.shared-layout) .callbar [data-chat-toggle][aria-expanded=true]{background:#24302a;border-color:var(--lime);color:var(--cream)}
 body:is(.bob-mode,.shared-layout) .callbar [data-chat-toggle][data-unread]{border-color:var(--amber);color:var(--amber)}
 body:is(.bob-mode,.shared-layout) .callbar .leave-room{background:var(--danger);border-color:var(--danger);color:#fff}
 body:is(.bob-mode,.shared-layout) .callbar .callbar-more{display:none}

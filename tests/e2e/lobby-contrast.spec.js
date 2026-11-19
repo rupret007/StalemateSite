@@ -124,3 +124,64 @@ test('staff sign-in fields have the same readable boundary without broadening st
     await expect(page.locator('[data-nick]')).toBeVisible(); await page.locator('[data-nick]').blur();
     await check(page, testInfo, 'staff-entry', { text: ['.gate-card h1', '.gate-card .lede', '[data-signin]', '[data-enter]'], fields: ['[data-nick]'] });
 });
+
+for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    test(`creative room and Paint Along composers remain readable at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+        const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
+        try {
+            const page = await context.newPage();
+            const origin = new URL(baseURL).origin;
+            await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+            const relay = hangoutRelayWsBase(baseURL, `room-contrast-${randomUUID()}`);
+            await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+            await page.locator('[data-name]').fill('ContrastHost');
+            await page.locator('[data-enter]').click();
+            await expect(page.locator('[data-room]')).toBeVisible();
+            const field = '.chat [data-text]';
+            const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+            const samples = { fields: [field], placeholders: [field] };
+            await expect(composer).toBeVisible();
+            await check(page, testInfo, 'creative-room-composer', samples);
+
+            await page.locator('[data-bob-toggle]').click();
+            await expect(page.locator('body')).toHaveAttribute('data-shared-layout', 'paint');
+            await page.locator('[data-consent-skip]').click();
+            const chat = page.locator('[data-chat-toggle]');
+            if (viewport.width <= 820) {
+                await expect(chat).toHaveAttribute('aria-expanded', 'false');
+                await expect(chat).toHaveCSS('border-top-color', 'rgb(52, 61, 54)');
+                await chat.click();
+            }
+            await expect(chat).toHaveAttribute('aria-expanded', 'true');
+            await expect(chat).toHaveCSS('border-top-color', 'rgb(209, 250, 120)');
+            await expect(composer).toBeVisible();
+            await expect(composer).toBeInViewport({ ratio: 1 });
+            const send = page.getByRole('button', { name: 'Send', exact: true });
+            await expect(send).toBeInViewport({ ratio: 1 });
+            const stage = page.locator('.watch .screen');
+            if (viewport.width <= 820) {
+                await expect(stage).toBeInViewport({ ratio: 1 });
+                const dock = page.getByRole('group', { name: 'Call controls', exact: true });
+                await expect.poll(async () => {
+                    const [button, controls] = await Promise.all([send.boundingBox(), dock.boundingBox()]);
+                    return controls.y - button.y - button.height;
+                }).toBeGreaterThanOrEqual(0);
+            }
+            await check(page, testInfo, 'paint-along-composer', samples);
+            await page.screenshot({ path: testInfo.outputPath(`paint-chat-contrast-${viewport.width}.png`) });
+            await composer.fill('Ready to paint');
+            await send.click();
+            await expect(page.locator('[data-log]')).toContainText('Ready to paint');
+            if (viewport.width <= 820) {
+                await chat.press('Enter');
+                await expect(chat).toBeFocused();
+                await expect(chat).toHaveAttribute('aria-expanded', 'false');
+                await expect(chat).toHaveCSS('border-top-color', 'rgb(52, 61, 54)');
+                await expect(composer).toBeHidden();
+                await expect(stage).toBeInViewport({ ratio: 1 });
+            }
+        } finally {
+            await context.close();
+        }
+    });
+}
