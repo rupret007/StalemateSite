@@ -4,7 +4,8 @@ const CEILINGS = Object.freeze({ maxBytes: 8 * 1024 * 1024, maxNodes: 100000, ma
 const OPAQUE_MAX = 4096;
 const unsupported = () => { throw new Error('Unsupported participation checkpoint graph'); };
 const exceeded = () => { throw new Error('Participation checkpoint limit exceeded'); };
-const clock = () => globalThis.performance.now();
+const timer = globalThis.performance;
+const clock = () => timer.now();
 const dataDescriptor = descriptor => descriptor && Object.hasOwn(descriptor, 'value');
 const mapSize = Object.getOwnPropertyDescriptor(Map.prototype, 'size').get;
 const setSize = Object.getOwnPropertyDescriptor(Set.prototype, 'size').get;
@@ -18,7 +19,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
         || !Number.isFinite(limits.maxMs) || limits.maxMs <= 0 || limits.maxMs > CEILINGS.maxMs)
         throw new Error('Invalid participation checkpoint limits');
     if (!roots || typeof roots !== 'object') unsupported();
-    const started = clock(), seen = new WeakMap(), records = [], pending = [];
+    const started = clock(), seen = new WeakSet(), records = [], pending = [];
     const opaque = new WeakSet();
     let bytes = 0, nodes = 0, entries = 0, opaqueObjects = 0;
     function timeCheck(start = started) { if (clock() - start > limits.maxMs) exceeded(); }
@@ -48,11 +49,11 @@ export function createParticipationCheckpoint(roots, options = {}) {
     const keySizes = new Map();
     function keySize(key) {
         if (key.length > 64) return stringSize(key);
-        if (keySizes.has(key)) {
-            const size = keySizes.get(key);
-            if (key.length > limits.maxBytes - bytes || size > limits.maxBytes - bytes) exceeded();
+        const cached = keySizes.get(key);
+        if (cached !== undefined) {
+            if (cached > limits.maxBytes - bytes) exceeded();
             timeCheck();
-            return size;
+            return cached;
         }
         const size = stringSize(key);
         if (keySizes.size < 256) keySizes.set(key, size);
@@ -95,7 +96,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
         charge(8);
         if (seen.has(value)) return;
         if (opaque.has(value)) {
-            seen.set(value, null); charge(32, 1); opaqueObjects += 1; return;
+            seen.add(value); charge(32, 1); opaqueObjects += 1; return;
         }
         const prototype = Object.getPrototypeOf(value);
         const kind = prototype === Map.prototype ? 'map' : prototype === Set.prototype ? 'set'
@@ -105,7 +106,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
         if (kind === 'array' && value.length > limits.maxNodes) exceeded();
         charge(64, 1);
         const record = { value, prototype, kind, extensible: Object.isExtensible(value), properties: [], contents: kind === 'map' || kind === 'set' ? [] : null };
-        seen.set(value, record); records.push(record); pending.push(record);
+        seen.add(value); records.push(record); pending.push(record);
     }
     visit(roots);
     while (pending.length) {
