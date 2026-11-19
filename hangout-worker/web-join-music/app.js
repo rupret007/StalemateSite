@@ -1,4 +1,3 @@
-import { musicSignal } from './request-signal.js';
 import { readInvite } from "./crypto.js";
 import { acquireMusicStream, closeAudioContext } from "./audio.js";
 import { WebJoinSession } from "./session.js";
@@ -454,6 +453,8 @@ async function startJoin(listenOnly = false) {
     if (!isCurrent() || expireUnusedInvite()) return;
     let grantedCredentials;
     if (musicGrant) {
+      const { musicSignal } = await import("./request-signal.js");
+      if (!isCurrent() || expireUnusedInvite()) return;
       const result = await musicRequest("join", musicSignal(attempt.signal, AbortSignal.timeout(12000)));
       if (!isCurrent() || expireUnusedInvite()) return;
       const href = new URL(result.href);
