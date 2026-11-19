@@ -155,6 +155,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const musicOfferRequests = new Map();
     const musicHosts = new Map();
     const stoppedMusicHosts = new WeakSet();
+    const musicHostActivity = new WeakMap();
     const musicWork = new Map(); // irreversibly consumed issuance attempts, independent of room rollback
     const musicScope = musicProvider ? { providerScope: 'music' } : {};
 
@@ -458,6 +459,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             }
         }
         for (const [key, host] of musicHosts) if (!currentMusicHost(host)
+            || musicWork.get(host.id)?.phase === 'issued' && !liveMusicHostActivity(host)
             || !musicConsent(conns.get(host.host), false) || !musicConsent(conns.get(host.guest), false)
             || participation.revisionFor(controlled.context, host.host) !== host.hostRevision
             || participation.revisionFor(controlled.context, host.guest) !== host.guestRevision) finishMusicHost(key);
@@ -1065,6 +1067,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 peerRevision: isGuest ? offer.hostRevision : offer.guestRevision } : {}) };
     }
 
+    function liveMusicHostActivity(lease) {
+        // Native WebJam normally checks every four seconds. An unreachable or
+        // crashed host must not authorize a new guest for the whole grant TTL.
+        return (musicHostActivity.get(lease) ?? -Infinity) + 15_000 > now();
+    }
+
     function currentMusicHost(lease) {
         const room = ch(lease.room), host = conns.get(lease.host), guest = conns.get(lease.guest);
         return !participationBroken && !stoppedMusicHosts.has(lease) && participationMusicOpen(room) && room.keepRef === lease.instance
@@ -1161,13 +1169,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!lease || !host || !guest || site && (guest.betaInviteVersion !== site.version || guest.expiresAt !== site.exp)) return denied();
         const role = native ? 'host' : 'guest', target = native ? lease : offer;
         const current = () => musicHosts.get(hostKey) === lease && currentMusicHost(lease)
-            && (native || musicInvites.get(lease.room) === offer && offer.state === 'handed' && offer.expires > now()
+            && (native || liveMusicHostActivity(lease) && musicInvites.get(lease.room) === offer && offer.state === 'handed' && offer.expires > now()
                 && (musicWork.get(offer.id)?.phase !== 'issued' || ch(lease.room).members.has(guest.id)));
         const close = () => {
             stoppedMusicHosts.add(lease);
             retireMusicWork(lease.id);
             const activeOffer = musicInvites.get(lease.room);
-            if (activeOffer?.hostLease === hostKey) retireMusicWork(activeOffer.id);
+            if (musicHosts.get(hostKey) === lease && activeOffer?.hostLease === hostKey) retireMusicWork(activeOffer.id);
             return controlledRun(finishMusicHost, [hostKey, true, lease], true);
         };
         if (op === 'stop' || op === 'native-stop') {
@@ -1186,6 +1194,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             try {
                 await authorize(() => true);
                 if (!current()) return denied();
+                if (native) musicHostActivity.set(lease, now());
                 return musicResponse(200, { expires: target.expires });
             } catch { return denied(); }
         }
@@ -1198,13 +1207,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         try {
             await authorize(() => true);
             const prepared = await musicProvider.prepare(claim, ip);
+            if (attempt.phase === 'retired') {
+                if (prepared?.status === 200) revokeMusicPermit(claim);
+                return denied();
+            }
             if (prepared?.status !== 200) {
                 await close();
                 return musicResponse(prepared?.status === 429 ? 429 : 503, { error: prepared?.status === 429 ? 'cap' : 'unavailable' });
-            }
-            if (attempt.phase === 'retired') {
-                revokeMusicPermit(claim);
-                return denied();
             }
             attempt.phase = 'prepared';
             const issued = await authorize(() => {
@@ -1218,6 +1227,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             await authorize(() => true);
             if (!current() || attempt.phase !== 'issuing') throw Error('music-issuance-ended');
             attempt.phase = 'issued';
+            if (native) musicHostActivity.set(lease, now());
             return musicResponse(200, native ? issued.credentials : { href: offer.href, credentials: issued.credentials });
         } catch {
             await close();
@@ -1326,7 +1336,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
         const requestKey = musicRequestKey(hostActor, frame.request);
         const hostLease = musicHosts.get(requestKey);
-        if (musicProvider && (!hostLease || !currentMusicHost(hostLease)
+        if (musicProvider && (!hostLease || !currentMusicHost(hostLease) || !liveMusicHostActivity(hostLease)
             || hostLease.host !== host.id || hostLease.guest !== guest.id || hostLease.instance !== room.keepRef
             || hostLease.webjam !== capability.webjam || hostLease.generation !== capability.generation
             || capability.expires > hostLease.expires || musicWork.get(hostLease.id)?.phase !== 'issued')) return result('unavailable');

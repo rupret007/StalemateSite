@@ -212,6 +212,17 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         expect(JSON.stringify(f.frames).includes('#k=')).toBe(false);
     });
 
+    it('refuses a handoff after the bound native host goes silent', async () => {
+        const f = await setupMusic();
+        await f.acceptMusic(); await f.waitHandoff();
+        f.advance(15_000);
+        expect((await f.access('check')).status).toBe(403);
+        expect((await f.access('join')).status).toBe(403);
+        expect(f.provider.issue.mock.calls.length).toBe(1);
+        expect((await f.native('native-stop')).status).toBe(200);
+        await vi.waitFor(() => expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role)).toEqual(['host']));
+    });
+
     it('retires issued provider results that return after native Stop', async () => {
         const f = await setupMusic();
         await f.acceptMusic(); await f.waitHandoff();
