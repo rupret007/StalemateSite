@@ -146,12 +146,29 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }
             await page.locator('[data-bob-toggle]').click();
             await expect(page.locator('body')).toHaveAttribute('data-shared-layout', 'paint');
             await page.locator('[data-consent-skip]').click();
-            if (viewport.width <= 820) await page.locator('[data-chat-toggle]').click();
+            const chat = page.getByRole('button', { name: 'Chat', exact: true });
+            if (viewport.width <= 820) await chat.click();
             await expect(composer).toBeVisible();
-            await composer.scrollIntoViewIfNeeded();
             await expect(composer).toBeInViewport({ ratio: 1 });
+            const send = page.getByRole('button', { name: 'Send', exact: true });
+            await expect(send).toBeInViewport({ ratio: 1 });
+            if (viewport.width <= 820) {
+                const dock = page.getByRole('group', { name: 'Call controls', exact: true });
+                await expect.poll(async () => {
+                    const [button, controls] = await Promise.all([send.boundingBox(), dock.boundingBox()]);
+                    return controls.y - button.y - button.height;
+                }).toBeGreaterThanOrEqual(0);
+            }
             await check(page, testInfo, 'paint-along-composer', samples);
             await page.screenshot({ path: testInfo.outputPath(`paint-chat-contrast-${viewport.width}.png`) });
+            await composer.fill('Ready to paint');
+            await send.click();
+            await expect(page.locator('[data-log]')).toContainText('Ready to paint');
+            if (viewport.width <= 820) {
+                await chat.click();
+                await expect(composer).toBeHidden();
+                await expect(page.locator('.watch .screen')).toBeInViewport({ ratio: 1 });
+            }
         } finally {
             await context.close();
         }

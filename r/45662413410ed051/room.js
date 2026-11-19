@@ -3186,6 +3186,10 @@
             ui.log.scrollTop = ui.log.scrollHeight;
             setMore(false);
         }
+        if (doc.body.classList.contains('bob-mode') && chatPhone.matches) {
+            if (open) ui.say.scrollIntoView({ block: 'nearest' });
+            else ui.room.scrollTop = 0;
+        }
     }
     ui.chatClose.hidden = false;
     ui.chatToggle.addEventListener('click', () =>
