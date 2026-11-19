@@ -694,3 +694,87 @@ test('capture arriving after Leave releases only its own tracks during the next 
   await expect.poll(() => page.evaluate(() => audioContexts.every(context => context.state === 'closed'))).toBe(true);
   expect(unexpected).toEqual([]);
 });
+
+// Exercises the packaged protected UI with an inert same-origin issuer and
+// inert session transport. Production cookie/room authority is tested against
+// the actual Worker and lobby in the SQLite authority suite.
+for (const outcome of ['quota refusal', 'revocation after joining']) {
+    test(`protected Music ${outcome} respects explicit audio join and capture ownership`, async ({ page, baseURL }) => {
+        const requests = [], external = [];
+        const grant = '9'.repeat(32), proof = '5'.repeat(64);
+        const expires = Math.floor(Date.now() / 1000) + 240;
+        let withdrawn = false;
+        await page.addInitScript(({ grant, proof }) => {
+            sessionStorage.setItem(`webjam-private-music-${grant}`, proof);
+            window.musicCapture = [];
+            Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
+                configurable: true,
+                value: async () => {
+                    const context = new AudioContext();
+                    const stream = context.createMediaStreamDestination().stream;
+                    const track = stream.getAudioTracks()[0];
+                    const stop = track.stop.bind(track);
+                    track.stop = () => { stop(); void context.close(); };
+                    window.musicCapture.push(track);
+                    return stream;
+                }
+            });
+        }, { grant, proof });
+        await page.route('**/*', async route => {
+            const url = new URL(route.request().url());
+            if (url.origin !== baseURL) { external.push(url.origin); return route.abort(); }
+            if (url.pathname === '/join/') {
+                const html = readFileSync(resolve(__dirname, '../../.beta-assets/join/index.html'), 'utf8');
+                return route.fulfill({ contentType: 'text/html', body: html.replace('<head>', '<head><meta name="private-music" content="required">') });
+            }
+            if (url.pathname === '/join/app.js') {
+                return route.fulfill({ path: resolve(__dirname, '../../.beta-assets/join/app.js'), contentType: 'text/javascript' });
+            }
+            if (url.pathname === '/join/session.js') return route.fulfill({ contentType: 'text/javascript', body: `
+                export class WebJoinSession {
+                    constructor({ stream, grantedCredentials }) {
+                        this.stream = stream;
+                        this.accessExpiresAt = grantedCredentials.expiresAt;
+                    }
+                    async join() { window.musicTransportOpen = true; }
+                    close() { for (const track of this.stream.getTracks()) track.stop(); window.musicTransportOpen = false; }
+                }
+            ` });
+            if (url.pathname !== '/beta/music') return route.continue();
+            const { op, id, proof: supplied } = route.request().postDataJSON();
+            requests.push({ op, matched: id === grant && supplied === proof });
+            if (op === 'join') {
+                if (outcome === 'quota refusal') return route.fulfill({ status: 429, json: { error: 'cap' } });
+                return route.fulfill({ json: {
+                    href: `${baseURL}/join/#k=${Buffer.alloc(32, 1).toString('base64url')}&s=${'2'.repeat(64)}&g=1&e=${expires}`,
+                    credentials: { client: 'web', ttl: 120, quota_bytes: 256 * 1024 * 1024, iceServers: [{
+                        urls: 'turn:turn.cloudflare.com:3478?transport=udp', username: 'fixture', credential: 'inert'
+                    }] }
+                } });
+            }
+            return route.fulfill({ status: op === 'check' && withdrawn ? 403 : 200, json: {} });
+        });
+        await page.goto(`/join/#m=${grant}&e=${expires}`);
+        await expect(page.locator('#status')).toContainText('Your host invited you');
+        expect(await page.evaluate(() => location.hash === '' && window.musicCapture.length === 0)).toBe(true);
+        expect(requests).toEqual([]);
+        await page.getByRole('button', { name: 'Skip check', exact: true }).click();
+        await page.getByRole('checkbox').check();
+        await page.getByRole('button', { name: 'Join with microphone', exact: true }).click();
+        if (outcome === 'quota refusal') {
+            await expect(page.locator('#status')).toHaveText('Web Join reached a usage limit.');
+            expect(await page.evaluate(() => window.musicCapture.length)).toBe(0);
+        } else {
+            const leave = page.getByRole('button', { name: 'Leave session', exact: true });
+            await expect(leave).toBeVisible();
+            await expect.poll(() => page.evaluate(() => window.musicTransportOpen === true && window.musicCapture[0]?.readyState === 'live')).toBe(true);
+            withdrawn = true;
+            await expect(leave).toBeHidden();
+            expect(await page.evaluate(() => window.musicTransportOpen === false && window.musicCapture[0]?.readyState === 'ended')).toBe(true);
+        }
+        await expect.poll(() => requests.filter(request => request.op === 'stop').length).toBe(1);
+        expect(requests.filter(request => request.op === 'join')).toEqual([{ op: 'join', matched: true }]);
+        expect(requests.every(request => request.matched)).toBe(true);
+        expect(external).toEqual([]);
+    });
+}

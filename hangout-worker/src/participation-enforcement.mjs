@@ -6,16 +6,22 @@ import { PARTICIPATION_AUDIENCE, resolveParticipation } from './participation-po
 const enc = new TextEncoder(), clone = value => structuredClone(value);
 const validIdentity = value => value && Object.keys(value).length === 3 && ['principalRef', 'communityRef', 'expiresAt'].every(key => Object.hasOwn(value, key))
     && [value.principalRef, value.communityRef].every(id => typeof id === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(id)) && Number.isSafeInteger(value.expiresAt);
+const revision = binding => binding ? JSON.stringify([binding.subjectRef, binding.subjectRevision,
+    binding.policyVersion, binding.policyRevision, binding.noticeDigest]) : '';
 const limits = Object.freeze({ connections: 256, checks: 2048, writes: 128, bytes: 16 * 1024 * 1024 });
 function selectedProviderRequest(request) {
     const value = { actorId: request?.actorId, action: request?.action,
         providerReady: request?.providerReady, publicTextEligible: request?.publicTextEligible,
-        ...(request?.peerId === undefined ? {} : { peerId: request.peerId }) };
+        ...(request?.peerId === undefined ? {} : { peerId: request.peerId }),
+        ...(request?.providerScope === undefined ? {} : { providerScope: request.providerScope }),
+        ...(request?.actorRevision === undefined ? {} : { actorRevision: request.actorRevision, peerRevision: request.peerRevision }) };
     // Public-text review and explicitly consented external-provider actions
     // use the same qualified start fence. Music may bind a peer so both
     // participants' current consent is rechecked at dispatch.
     if (typeof value.actorId !== 'string' || value.providerReady !== true) return null;
-    if (value.action === 'aiPublicReview' && value.publicTextEligible === true && value.peerId === undefined) return Object.freeze(value);
+    if (value.action === 'aiPublicReview' && value.publicTextEligible === true && value.peerId === undefined && value.providerScope === undefined) return Object.freeze(value);
+    if (value.providerScope !== undefined && (value.providerScope !== 'music' || !value.peerId
+        || typeof value.actorRevision !== 'string' || !value.actorRevision || typeof value.peerRevision !== 'string' || !value.peerRevision)) return null;
     if (value.action === 'externalProvider' && value.publicTextEligible === false
         && (value.peerId === undefined || typeof value.peerId === 'string' && value.peerId.length > 0 && value.peerId.length <= 128)) return Object.freeze(value);
     return null;
@@ -30,7 +36,7 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
     const check = (state, request, current = state.snapshot, at = now()) => {
         const index = state.connections.findIndex(c => c.id === request.actorId), other = state.connections.findIndex(c => c.id === request.peerId);
         if (!current?.ok || index < 0 || !state.bindings[index] || !current.subjects[index]) return false;
-        const safeguards = { available: true, quota: true, content: true, provider: request.providerReady === true && providerQualified(request.action) === true
+        const safeguards = { available: true, quota: true, content: true, provider: request.providerReady === true && providerQualified(request.action, request.providerScope) === true
             && (request.action !== 'aiPublicReview' && request.action !== 'externalProvider' || typeof dispatchStart === 'function') ? 'provider-ready' : 'off',
             publicTextEligible: request.publicTextEligible === true };
         const allowed = resolveParticipation({ action: request.action, now: at, policy: current.policy, subject: current.subjects[index], binding: state.bindings[index],
@@ -39,6 +45,10 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
             ...(['requestDirectContact', 'acceptDirectContact'].includes(request.action) ? { peer: { subject: current.subjects[other], binding: state.bindings[other] } } : {}) }).allowed;
         if (!allowed || request.action !== 'externalProvider' || request.peerId === undefined) return allowed;
         if (other < 0 || other === index || !state.bindings[other] || !current.subjects[other]) return false;
+        if (request.providerScope === 'music' && (request.actorRevision !== revision(state.bindings[index])
+            || request.peerRevision !== revision(state.bindings[other])
+            || ![index, other].every(slot => ['sendAudio', 'receiveMedia'].every(action =>
+                check(state, { actorId: state.connections[slot].id, action }, current, at))))) return false;
         const directContactAllowed = (actor, peer, action) => resolveParticipation({ action, now: at, policy: current.policy,
             subject: current.subjects[actor], binding: state.bindings[actor], authority: { global: true, room: true, actor: true },
             safeguards: { available: true, quota: true, content: true, provider: 'off', publicTextEligible: false },
@@ -46,7 +56,7 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
         const peerProviderAllowed = resolveParticipation({ action: 'externalProvider', now: at, policy: current.policy,
             subject: current.subjects[other], binding: state.bindings[other], authority: { global: true, room: true, actor: true },
             safeguards: { available: true, quota: true, content: true,
-                provider: providerQualified('externalProvider') === true && typeof dispatchStart === 'function' ? 'provider-ready' : 'off', publicTextEligible: false } }).allowed;
+                provider: providerQualified('externalProvider', request.providerScope) === true && typeof dispatchStart === 'function' ? 'provider-ready' : 'off', publicTextEligible: false } }).allowed;
         return peerProviderAllowed && directContactAllowed(index, other, 'requestDirectContact')
             && directContactAllowed(other, index, 'acceptDirectContact');
     };
@@ -123,7 +133,7 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
         },
         revisionFor(context, actorId) {
             const state = contexts.get(context), index = state?.connections.findIndex(c => c.id === actorId), binding = state?.bindings[index];
-            return binding ? JSON.stringify([binding.subjectRef, binding.subjectRevision, binding.policyVersion, binding.policyRevision, binding.noticeDigest]) : '';
+            return revision(binding);
         },
         async commit(context, effects, { costsOnly = false, transaction = operation => storage.transaction(operation) } = {}) {
             try {
@@ -200,6 +210,7 @@ export function createParticipationEnforcement({ storage, resolveConnection, res
             // ordering. Never run irreversible HTTP in a retryable transaction.
             return dispatchStart({
                 actorId,
+                ...(selected.providerScope === 'music' ? { peerId: selected.peerId } : {}),
                 validate: async tx => {
                     const current = await read(tx, state.identities);
                     const checked = [index, ...(peerIndex < 0 ? [] : [peerIndex])];

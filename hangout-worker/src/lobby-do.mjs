@@ -1,3 +1,4 @@
+import { MUSIC_INTERNAL_PATH, musicJson, musicResponse, privateMusicOrigin, stoppingMusic } from './private-music.mjs';
 import { sweepGameNightPasses } from './game-night-pass.mjs';
 // The #stalemate lobby Durable Object + its Worker-side admission. Everything that can be refused is refused here,
 // before a DO request is spent. Missing config/secrets => 503 (fail closed).
@@ -336,13 +337,24 @@ export class HangoutLobby {
         const participationStartOwner = this.participationMode ? {
             engine: null, authority: this.authority, failureToken: this.storageFailureToken
         } : null;
+        this.engine?.retireMusic();
+        const musicOrigin = privateMusicOrigin(env);
+        const musicProvider = musicOrigin ? {
+            origin: musicOrigin,
+            prepare: (claim, ip) => env.WEBJAM_PRIVATE_MUSIC.prepare(claim, ip),
+            issue: (claim, confirm) => env.WEBJAM_PRIVATE_MUSIC.issue(claim, confirm),
+            touch: claim => env.WEBJAM_PRIVATE_MUSIC.touch(claim),
+            revoke: claim => env.WEBJAM_PRIVATE_MUSIC.revoke(claim),
+            keepAlive: task => this.state.waitUntil?.(task)
+        } : null;
         this.engine = createLobby({
+            musicProvider,
             incidentSources: !!this.incidentSourceMode,
             gameNight: env.HANGOUT_BETA_MODE === 'protected',
             directMusicInvites: env.HANGOUT_BETA_MODE === 'protected',
             webJamChess: gameRoomGrantsEnabled(env) && arcadeEnabled(env, 'chess'),
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
-            ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority,
+            ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority, musicProvider,
                 dispatchStart: request => this.dispatchParticipationStart(request, participationStartOwner) }) } : {}),
             deferPresence: marker => this.presence.mark(marker),
             aiModerationStatus: () => ({ ...this.aiModerator.status(), requested: eligibility.requested,
@@ -550,22 +562,30 @@ export class HangoutLobby {
         const denied = () => Error('participation-denied');
         if (!request || typeof request !== 'object' || this.usedParticipationStarts.has(request)) throw denied();
         this.usedParticipationStarts.add(request);
-        const fields = Object.getOwnPropertyDescriptors(request), keys = ['actorId', 'validate', 'start'];
+        const fields = Object.getOwnPropertyDescriptors(request);
+        const hasPeer = Object.hasOwn(fields, 'peerId');
+        const keys = ['actorId', 'validate', 'start', ...(hasPeer ? ['peerId'] : [])];
         if (Object.keys(fields).length !== keys.length || keys.some(key => !Object.hasOwn(fields[key] || {}, 'value'))) throw denied();
-        const actorId = fields.actorId.value, validate = fields.validate.value, start = fields.start.value;
-        if (typeof actorId !== 'string' || !actorId || actorId.length > 128 || typeof validate !== 'function' || typeof start !== 'function') throw denied();
+        const actorId = fields.actorId.value, peerId = fields.peerId?.value, validate = fields.validate.value, start = fields.start.value;
+        const validId = id => typeof id === 'string' && id.length > 0 && id.length <= 128;
+        if (!validId(actorId) || hasPeer && (!validId(peerId) || peerId === actorId)
+            || typeof validate !== 'function' || typeof start !== 'function') throw denied();
         await this.ready;
-        const socket = this.byId(actorId), binding = this.liveBindings.get(actorId);
+        const participants = (hasPeer ? [actorId, peerId] : [actorId]).map(id => ({
+            id, socket: this.byId(id), binding: this.liveBindings.get(id)
+        }));
         const current = () => {
             try {
                 if (!owner || owner !== this.participationStartOwner || owner.engine !== this.engine || owner.authority !== this.authority
                     || owner.failureToken !== this.storageFailureToken || !this.authorityMode || !this.participationMode
                     || !lobbyAuthorityMode(this.env) || !lobbyParticipationMode(this.env) || this.authorityUnavailable !== false
-                    || this.evidenceStorage !== 'ready' || !socket || !binding || this.byId(actorId) !== socket
-                    || this.liveBindings.get(actorId) !== binding || this.closedSockets.has(socket)
-                    || socket.readyState !== undefined && socket.readyState !== 1) return false;
-                const attachment = socket.deserializeAttachment() || {};
-                return attachment.id === actorId && !socketIdentityInvalid(attachment, this.env) && this.bindingLive(attachment);
+                    || this.evidenceStorage !== 'ready') return false;
+                return participants.every(({ id, socket, binding }) => {
+                    if (!socket || !binding || this.byId(id) !== socket || this.liveBindings.get(id) !== binding || this.closedSockets.has(socket)
+                        || socket.readyState !== undefined && socket.readyState !== 1) return false;
+                    const attachment = socket.deserializeAttachment() || {};
+                    return attachment.id === id && !socketIdentityInvalid(attachment, this.env) && this.bindingLive(attachment);
+                });
             } catch { return false; }
         };
         if (!current()) throw denied();
@@ -846,6 +866,7 @@ export class HangoutLobby {
     storageFailed() {
         this.storageFailureToken = {};
         this.evidenceStorage = 'degraded';
+        this.engine?.retireMusic();
         this.engine?.notifyAiStatus();
     }
     persistState(key, value) {
@@ -973,6 +994,16 @@ export class HangoutLobby {
         await this.ready;
         const { pathname: path, searchParams } = new URL(request.url);
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
+        if (path === MUSIC_INTERNAL_PATH) {
+            if (!privateMusicOrigin(this.env) || request.method !== 'POST' || searchParams.size || !this.engine)
+                return musicResponse(503, { error: 'unavailable' });
+            const body = await musicJson(request);
+            if ((this.authorityUnavailable || this.evidenceStorage !== 'ready') && !stoppingMusic(body?.op))
+                return musicResponse(503, { error: 'unavailable' });
+            let site;
+            try { site = JSON.parse(request.headers.get('X-Hangout-Music-Session')); } catch { return musicResponse(403, { error: 'unavailable' }); }
+            return this.engine.musicAccess(body, site, request.headers.get('CF-Connecting-IP'));
+        }
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
         const roomGrant = path.startsWith(GAME_ROOM_GRANT_PATH + '/');
         if ((roomGrant || path.startsWith(GAME_INVITATION_PATH + '/')) && request.method === 'POST') {
