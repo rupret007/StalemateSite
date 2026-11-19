@@ -362,6 +362,7 @@ body:is(.bob-mode,.shared-layout) .react-float{bottom:calc(var(--bar-h) + 16px)}
     /* Keep room for the composer without shrinking the lesson or touch targets. */
     body.bob-mode:not(.chat-closed) .room{row-gap:4px}
     body.bob-mode:not(.chat-closed) .chat{padding-block:6px}
+    body.bob-mode:not(.chat-closed) .chat .log{min-height:2rem}
     body.bob-mode:not(.chat-closed) .chat .say{margin-top:4px}
     body.bob-mode:not(.chat-closed) .call .tiles .tile{height:90px}
 }

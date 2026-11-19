@@ -363,6 +363,12 @@ test('the Paint Along stage stays fully visible above two live tiles and open ch
             const composer = await host.locator('[data-say]').boundingBox();
             const dock = await host.getByRole('group', { name: 'Call controls', exact: true }).boundingBox();
             expect(composer.y + composer.height).toBeLessThanOrEqual(dock.y);
+            if (size.height === 657) {
+                await host.getByRole('textbox', { name: 'Message', exact: true }).fill('Ready to paint along. I can see the lesson and everyone in the room.');
+                await host.getByRole('button', { name: 'Send', exact: true }).click();
+                await expect(host.locator('[data-log]')).toContainText('I can see the lesson');
+                await expectPhoneStage(host);
+            }
             await host.screenshot({ path: test.info().outputPath(`paint-stage-chat-${size.width}x${size.height}.png`) });
             if (size.width === 390) await saveShot(host, 'paint-along-two-tiles.png');
             await host.locator('[data-chat-toggle]').click();
