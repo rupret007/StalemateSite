@@ -760,6 +760,15 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     await originalLink.close();
                     await guest.reload();
                     await expect(guest.locator('[data-chess-status]')).toHaveText('You’re Black · Your turn');
+                    // A restored board snapshot alone does not prove that
+                    // the phone can still play from the original seat.
+                    await tapSquare(guest, 'e7');
+                    await expect(guest.locator('[data-square="e5"]')).toHaveAttribute('data-legal', '');
+                    await tapSquare(guest, 'e5');
+                    await expect(host.getByRole('button', { name: 'e5, Black pawn' })).toBeAttached();
+                    await expect(guest.getByRole('button', { name: 'e5, Black pawn' })).toBeInViewport();
+                    await captureArcadeInvite(guest, viewport, 'first-visit-03-resumed-move');
+                    console.log(`Passed ${engine} 390x844 protected Chess guest plays from the restored seat; host sees the move.`);
                     await host.getByRole('button', { name: 'Leave match', exact: true }).click();
                     await host.getByRole('dialog', { name: 'Leave match?' }).getByRole('button', { name: 'Leave match', exact: true }).click();
                     await expect(host.getByRole('button', { name: 'Open Chess match', exact: true })).toBeVisible();
@@ -799,6 +808,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                     // Select and move only from the guest's own board.
                     await tapSquare(guest, 'e5', phone);
                     await expect(host.getByRole('button', { name: 'e5, Black pawn' })).toBeAttached();
+                    await captureArcadeInvite(guest, viewport, 'first-visit-03-guest-move');
                     await expect.poll(() => guest.evaluate(() => window.gameAudioCues)).toBeGreaterThan(0);
                     await sound.click();
                     await expect(sound).toHaveAttribute('aria-pressed', 'false');
