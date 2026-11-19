@@ -1075,7 +1075,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function bindMusicHost(host, frame) {
         if (!musicProvider || frame.version !== 1 || !validPmRef(frame.request) || !musicDigest(frame.proofHash)
-            || !musicDigest(frame.webjam) || !Number.isInteger(frame.generation) || frame.generation < 1 || frame.generation > 0xffffffff
+            || !musicDigest(frame.webjam) || !frame.webjam.startsWith('776a6d7573696301') || !Number.isInteger(frame.generation) || frame.generation < 1 || frame.generation > 0xffffffff
             || Object.keys(frame).some(key => !['t', 'version', 'request', 'ch', 'roomInstance', 'peer', 'proofHash', 'webjam', 'generation'].includes(key))) return;
         const room = participationMusicRoom(frame), guest = typeof frame.peer === 'string' && conns.get(frame.peer);
         const hostActor = musicActor(host), guestActor = musicActor(guest);
@@ -1135,7 +1135,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (native) {
             const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body.proof))),
                 byte => byte.toString(16).padStart(2, '0')).join('');
-            const match = [...musicHosts].find(([, value]) => value.request === id && value.proofHash === hash);
+            const match = [...musicHosts].find(([, value]) => value.webjam.slice(-32) === id && value.proofHash === hash);
             if (!match) return denied();
             [hostKey, lease] = match;
         } else {
