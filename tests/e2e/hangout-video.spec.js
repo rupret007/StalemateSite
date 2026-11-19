@@ -1415,3 +1415,38 @@ test('iOS lock under the gesture rule: devices stay on, one tap restores camera 
     ({ browser }, testInfo) => exerciseMediaResume(browser, testInfo, PHONE_OPTS.viewport));
 test('iOS lock under the gesture rule at 375px: one tap restores camera and mic above the tiles',
     ({ browser }, testInfo) => exerciseMediaResume(browser, testInfo, { width: 375, height: 667 }));
+
+test('iOS lock with the camera off offers to resume the mic at 390px', async ({ browser }, testInfo) => {
+    const guest = await openBrowser(browser, PHONE_OPTS);
+    await join(guest, roomUrl(), 'MicOnlyGuest');
+    await micOn(guest);
+    await expectOrdinaryMediaLabel(guest, 'video', false);
+    await guest.evaluate(armIosGestureMedia);
+    await guest.evaluate(() => {
+        const audio = window.__hangout.av.stream.getAudioTracks()[0];
+        window.__stoppedAudioId = audio.id;
+        let visible = 'hidden';
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visible });
+        document.dispatchEvent(new Event('visibilitychange'));
+        audio.stop();
+        visible = 'visible';
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    const resume = await expectResumeAboveTiles(guest);
+    await expect(resume).toHaveAccessibleName('Tap to resume mic');
+    await guest.screenshot({ path: testInfo.outputPath('media-resume-mic-only-390.png') });
+    await resume.click();
+    await expect.poll(() => guest.evaluate(() => {
+        const { av } = window.__hangout;
+        const audio = av.stream.getAudioTracks()[0];
+        return Boolean(audio && audio.readyState === 'live' && audio.id !== window.__stoppedAudioId);
+    })).toBe(true);
+    await expect(resume).toBeHidden();
+    await expectOrdinaryMediaLabel(guest, 'audio', true);
+    await expectOrdinaryMediaLabel(guest, 'video', false);
+    expect(await guest.evaluate(() => window.__gumLog.filter(entry => entry.gesture))).toEqual([
+        { gesture: true, video: false, audio: true }
+    ]);
+    expect(guest.errors).toEqual([]);
+});

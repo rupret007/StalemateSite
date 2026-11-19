@@ -1657,6 +1657,8 @@
         if (!needsTap && doc.activeElement === ui.avResume && !ui.room.hidden) {
             ui.callControls.focus({ preventScroll: true });
         }
+        const label = avResumeWhy.audio && !avResumeWhy.video ? 'Tap to resume mic' : 'Tap to resume video';
+        if (needsTap && ui.avResume.textContent !== label) ui.avResume.textContent = label;
         ui.avResume.hidden = !needsTap;
     }
     function showAvResume(on) { avResumeWhy.playback = Boolean(on); paintAvResume(); }
