@@ -1070,7 +1070,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return !participationBroken && !stoppedMusicHosts.has(lease.id) && participationMusicOpen(room) && room.keepRef === lease.instance
             && lease.expires > now() && host?.expiresAt > now() && guest?.expiresAt > now()
             && musicActor(host) === lease.hostActor && musicActor(guest) === lease.guestActor
-            && canInviteMusic(host, guest, room);
+            && canInviteMusic(host, guest, room)
+            && (isBand(guest) || owns(guest, room) || !(banned(room.bans, guest) || (room.kicks[guest.dev] || 0) > now()));
     }
 
     function bindMusicHost(host, frame) {
@@ -1129,14 +1130,16 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const { op, id } = body;
         const native = ['native-check', 'native-join', 'native-stop'].includes(op);
         if (!site && !native || site && native) return denied();
-        if (native && (!musicRef(id) || !musicDigest(body.proof) || Object.keys(body).length !== 3)
+        if (native && (!musicRef(id) || !musicDigest(body.proof) || !musicDigest(body.webjam) || !Number.isInteger(body.generation)
+            || Object.keys(body).length !== 5)
             || !native && op !== 'page' && (!musicRef(id) || Object.keys(body).length !== 2)) return denied();
 
         let hostKey, lease, offer;
         if (native) {
             const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body.proof))),
                 byte => byte.toString(16).padStart(2, '0')).join('');
-            const match = [...musicHosts].find(([, value]) => value.webjam.slice(-32) === id && value.proofHash === hash);
+            const match = [...musicHosts].find(([, value]) => value.webjam.slice(-32) === id && value.webjam === body.webjam
+                && value.generation === body.generation && value.proofHash === hash);
             if (!match) return denied();
             [hostKey, lease] = match;
         } else {
@@ -1350,7 +1353,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const validCurrentOffer = () => musicInvites.get(room.name) === offer && offer.state === 'accepting'
             && now() < offer.expires && room.keepRef === offer.instance && ch(room.name) === room
             && participationMusicOpen(room)
-            && conns.get(host.id) === host && conns.get(guest.id) === guest && room.members.has(host.id) && room.members.has(guest.id)
+            && conns.get(host.id) === host && conns.get(guest.id) === guest && room.members.has(host.id) && (musicProvider || room.members.has(guest.id))
             && canInviteMusic(host, guest, room) && offer.hostActor === musicActor(host) && offer.guestActor === musicActor(guest)
             && participation.revisionFor(context, host.id) === offer.hostRevision
             && participation.revisionFor(context, guest.id) === offer.guestRevision;
