@@ -1126,7 +1126,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const denied = () => musicResponse(403, { error: 'unavailable' });
         if (!musicProvider || !body || participationBroken) return denied();
         const { op, id } = body;
-        const native = op === 'native-join' || op === 'native-stop';
+        const native = ['native-check', 'native-join', 'native-stop'].includes(op);
         if (!site && !native || site && native) return denied();
         if (native && (!musicRef(id) || !musicDigest(body.proof) || Object.keys(body).length !== 3)
             || !native && op !== 'page' && (!musicRef(id) || Object.keys(body).length !== 2)) return denied();
@@ -1172,11 +1172,11 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 return start();
             });
         };
-        if (op === 'page' || op === 'check') {
+        if (op === 'page' || op === 'check' || op === 'native-check') {
             try {
                 await authorize(() => true);
                 if (!current()) return denied();
-                return musicResponse(200, { expires: offer.expires });
+                return musicResponse(200, { expires: target.expires });
             } catch { return denied(); }
         }
         if (musicWork.has(target.id) || musicWork.size >= 256) return denied();
@@ -1195,7 +1195,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const issued = await authorize(() => {
                 if (attempt.phase !== 'preparing') throw Error('participation-denied');
                 attempt.phase = 'issuing';
-                return musicProvider.issue(claim);
+                return musicProvider.issue(claim, () => authorize(() => attempt.phase === 'issuing'));
             });
             if (issued?.status !== 200 || !issued.credentials || attempt.phase !== 'issuing') throw Error('music-issuance-ended');
             await authorize(() => true);

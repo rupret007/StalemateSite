@@ -448,6 +448,19 @@ async function betaRequest(request, env, deps = {}) {
         const asset = await env.ASSETS.fetch(new Request(`${url.origin}${ROOT}entry-sites.mjs`));
         return reply(asset.body, asset.status, 'text/javascript');
     }
+    if (url.pathname === MUSIC_PATH || url.pathname === MUSIC_PATH + '/native') {
+        const native = url.pathname.endsWith('/native');
+        if (privateMusicOrigin(env) !== url.origin || url.search || request.method !== 'POST'
+            || (native ? request.headers.has('Origin') || request.headers.has('Cookie') : !sameOrigin(request)))
+            return musicResponse(403, { error: 'unavailable' });
+        const body = await musicJson(request);
+        if (!body || !(native ? ['native-check', 'native-join', 'native-stop'] : ['join', 'check', 'stop']).includes(body.op))
+            return musicResponse(403, { error: 'unavailable' });
+        const session = native ? null : await betaSession(request, env);
+        if (!native && (!session || session.access.scope === 'game-night')) return musicResponse(403, { error: 'unavailable' });
+        try { return await musicLobby(env, body, session, request.headers.get('CF-Connecting-IP')); }
+        catch { return musicResponse(503, { error: 'unavailable' }); }
+    }
     if (request.method === 'POST' && url.pathname.startsWith('/beta/') && !arcadePath(url.pathname) && !mediaPath(url.pathname)) {
         if (!sameOrigin(request) || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')) return json({ error: 'Same-origin JSON request required.' }, 403);
         if (Number(request.headers.get('Content-Length') || 0) > 2048) return json({ error: 'Request too large.' }, 413);
@@ -487,19 +500,6 @@ async function betaRequest(request, env, deps = {}) {
             return result;
         }
         return json({ error: 'Unknown request.' }, 404);
-    }
-    if (url.pathname === MUSIC_PATH || url.pathname === MUSIC_PATH + '/native') {
-        const native = url.pathname.endsWith('/native');
-        if (privateMusicOrigin(env) !== url.origin || url.search || request.method !== 'POST'
-            || (native ? request.headers.has('Origin') || request.headers.has('Cookie') : !sameOrigin(request)))
-            return musicResponse(403, { error: 'unavailable' });
-        const body = await musicJson(request);
-        if (!body || !(native ? ['native-join', 'native-stop'] : ['join', 'check', 'stop']).includes(body.op))
-            return musicResponse(403, { error: 'unavailable' });
-        const session = native ? null : await betaSession(request, env);
-        if (!native && (!session || session.access.scope === 'game-night')) return musicResponse(403, { error: 'unavailable' });
-        try { return await musicLobby(env, body, session, request.headers.get('CF-Connecting-IP')); }
-        catch { return musicResponse(503, { error: 'unavailable' }); }
     }
     const gameGuestRequested = url.searchParams.get('game-guest') === '1';
     const gameGuestsAvailable = gameGuestEnabled(env);

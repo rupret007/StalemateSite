@@ -342,7 +342,7 @@ export class HangoutLobby {
         const musicProvider = musicOrigin ? {
             origin: musicOrigin,
             prepare: (claim, ip) => env.WEBJAM_PRIVATE_MUSIC.prepare(claim, ip),
-            issue: claim => env.WEBJAM_PRIVATE_MUSIC.issue(claim),
+            issue: (claim, confirm) => env.WEBJAM_PRIVATE_MUSIC.issue(claim, confirm),
             revoke: claim => env.WEBJAM_PRIVATE_MUSIC.revoke(claim),
             keepAlive: task => this.state.waitUntil?.(task)
         } : null;
