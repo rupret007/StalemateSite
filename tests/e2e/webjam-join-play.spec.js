@@ -723,8 +723,11 @@ for (const outcome of ['quota refusal', 'revocation after joining']) {
             const url = new URL(route.request().url());
             if (url.origin !== baseURL) { external.push(url.origin); return route.abort(); }
             if (url.pathname === '/join/') {
-                const response = await route.fetch();
-                return route.fulfill({ response, body: (await response.text()).replace('<head>', '<head><meta name="private-music" content="required">') });
+                const html = readFileSync(resolve(__dirname, '../../.beta-assets/join/index.html'), 'utf8');
+                return route.fulfill({ contentType: 'text/html', body: html.replace('<head>', '<head><meta name="private-music" content="required">') });
+            }
+            if (url.pathname === '/join/app.js') {
+                return route.fulfill({ path: resolve(__dirname, '../../.beta-assets/join/app.js'), contentType: 'text/javascript' });
             }
             if (url.pathname === '/join/session.js') return route.fulfill({ contentType: 'text/javascript', body: `
                 export class WebJoinSession {
