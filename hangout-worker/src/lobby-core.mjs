@@ -1100,14 +1100,19 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         result('bound');
     }
 
+    function revokeMusicPermit(claim) {
+        const cleanup = Promise.resolve().then(() => musicProvider.revoke(claim)).catch(() => {});
+        musicProvider.keepAlive(cleanup);
+    }
+
     function retireMusicWork(id) {
         const attempt = musicWork.get(id);
         if (!attempt || attempt.phase === 'retired') return;
+        // Prepare consumes quota before publishing its permit. A denial or
+        // pending prepare must not create an uncharged issuer tombstone.
+        const owned = attempt.phase !== 'preparing';
         attempt.phase = 'retired';
-        // A pending generation is also revoked. The issuer owns late results
-        // and retains cleanup state independently of any browser capture.
-        const cleanup = Promise.resolve().then(() => musicProvider.revoke(attempt.claim)).catch(() => {});
-        musicProvider.keepAlive(cleanup);
+        if (owned) revokeMusicPermit(attempt.claim);
     }
 
     function finishMusicHost(key, finishOffer = true, expected = null) {
@@ -1196,8 +1201,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 await close();
                 return musicResponse(prepared?.status === 429 ? 429 : 503, { error: prepared?.status === 429 ? 'cap' : 'unavailable' });
             }
+            if (attempt.phase === 'retired') {
+                revokeMusicPermit(claim);
+                return denied();
+            }
+            attempt.phase = 'prepared';
             const issued = await authorize(() => {
-                if (attempt.phase !== 'preparing') throw Error('participation-denied');
+                if (attempt.phase !== 'prepared') throw Error('participation-denied');
                 attempt.phase = 'issuing';
                 return musicProvider.issue(claim, () => authorize(() => attempt.phase === 'issuing'));
             });
