@@ -427,8 +427,9 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 assert.equal(await guest.evaluate(() => window.gameAudioContexts), 0, 'opening the invite does not unlock sound');
                 const joiningAudio = [];
                 await guest.exposeFunction('recordJoinAudio', sample => { joiningAudio.push(sample); });
-                await guest.evaluate(() => document.querySelector('[data-guest-join]').addEventListener('click', () =>
-                    window.recordJoinAudio({ contexts: window.gameAudioContexts, cues: window.gameAudioCues })));
+                // Observe the submission on the same container as the app, after its synchronous audio unlock.
+                await guest.evaluate(() => document.querySelector('[data-guest-invite]').addEventListener('submit', event =>
+                    window.recordJoinAudio({ trusted: event.isTrusted, contexts: window.gameAudioContexts, cues: window.gameAudioCues })));
                 await captureArcadeInvite(guest, viewport, 'first-visit-01-guest-accept');
                 await reopenGameNight(host, viewport, phone);
                 const join = guest.getByRole('button', { name: 'Join game', exact: true });
@@ -517,7 +518,8 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
                 if (phone) assert.equal(interruptedJoin, true, 'the phone automatically retries its first Join on a new socket');
                 await expect(guest.locator('[data-game-guest-connecting]')).toBeHidden();
                 await expect(guest.locator('details.arcade-chess > summary')).toBeFocused();
-                assert.deepEqual(joiningAudio, [{ contexts: 1, cues: 0 }], 'Join unlocks without playing a cue');
+                assert.deepEqual(joiningAudio, [{ trusted: true, contexts: 1, cues: 0 }],
+                    'A trusted Join submission unlocks without playing a cue');
                 const pieces = guest.locator('.arcade-chess [data-square] img');
                 await expect(pieces).toHaveCount(32);
                 await expect(pieces.first()).toBeVisible();
