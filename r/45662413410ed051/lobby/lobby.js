@@ -2388,7 +2388,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         let hrefOrigin = '';
         try { hrefOrigin = new URL(frame.href).origin; } catch { /* invalid invitation below */ }
         if (frame.expires !== offer.expires || hrefOrigin !== offer.origin || musicInviteDeadline(frame.href, privateMusicProviderSupported ? offer.id : '') !== offer.expires
-            || jam?.keepRef !== offer.instance || !jam.names?.some(n => n.nick === app.me) || jam.kind !== 'jam'
+            || !privateMusicProviderSupported && (jam?.keepRef !== offer.instance || !jam.names?.some(n => n.nick === app.me) || jam.kind !== 'jam')
             || offer.expires <= Date.now() || !offer.pendingWindow || offer.pendingWindow.closed) return endMusicInvite();
         const popup = offer.pendingWindow;
         try { popup.location.replace(frame.href); }
@@ -2396,7 +2396,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         offer.pendingWindow = null;
         clearTimeout(offer.replyTimer);
         offer.state = 'accepted';
-        if (app.active !== jam.name) switchTo(jam.name);
+        if (jam && app.active !== jam.name) switchTo(jam.name);
         drawMusicInvite();
     }
 
