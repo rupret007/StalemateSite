@@ -1,3 +1,4 @@
+import { MUSIC_INTERNAL_PATH, MUSIC_PATH, musicJson, musicResponse, privateMusicOrigin } from './private-music.mjs';
 import { validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
 // Invitation-only real visitor beta. Never imports the pilot's role selector or synthetic emails.
 import worker, { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } from './index.mjs';
@@ -388,6 +389,16 @@ async function checkTurnstile(request, env, url, deps) {
     } catch { return false; }
 }
 
+function musicLobby(env, body, session, ip = '') {
+    const access = session?.access;
+    return env.LOBBY.get(env.LOBBY.idFromName('stalemate')).fetch(new Request('https://lobby' + MUSIC_INTERNAL_PATH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Hangout-Music-Session': JSON.stringify(access
+            ? { sid: access.sid, version: access.version, exp: access.exp } : null), 'CF-Connecting-IP': ip || '' },
+        body: JSON.stringify(body)
+    }));
+}
+
 async function betaRequest(request, env, deps = {}) {
     const url = new URL(request.url);
     const help = await publicBetaHelp(request, env);
@@ -476,6 +487,19 @@ async function betaRequest(request, env, deps = {}) {
             return result;
         }
         return json({ error: 'Unknown request.' }, 404);
+    }
+    if (url.pathname === MUSIC_PATH || url.pathname === MUSIC_PATH + '/native') {
+        const native = url.pathname.endsWith('/native');
+        if (privateMusicOrigin(env) !== url.origin || url.search || request.method !== 'POST'
+            || (native ? request.headers.has('Origin') || request.headers.has('Cookie') : !sameOrigin(request)))
+            return musicResponse(403, { error: 'unavailable' });
+        const body = await musicJson(request);
+        if (!body || !(native ? ['native-join', 'native-stop'] : ['join', 'check', 'stop']).includes(body.op))
+            return musicResponse(403, { error: 'unavailable' });
+        const session = native ? null : await betaSession(request, env);
+        if (!native && (!session || session.access.scope === 'game-night')) return musicResponse(403, { error: 'unavailable' });
+        try { return await musicLobby(env, body, session, request.headers.get('CF-Connecting-IP')); }
+        catch { return musicResponse(503, { error: 'unavailable' }); }
     }
     const gameGuestRequested = url.searchParams.get('game-guest') === '1';
     const gameGuestsAvailable = gameGuestEnabled(env);
@@ -602,15 +626,28 @@ async function betaRequest(request, env, deps = {}) {
         return worker.fetch(next, { ...env, HANGOUT_EXTRA_ORIGINS: url.origin });
     }
     if ((assetPath === `${ROOT}admin` || assetPath.startsWith(`${ROOT}admin/`)) && session.identity?.kind !== 'staff') return reply('Restricted moderator sign-in required.', 403);
-    if (lobbyParticipationMode(env) && (assetPath === '/join' || assetPath.startsWith('/join/'))) return reply('This audio path is unavailable under the current participation permissions.', 503);
+    const webJoin = assetPath === '/join' || assetPath.startsWith('/join/');
+    const protectedMusic = webJoin && lobbyParticipationMode(env);
+    const musicHandoff = ['/join/handoff.html', '/join/handoff.js'].includes(assetPath);
+    if (protectedMusic) {
+        if (privateMusicOrigin(env) !== url.origin) return reply('This audio path is unavailable under the current participation permissions.', 503);
+        if (url.search) return reply('Open a current Music invitation from your Jam room.', 403);
+        if (!musicHandoff) {
+            let access;
+            try { access = await musicLobby(env, { op: 'page' }, session); } catch { /* Deny on failed authority read. */ }
+            if (access?.status !== 200) return reply('Open a current Music invitation from your Jam room.', 403);
+        }
+    }
     if (!['GET', 'HEAD'].includes(request.method)) return reply('Method not allowed.', 405);
     const asset = await env.ASSETS.fetch(request);
-    if (assetPath === '/join' || assetPath.startsWith('/join/')) {
-        // Web Join is a separate opt-in audio client. Keep its stricter policy
-        // and omit the chat bootstrap; invitation admission above still applies.
-        const result = new Response(asset.body, asset);
+    if (webJoin) {
+        // The participation page uses the protected issuer through this site.
+        const content = protectedMusic && !musicHandoff && request.method === 'GET' && asset.headers.get('Content-Type')?.includes('text/html')
+            ? (await asset.text()).replace('<head>', '<head><meta name="private-music" content="required">')
+            : asset.body;
+        const result = new Response(content, asset);
+        if (typeof content === 'string') result.headers.delete('Content-Length');
         for (const [key, value] of Object.entries(headers)) result.headers.set(key, value);
-        const musicHandoff = assetPath === '/join/handoff.html' || assetPath === '/join/handoff.js';
         result.headers.set('Content-Security-Policy', musicHandoff ? MUSIC_HANDOFF_CSP : WEB_JOIN_CSP);
         result.headers.set('Permissions-Policy', musicHandoff ? 'camera=(), geolocation=(), microphone=()' : 'camera=(), geolocation=(), microphone=(self)');
         return result;
