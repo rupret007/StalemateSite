@@ -1646,13 +1646,21 @@
     });
 
     // The button stays up while remote playback or the local camera/mic still needs a tap.
-    const localMediaTapHint = 'Tap the resume button to bring your camera or mic back.';
+    let localMediaTapHint = '';
     const avResumeWhy = { playback: false, video: false, audio: false };
+    function paintLocalMediaTapHint() {
+        const { audio, video } = avResumeWhy;
+        const devices = [video && 'camera', audio && 'mic'].filter(Boolean);
+        const target = devices.length > 1 ? 'them' : 'it';
+        localMediaTapHint = devices.length
+            ? `Your ${devices.join(' and ')} paused. Use the resume button to bring ${target} back.` : '';
+        if (ui.status.textContent !== localMediaTapHint) say(localMediaTapHint);
+    }
     function paintAvResume() {
         if (!app.av.cam || app.av.screen) avResumeWhy.video = false;
         if (!app.av.mic) avResumeWhy.audio = false;
         const capturePaused = avResumeWhy.video || avResumeWhy.audio;
-        if (!capturePaused && ui.status.textContent === localMediaTapHint) say('');
+        if (localMediaTapHint && ui.status.textContent === localMediaTapHint) paintLocalMediaTapHint();
         const needsTap = avResumeWhy.playback || capturePaused;
         if (!needsTap && doc.activeElement === ui.avResume && !ui.room.hidden) {
             ui.callControls.focus({ preventScroll: true });
@@ -2918,7 +2926,7 @@
         }
         if (playJob) await playJob;
         else if (doc.visibilityState === 'visible') await resumeRemotePlayback();
-        if (!busyCam && !busyMic && (avResumeWhy.video || avResumeWhy.audio)) say(localMediaTapHint);
+        if (!busyCam && !busyMic && (avResumeWhy.video || avResumeWhy.audio)) paintLocalMediaTapHint();
         layout();
     }
     async function resumeRemotePlayback() {

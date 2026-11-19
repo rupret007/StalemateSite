@@ -1355,7 +1355,7 @@ async function exerciseMediaResume(browser, testInfo, viewport) {
     // The automatic re-acquire was refused, so the page asks for a tap and keeps both devices on.
     await expectResumeAboveTiles(guest);
     const status = guest.locator('[data-status]');
-    await expect(status).toHaveText(/bring your camera .* mic back\./);
+    await expect(status).toHaveText('Your camera and mic paused. Use the resume button to bring them back.');
     const pausedHint = await status.textContent();
     await guest.screenshot({ path: testInfo.outputPath(`media-resume-call-${viewport.width}.png`) });
     await expect.poll(() => guest.evaluate(() => window.__gumLog.filter((entry) => !entry.gesture).length)).toBeGreaterThan(0);
@@ -1435,6 +1435,8 @@ test('iOS lock with the camera off offers to resume the mic at 390px', async ({ 
 
     const resume = await expectResumeAboveTiles(guest);
     await expect(resume).toHaveAccessibleName('Tap to resume mic');
+    const status = guest.locator('[data-status]');
+    await expect(status).toHaveText('Your mic paused. Use the resume button to bring it back.');
     await guest.screenshot({ path: testInfo.outputPath('media-resume-mic-only-390.png') });
     await resume.click();
     await expect.poll(() => guest.evaluate(() => {
@@ -1443,6 +1445,7 @@ test('iOS lock with the camera off offers to resume the mic at 390px', async ({ 
         return Boolean(audio && audio.readyState === 'live' && audio.id !== window.__stoppedAudioId);
     })).toBe(true);
     await expect(resume).toBeHidden();
+    await expect(status).not.toContainText('Your mic paused.');
     await expectOrdinaryMediaLabel(guest, 'audio', true);
     await expectOrdinaryMediaLabel(guest, 'video', false);
     expect(await guest.evaluate(() => window.__gumLog.filter(entry => entry.gesture))).toEqual([
