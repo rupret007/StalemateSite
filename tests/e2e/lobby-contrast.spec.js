@@ -146,13 +146,15 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }
             await page.locator('[data-bob-toggle]').click();
             await expect(page.locator('body')).toHaveAttribute('data-shared-layout', 'paint');
             await page.locator('[data-consent-skip]').click();
-            const chat = page.getByRole('button', { name: 'Chat', exact: true });
+            const chat = page.locator('[data-chat-toggle]');
             if (viewport.width <= 820) await chat.click();
             await expect(composer).toBeVisible();
             await expect(composer).toBeInViewport({ ratio: 1 });
             const send = page.getByRole('button', { name: 'Send', exact: true });
             await expect(send).toBeInViewport({ ratio: 1 });
+            const stage = page.locator('.watch .screen');
             if (viewport.width <= 820) {
+                await expect(stage).toBeInViewport({ ratio: 1 });
                 const dock = page.getByRole('group', { name: 'Call controls', exact: true });
                 await expect.poll(async () => {
                     const [button, controls] = await Promise.all([send.boundingBox(), dock.boundingBox()]);
@@ -167,7 +169,7 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }
             if (viewport.width <= 820) {
                 await chat.click();
                 await expect(composer).toBeHidden();
-                await expect(page.locator('.watch .screen')).toBeInViewport({ ratio: 1 });
+                await expect(stage).toBeInViewport({ ratio: 1 });
             }
         } finally {
             await context.close();
