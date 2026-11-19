@@ -45,6 +45,7 @@
         // teardown must not reuse pixels from a previous retained drawing.
         let canvasBase = null, canvasBaseChannel = null, canvasBaseLastId = null, canvasBaseCount = 0, canvasBasePrefix = '';
         let canvasBaseGeneration = -1;
+        let canvasRoomInstance;
         let flushTimer = 0;
         let roomGeneration = 0, captureVersion = 0, turnClient = null, turnInit = null;
         let cameraFailureNotice = '';
@@ -227,6 +228,16 @@
         }
 
         function onJoin(chan, act) {
+            // A current bitmap can be reused only after the incoming snapshot
+            // independently validates every vector that produced its prefix.
+            let previousPaint;
+            const previousStrokes = state.room.strokes;
+            if (act && chan?.kind === 'art' && state.kind === 'art' && state.ch === chan.name && canvasRoomInstance === chan.keepRef
+                && canvasBase && canvasBaseGeneration === roomGeneration && canvasBaseCount === previousStrokes.length
+                && canvasBaseLastId === previousStrokes.at(-1)?.id && canvasBasePrefix === strokesPrefixFingerprint(previousStrokes)) {
+                previousPaint = { bitmap: canvasBase, strokes: previousStrokes };
+                canvasBase = null;
+            }
             teardown();
             if (!chan || !['art', 'bobross', 'watch'].includes(chan.kind)) return;
             state.ch = chan.name;
@@ -248,9 +259,9 @@
             $('[data-paint-canvas-hint]').hidden = chan.kind !== 'bobross';
             ui.cameraSwitch.hidden = chan.kind !== 'bobross' || !phone;
             ui.episodeTitle.hidden = chan.kind !== 'bobross';
-            if (paint) setupCanvas();
+            if (paint) { canvasRoomInstance = chan.keepRef; setupCanvas(); }
             if (video) setupVideoUi();
-            if (act) ingestSnap(act);
+            if (act) ingestSnap(act, previousPaint);
             syncNames(chan);
             if (video && chan.kind === 'bobross' && isOp() && !state.room.video) {
                 const ep = BOB.DEFAULT_LESSON;
@@ -258,9 +269,19 @@
             }
         }
 
-        function ingestSnap(act) {
+        function ingestSnap(act, previousPaint) {
             if (!act) return;
             H.apply(state.room, { type: 'snapshot', state: { strokes: act.strokes || [], video: act.video } });
+            const strokes = state.room.strokes;
+            if (previousPaint && previousPaint.bitmap.width === ui.canvas.width && previousPaint.bitmap.height === ui.canvas.height
+                && samePaintPrefix(previousPaint.strokes, strokes)) {
+                canvasBase = previousPaint.bitmap;
+                canvasBaseChannel = state.ch;
+                canvasBaseGeneration = roomGeneration;
+                canvasBaseLastId = strokes.at(-1).id;
+                canvasBaseCount = strokes.length;
+                canvasBasePrefix = strokesPrefixFingerprint(strokes);
+            }
             if (act.video) applyVideoMetadata(act.video);
             paintEpisodeTitle();
             redraw();
@@ -429,15 +450,27 @@
             ctx.lineWidth = stroke.size * (w / 1200);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.beginPath();
             const pts = stroke.pts;
+            ctx.beginPath();
             ctx.moveTo(pts[from][0] * w, pts[from][1] * h);
             for (let i = from + 1; i < pts.length; i += 1) ctx.lineTo(pts[i][0] * w, pts[i][1] * h);
             ctx.stroke();
         }
 
-        // Inside one live generation strokes only gain points. A new snapshot
-        // goes through teardown and invalidates this append-only prefix cache.
+        function samePaintPrefix(before, after) {
+            if (after.length < 2 || before.length !== after.length) return false;
+            for (let index = 0; index < after.length - 1; index += 1) {
+                const a = before[index], b = after[index];
+                if (a.id !== b.id || a.color !== b.color || a.size !== b.size || a.pts.length !== b.pts.length) return false;
+                for (let point = 0; point < b.pts.length; point += 1) {
+                    if (a.pts[point][0] !== b.pts[point][0] || a.pts[point][1] !== b.pts[point][1]) return false;
+                }
+            }
+            return true;
+        }
+
+        // Within one live generation strokes only gain points. Cached prefixes
+        // from another generation must first pass the full vector comparison.
         function strokesPrefixFingerprint(strokes) {
             let out = '';
             for (let i = 0; i < strokes.length - 1; i += 1) out += strokes[i].id + ':' + strokes[i].pts.length + '|';

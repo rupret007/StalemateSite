@@ -154,6 +154,31 @@ test('canonical canvas reports realistic and retained-bound redraw cost', async 
     await testInfo.attach('canonical-canvas-cost', { body: JSON.stringify(results), contentType: 'application/json' });
 });
 
+test('an authoritative long-stroke snapshot matches a fresh canvas after a same-length prefix changes', async ({ page }) => {
+    await openCanvasControls(page);
+    const pixels = await page.evaluate(async () => {
+        const f = window.canvasControls, H = window.HangoutCore;
+        const strokes = H.COLORS.slice(0, 2).map((color, index) => ({ id: `long-${index}`, color, size: 3 + index,
+            pts: Array.from({ length: H.LIMITS.strokeTotalPoints }, (_, point) => [point / H.LIMITS.strokeTotalPoints,
+                .5 + .35 * Math.sin(point / 97 + index)]) }));
+        f.room.onJoin(f.channel, { strokes });
+        const before = await f.pixels();
+        f.snapshot();
+        const repeated = await f.pixels();
+        const updated = structuredClone(window.__lobbyRoom.state.room.strokes);
+        updated[0].pts = updated[0].pts.map(([x, y]) => [x, y / 2]);
+        f.room.onJoin(f.channel, { strokes: updated });
+        const replaced = await f.pixels();
+        f.room.onLeave();
+        f.room.onJoin(f.channel, { strokes: structuredClone(updated) });
+        const fresh = await f.pixels();
+        return { before, repeated, replaced, fresh };
+    });
+    expect(pixels.repeated).toBe(pixels.before);
+    expect(pixels.replaced).not.toBe(pixels.before);
+    expect(pixels.replaced).toBe(pixels.fresh);
+});
+
 async function checkControls(page) {
     const controls = page.getByRole('group', { name: 'Call controls' });
     await expect(controls).toBeInViewport();
