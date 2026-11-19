@@ -866,6 +866,7 @@ describe('private Music through signed beta admission, production lobby and SQLi
         const ledger = await participationLedger(f);
         for (const party of [host, guest, outsider]) await ledger.grant(party.binding);
         const origin = 'https://private-music.example.invalid', requests = [];
+        const nativeRate = vi.fn(async () => new Response(null, { status: 200 }));
         let release, notify;
         const pending = new Promise(resolve => { notify = resolve; });
         const hold = new Promise(resolve => { release = resolve; });
@@ -874,7 +875,7 @@ describe('private Music through signed beta admission, production lobby and SQLi
             HANGOUT_BETA_INVITE_KEY: 'offline-music-fixture-key-for-signed-cookies',
             HANGOUT_PREVIEW_KEY: 'offline-music-fixture-preview',
             ASSETS: { fetch: async () => new Response('<html><head></head></html>', { headers: { 'Content-Type': 'text/html' } }) },
-            ROOMS: {}, QUOTA: {},
+            ROOMS: {}, QUOTA: { idFromName: name => name, get: () => ({ fetch: nativeRate }) },
             WEBJAM_PRIVATE_MUSIC: {
                 prepare: async claim => { if (claim.role === 'guest') { notify(); await hold; } return { status: 200 }; },
                 issue: async (claim, confirm) => {
@@ -882,6 +883,7 @@ describe('private Music through signed beta admission, production lobby and SQLi
                     requests.push(claim.role);
                     return { status: 200, credentials: { fixture: true } };
                 },
+                touch: vi.fn(async () => ({ status: 200 })),
                 revoke: vi.fn(async () => ({ status: 200 }))
             }
         });
@@ -891,10 +893,10 @@ describe('private Music through signed beta admission, production lobby and SQLi
         const cookie = async party => BETA_COOKIE + '=' + await signBeta('access', {
             v: 1, sid: party.request.sid, version: party.request.version, exp: party.request.exp, scope: 'guest'
         }, f.env.HANGOUT_HMAC_KEY);
-        const call = (path, { cookie: session, body, native = false } = {}) => betaFetch(new Request(origin + path, {
+        const call = (path, { cookie: session, body, native = false, extra = {} } = {}) => betaFetch(new Request(origin + path, {
             ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}),
             headers: { ...(session ? { Cookie: session } : {}), ...(!native ? { Origin: origin } : {}),
-                ...(body ? { 'Content-Type': 'application/json' } : {}), 'CF-Connecting-IP': '192.0.2.18' }
+                ...(body ? { 'Content-Type': 'application/json' } : {}), 'CF-Connecting-IP': '192.0.2.18', ...extra }
         }), f.env);
         let joining;
         try {
@@ -911,6 +913,11 @@ describe('private Music through signed beta admission, production lobby and SQLi
             await app.message(wa, { t: 'music-host-bind', ...common, peer: wb.attachment.id, webjam,
                 generation, proofHash: createHash('sha256').update(proof).digest('hex') });
             expect(wa.frames.some(frame => frame.t === 'music-host-bound' && frame.status === 'bound')).toBe(true);
+            expect((await call('/beta/music/native', { native: true, body: { op: 'native-join' } })).status).toBe(403);
+            expect(nativeRate).not.toHaveBeenCalled();
+            nativeRate.mockResolvedValueOnce(new Response(null, { status: 429 }));
+            expect((await native('native-join')).status).toBe(429);
+            expect(requests).toEqual([]);
             expect((await native('native-join')).status).toBe(200);
             const href = `${origin}/join/#k=${'B'.repeat(43)}&s=${webjam}&g=${generation}&e=${expires}`;
             await app.message(wa, { t: 'music-offer-create', ...common, peer: wb.attachment.id, href });
@@ -922,10 +929,22 @@ describe('private Music through signed beta admission, production lobby and SQLi
             await vi.waitFor(() => expect(wb.frames.some(frame => frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
             expect((await call('/join/')).status).toBe(401);
             expect((await call('/join/', { cookie: outsideCookie })).status).toBe(403);
-            expect((await call('/join/', { cookie: guestCookie })).status).toBe(200);
+            const page = await call('/join/', { cookie: guestCookie });
+            expect(page.status).toBe(200);
+            expect(page.headers.get('Cache-Control')).toBe('private, no-store');
+            const originalAssets = f.env.ASSETS;
+            f.env.ASSETS = { fetch: async () => new Response('<html><head data-fixture></head></html>', {
+                headers: { 'Content-Type': 'text/html' }
+            }) };
+            expect((await call('/join/', { cookie: guestCookie })).status).toBe(503);
+            f.env.ASSETS = originalAssets;
             expect((await call('/turn', { cookie: guestCookie })).status).toBe(503);
             const body = { op: 'join', id: offer.id, proof: joinProof };
-            expect((await call('/beta/music', { cookie: outsideCookie, body })).status).toBe(403);
+            const forged = { 'X-Hangout-Music-Session': JSON.stringify({
+                sid: guest.request.sid, version: guest.request.version, exp: guest.request.exp
+            }) };
+            expect((await call('/__private-music', { cookie: outsideCookie, body, extra: forged })).status).toBe(404);
+            expect((await call('/beta/music', { cookie: outsideCookie, body, extra: forged })).status).toBe(403);
             joining = call('/beta/music', { cookie: guestCookie, body });
             await pending;
             if (action === 'logout') {

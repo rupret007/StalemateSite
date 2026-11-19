@@ -118,6 +118,7 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
             origin, keepAlive: task => void task,
             prepare: vi.fn(async () => ({ status: 200 })),
             issue: vi.fn(async (_claim, confirm) => await confirm() ? { status: 200, credentials } : { status: 403 }),
+            touch: vi.fn(async () => ({ status: 200 })),
             revoke: vi.fn(async () => ({ status: 200 }))
         };
         const f = await setup({ musicOrigin: origin, musicProvider: provider, provider: true });
@@ -219,8 +220,16 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         expect((await f.access('check')).status).toBe(403);
         expect((await f.access('join')).status).toBe(403);
         expect(f.provider.issue.mock.calls.length).toBe(1);
-        expect((await f.native('native-stop')).status).toBe(200);
+        expect((await f.native('native-stop')).status).toBe(403);
         await vi.waitFor(() => expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role)).toEqual(['host']));
+    });
+
+    it('retries an issuer revoke when the first request fails', async () => {
+        const f = await setupMusic();
+        f.provider.revoke.mockResolvedValueOnce({ status: 503 });
+        expect((await f.native('native-stop')).status).toBe(200);
+        await vi.waitFor(() => expect(f.provider.revoke).toHaveBeenCalledTimes(2), { timeout: 2000 });
+        expect(f.provider.revoke.mock.calls.every(([claim]) => claim.role === 'host')).toBe(true);
     });
 
     it('retires issued provider results that return after native Stop', async () => {

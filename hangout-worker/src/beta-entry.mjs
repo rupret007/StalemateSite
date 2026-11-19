@@ -1,4 +1,4 @@
-import { MUSIC_INTERNAL_PATH, MUSIC_PATH, musicJson, musicResponse, privateMusicOrigin } from './private-music.mjs';
+import { MUSIC_INTERNAL_PATH, MUSIC_PATH, musicJson, musicResponse, privateMusicOrigin, validMusicBody } from './private-music.mjs';
 import { validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
 // Invitation-only real visitor beta. Never imports the pilot's role selector or synthetic emails.
 import worker, { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } from './index.mjs';
@@ -409,6 +409,7 @@ async function betaRequest(request, env, deps = {}) {
     if (url.pathname === '/robots.txt') return reply('User-agent: *\nDisallow: /\n');
     if (url.pathname === '/beta/health') return betaHealth(request, env, { betaConfigured: !!betaConfigured(env), accessConfigured: betaAccessConfigured(env) });
     if (!betaConfigured(env)) return reply('Private community beta is not configured.', 503);
+    if (assetPath === MUSIC_INTERNAL_PATH) return reply('Not found.', 404);
     if (['/', '/beta', '/beta/'].includes(url.pathname)) return reply(SHELL
         .replace('Stalemate · Private community beta', 'Hang Out · Private community beta')
         .replace('STALEMATE / INVITATION ONLY', 'HANG OUT / INVITATION ONLY')
@@ -454,12 +455,21 @@ async function betaRequest(request, env, deps = {}) {
             || (native ? request.headers.has('Origin') || request.headers.has('Cookie') : !sameOrigin(request)))
             return musicResponse(403, { error: 'unavailable' });
         const body = await musicJson(request);
-        if (!body || !(native ? ['native-check', 'native-join', 'native-stop'] : ['join', 'check', 'stop']).includes(body.op))
-            return musicResponse(403, { error: 'unavailable' });
+        if (!validMusicBody(body, native)) return musicResponse(403, { error: 'unavailable' });
         const session = native ? null : await betaSession(request, env);
         if (!native && (!session || session.access.scope === 'game-night')) return musicResponse(403, { error: 'unavailable' });
-        try { return await musicLobby(env, body, session, request.headers.get('CF-Connecting-IP')); }
-        catch { return musicResponse(503, { error: 'unavailable' }); }
+        const ip = request.headers.get('CF-Connecting-IP');
+        try {
+            if (native) {
+                if (!ip || !/^[0-9a-f:.]{2,45}$/i.test(ip)) return musicResponse(403, { error: 'unavailable' });
+                const bucket = await ipHash(ip, env.HANGOUT_HMAC_KEY);
+                const namespace = body.op === 'native-stop' ? 'private-music-stop:' : 'private-music-native:';
+                const rate = await env.QUOTA.get(env.QUOTA.idFromName(namespace + bucket))
+                    .fetch('https://quota/private-music-native', { method: 'POST' });
+                if (rate.status !== 200) return musicResponse(rate.status === 429 ? 429 : 503, { error: 'unavailable' });
+            }
+            return await musicLobby(env, body, session, ip);
+        } catch { return musicResponse(503, { error: 'unavailable' }); }
     }
     if (request.method === 'POST' && url.pathname.startsWith('/beta/') && !arcadePath(url.pathname) && !mediaPath(url.pathname)) {
         if (!sameOrigin(request) || !/^application\/json(?:;|$)/i.test(request.headers.get('Content-Type') || '')) return json({ error: 'Same-origin JSON request required.' }, 403);
@@ -642,12 +652,19 @@ async function betaRequest(request, env, deps = {}) {
     const asset = await env.ASSETS.fetch(request);
     if (webJoin) {
         // The participation page uses the protected issuer through this site.
-        const content = protectedMusic && !musicHandoff && request.method === 'GET' && asset.headers.get('Content-Type')?.includes('text/html')
-            ? (await asset.text()).replace('<head>', '<head><meta name="private-music" content="required">')
-            : asset.body;
+        let content = asset.body;
+        if (protectedMusic && !musicHandoff && request.method === 'GET' && asset.headers.get('Content-Type')?.includes('text/html')) {
+            const page = await asset.text();
+            content = page.replace('<head>', '<head><meta name="private-music" content="required">');
+            if (content === page) return reply('Music access is unavailable.', 503);
+        }
         const result = new Response(content, asset);
-        if (typeof content === 'string') result.headers.delete('Content-Length');
         for (const [key, value] of Object.entries(headers)) result.headers.set(key, value);
+        if (protectedMusic && !musicHandoff) {
+            result.headers.set('Cache-Control', 'private, no-store');
+            for (const name of ['ETag', 'Last-Modified']) result.headers.delete(name);
+            if (typeof content === 'string') result.headers.delete('Content-Length');
+        }
         result.headers.set('Content-Security-Policy', musicHandoff ? MUSIC_HANDOFF_CSP : WEB_JOIN_CSP);
         result.headers.set('Permissions-Policy', musicHandoff ? 'camera=(), geolocation=(), microphone=()' : 'camera=(), geolocation=(), microphone=(self)');
         return result;

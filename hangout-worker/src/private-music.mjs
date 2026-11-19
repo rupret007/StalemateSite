@@ -6,6 +6,17 @@ export const MUSIC_PURPOSE = 'private-music-turn-v1';
 export const musicRef = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
 export const musicDigest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 
+export const nativeMusicOp = op => ['native-check', 'native-join', 'native-stop'].includes(op);
+export const stoppingMusic = op => op === 'stop' || op === 'native-stop';
+
+export function validMusicBody(body, native) {
+    if (!body || !musicRef(body.id) || !musicDigest(body.proof)) return false;
+    if (!native) return ['check', 'join', 'stop'].includes(body.op) && Object.keys(body).length === 3;
+    return nativeMusicOp(body.op) && musicDigest(body.webjam) && body.webjam.slice(-32) === body.id
+        && Number.isInteger(body.generation) && body.generation > 0 && body.generation <= 0xffffffff
+        && Object.keys(body).length === 5;
+}
+
 export function equalMusicProof(left, right) {
     if (!musicDigest(left) || !musicDigest(right)) return false;
     let different = 0;
@@ -16,7 +27,7 @@ export function equalMusicProof(left, right) {
 export function privateMusicOrigin(env) {
     if (env.HANGOUT_BETA_MODE !== 'protected' || env.HANGOUT_SESSION_AUTHORITY !== 'lobby-v1'
         || env.HANGOUT_PARTICIPATION_AUTHORITY !== 'c3-v1' || env.HANGOUT_OPEN === '0'
-        || !['prepare', 'issue', 'revoke'].every(method => typeof env.WEBJAM_PRIVATE_MUSIC?.[method] === 'function')) return '';
+        || !['prepare', 'issue', 'touch', 'revoke'].every(method => typeof env.WEBJAM_PRIVATE_MUSIC?.[method] === 'function')) return '';
     const origin = env.WEBJAM_WEB_ORIGINS;
     try { return new URL(origin).origin === origin && origin.startsWith('https://') ? origin : ''; }
     catch { return ''; }

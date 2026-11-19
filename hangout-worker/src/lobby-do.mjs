@@ -1,4 +1,4 @@
-import { MUSIC_INTERNAL_PATH, musicJson, musicResponse, privateMusicOrigin } from './private-music.mjs';
+import { MUSIC_INTERNAL_PATH, musicJson, musicResponse, privateMusicOrigin, stoppingMusic } from './private-music.mjs';
 import { sweepGameNightPasses } from './game-night-pass.mjs';
 // The #stalemate lobby Durable Object + its Worker-side admission. Everything that can be refused is refused here,
 // before a DO request is spent. Missing config/secrets => 503 (fail closed).
@@ -343,6 +343,7 @@ export class HangoutLobby {
             origin: musicOrigin,
             prepare: (claim, ip) => env.WEBJAM_PRIVATE_MUSIC.prepare(claim, ip),
             issue: (claim, confirm) => env.WEBJAM_PRIVATE_MUSIC.issue(claim, confirm),
+            touch: claim => env.WEBJAM_PRIVATE_MUSIC.touch(claim),
             revoke: claim => env.WEBJAM_PRIVATE_MUSIC.revoke(claim),
             keepAlive: task => this.state.waitUntil?.(task)
         } : null;
@@ -993,14 +994,17 @@ export class HangoutLobby {
         await this.ready;
         const { pathname: path, searchParams } = new URL(request.url);
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
-        if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
         if (path === MUSIC_INTERNAL_PATH) {
-            if (!privateMusicOrigin(this.env) || request.method !== 'POST' || searchParams.size || this.evidenceStorage !== 'ready')
+            if (!privateMusicOrigin(this.env) || request.method !== 'POST' || searchParams.size || !this.engine)
+                return musicResponse(503, { error: 'unavailable' });
+            const body = await musicJson(request);
+            if ((this.authorityUnavailable || this.evidenceStorage !== 'ready') && !stoppingMusic(body?.op))
                 return musicResponse(503, { error: 'unavailable' });
             let site;
             try { site = JSON.parse(request.headers.get('X-Hangout-Music-Session')); } catch { return musicResponse(403, { error: 'unavailable' }); }
-            return this.engine.musicAccess(await musicJson(request), site, request.headers.get('CF-Connecting-IP'));
+            return this.engine.musicAccess(body, site, request.headers.get('CF-Connecting-IP'));
         }
+        if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
         const roomGrant = path.startsWith(GAME_ROOM_GRANT_PATH + '/');
         if ((roomGrant || path.startsWith(GAME_INVITATION_PATH + '/')) && request.method === 'POST') {
             return retirementGate(this, async () => {
