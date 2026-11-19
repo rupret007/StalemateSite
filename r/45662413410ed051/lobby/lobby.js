@@ -1494,8 +1494,6 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         case 'music-invite-accepted':
         case 'music-invite-ended':
             receiveMusicInvite(m); break;
-        case 'music-invite-result':
-        case 'music-invite-outcome':
         case 'music-host-bound': {
             if (m.version === 1 && musicHandoff?.request === m.request && m.status !== 'bound') {
                 const { room } = musicHandoff;
@@ -1505,6 +1503,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             break;
         }
+        case 'music-invite-result':
+        case 'music-invite-outcome':
         case 'music-offer-result':
         case 'music-offer-outcome':
             receiveMusicHandoffStatus(m); break;
