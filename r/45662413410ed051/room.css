@@ -359,6 +359,10 @@ body:is(.bob-mode,.shared-layout) .react-float{bottom:calc(var(--bar-h) + 16px)}
     body:is(.bob-mode,.shared-layout) .callbar .callbar-more .btn{white-space:normal}
 }
 @media (max-width:820px) and (max-height:700px) and (orientation:portrait){
+    /* Keep room for the composer without shrinking the lesson or touch targets. */
+    body.bob-mode:not(.chat-closed) .room{row-gap:4px}
+    body.bob-mode:not(.chat-closed) .chat{padding-block:6px}
+    body.bob-mode:not(.chat-closed) .chat .say{margin-top:4px}
     body.bob-mode:not(.chat-closed) .call .tiles .tile{height:90px}
 }
 @media (max-width:820px) and (orientation:landscape){
