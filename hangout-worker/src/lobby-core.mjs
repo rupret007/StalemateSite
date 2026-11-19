@@ -188,9 +188,10 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const musicInvitesEnabled = directMusicInvites && !participationConfigured && L.webJoinOrigins?.length > 0;
     const participationSafeMusicOffersConfigured = directMusicInvites && participationConfigured && participationReady
         && effectCommitReady && L.webJoinOrigins?.length > 0;
-    const send = (id, frame) => {
+    const frameBytes = frame => encoder.encode(JSON.stringify(frame)).byteLength;
+    const send = (id, frame, measuredBytes) => {
         if (!controlled) return sendImpl(id, frame);
-        controlled.bytes += encoder.encode(JSON.stringify(frame)).byteLength;
+        controlled.bytes += measuredBytes ?? frameBytes(frame);
         if (controlled.frames.length >= 8192 || controlled.bytes > 16 * 1024 * 1024) { controlled.capacity = true; return; }
         controlled.frames.push([id, frame]);
     };
@@ -531,9 +532,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     // ---------- helpers ----------
     const safetyFrames = new Set(['sharing-stopped', 'notice', 'report-status', 'pm-setting', 'entry-source', 'message-result', 'person-preferences']);
-    const out = (c, msg) => {
+    const out = (c, msg, measuredBytes) => {
         if (c.safetyOnly && !safetyFrames.has(msg.t)) return;
-        try { if (outputBatch) outputBatch.push([c.id, msg]); else send(c.id, msg); } catch (e) { /* gone */ }
+        try {
+            if (outputBatch) outputBatch.push(measuredBytes === undefined ? [c.id, msg] : [c.id, msg, null, measuredBytes]);
+            else send(c.id, msg, measuredBytes);
+        } catch (e) { /* gone */ }
     };
     const queuePresence = marker => {
         // Mark only after the durable command commits. No prepared projection,
@@ -585,8 +589,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     };
     const names = (chan) => membersOf(chan).filter((m) => m.nick).map((m) => ({ id: m.id, nick: m.nick, entrySource: m.entrySource, prefix: prefix(m, chan), band: isBand(m), moderator: m.role === 'moderator', verified: !!m.account, owner: owns(m, chan), away: !!m.away, cam: !!(m.cams && m.cams.has(lc(chan.name))) }))
         .sort((a, b) => (a.prefix === b.prefix ? lc(a.nick).localeCompare(lc(b.nick)) : a.prefix === '@' ? -1 : b.prefix === '@' ? 1 : a.prefix === '+' ? -1 : 1));
-    const mediaBlocked = (chan, viewer) => !viewer || ['lobby', 'chat'].includes(chan.kind) ? []
-        : membersOf(chan).filter(peer => peer.id !== viewer.id && (viewer.blocks.has(peer.dev) || peer.blocks.has(viewer.dev))).map(peer => peer.id);
+    const mediaBlocked = (chan, viewer, members) => !viewer || ['lobby', 'chat'].includes(chan.kind) ? []
+        : (members ?? membersOf(chan)).filter(peer => peer.id !== viewer.id && (viewer.blocks.has(peer.dev) || peer.blocks.has(viewer.dev))).map(peer => peer.id);
     // Only current connection IDs are disclosed to the affected recipient.
     // Device block references remain private session preferences.
     const roomKind = (chan) => gameNight && chan.kind === 'chat' && gameNightRoomName(chan.name) ? 'game' : chan.kind;
@@ -646,8 +650,19 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         if (presence && typeof deferPresence === 'function') return queuePresence({ channel: chan.name, generation: chan.generation });
         const view = chanView(chan);
-        for (const member of membersOf(chan)) out(member, { t: 'chan', ch: { ...view, jam: member.gameGuest ? null : view.jam, mediaBlocked: mediaBlocked(chan, member) } });
-        for (const c of membersOf(chan)) if (owns(c, chan)) out(c, { t: 'ownership', ch: chan.name,
+        const members = membersOf(chan);
+        let commonFrameBytes;
+        for (const member of members) {
+            const jam = member.gameGuest ? null : view.jam;
+            const blocked = mediaBlocked(chan, member, members);
+            const frame = { t: 'chan', ch: { ...view, jam, mediaBlocked: blocked } };
+            // The common roster is byte-identical for each unblocked viewer
+            // with the same Jam visibility. Charge the full size per recipient.
+            const measuredBytes = controlled && jam === view.jam && !blocked.length
+                ? commonFrameBytes ??= frameBytes(frame) : undefined;
+            out(member, frame, measuredBytes);
+        }
+        for (const c of members) if (owns(c, chan)) out(c, { t: 'ownership', ch: chan.name,
             cohosts: [...chan.cohosts].map((id) => ({ id, label: chan.cohostLabels[id] || 'Verified co-host' })) });
     };
     function refreshBlockedMedia(viewer, dev) {
@@ -668,11 +683,18 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
     }
     const visibleRoom = (viewer, room) => publicChannel(room) || isStaff(viewer) || !!viewer && (hosts(viewer, room) || room.members.has(viewer.id));
+    function hostPresent(room) {
+        for (const id of room.members) {
+            const member = conns.get(id);
+            if (member && hosts(member, room)) return true;
+        }
+        return false;
+    }
     const directory = (viewer) => [...channels.values()].filter((r) => r.kind !== 'lobby' && visibleRoom(viewer, r)
         && (!viewer?.gameGuest || r.name === viewer.gameGuest.room && r.keepRef === viewer.gameGuest.ref))
         .map((r) => ({ name: r.name, roomInstance: r.keepRef, kind: roomKind(r), title: r.title, count: r.members.size, max: r.modes.l,
             locked: r.modes.locked || r.modes.i, key: !!r.modes.k, cams: r.modes.C, persistent: !!r.owner,
-            mine: !!viewer && owns(viewer, r), hostPresent: membersOf(r).some((m) => hosts(m, r)) }));
+            mine: !!viewer && owns(viewer, r), hostPresent: hostPresent(r) }));
     const pushList = ({ presence = false } = {}) => {
         if (presence && typeof deferPresence === 'function') queuePresence({ directory: true });
         else for (const c of conns.values()) if (c.nick) out(c, { t: 'list', rooms: directory(c) });
@@ -2165,8 +2187,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             else if (persistImpl !== volatilePersist || controlled) persist('sessions', sessionStorageSnapshot(metadata), writes);
         }
         const flush = () => {
-            for (const [id, frame, marker] of frames) try {
-                if (marker) deferPresence(marker); else send(id, frame);
+            for (const [id, frame, marker, measuredBytes] of frames) try {
+                if (marker) deferPresence(marker); else send(id, frame, measuredBytes);
             } catch { /* one gone socket must not stop delivery to everyone else */ }
             for (const args of closing) try { close(...args); } catch { /* already gone */ }
             return result;

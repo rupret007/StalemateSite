@@ -43,20 +43,21 @@ export function createParticipationCheckpoint(roots, options = {}) {
         }
         return size;
     }
-    // Capture-local memo of short property-name sizes only. Every occurrence
-    // still pays its full byte/node charge and a fresh clock check. Do not
-    // reuse this for values, restoration, or a later checkpoint.
+    // Property names and short values such as room member IDs repeat in the
+    // graph. Capture-local caches still charge each occurrence in full and
+    // perform the same clock check as scanning a short string.
     const keySizes = new Map();
-    function keySize(key) {
-        if (key.length > 64) return stringSize(key);
-        const cached = keySizes.get(key);
+    const valueSizes = new Map();
+    function shortStringSize(value, sizes) {
+        if (!value.length || value.length > 64) return stringSize(value);
+        const cached = sizes.get(value);
         if (cached !== undefined) {
             if (cached > limits.maxBytes - bytes) exceeded();
             timeCheck();
             return cached;
         }
-        const size = stringSize(key);
-        if (keySizes.size < 256) keySizes.set(key, size);
+        const size = stringSize(value);
+        if (sizes.size < 256) sizes.set(value, size);
         return size;
     }
     // Only trusted callers may omit objects whose internals this particular
@@ -91,7 +92,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
     }
     function visit(value) {
         if (value === null || value === undefined || typeof value === 'boolean' || typeof value === 'number') { charge(8); return; }
-        if (typeof value === 'string') { charge(16 + stringSize(value)); return; }
+        if (typeof value === 'string') { charge(16 + shortStringSize(value, valueSizes)); return; }
         if (typeof value !== 'object') unsupported();
         charge(8);
         if (seen.has(value)) return;
@@ -117,7 +118,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
             if (typeof key !== 'string') unsupported();
             const descriptor = Object.getOwnPropertyDescriptor(item.value, key);
             if (!dataDescriptor(descriptor)) unsupported();
-            charge(48 + keySize(key), 1); entries += 1;
+            charge(48 + shortStringSize(key, keySizes), 1); entries += 1;
             // getOwnPropertyDescriptor already returned a fresh private record.
             // Keep it directly rather than allocate an identical second record.
             // Flat private pairs avoid a separate allocation for every property.
