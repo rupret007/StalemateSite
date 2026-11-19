@@ -625,6 +625,39 @@ for (const { viewport, submitFromNickname } of [
 }
 
 for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    test(`an expired Game Night invitation confirms copying without moving focus at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+        const origin = new URL(baseURL).origin;
+        const isMobile = viewport.width < 500;
+        const context = await browser.newContext({ viewport, isMobile, hasTouch: isMobile });
+        try {
+            await gameNightEntryFixture(context, origin);
+            await context.route('**/beta/game-night/invitation/details', route => route.fulfill({ status: 410, json: { error: 'expired' } }));
+            const page = await context.newPage();
+            await page.addInitScript(() => {
+                Object.defineProperty(navigator, 'share', { value: undefined });
+                Object.defineProperty(navigator, 'clipboard', { value: { writeText: async text => { window.copiedMessage = text; } } });
+            });
+            await page.goto(origin + gameGuestPath + '#invite=synthetic-expired');
+            const status = page.getByRole('status');
+            const ask = page.getByRole('button', { name: 'Ask the host for a fresh link.' });
+            const confirmation = page.locator('[data-guest-fresh-confirmation]');
+            await expect(status).toBeFocused();
+            await expect(confirmation).toHaveAttribute('aria-live', 'polite');
+            await expect(confirmation).toHaveAttribute('aria-atomic', 'true');
+            await expect(confirmation).toBeEmpty();
+            await ask.press('Enter');
+            await expect(ask).toBeFocused();
+            await expect(confirmation).toHaveText('Message copied. Send it to your host.');
+            await expect(confirmation).toBeInViewport();
+            await expect(status).toHaveText('This invite is no longer available. Ask your host for a new one.');
+            expect(await page.evaluate(() => window.copiedMessage)).toBe('Could you send me a fresh Game Night link?');
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await page.screenshot({ path: testInfo.outputPath('game-night-expired-copy-confirmation.png') });
+        } finally {
+            await context.close();
+        }
+    });
+
     test(`an expired Game Night invitation shows a message when sharing is blocked at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
         const origin = new URL(baseURL).origin;
         const isMobile = viewport.width < 500;

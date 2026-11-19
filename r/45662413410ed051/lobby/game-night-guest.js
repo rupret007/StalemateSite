@@ -6,6 +6,7 @@ const invite = document.querySelector('[data-guest-invite]');
 const join = document.querySelector('[data-guest-join]');
 const retry = document.querySelector('[data-guest-retry]');
 const askHost = document.querySelector('[data-guest-fresh]');
+const freshConfirmation = document.querySelector('[data-guest-fresh-confirmation]');
 const freshMessage = document.querySelector('[data-guest-fresh-message]');
 const FRESH_LINK = 'Ask the host for a fresh link.';
 const gameTitle = document.querySelector('[data-guest-game]');
@@ -255,6 +256,7 @@ let freshLinkRequestPending = false;
 async function shareFreshLink() {
     if (freshLinkRequestPending) return;
     freshLinkRequestPending = true;
+    freshConfirmation?.replaceChildren();
     const startingFocus = document.activeElement;
     const message = 'Could you send me a fresh Game Night link?';
     const payload = { title: 'Game Night', text: message };
@@ -266,7 +268,7 @@ async function shareFreshLink() {
         if (typeof navigator.clipboard?.writeText === 'function') {
             try {
                 await navigator.clipboard.writeText(message);
-                if (askHost) askHost.textContent = 'Copied. Send it to your host.';
+                if (freshConfirmation) freshConfirmation.textContent = 'Message copied. Send it to your host.';
                 return;
             } catch { /* Show the message on the page when copying is blocked. */ }
         }

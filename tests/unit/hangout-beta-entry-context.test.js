@@ -286,18 +286,26 @@ it.each(['share', 'clipboard'])('asks the host directly for a fresh invite via %
         const status = window.document.querySelector('[data-guest-status]');
         const ask = window.document.querySelector('[data-guest-fresh]');
         const retry = window.document.querySelector('[data-guest-retry]');
+        const confirmation = window.document.querySelector('[data-guest-fresh-confirmation]');
         await vi.waitFor(() => expect(status.textContent).toBe(GAME_INVITE_UNAVAILABLE));
         expect(retry.hidden).toBe(true);
         expect(ask.hidden).toBe(false);
         expect(ask.textContent).toBe('Ask the host for a fresh link.');
+        ask.focus();
         ask.click();
         await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
         const message = 'Could you send me a fresh Game Night link?';
         expect(send).toHaveBeenCalledWith(method === 'share' ? { title: 'Game Night', text: message } : message);
         expect(JSON.stringify(send.mock.calls)).not.toContain('fixture-link');
         if (method === 'clipboard') {
-            await vi.waitFor(() => expect(ask.textContent).toBe('Copied. Send it to your host.'));
+            expect(confirmation?.getAttribute('aria-live')).toBe('polite');
+            expect(confirmation.getAttribute('aria-atomic')).toBe('true');
+            expect(confirmation.hidden).toBe(false);
+            await vi.waitFor(() => expect(confirmation.textContent).toBe('Message copied. Send it to your host.'));
         }
+        expect(ask.textContent).toBe('Ask the host for a fresh link.');
+        expect(window.document.activeElement).toBe(ask);
+        expect(status.textContent).toBe(GAME_INVITE_UNAVAILABLE);
     } finally {
         window.close();
     }

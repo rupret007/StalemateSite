@@ -76,6 +76,7 @@ const GAME_GUEST_ENTRANCE = `<!doctype html>
 <p class="muted">Camera and microphone stay off. <a href="/beta/privacy" target="_blank" rel="noopener">House rules</a></p>
 <p class="muted" data-guest-expiry hidden>Invite expires <time></time>.</p>
 </section><button type="button" data-guest-retry hidden>Try again</button><button type="button" data-guest-fresh hidden>Ask the host for a fresh link</button>
+<p data-guest-fresh-confirmation aria-live="polite" aria-atomic="true"></p>
 <p data-guest-fresh-message tabindex="-1" hidden></p></main></body></html>`;
 const GAME_GUEST_STYLE = `
 .game-invitation h1 { font-size: clamp(2.6rem, 9vw, 4.5rem); }
@@ -84,6 +85,7 @@ const GAME_GUEST_STYLE = `
 .game-invitation section p:last-child { margin-bottom: 0; }
 .game-invitation [data-guest-join], .game-invitation [data-guest-fresh] { width: 100%; min-height: 48px; }
 .game-invitation [data-guest-status]:empty { display: none; }
+.game-invitation [data-guest-fresh-confirmation]:empty { margin: 0; }
 `;
 const headers = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': CSP };
 const reply = (body, status = 200, type = 'text/plain; charset=utf-8', extra = {}) => new Response(body, { status, headers: { ...headers, 'Content-Type': type, ...extra } });
