@@ -147,7 +147,13 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }
             await expect(page.locator('body')).toHaveAttribute('data-shared-layout', 'paint');
             await page.locator('[data-consent-skip]').click();
             const chat = page.locator('[data-chat-toggle]');
-            if (viewport.width <= 820) await chat.click();
+            if (viewport.width <= 820) {
+                await expect(chat).toHaveAttribute('aria-expanded', 'false');
+                await expect(chat).toHaveCSS('border-top-color', 'rgb(52, 61, 54)');
+                await chat.click();
+            }
+            await expect(chat).toHaveAttribute('aria-expanded', 'true');
+            await expect(chat).toHaveCSS('border-top-color', 'rgb(209, 250, 120)');
             await expect(composer).toBeVisible();
             await expect(composer).toBeInViewport({ ratio: 1 });
             const send = page.getByRole('button', { name: 'Send', exact: true });
@@ -167,7 +173,10 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }
             await send.click();
             await expect(page.locator('[data-log]')).toContainText('Ready to paint');
             if (viewport.width <= 820) {
-                await chat.click();
+                await chat.press('Enter');
+                await expect(chat).toBeFocused();
+                await expect(chat).toHaveAttribute('aria-expanded', 'false');
+                await expect(chat).toHaveCSS('border-top-color', 'rgb(52, 61, 54)');
                 await expect(composer).toBeHidden();
                 await expect(stage).toBeInViewport({ ratio: 1 });
             }
