@@ -17,6 +17,18 @@ export function validMusicBody(body, native) {
         && Object.keys(body).length === 5;
 }
 
+export function nativeMusicRateAddress(ip) {
+    if (typeof ip !== 'string' || !/^[0-9a-f:.]{2,45}$/i.test(ip)) return '';
+    if (!ip.includes(':')) return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(ip) && ip.split('.').every(part => Number(part) <= 255) ? ip : '';
+    try {
+        const canonical = new URL(`https://[${ip}]/`).hostname.slice(1, -1);
+        const [start, end] = canonical.split('::');
+        const head = start ? start.split(':') : [], tail = end ? end.split(':') : [];
+        const parts = end === undefined ? head : [...head, ...Array(8 - head.length - tail.length).fill('0'), ...tail];
+        return parts.slice(0, 4).join(':') + '/64';
+    } catch { return ''; }
+}
+
 export function equalMusicProof(left, right) {
     if (!musicDigest(left) || !musicDigest(right)) return false;
     let different = 0;

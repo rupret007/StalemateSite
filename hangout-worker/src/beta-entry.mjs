@@ -1,4 +1,4 @@
-import { MUSIC_INTERNAL_PATH, MUSIC_PATH, musicJson, musicResponse, privateMusicOrigin, validMusicBody } from './private-music.mjs';
+import { MUSIC_INTERNAL_PATH, MUSIC_PATH, musicJson, musicResponse, nativeMusicRateAddress, privateMusicOrigin, validMusicBody } from './private-music.mjs';
 import { validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
 // Invitation-only real visitor beta. Never imports the pilot's role selector or synthetic emails.
 import worker, { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } from './index.mjs';
@@ -461,11 +461,12 @@ async function betaRequest(request, env, deps = {}) {
         const ip = request.headers.get('CF-Connecting-IP');
         try {
             if (native) {
-                if (!ip || !/^[0-9a-f:.]{2,45}$/i.test(ip)) return musicResponse(403, { error: 'unavailable' });
-                const bucket = await ipHash(ip, env.HANGOUT_HMAC_KEY);
+                const address = nativeMusicRateAddress(ip);
+                if (!address) return musicResponse(403, { error: 'unavailable' });
+                const bucket = await ipHash(address, env.HANGOUT_HMAC_KEY);
                 const namespace = body.op === 'native-stop' ? 'private-music-stop:' : 'private-music-native:';
-                const rate = await env.QUOTA.get(env.QUOTA.idFromName(namespace + bucket))
-                    .fetch('https://quota/private-music-native', { method: 'POST' });
+                const rate = await env.QUOTA.get(env.QUOTA.idFromName(namespace + bucket[0]))
+                    .fetch('https://quota/private-music-native', { method: 'POST', headers: { 'X-Hangout-Native-Rate': bucket } });
                 if (rate.status !== 200) return musicResponse(rate.status === 429 ? 429 : 503, { error: 'unavailable' });
             }
             return await musicLobby(env, body, session, ip);
@@ -649,9 +650,17 @@ async function betaRequest(request, env, deps = {}) {
         }
     }
     if (!['GET', 'HEAD'].includes(request.method)) return reply('Method not allowed.', 405);
-    const asset = await env.ASSETS.fetch(request);
+    let assetRequest = request;
+    if (protectedMusic && !musicHandoff) {
+        const fresh = new Headers(request.headers);
+        fresh.delete('If-None-Match');
+        fresh.delete('If-Modified-Since');
+        assetRequest = new Request(request, { headers: fresh });
+    }
+    const asset = await env.ASSETS.fetch(assetRequest);
     if (webJoin) {
         // The participation page uses the protected issuer through this site.
+        if (protectedMusic && !musicHandoff && asset.status === 304) return reply('Music access is unavailable.', 503);
         let content = asset.body;
         if (protectedMusic && !musicHandoff && request.method === 'GET' && asset.headers.get('Content-Type')?.includes('text/html')) {
             const page = await asset.text();

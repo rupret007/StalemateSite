@@ -874,7 +874,10 @@ describe('private Music through signed beta admission, production lobby and SQLi
             WEBJAM_WEB_ORIGINS: origin, HANGOUT_TURN_ENABLED: '0', HANGOUT_AI_MODERATION: 'off',
             HANGOUT_BETA_INVITE_KEY: 'offline-music-fixture-key-for-signed-cookies',
             HANGOUT_PREVIEW_KEY: 'offline-music-fixture-preview',
-            ASSETS: { fetch: async () => new Response('<html><head></head></html>', { headers: { 'Content-Type': 'text/html' } }) },
+            ASSETS: { fetch: async request => request.headers.has('If-None-Match') || request.headers.has('If-Modified-Since')
+                ? new Response(null, { status: 304 }) : new Response('<html><head></head></html>', {
+                    headers: { 'Content-Type': 'text/html', ETag: '"fixture"' }
+                }) },
             ROOMS: {}, QUOTA: { idFromName: name => name, get: () => ({ fetch: nativeRate }) },
             WEBJAM_PRIVATE_MUSIC: {
                 prepare: async claim => { if (claim.role === 'guest') { notify(); await hold; } return { status: 200 }; },
@@ -929,9 +932,10 @@ describe('private Music through signed beta admission, production lobby and SQLi
             await vi.waitFor(() => expect(wb.frames.some(frame => frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
             expect((await call('/join/')).status).toBe(401);
             expect((await call('/join/', { cookie: outsideCookie })).status).toBe(403);
-            const page = await call('/join/', { cookie: guestCookie });
+            const page = await call('/join/', { cookie: guestCookie, extra: { 'If-None-Match': '"fixture"' } });
             expect(page.status).toBe(200);
             expect(page.headers.get('Cache-Control')).toBe('private, no-store');
+            expect(page.headers.has('ETag')).toBe(false);
             const originalAssets = f.env.ASSETS;
             f.env.ASSETS = { fetch: async () => new Response('<html><head data-fixture></head></html>', {
                 headers: { 'Content-Type': 'text/html' }
