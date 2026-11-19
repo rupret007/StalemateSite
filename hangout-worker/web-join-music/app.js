@@ -1,6 +1,7 @@
 import { readInvite } from "./crypto.js";
 import { acquireMusicStream, closeAudioContext } from "./audio.js";
 import { WebJoinSession } from "./session.js";
+import { validateCredentials } from "./policy.js";
 import { RELAY_ORIGIN } from "./config.js";
 import {
   micCheckFailure,
@@ -20,6 +21,36 @@ const failureElements = () => ({
   join: $("join"),
   leave: $("leave"),
 });
+
+const requiresMusicGrant = !!document.querySelector('meta[name="private-music"][content="required"]');
+const grantMatch = requiresMusicGrant && /^#m=([a-f0-9]{32})&e=([1-9]\d{0,12})$/.exec(location.hash);
+const musicGrant = grantMatch?.[1];
+if (requiresMusicGrant) history.replaceState(null, "", location.pathname);
+let musicCheckTimer, grantRetired = false, musicJoinStarted = false;
+
+async function musicRequest(op, signal) {
+  const response = await fetch("/beta/music", {
+    method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id: musicGrant }),
+    signal: signal || AbortSignal.timeout(8000), keepalive: op === "stop",
+  });
+  if (response.status === 429) throw new Error(JOIN_SIGNAL.RELAY_CAP_REACHED);
+  if (!response.ok) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
+  return response.json();
+}
+
+function watchMusicGrant() {
+  clearTimeout(musicCheckTimer);
+  musicCheckTimer = setTimeout(async () => {
+    try {
+      if (grantRetired) return;
+      await musicRequest("check");
+      if (!grantRetired) watchMusicGrant();
+    } catch {
+      if (!grantRetired) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
+    }
+  }, 4000);
+}
 
 let invite;
 let session;
@@ -88,7 +119,10 @@ function showAccessTime(expiresAt, isCurrent) {
 }
 
 try {
-  invite = readInvite(location.hash);
+  if (requiresMusicGrant) {
+    if (!musicGrant) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
+    invite = { expiresAt: Number(grantMatch[2]) };
+  } else invite = readInvite(location.hash);
   clearJoinFailure(failureElements(), "Your host invited you to join.");
 } catch (error) {
   const view = mapJoinError(error);
@@ -230,6 +264,10 @@ async function runMicCheck(control) {
       context = new AudioContext({ sampleRate: 48000, latencyHint: "interactive" });
     }
     await context.resume();
+    if (musicGrant) {
+      await musicRequest("check", signal);
+      watchMusicGrant();
+    }
     if (signal.aborted || expireUnusedInvite()) return;
     const capture = await acquireMusicStream(navigator.mediaDevices, $("mic-device").value);
     if (signal.aborted || expireUnusedInvite()) {
@@ -318,6 +356,12 @@ async function playHostAudio(attempt) {
 }
 
 function leave(message = "You left the session.", error) {
+  if (musicGrant && !grantRetired) {
+    grantRetired = true;
+    clearTimeout(musicCheckTimer);
+    void musicRequest("stop").catch(() => {});
+    invite = undefined;
+  }
   const elements = failureElements();
   const restoreFocus = document.activeElement === elements.leave || document.activeElement === resumeAudio
     || (retryListening && document.activeElement === listen);
@@ -351,6 +395,7 @@ function leave(message = "You left the session.", error) {
     if (view.needsFreshInvite && !view.showRetry) {
       invite = undefined;
     }
+    if (requiresMusicGrant) view.showRetry = false;
     applyJoinFailure(view, elements);
     elements.status.dataset.failure = "true";
   } else {
@@ -368,7 +413,8 @@ function leave(message = "You left the session.", error) {
 }
 
 async function startJoin(listenOnly = false) {
-  if (expireUnusedInvite() || !invite || session || starting || (!listenOnly && !joinReady())) return;
+  if (expireUnusedInvite() || !invite || session || starting || (!listenOnly && !joinReady()) || musicJoinStarted) return;
+  if (musicGrant) musicJoinStarted = true;
   const elements = failureElements();
   const activeControl = document.activeElement;
   starting = true;
@@ -392,6 +438,19 @@ async function startJoin(listenOnly = false) {
     }
     await context.resume();
     if (!isCurrent() || expireUnusedInvite()) return;
+    let grantedCredentials;
+    if (musicGrant) {
+      const result = await musicRequest("join", AbortSignal.any([attempt.signal, AbortSignal.timeout(12000)]));
+      if (!isCurrent() || expireUnusedInvite()) return;
+      const href = new URL(result.href);
+      if (href.origin !== location.origin || href.pathname !== "/join/" || href.search || href.username || href.password)
+        throw new Error(JOIN_SIGNAL.SESSION_ENDED);
+      const grantedInvite = readInvite(href.hash);
+      if (grantedInvite.expiresAt !== invite.expiresAt) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
+      invite = grantedInvite;
+      grantedCredentials = validateCredentials(result.credentials);
+      watchMusicGrant();
+    }
     if (!listenOnly && prejoinStream?.getAudioTracks().some((track) => track.readyState === "live")) {
       stream = prejoinStream;
       prejoinStream = null;
@@ -416,6 +475,7 @@ async function startJoin(listenOnly = false) {
     const joinedSession = new WebJoinSession({
       origin: RELAY_ORIGIN,
       invite,
+      grantedCredentials,
       stream,
       audioContext: context,
       onStatus: (message) => {

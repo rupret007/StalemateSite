@@ -35,8 +35,8 @@ export async function gatherAnswerSDP(pc, signal, { timeout = 15000, allowReview
   return policySdp(pc.localDescription?.sdp ?? "", { allowReviewedAllocations });
 }
 export class WebJoinSession {
-  constructor({ origin, invite, stream, audioContext, onStatus = () => {}, onTrack = () => {}, onLatency = () => {}, onRoute = () => {}, onError = () => {} }) {
-    Object.assign(this, { invite, stream, audioContext, onStatus, onTrack, onLatency, onRoute, onError });
+  constructor({ origin, invite, grantedCredentials, stream, audioContext, onStatus = () => {}, onTrack = () => {}, onLatency = () => {}, onRoute = () => {}, onError = () => {} }) {
+    Object.assign(this, { invite, grantedCredentials, stream, audioContext, onStatus, onTrack, onLatency, onRoute, onError });
     this.controller = new AbortController();
     this.mailbox = new Mailbox(origin, invite, { signal: this.controller.signal });
     this.authorized = false; this.quotaBytes = SESSION_BYTES; this.previousBytes = 0;
@@ -50,7 +50,8 @@ export class WebJoinSession {
     this.onStatus("Checking the host invitation…");
     const offer = validateOffer(this.invite, await open(this.invite, await this.mailbox.receive("offer")));
     const remoteSDP = policySdp(offer.sdp, { remote: true });
-    const credentials = await this.mailbox.credentials();
+    const credentials = this.grantedCredentials ?? await this.mailbox.credentials();
+    this.grantedCredentials = null;
     this.accessExpiresAt = credentials.expiresAt;
     this.quotaBytes = Math.min(this.quotaBytes, credentials.quotaBytes);
     const certificate = await RTCPeerConnection.generateCertificate({ name: "ECDSA", namedCurve: "P-256" });
