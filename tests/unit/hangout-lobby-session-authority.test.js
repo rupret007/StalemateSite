@@ -917,13 +917,14 @@ describe('private Music through signed beta admission, production lobby and SQLi
             const offer = wb.frames.find(frame => frame.t === 'music-offer');
             expect(!!offer).toBe(true);
             await app.message(wb, { t: 'music-offer-seen', ...common, id: offer.id });
-            await app.message(wb, { t: 'music-offer-accept', ...common, id: offer.id });
+            const joinProof = randomBytes(32).toString('hex');
+            await app.message(wb, { t: 'music-offer-accept', ...common, id: offer.id, joinProof });
             await vi.waitFor(() => expect(wb.frames.some(frame => frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
             expect((await call('/join/')).status).toBe(401);
             expect((await call('/join/', { cookie: outsideCookie })).status).toBe(403);
             expect((await call('/join/', { cookie: guestCookie })).status).toBe(200);
             expect((await call('/turn', { cookie: guestCookie })).status).toBe(503);
-            const body = { op: 'join', id: offer.id };
+            const body = { op: 'join', id: offer.id, proof: joinProof };
             expect((await call('/beta/music', { cookie: outsideCookie, body })).status).toBe(403);
             joining = call('/beta/music', { cookie: guestCookie, body });
             await pending;

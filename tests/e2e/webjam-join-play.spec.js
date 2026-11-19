@@ -701,10 +701,11 @@ test('capture arriving after Leave releases only its own tracks during the next 
 for (const outcome of ['quota refusal', 'revocation after joining']) {
     test(`protected Music ${outcome} respects explicit audio join and capture ownership`, async ({ page, baseURL }) => {
         const requests = [], external = [];
-        const grant = '9'.repeat(32);
+        const grant = '9'.repeat(32), proof = '5'.repeat(64);
         const expires = Math.floor(Date.now() / 1000) + 240;
         let withdrawn = false;
-        await page.addInitScript(() => {
+        await page.addInitScript(({ grant, proof }) => {
+            sessionStorage.setItem(`webjam-private-music-${grant}`, proof);
             window.musicCapture = [];
             Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
                 configurable: true,
@@ -718,7 +719,7 @@ for (const outcome of ['quota refusal', 'revocation after joining']) {
                     return stream;
                 }
             });
-        });
+        }, { grant, proof });
         await page.route('**/*', async route => {
             const url = new URL(route.request().url());
             if (url.origin !== baseURL) { external.push(url.origin); return route.abort(); }
@@ -740,8 +741,8 @@ for (const outcome of ['quota refusal', 'revocation after joining']) {
                 }
             ` });
             if (url.pathname !== '/beta/music') return route.continue();
-            const { op, id } = route.request().postDataJSON();
-            requests.push({ op, matched: id === grant });
+            const { op, id, proof: supplied } = route.request().postDataJSON();
+            requests.push({ op, matched: id === grant && supplied === proof });
             if (op === 'join') {
                 if (outcome === 'quota refusal') return route.fulfill({ status: 429, json: { error: 'cap' } });
                 return route.fulfill({ json: {

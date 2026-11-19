@@ -2478,15 +2478,19 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (!offer || !readyForMusicOffer() || musicPanel.hidden) return;
         if (offer.expires <= Date.now()) return endMusicInvite();
         if (offer.safe && offer.state === 'offer') {
-            let popup;
+            let popup, joinProof;
             try {
                 popup = window.open('about:blank', '_blank');
                 if (popup) {
+                    if (privateMusicProviderSupported) {
+                        joinProof = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
+                        popup.sessionStorage.setItem(`webjam-private-music-${offer.id}`, joinProof);
+                    }
                     popup.opener = null;
                     popup.document.title = 'Joining shared Music…';
                     popup.document.body.textContent = 'Joining shared Music…';
                 }
-            } catch { popup = null; }
+            } catch { popup?.close(); popup = null; }
             if (!popup) {
                 offer.sendFailed = true;
                 musicStatus.textContent = 'Your browser blocked the Music tab. Allow pop-ups for this private site, then ask the host to send a new invitation.';
@@ -2495,7 +2499,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             offer.pendingWindow = popup;
             if (send({ t: 'music-offer-accept', version: 1, id: offer.id, request: offer.request,
-                ch: offer.room, roomInstance: offer.instance })) {
+                ch: offer.room, roomInstance: offer.instance, ...(joinProof ? { joinProof } : {}) })) {
                 offer.state = 'joining';
                 offer.replyTimer = setTimeout(() => {
                     if (musicOffer !== offer || offer.state !== 'joining') return;

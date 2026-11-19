@@ -25,13 +25,22 @@ const failureElements = () => ({
 const requiresMusicGrant = !!document.querySelector('meta[name="private-music"][content="required"]');
 const grantMatch = requiresMusicGrant && /^#m=([a-f0-9]{32})&e=([1-9]\d{0,12})$/.exec(location.hash);
 const musicGrant = grantMatch?.[1];
-if (requiresMusicGrant) history.replaceState(null, "", location.pathname);
+let musicProof;
+if (requiresMusicGrant) {
+  history.replaceState(null, "", location.pathname);
+  if (musicGrant) try {
+    const key = `webjam-private-music-${musicGrant}`;
+    const value = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    if (/^[a-f0-9]{64}$/.test(value)) musicProof = value;
+  } catch { /* The protected handoff needs its original tab. */ }
+}
 let musicCheckTimer, grantRetired = false, musicJoinStarted = false;
 
 async function musicRequest(op, signal) {
   const response = await fetch("/beta/music", {
     method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id: musicGrant }),
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id: musicGrant, proof: musicProof }),
     signal: signal || AbortSignal.timeout(8000), keepalive: op === "stop",
   });
   if (response.status === 429) throw new Error(JOIN_SIGNAL.RELAY_CAP_REACHED);
@@ -120,7 +129,7 @@ function showAccessTime(expiresAt, isCurrent) {
 
 try {
   if (requiresMusicGrant) {
-    if (!musicGrant) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
+    if (!musicGrant || !musicProof) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
     invite = { expiresAt: Number(grantMatch[2]) };
   } else invite = readInvite(location.hash);
   clearJoinFailure(failureElements(), "Your host invited you to join.");

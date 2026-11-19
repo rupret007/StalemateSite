@@ -137,13 +137,13 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         await f.message('alice', { t: 'music-offer-create', ...target, peer, href });
         const offer = f.frames.find(frame => frame.t === 'music-offer' && frame.recipient === peer);
         expect(!!offer).toBe(true);
-        const accept = { ...target, id: offer.id };
+        const accept = { ...target, id: offer.id }, joinProof = randomBytes(32).toString('hex');
         await f.message(peer, { t: 'music-offer-seen', ...accept });
-        const access = (op, actor = peer, id = offer.id, override = {}) => {
+        const access = (op, actor = peer, id = offer.id, override = {}, proof = joinProof) => {
             const binding = f.sessionBindings.get(actor);
-            return f.engine.musicAccess({ op, id }, { sid: binding.betaSid, version: binding.betaInviteVersion, exp: binding.expiresAt, ...override }, '[inert]');
+            return f.engine.musicAccess({ op, id, proof }, { sid: binding.betaSid, version: binding.betaInviteVersion, exp: binding.expiresAt, ...override }, '[inert]');
         };
-        const acceptMusic = () => f.message(peer, { t: 'music-offer-accept', ...accept });
+        const acceptMusic = () => f.message(peer, { t: 'music-offer-accept', ...accept, joinProof });
         const handed = () => f.frames.filter(frame => frame.t === 'music-offer-accepted');
         const waitHandoff = () => vi.waitFor(() => expect(handed().length).toBe(1), { timeout: 2000 });
         return { ...f, provider, credentials, room, roomInstance, request, webjam, generation, expires, href, access, native, acceptMusic, handed, waitHandoff };
@@ -158,6 +158,7 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         expect(f.engine._debug.channels.get(f.room).members.has('bravo')).toBe(false);
         expect((await f.access('check', 'peer')).status).toBe(403);
         expect((await f.access('join', 'alice')).status).toBe(403);
+        expect((await f.access('join', 'bravo', undefined, {}, '0'.repeat(64))).status).toBe(403);
         expect((await f.access('join', 'bravo', '0'.repeat(32))).status).toBe(403);
         expect((await f.access('join', 'bravo', undefined, { exp: f.now() + 599999 })).status).toBe(403);
         expect(f.provider.issue.mock.calls.length).toBe(1);

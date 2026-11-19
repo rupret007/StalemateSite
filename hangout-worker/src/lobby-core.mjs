@@ -1137,7 +1137,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (!site && !native || site && native) return denied();
         if (native && (!musicRef(id) || !musicDigest(body.proof) || !musicDigest(body.webjam) || !Number.isInteger(body.generation)
             || Object.keys(body).length !== 5)
-            || !native && op !== 'page' && (!musicRef(id) || Object.keys(body).length !== 2)) return denied();
+            || !native && op !== 'page' && (!musicRef(id) || !musicDigest(body.proof) || Object.keys(body).length !== 3)) return denied();
 
         let hostKey, lease, offer;
         if (native) {
@@ -1149,7 +1149,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             [hostKey, lease] = match;
         } else {
             if (!['page', 'check', 'join', 'stop'].includes(op)) return denied();
-            const matches = value => value?.state === 'handed' && value.guestActor === site.sid && (op === 'page' || value.id === id);
+            const matches = value => value?.state === 'handed' && value.guestActor === site.sid && (op === 'page' || value.id === id && value.guestProof === body.proof);
             offer = [...musicInvites.values()].find(matches);
             if (!offer) return denied();
             hostKey = offer.hostLease;
@@ -1241,12 +1241,19 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         return { ok: true };
     }
 
+    function validMusicAnswer(frame) {
+        const protectedAccept = musicProvider && frame.t === 'music-offer-accept';
+        const fields = ['t', 'version', 'id', 'request', 'ch', 'roomInstance', ...(protectedAccept ? ['joinProof'] : [])];
+        return frame.version === 1 && validPmRef(frame.id) && validPmRef(frame.request)
+            && (!protectedAccept || musicDigest(frame.joinProof))
+            && Object.keys(frame).every(key => fields.includes(key));
+    }
+
     function musicProviderPreflight(id, raw) {
         if (!participationSafeMusicOffersConfigured || typeof raw !== 'string' || raw.length > L.frameBytes) return null;
         let frame;
         try { frame = JSON.parse(raw); } catch { return null; }
-        if (frame?.t !== 'music-offer-accept' || frame.version !== 1 || !validPmRef(frame.id) || !validPmRef(frame.request)
-            || Object.keys(frame).some(key => !['t', 'version', 'id', 'request', 'ch', 'roomInstance'].includes(key))) return null;
+        if (frame?.t !== 'music-offer-accept' || !validMusicAnswer(frame)) return null;
         const room = participationMusicRoom(frame), offer = room && musicInvites.get(room.name);
         const guest = conns.get(id), host = offer && conns.get(offer.host);
         if (!offer || offer.state !== 'offered' || offer.id !== frame.id || offer.request !== frame.request
@@ -1410,8 +1417,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     }
 
     function answerParticipationMusic(guest, frame) {
-        if (frame.version !== 1 || !validPmRef(frame.id) || !validPmRef(frame.request)
-            || Object.keys(frame).some(key => !['t', 'version', 'id', 'request', 'ch', 'roomInstance'].includes(key))) return;
+        if (!validMusicAnswer(frame)) return;
         const room = participationMusicRoom(frame), offer = room && musicInvites.get(room.name);
         if (!offer || offer.version !== 1 || offer.id !== frame.id || offer.request !== frame.request
             || offer.guest !== guest.id || offer.guestActor !== musicActor(guest) || offer.instance !== room.keepRef) {
@@ -1440,7 +1446,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             offer.addedMember = addedMember;
         }
         offer.state = 'accepting';
-        if (!musicProvider) {
+        if (musicProvider) offer.guestProof = frame.joinProof;
+        else {
             offer.hostRevision = participation.revisionFor(controlled.context, host.id);
             offer.guestRevision = participation.revisionFor(controlled.context, guest.id);
         }
