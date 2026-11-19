@@ -124,3 +124,36 @@ test('staff sign-in fields have the same readable boundary without broadening st
     await expect(page.locator('[data-nick]')).toBeVisible(); await page.locator('[data-nick]').blur();
     await check(page, testInfo, 'staff-entry', { text: ['.gate-card h1', '.gate-card .lede', '[data-signin]', '[data-enter]'], fields: ['[data-nick]'] });
 });
+
+for (const viewport of [{ width: 375, height: 667 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    test(`creative room and Paint Along composers remain readable at ${viewport.width}px`, async ({ browser, baseURL }, testInfo) => {
+        const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
+        try {
+            const page = await context.newPage();
+            const origin = new URL(baseURL).origin;
+            await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+            const relay = hangoutRelayWsBase(baseURL, `room-contrast-${randomUUID()}`);
+            await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+            await page.locator('[data-name]').fill('ContrastHost');
+            await page.locator('[data-enter]').click();
+            await expect(page.locator('[data-room]')).toBeVisible();
+            const field = '.chat [data-text]';
+            const composer = page.getByRole('textbox', { name: 'Message', exact: true });
+            const samples = { fields: [field], placeholders: [field] };
+            await expect(composer).toBeVisible();
+            await check(page, testInfo, 'creative-room-composer', samples);
+
+            await page.locator('[data-bob-toggle]').click();
+            await expect(page.locator('body')).toHaveAttribute('data-shared-layout', 'paint');
+            await page.locator('[data-consent-skip]').click();
+            if (viewport.width <= 820) await page.locator('[data-chat-toggle]').click();
+            await expect(composer).toBeVisible();
+            await composer.scrollIntoViewIfNeeded();
+            await expect(composer).toBeInViewport({ ratio: 1 });
+            await check(page, testInfo, 'paint-along-composer', samples);
+            await page.screenshot({ path: testInfo.outputPath(`paint-chat-contrast-${viewport.width}.png`) });
+        } finally {
+            await context.close();
+        }
+    });
+}
