@@ -149,6 +149,50 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         const waitHandoff = () => vi.waitFor(() => expect(handed().length).toBe(1), { timeout: 2000 });
         return { ...f, provider, credentials, room, roomInstance, request, webjam, generation, expires, href, access, native, acceptMusic, handed, waitHandoff };
     }
+
+    it('keeps Music alive through a busy chat commit and publishes the handoff only after its own commit', async () => {
+        const f = await setupMusic();
+        const busyChat = gate();
+        f.controls.commitGate = busyChat;
+        const chat = f.message('alice', { t: 'say', ch: '#stalemate', text: 'Still here' });
+        await busyChat.entered;
+        const check = f.native('native-check');
+        busyChat.release();
+        await chat;
+        expect((await check).status).toBe(200);
+        expect(f.provider.revoke).not.toHaveBeenCalled();
+
+        const handoffCommit = gate();
+        f.controls.afterValidate = () => {
+            f.controls.afterValidate = null;
+            f.controls.commitGate = handoffCommit;
+        };
+        await f.acceptMusic();
+        await handoffCommit.entered;
+        try { expect(f.handed()).toEqual([]); }
+        finally { handoffCommit.release(); }
+        await f.waitHandoff();
+        expect((await f.access('join')).status).toBe(200);
+    });
+
+    it('never exposes a Music page or issues guest credentials if the handoff commit fails', async () => {
+        const f = await setupMusic();
+        const handoffCommit = gate();
+        f.controls.afterValidate = () => {
+            f.controls.afterValidate = null;
+            f.controls.writeGate = handoffCommit;
+        };
+        await f.acceptMusic();
+        await handoffCommit.entered;
+        f.controls.failWrites = true;
+        handoffCommit.release();
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.t === 'net' && frame.lock === 'readonly')).toBe(true));
+        expect(f.handed()).toEqual([]);
+        expect((await f.access('page')).status).toBe(403);
+        expect((await f.access('join')).status).toBe(403);
+        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+    });
+
     it('keeps a single handoff and refuses copied, stale and cross-session grants with no early room or provider access', async () => {
         const f = await setupMusic();
         expect((await f.access('join')).status).toBe(403);

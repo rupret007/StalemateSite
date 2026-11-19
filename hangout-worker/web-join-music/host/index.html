@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Host private Music</title>
+    <link rel="stylesheet" href="./style.css">
+    <script type="module" src="./host-app.js"></script>
+</head>
+<body>
+    <main>
+        <h1>Host private Music</h1>
+        <p>Wear headphones. Your microphone opens when you start and audio is shared after your guest connects.</p>
+        <label><input id="headphones" type="checkbox"> I’m wearing headphones</label>
+        <p role="status" id="status">Preparing your invitation…</p>
+        <button type="button" id="start" disabled>Start with microphone</button>
+        <button type="button" id="stop" hidden>Stop Music</button>
+        <button type="button" id="listen" hidden>Play guest audio</button>
+        <audio id="guest-audio" playsinline></audio>
+    </main>
+</body>
+</html>

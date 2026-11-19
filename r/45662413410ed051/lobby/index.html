@@ -150,6 +150,12 @@
         </div>
     </main>
 
+    <details class="music-session-panel" data-music-session-panel hidden>
+        <summary>Music controls</summary>
+        <button class="btn btn--ghost" type="button" data-music-session-close>End Music</button>
+        <div data-music-session-content></div>
+    </details>
+
     <main class="irc" data-app hidden>
         <h1 class="sr-only">Community chat</h1>
         <aside class="pane rooms" id="rooms-pane" data-pane="rooms" aria-label="Rooms">
@@ -302,6 +308,9 @@
                 <p class="small" data-webjam-host-seat-status role="status"></p>
                 <p class="small jam-note" data-jam-browser-note>Browser audio: headphones required; higher delay.</p>
                 <button class="btn jam-room-invite" type="button" data-jam-invite-music aria-haspopup="dialog" hidden>Invite to Music</button>
+                <button class="btn jam-room-invite" type="button" data-browser-music-host aria-haspopup="dialog" hidden>Host Music on this device</button>
+                <button class="btn btn--ghost jam-room-invite" type="button" data-browser-music-stop hidden>Stop Music</button>
+                <p class="small" data-browser-music-status role="status" hidden></p>
                 <button class="btn btn--ghost jam-room-invite" type="button" data-music-handoff-manual hidden>Share a link instead</button>
                 <p class="small" data-music-handoff-status role="status"></p>
                 <button class="btn btn--ghost" type="button" data-music-handoff-cancel hidden>Cancel Music invitation</button>

@@ -1,3 +1,4 @@
+import { musicSignal } from './request-signal.js';
 import { readInvite } from "./crypto.js";
 import { acquireMusicStream, closeAudioContext } from "./audio.js";
 import { WebJoinSession } from "./session.js";
@@ -37,14 +38,18 @@ if (requiresMusicGrant) {
 }
 let musicCheckTimer, grantRetired = false, musicJoinStarted = false;
 
-async function musicRequest(op, signal) {
+let lastMusicCheck = 0;
+async function musicRequest(op, signal, allowBusy = false) {
   const response = await fetch("/beta/music", {
     method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id: musicGrant, proof: musicProof }),
     signal: signal || AbortSignal.timeout(8000), keepalive: op === "stop",
   });
+  if (allowBusy && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy'
+      && Date.now() - lastMusicCheck < 15000) return;
   if (response.status === 429) throw new Error(JOIN_SIGNAL.RELAY_CAP_REACHED);
   if (!response.ok) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
+  if (op === 'check' || op === 'join') lastMusicCheck = Date.now();
   return response.json();
 }
 
@@ -53,7 +58,7 @@ function watchMusicGrant() {
   musicCheckTimer = setTimeout(async () => {
     try {
       if (grantRetired) return;
-      await musicRequest("check");
+      await musicRequest("check", undefined, true);
       if (!grantRetired) watchMusicGrant();
     } catch {
       if (!grantRetired) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
@@ -449,7 +454,7 @@ async function startJoin(listenOnly = false) {
     if (!isCurrent() || expireUnusedInvite()) return;
     let grantedCredentials;
     if (musicGrant) {
-      const result = await musicRequest("join", AbortSignal.any([attempt.signal, AbortSignal.timeout(12000)]));
+      const result = await musicRequest("join", musicSignal(attempt.signal, AbortSignal.timeout(12000)));
       if (!isCurrent() || expireUnusedInvite()) return;
       const href = new URL(result.href);
       if (href.origin !== location.origin || href.pathname !== "/join/" || href.search || href.username || href.password)

@@ -860,6 +860,98 @@ describe('actual HangoutLobby constructs the required participation bridge', () 
 });
 
 describe('private Music through signed beta admission, production lobby and SQLite authority', () => {
+    it('fences a browser Music host and the selected guest to their signed sessions and retires both roles on Stop', async () => {
+        const f = await fixture({ participation: true });
+        const host = await f.enroll('browser-music-host'), guest = await f.enroll('browser-music-guest');
+        const ledger = await participationLedger(f);
+        for (const party of [host, guest]) await ledger.grant(party.binding);
+        const origin = 'https://music-fixture.example.invalid';
+        const prepare = vi.fn(async () => ({ status: 200 }));
+        const issue = vi.fn(async (claim, confirm) => await confirm()
+            ? { status: 200, credentials: { role: claim.role } } : { status: 403 });
+        const revoke = vi.fn(async () => ({ status: 200 }));
+        Object.assign(f.env, {
+            WEBJAM_WEB_ORIGINS: origin, HANGOUT_TURN_ENABLED: '0', HANGOUT_AI_MODERATION: 'off',
+            HANGOUT_BETA_INVITE_KEY: 'offline-music-fixture-key-for-signed-cookies',
+            HANGOUT_PREVIEW_KEY: 'offline-music-fixture-preview',
+            ASSETS: { fetch: async () => new Response('<html><head></head></html>', { headers: { 'Content-Type': 'text/html' } }) },
+            ROOMS: {}, QUOTA: { idFromName: name => name, get: () => ({ fetch: () => new Response(null) }) },
+            WEBJAM_PRIVATE_MUSIC: { prepare, issue, revoke, touch: async () => ({ status: 200 }) }
+        });
+        const app = await productionDo(f);
+        const owner = p9SerializedOwner(app.lobby);
+        f.env.LOBBY = { idFromName: name => name, get: () => ({ fetch: (request, init) =>
+            app.lobby.fetch(request instanceof Request ? request : new Request(request, init)) }) };
+        const cookie = async party => BETA_COOKIE + '=' + await signBeta('access', {
+            v: 1, sid: party.request.sid, version: party.request.version, exp: party.request.exp, scope: 'guest'
+        }, f.env.HANGOUT_HMAC_KEY);
+        const call = (path, session, body) => betaFetch(new Request(origin + path, {
+            ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}),
+            headers: { ...(session ? { Cookie: session, Origin: origin } : {}),
+                ...(body ? { 'Content-Type': 'application/json' } : {}), 'CF-Connecting-IP': '127.0.0.1' }
+        }), f.env);
+        try {
+            const wa = await app.connect(host, 'PhoneHost'), wb = await app.connect(guest, 'PhoneGuest');
+            const hostCookie = await cookie(host), guestCookie = await cookie(guest);
+            const lobbyPage = await call('/r/45662413410ed051/lobby/', hostCookie);
+            expect(lobbyPage.status).toBe(200);
+            expect(lobbyPage.headers.get('Content-Security-Policy')).toContain(`frame-src ${origin}/join/host/ ${origin}/join/guest/ `);
+            expect(lobbyPage.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'none'");
+            expect(lobbyPage.headers.get('Permissions-Policy')).toBe('microphone=(self)');
+            await app.message(wa, { t: 'cmd', name: 'join', args: ['#jam-phone-music'], ch: '#stalemate' });
+            const room = wa.frames.find(frame => frame.t === 'join' && frame.ch.name === '#jam-phone-music').ch;
+            const request = randomBytes(16).toString('hex'), proof = randomBytes(32).toString('hex');
+            const webjam = '776a6d7573696301' + Math.floor(f.now() / 1000).toString(16) + randomBytes(20).toString('hex');
+            const common = { version: 1, request, ch: room.name, roomInstance: room.keepRef };
+            const generation = 1, requestHost = { id: webjam.slice(-32), webjam, generation, proof };
+            expect((await call('/join/host/', hostCookie)).status).toBe(403);
+            await app.message(wa, { t: 'music-host-bind', ...common, peer: wb.attachment.id, webjam, generation,
+                hostMode: 'browser', proofHash: createHash('sha256').update(proof).digest('hex') });
+            const bound = wa.frames.find(frame => frame.t === 'music-host-bound' && frame.request === request);
+            expect(bound).toMatchObject({ status: 'bound' });
+            expect(bound.expires).toBeGreaterThan(f.now());
+            const hostPage = await call('/join/host/', hostCookie);
+            expect(hostPage.status).toBe(200);
+            expect(hostPage.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'self'");
+            expect((await call('/join/host/', guestCookie)).status).toBe(403);
+            expect((await call('/join/guest/', guestCookie)).status).toBe(403);
+            expect((await call('/join/', hostCookie)).status).toBe(403);
+            expect((await call('/beta/music/native', null, { op: 'native-join', ...requestHost })).status).toBe(403);
+            expect((await call('/beta/music', guestCookie, { op: 'host-join', ...requestHost })).status).toBe(403);
+            expect((await call('/beta/music', hostCookie, { op: 'host-join', ...requestHost, generation: 2 })).status).toBe(403);
+            expect(prepare).not.toHaveBeenCalled();
+            const hostJoin = await call('/beta/music', hostCookie, { op: 'host-join', ...requestHost });
+            expect(hostJoin.status).toBe(200);
+            expect(await hostJoin.json()).toEqual({ role: 'host' });
+            expect((await call('/beta/music', hostCookie, { op: 'host-join', ...requestHost })).status).toBe(403);
+            const href = `${origin}/join/#k=${'B'.repeat(43)}&s=${webjam}&g=${generation}&e=${Math.floor(f.now() / 1000) + 60}`;
+            await app.message(wa, { t: 'music-offer-create', ...common, peer: wb.attachment.id, href });
+            const offer = wb.frames.find(frame => frame.t === 'music-offer');
+            expect(offer).toBeDefined();
+            await app.message(wb, { t: 'music-offer-seen', ...common, id: offer.id });
+            const joinProof = randomBytes(32).toString('hex');
+            await app.message(wb, { t: 'music-offer-accept', ...common, id: offer.id, joinProof });
+            await vi.waitFor(() => expect(wb.frames.some(frame => frame.t === 'music-offer-accepted')).toBe(true));
+            const guestPage = await call('/join/guest/', guestCookie);
+            expect(guestPage.status).toBe(200);
+            expect(guestPage.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'self'");
+            expect((await call('/join/guest/', hostCookie)).status).toBe(403);
+            const join = { op: 'join', id: offer.id, proof: joinProof };
+            expect((await call('/beta/music', hostCookie, join)).status).toBe(403);
+            const guestJoin = await call('/beta/music', guestCookie, join);
+            expect(guestJoin.status).toBe(200);
+            expect(await guestJoin.json()).toEqual({ href, credentials: { role: 'guest' } });
+            expect(issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+            expect((await call('/beta/music', hostCookie, { op: 'host-stop', ...requestHost })).status).toBe(200);
+            expect((await call('/join/host/', hostCookie)).status).toBe(403);
+            expect((await call('/beta/music', guestCookie, join)).status).toBe(403);
+            await vi.waitFor(() => expect(revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(['guest', 'host']));
+        } finally {
+            owner.restore();
+            await app.dispose();
+        }
+    });
+
     it.each(['logout', 'Stop'])('rejects an admitted guest after real %s wins before issuer start', async action => {
         const f = await fixture({ participation: true });
         const host = await f.enroll('music-host'), guest = await f.enroll('music-guest'), outsider = await f.enroll('music-outsider');

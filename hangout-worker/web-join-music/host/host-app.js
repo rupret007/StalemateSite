@@ -1,0 +1,99 @@
+import { musicSignal } from './request-signal.js';
+import { acquireMusicStream } from './audio.js';
+import { RELAY_ORIGIN } from './config.js';
+import { readInvite, toBase64Url } from './crypto.js';
+import { BrowserMusicHost } from './host-session.js';
+import { validateCredentials } from './policy.js';
+
+const $ = id => document.getElementById(id);
+const start = $('start'), stop = $('stop'), listen = $('listen'), headphones = $('headphones'), status = $('status');
+const audio = $('guest-audio');
+let handoff;
+try {
+    handoff = JSON.parse(sessionStorage.getItem('private-music-host'));
+    sessionStorage.removeItem('private-music-host');
+} catch { /* An admitted host still needs the original tab handoff. */ }
+const ref = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
+if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f0-9]{64}$/.test(handoff?.proof)
+    || !Number.isInteger(handoff.generation) || !Number.isSafeInteger(handoff.expires) || handoff.expires <= Date.now()) {
+    status.textContent = 'Open a current Music host invitation from your Jam room.';
+} else {
+    const controller = new AbortController();
+    const channel = new BroadcastChannel(`webjam-browser-host-${handoff.request}`);
+    let session, stream, heartbeat, checking = false, lastCheck = 0;
+    const end = message => {
+        if (controller.signal.aborted) return;
+        controller.abort();
+        clearInterval(heartbeat);
+        session?.close();
+        session = null;
+        stream?.getTracks().forEach(track => track.stop());
+        stream = null;
+        audio.pause(); audio.srcObject = null;
+        start.disabled = true; stop.hidden = true; listen.hidden = true;
+        status.textContent = message;
+        channel.postMessage({ type: 'ended' }); channel.close();
+        void request('host-stop').catch(() => {});
+        handoff = null;
+    };
+    async function request(op) {
+        const closing = op === 'host-stop';
+        const deadline = AbortSignal.timeout(8000);
+        const response = await fetch('/beta/music', { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+            headers: { 'Content-Type': 'application/json' }, keepalive: closing,
+            signal: closing ? deadline : musicSignal(controller.signal, deadline),
+            body: JSON.stringify({ op, id: handoff.webjam.slice(-32), proof: handoff.proof, webjam: handoff.webjam, generation: handoff.generation }) });
+        if (op === 'host-check' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy'
+            && Date.now() - lastCheck < 15000) return;
+        if (!response.ok) throw new Error('Music authority ended.');
+        if (!closing) lastCheck = Date.now();
+        return response.json();
+    }
+    async function play() {
+        if (!audio.srcObject || controller.signal.aborted) return;
+        try { await audio.play(); listen.hidden = true; }
+        catch { if (!controller.signal.aborted) listen.hidden = false; }
+    }
+    async function check() {
+        if (checking) return;
+        checking = true;
+        try { await request('host-check'); }
+        catch { end('The Music connection ended. Start a fresh invitation to rejoin.'); }
+        finally { checking = false; }
+    }
+    status.textContent = 'Confirm headphones and start when you’re ready to invite your guest.';
+    headphones.addEventListener('change', () => { if (!stream && !controller.signal.aborted) start.disabled = !headphones.checked; });
+    start.addEventListener('click', async event => {
+        if (!event.isTrusted || !headphones.checked || start.disabled || controller.signal.aborted) return;
+        start.disabled = true; headphones.disabled = true; stop.hidden = false;
+        status.textContent = 'Allow microphone access to host Music.';
+        try {
+            const { stream: captured } = await acquireMusicStream(navigator.mediaDevices);
+            captured.getAudioTracks().forEach(track => { track.enabled = false; });
+            if (controller.signal.aborted) { captured.getTracks().forEach(track => track.stop()); return; }
+            stream = captured;
+            controller.signal.throwIfAborted();
+            for (const track of stream.getAudioTracks()) track.addEventListener('ended', () => end('The microphone stopped.'));
+            const credentials = validateCredentials(await request('host-join'));
+            controller.signal.throwIfAborted();
+            heartbeat = setInterval(check, 4000);
+            const expires = Math.floor(Math.min(handoff.expires, credentials.expiresAt) / 1000);
+            const capability = toBase64Url(crypto.getRandomValues(new Uint8Array(32)));
+            const href = `${location.origin}/join/#k=${capability}&s=${handoff.webjam}&g=${handoff.generation}&e=${expires}`;
+            const invite = readInvite(new URL(href).hash);
+            session = new BrowserMusicHost({ origin: RELAY_ORIGIN, invite, stream, audioContext: { baseLatency: 0 },
+                onTrack: remote => { audio.srcObject = remote; void play(); },
+                onError: () => end('The Music session ended. Start a fresh invitation to rejoin.') });
+            status.textContent = 'Preparing secure Music audio…';
+            await session.host(credentials, () => {
+                channel.postMessage({ type: 'offer', href });
+                status.textContent = 'Waiting for your guest to accept the invitation and enable audio.';
+            });
+            status.textContent = 'Connected to your guest.';
+        } catch { end('Music could not start. Return to the Jam room for a fresh invitation.'); }
+    });
+    channel.addEventListener('message', ({ data }) => { if (data?.type === 'stop') end('The Music invitation ended.'); });
+    stop.addEventListener('click', () => end('Music stopped. You can return to the Jam room.'));
+    listen.addEventListener('click', play);
+    window.addEventListener('pagehide', () => end('Music stopped.'), { once: true });
+}

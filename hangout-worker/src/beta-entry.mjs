@@ -1,4 +1,4 @@
-import { MUSIC_INTERNAL_PATH, MUSIC_PATH, musicJson, musicResponse, nativeMusicRateAddress, privateMusicOrigin, validMusicBody } from './private-music.mjs';
+import { MUSIC_INTERNAL_PATH, MUSIC_PATH, musicJson, musicResponse, nativeMusicRateAddress, privateMusicOrigin, stoppingMusic, validMusicBody } from './private-music.mjs';
 import { validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
 // Invitation-only real visitor beta. Never imports the pilot's role selector or synthetic emails.
 import worker, { HangoutLobby, HangoutRoom, HangoutQuota, HangoutTurnBudget } from './index.mjs';
@@ -461,15 +461,14 @@ async function betaRequest(request, env, deps = {}) {
         if (!native && (!session || session.access.scope === 'game-night')) return musicResponse(403, { error: 'unavailable' });
         const ip = request.headers.get('CF-Connecting-IP');
         try {
-            if (native) {
-                const address = nativeMusicRateAddress(ip);
-                if (!address) return musicResponse(403, { error: 'unavailable' });
-                const bucket = await ipHash(address, env.HANGOUT_HMAC_KEY);
-                const namespace = body.op === 'native-stop' ? 'private-music-stop:' : 'private-music-native:';
-                const rate = await env.QUOTA.get(env.QUOTA.idFromName(namespace + bucket[0]))
-                    .fetch('https://quota/private-music-native', { method: 'POST', headers: { 'X-Hangout-Native-Rate': bucket } });
-                if (rate.status !== 200) return musicResponse(rate.status === 429 ? 429 : 503, { error: 'unavailable' });
-            }
+            const identity = native ? nativeMusicRateAddress(ip) : session.access.sid;
+            if (!identity) return musicResponse(403, { error: 'unavailable' });
+            const bucket = await ipHash(identity, env.HANGOUT_HMAC_KEY);
+            const namespace = native ? body.op === 'native-stop' ? 'private-music-stop:' : 'private-music-native:'
+                : stoppingMusic(body.op) ? 'private-music-browser-stop:' : 'private-music-browser:';
+            const rate = await env.QUOTA.get(env.QUOTA.idFromName(namespace + bucket[0]))
+                .fetch('https://quota/private-music-native', { method: 'POST', headers: { 'X-Hangout-Native-Rate': bucket } });
+            if (rate.status !== 200) return musicResponse(rate.status === 429 ? 429 : 503, { error: 'unavailable' });
             return await musicLobby(env, body, session, ip);
         } catch { return musicResponse(503, { error: 'unavailable' }); }
     }
@@ -640,13 +639,20 @@ async function betaRequest(request, env, deps = {}) {
     if ((assetPath === `${ROOT}admin` || assetPath.startsWith(`${ROOT}admin/`)) && session.identity?.kind !== 'staff') return reply('Restricted moderator sign-in required.', 403);
     const webJoin = assetPath === '/join' || assetPath.startsWith('/join/');
     const protectedMusic = webJoin && lobbyParticipationMode(env);
+    const browserHostAsset = assetPath === '/join/host' || assetPath.startsWith('/join/host/');
+    const browserGuestAsset = assetPath === '/join/guest' || assetPath.startsWith('/join/guest/');
     const musicHandoff = ['/join/handoff.html', '/join/handoff.js'].includes(assetPath);
+    const embeddedMusic = browserHostAsset || browserGuestAsset;
+    if (embeddedMusic && !protectedMusic) return reply('Not found.', 404);
     if (protectedMusic) {
+        if (guest) return reply('Open a current Music invitation from your Jam room.', 403);
         if (privateMusicOrigin(env) !== url.origin) return reply('This audio path is unavailable under the current participation permissions.', 503);
         if (url.search) return reply('Open a current Music invitation from your Jam room.', 403);
         if (!musicHandoff) {
             let access;
-            try { access = await musicLobby(env, { op: 'page' }, session); } catch { /* Deny on failed authority read. */ }
+            const op = browserHostAsset ? 'host-page' : browserGuestAsset ? 'guest-frame-page' : 'page';
+            try { access = await musicLobby(env, { op }, session); } catch { /* Deny on failed authority read. */ }
+            if (access?.status === 503) return reply('Music is temporarily unavailable. Return to your Jam room.', 503);
             if (access?.status !== 200) return reply('Open a current Music invitation from your Jam room.', 403);
         }
     }
@@ -675,7 +681,8 @@ async function betaRequest(request, env, deps = {}) {
             for (const name of ['ETag', 'Last-Modified']) result.headers.delete(name);
             if (typeof content === 'string') result.headers.delete('Content-Length');
         }
-        result.headers.set('Content-Security-Policy', musicHandoff ? MUSIC_HANDOFF_CSP : WEB_JOIN_CSP);
+        const joinPolicy = embeddedMusic ? WEB_JOIN_CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'") : WEB_JOIN_CSP;
+        result.headers.set('Content-Security-Policy', musicHandoff ? MUSIC_HANDOFF_CSP : joinPolicy);
         result.headers.set('Permissions-Policy', musicHandoff ? 'camera=(), geolocation=(), microphone=()' : 'camera=(), geolocation=(), microphone=(self)');
         return result;
     }
@@ -698,7 +705,10 @@ async function betaRequest(request, env, deps = {}) {
         .replace('<main class="gate" data-game-guest-connecting hidden>', '<main class="gate" data-game-guest-connecting>')
         .replace('<h1 data-game-guest-title>Game Night</h1>', `<h1 data-game-guest-title>${gameNightLabels[guest.game]}</h1>`)
         : webJamReturn ? page.replace('<body>', '<body data-webjam-return>') : page;
-    return reply(content, asset.status, 'text/html; charset=utf-8');
+    const musicFrames = !guest && assetPath === LOBBY_PAGE && privateMusicOrigin(env) === url.origin;
+    return reply(content, asset.status, 'text/html; charset=utf-8', musicFrames
+        ? { 'Content-Security-Policy': CSP.replace('frame-src ', `frame-src ${url.origin}/join/host/ ${url.origin}/join/guest/ `),
+            'Permissions-Policy': 'microphone=(self)' } : {});
 }
 export async function betaFetch(request, env, deps = {}) {
     try { return await betaRequest(request, env, deps); }

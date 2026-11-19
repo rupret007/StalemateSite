@@ -19,8 +19,21 @@ if (target === 'beta') {
     for (const file of ['app.js', 'handoff.html', 'handoff.js']) {
         fs.copyFileSync(path.join(musicJoin, file), path.join(out, 'join', file));
     }
+    fs.copyFileSync(path.join(musicJoin, 'request-signal.js'), path.join(out, 'join', 'request-signal.js'));
     const joinStyle = path.join(out, 'join', 'style.css');
     fs.appendFileSync(joinStyle, '\n' + fs.readFileSync(path.join(musicJoin, 'style.css'), 'utf8'));
+    const musicHost = path.join(out, 'join', 'host');
+    fs.cpSync(path.join(musicJoin, 'host'), musicHost, { recursive: true });
+    for (const file of ['audio.js', 'config.js', 'crypto.js', 'errors.js', 'mailbox.js', 'policy.js', 'session.js', 'style.css']) {
+        fs.copyFileSync(path.join(root, 'join', file), path.join(musicHost, file));
+    }
+    fs.copyFileSync(path.join(musicJoin, 'request-signal.js'), path.join(musicHost, 'request-signal.js'));
+    const musicGuest = path.join(out, 'join', 'guest');
+    fs.mkdirSync(musicGuest);
+    for (const file of ['index.html', 'style.css', 'app.js', 'session.js', 'audio.js', 'config.js', 'crypto.js',
+        'errors.js', 'mailbox.js', 'policy.js', 'prejoin.js', 'game-offer.js', 'request-signal.js']) {
+        fs.copyFileSync(path.join(out, 'join', file), path.join(musicGuest, file));
+    }
     const play = path.join(root, 'play');
     fs.mkdirSync(path.join(out, 'play/assets'), { recursive: true });
     fs.copyFileSync(path.join(play, 'assets/suite-sound.js'), path.join(out, 'play/assets/suite-sound.js'));

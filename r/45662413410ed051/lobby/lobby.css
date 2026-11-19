@@ -23,6 +23,10 @@ html, body { height: 100%; }
 html, body { overflow-x: hidden; }
 body { margin: 0; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--ink); color: var(--cream); font: 15px/1.5 var(--body); }
 [hidden] { display: none !important; }
+
+.music-session-panel { flex: none; background: var(--surface); border-bottom: 1px solid var(--control-line); }
+.music-session-panel summary { min-height: 48px; padding: 12px 16px; color: var(--lime); }
+.music-session-panel iframe { display: block; width: 100%; height: min(48dvh, 25rem); border: 0; }
 button, input, select, a, summary { -webkit-tap-highlight-color: transparent; }
 button, input, select { font: inherit; }
 button, summary { cursor: pointer; }

@@ -7,12 +7,13 @@ export const musicRef = value => typeof value === 'string' && /^[a-f0-9]{32}$/.t
 export const musicDigest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 
 export const nativeMusicOp = op => ['native-check', 'native-join', 'native-stop'].includes(op);
-export const stoppingMusic = op => op === 'stop' || op === 'native-stop';
+export const browserMusicHostOp = op => ['host-check', 'host-join', 'host-stop'].includes(op);
+export const stoppingMusic = op => ['stop', 'native-stop', 'host-stop'].includes(op);
 
 export function validMusicBody(body, native) {
     if (!body || !musicRef(body.id) || !musicDigest(body.proof)) return false;
-    if (!native) return ['check', 'join', 'stop'].includes(body.op) && Object.keys(body).length === 3;
-    return nativeMusicOp(body.op) && musicDigest(body.webjam) && body.webjam.slice(-32) === body.id
+    if (!native && !browserMusicHostOp(body.op)) return ['check', 'join', 'stop'].includes(body.op) && Object.keys(body).length === 3;
+    return (native ? nativeMusicOp(body.op) : browserMusicHostOp(body.op)) && musicDigest(body.webjam) && body.webjam.slice(-32) === body.id
         && Number.isInteger(body.generation) && body.generation > 0 && body.generation <= 0xffffffff
         && Object.keys(body).length === 5;
 }
