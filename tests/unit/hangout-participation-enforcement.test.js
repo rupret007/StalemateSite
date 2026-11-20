@@ -156,9 +156,9 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         expect(!!offer).toBe(true);
         const accept = { ...target, id: offer.id }, joinProof = randomBytes(32).toString('hex');
         await f.message(peer, { t: 'music-offer-seen', ...accept });
-        const access = (op, actor = peer, id = offer.id, override = {}, proof = joinProof) => {
+        const access = (op, actor = peer, id = offer.id, override = {}, proof = joinProof, extra = {}) => {
             const binding = f.sessionBindings.get(actor);
-            return f.engine.musicAccess({ op, id, proof }, { sid: binding.betaSid, version: binding.betaInviteVersion, exp: binding.expiresAt, ...override }, '[inert]');
+            return f.engine.musicAccess({ op, id, proof, ...extra }, { sid: binding.betaSid, version: binding.betaInviteVersion, exp: binding.expiresAt, ...override }, '[inert]');
         };
         const acceptMusic = () => f.message(peer, { t: 'music-offer-accept', ...accept, joinProof });
         const handed = () => f.frames.filter(frame => frame.t === 'music-offer-accepted');
@@ -216,6 +216,26 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
         expect((await f.access('join')).status).toBe(403);
         expect(f.provider.revoke).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])('closes an unconfirmed guest attempt while preserving an unaffected host (issuer started: %s)', async started => {
+        const f = await setupMusic();
+        await f.acceptMusic();
+        await f.waitHandoff();
+        const preparing = gate();
+        if (started) f.provider.prepare.mockImplementationOnce(async () => { await preparing.wait(); return { status: 200 }; });
+        const joining = started ? f.access('join') : null;
+        if (started) await preparing.entered;
+        try {
+            const closed = await f.access('stop', undefined, undefined, undefined, undefined, { ifStarted: true });
+            expect(closed.status).toBe(200);
+            expect(await closed.json()).toEqual({ closed: true });
+        } finally { if (started) preparing.release(); }
+        if (joining) expect((await joining).status).toBe(403);
+        expect((await f.access('join')).status).toBe(403);
+        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+        expect((await f.native('native-check')).status).toBe(started ? 403 : 200);
+        expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(started ? ['guest', 'host'] : []);
     });
 
     it.each([

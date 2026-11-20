@@ -160,6 +160,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const musicOfferRequests = new Map();
     const musicHosts = new Map();
     const stoppedMusicHosts = new WeakSet();
+    const abandonedMusicGuests = new WeakSet();
     const retiredMusicStops = new Map();
     const musicHostStarts = new Map();
     const musicWork = new Map(); // irreversibly consumed issuance attempts, independent of room rollback
@@ -1286,6 +1287,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const host = conns.get(lease?.host), guest = conns.get(lease?.guest);
         if (!lease || guestFrame && !lease.browserHost || !isHost && (lease.guestVersion !== site.version || lease.guestExpiry !== site.exp)) return denied();
         if (retired) return musicResponse(200, { closed: true });
+        if (!isHost && !stop && abandonedMusicGuests.has(offer)) return denied();
         const role = isHost ? 'host' : 'guest', target = isHost ? lease : offer;
         const current = () => musicHosts.get(hostKey) === lease && currentMusicHost(lease)
             && (isHost || liveMusicActivity(lease.id) && musicInvites.get(lease.room) === offer && offer.state === 'handed');
@@ -1298,6 +1300,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             return controlledRun(finishMusicHost, [hostKey, true, lease], true);
         };
         if (stop) {
+            // A guest that saw an ambiguous join response still closes any
+            // in-flight issuer work, without retiring a host it never joined.
+            if (body.ifStarted === true && !musicWork.has(target.id)) {
+                abandonedMusicGuests.add(offer);
+                return musicResponse(200, { closed: true });
+            }
             await close();
             return musicResponse(200, { closed: true });
         }

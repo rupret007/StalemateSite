@@ -173,13 +173,14 @@ for (const [outcome, title] of [
     ['busy', 'the packaged browser Music host keeps capture and resumes playback after a busy foreground check'],
     ['outage', 'the packaged browser Music host recovers from an edge error without stopping capture'],
     ['join-busy', 'the packaged browser Music host retries an explicitly busy initial join after one consent tap'],
+    ['join-edge', 'the packaged browser Music host retries a transient initial join error after one consent tap'],
     ['cache', 'the packaged browser Music host checks on cache restoration before resuming capture'],
     ['deadline', 'the packaged browser Music host closes capture at the heartbeat deadline during a pending check'],
 ]) test(title, async ({ page }) => {
     const hostAssets = path.resolve(__dirname, '../../.beta-assets/join/host');
     const operations = [];
     const recoverable = outcome === 'busy' || outcome === 'outage';
-    const joiningBusy = outcome === 'join-busy';
+    const joiningBusy = outcome === 'join-busy' || outcome === 'join-edge';
     const cached = outcome === 'cache';
     const foreground = outcome === 'foreground' || recoverable || joiningBusy || cached;
     const deadline = outcome === 'deadline';
@@ -199,7 +200,9 @@ for (const [outcome, title] of [
             : route.fulfill({ status: 502, contentType: 'text/html', body: 'Synthetic edge error' });
         if ((recoverable || cached) && op === 'host-check') return route.fulfill({ json: {} });
         if ((recoverable || cached) && op === 'host-stop') return route.fulfill({ json: { closed: true } });
-        if (joiningBusy && op === 'host-join' && ++joins === 1) return route.fulfill({ status: 503, json: { error: 'busy' } });
+        if (joiningBusy && op === 'host-join' && ++joins === 1) return outcome === 'join-busy'
+            ? route.fulfill({ status: 503, json: { error: 'busy' } })
+            : route.fulfill({ status: 502, contentType: 'text/html', body: 'Synthetic edge error' });
         if (outcome !== 'refused' && op === 'host-join') return route.fulfill({ json: {
             client: 'web', ttl: 120, quota_bytes: 256 * 1024 * 1024,
             iceServers: [{ urls: 'turn:turn.cloudflare.com:3478?transport=udp', username: 'fixture', credential: 'inert' }],

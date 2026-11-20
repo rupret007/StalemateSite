@@ -699,16 +699,18 @@ test('capture arriving after Leave releases only its own tracks during the next 
 // inert session transport. Production cookie/room authority is tested against
 // the actual Worker and lobby in the SQLite authority suite.
 for (const outcome of ['quota refusal', 'revocation after joining', 'revocation on foreground return', 'heartbeat expiring during a pending check',
-    'busy foreground check followed by success', 'unavailable heartbeat followed by success', 'busy join followed by success', 'restored cached page']) {
+    'busy foreground check followed by success', 'unavailable heartbeat followed by success', 'busy join followed by success',
+    'unavailable join followed by success', 'unavailable first mic check followed by success', 'restored cached page']) {
     test(`protected Music ${outcome} respects explicit audio join and capture ownership`, async ({ page, baseURL }) => {
-        const requests = [], external = [];
+        const requests = [], external = [], stopOptions = [];
         const grant = '9'.repeat(32), proof = '5'.repeat(64);
         const expires = Math.floor(Date.now() / 1000) + 240;
         let withdrawn = false;
         const recoverable = ['busy foreground check followed by success', 'unavailable heartbeat followed by success'].includes(outcome);
-        const joiningBusy = outcome === 'busy join followed by success';
+        const joiningBusy = outcome === 'busy join followed by success' || outcome === 'unavailable join followed by success';
+        const firstCheck = outcome === 'unavailable first mic check followed by success';
         const cached = outcome === 'restored cached page';
-        const foreground = outcome === 'revocation on foreground return' || recoverable || cached || joiningBusy;
+        const foreground = outcome === 'revocation on foreground return' || recoverable || cached || joiningBusy || firstCheck;
         const deadline = outcome === 'heartbeat expiring during a pending check';
         let checks = 0, joins = 0;
         if (deadline) await page.clock.install();
@@ -767,15 +769,18 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
                 }
             ` });
             if (url.pathname !== '/beta/music') return route.continue();
-            const { op, id, proof: supplied } = route.request().postDataJSON();
+            const { op, id, proof: supplied, ifStarted } = route.request().postDataJSON();
             requests.push({ op, matched: id === grant && supplied === proof });
+            if (op === 'stop') stopOptions.push(ifStarted);
             if (deadline && op === 'check') return;
             if (recoverable && op === 'check' && ++checks === 1) return route.fulfill({ status: 503,
                 json: { error: outcome === 'busy foreground check followed by success' ? 'busy' : 'unavailable' } });
-            if ((recoverable || cached) && op === 'check') return route.fulfill({ json: {} });
+            if (firstCheck && op === 'check' && ++checks === 1) return route.fulfill({ status: 503, json: { error: 'unavailable' } });
+            if ((recoverable || cached || firstCheck) && op === 'check') return route.fulfill({ json: {} });
             if (op === 'join') {
                 if (outcome === 'quota refusal') return route.fulfill({ status: 429, json: { error: 'cap' } });
-                if (joiningBusy && ++joins === 1) return route.fulfill({ status: 503, json: { error: 'busy' } });
+                if (joiningBusy && ++joins === 1) return route.fulfill({ status: 503,
+                    json: { error: outcome === 'busy join followed by success' ? 'busy' : 'unavailable' } });
                 return route.fulfill({ json: {
                     href: `${baseURL}/join/#k=${Buffer.alloc(32, 1).toString('base64url')}&s=${'2'.repeat(64)}&g=1&e=${expires}`,
                     credentials: { client: 'web', ttl: 120, quota_bytes: 256 * 1024 * 1024, iceServers: [{
@@ -789,6 +794,17 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
         await expect(page.locator('#status')).toContainText('Your host invited you');
         expect(await page.evaluate(() => location.hash === '' && window.musicCapture.length === 0)).toBe(true);
         expect(requests).toEqual([]);
+        if (firstCheck) {
+            await page.locator('#check-mic').click();
+            await expect.poll(() => requests.map(request => request.op)).toEqual(['check', 'check']);
+            await expect.poll(() => page.evaluate(() => window.musicCapture[0]?.readyState)).toBe('live');
+            await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+            await expect.poll(() => requests.map(request => request.op)).toEqual(['check', 'check', 'stop']);
+            expect(stopOptions).toEqual([true]);
+            expect(requests.every(request => request.matched)).toBe(true);
+            expect(external).toEqual([]);
+            return;
+        }
         await page.getByRole('button', { name: 'Skip check', exact: true }).click();
         await page.getByRole('checkbox').check();
         await page.getByRole('button', { name: 'Join with microphone', exact: true }).click();
@@ -834,6 +850,7 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
         await expect.poll(() => requests.filter(request => request.op === 'stop').length).toBe(1);
         expect(requests.filter(request => request.op === 'join')).toEqual(joinOps.map(op => ({ op, matched: true })));
         if (deadline) expect(requests.map(request => request.op)).toEqual(['join', 'check', 'stop']);
+        if (outcome === 'quota refusal') expect(stopOptions).toEqual([true]);
         if (recoverable) expect(requests.map(request => request.op)).toEqual(['join', 'check', 'check', 'stop']);
         if (cached || joiningBusy) expect(requests.map(request => request.op)).toEqual([...joinOps, 'check', 'stop']);
         expect(requests.every(request => request.matched)).toBe(true);

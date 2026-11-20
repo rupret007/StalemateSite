@@ -36,9 +36,10 @@ if (requiresMusicGrant) {
   } catch { /* The protected handoff needs its original tab. */ }
 }
 let musicCheckTimer, musicDeadlineTimer, checkingMusic, grantRetired = false, cachedCapture = null;
-let musicInPageCache = false;
+let musicInPageCache = false, musicJoined = false;
 
 const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
+const MUSIC_RETRY_MS = 1000;
 let lastMusicCheck = 0;
 
 async function musicRequestSignal(attempt, timeout) {
@@ -49,15 +50,15 @@ async function musicRequestSignal(attempt, timeout) {
     : (await import("./request-signal.js")).musicSignal(...signals);
 }
 
-async function musicRequest(op, signal) {
+async function musicRequest(op, signal, ifStarted = false) {
   const sentAt = Date.now();
   const response = await fetch("/beta/music", {
     method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id: musicGrant, proof: musicProof }),
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id: musicGrant, proof: musicProof,
+      ...(ifStarted ? { ifStarted: true } : {}) }),
     signal: signal || AbortSignal.timeout(8000), keepalive: op === "stop",
   });
-  if (op === 'check' && response.status >= 500) return false;
-  if (op === 'join' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy') return false;
+  if ((op === 'check' || op === 'join') && response.status >= 500) return false;
   if (response.status === 429) throw new Error(JOIN_SIGNAL.RELAY_CAP_REACHED);
   if (!response.ok) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
   const value = await response.json();
@@ -90,7 +91,7 @@ async function confirmMusicGrant() {
         watchMusicGrant();
         return true;
       }
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, MUSIC_RETRY_MS));
     }
   } catch { /* A terminal response or failed request closes capture. */ }
   if (!grantRetired && !musicInPageCache) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
@@ -99,17 +100,17 @@ async function confirmMusicGrant() {
 
 function checkMusicGrant() {
   clearTimeout(musicCheckTimer);
-  if (grantRetired || musicInPageCache) return false;
+  if (grantRetired || musicInPageCache || !lastMusicCheck) return false;
   checkingMusic ??= confirmMusicGrant().finally(() => { checkingMusic = null; });
   return checkingMusic;
 }
 
-async function joinMusicGrant(signal) {
+async function requestMusicUntilConfirmed(op, signal) {
   while (true) {
     signal.throwIfAborted();
-    const result = await musicRequest("join", signal);
+    const result = await musicRequest(op, signal);
     if (result !== false) return result;
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, MUSIC_RETRY_MS));
   }
 }
 
@@ -326,7 +327,8 @@ async function runMicCheck(control) {
     }
     await context.resume();
     if (musicGrant) {
-      await musicRequest("check", signal);
+      const authority = await musicRequestSignal(prejoinAbort, 8000);
+      await requestMusicUntilConfirmed("check", authority);
       watchMusicGrant();
     }
     if (signal.aborted || expireUnusedInvite()) return;
@@ -416,13 +418,13 @@ async function playHostAudio(attempt) {
   if (restoreFocus) $("leave").focus();
 }
 
-function leave(message = "You left the session.", error) {
+function leave(message = "You left the session.", error, explicit = false) {
   cachedCapture = null;
   if (musicGrant && !grantRetired) {
     grantRetired = true;
     clearTimeout(musicCheckTimer);
     clearTimeout(musicDeadlineTimer);
-    void musicRequest("stop").catch(() => {
+    void musicRequest("stop", undefined, !explicit && !musicJoined).catch(() => {
       const status = $("status");
       status.textContent += " The room did not confirm the stop.";
     });
@@ -510,8 +512,9 @@ async function startJoin(listenOnly = false) {
     if (musicGrant) {
       const signal = await musicRequestSignal(attempt, 12000);
       if (!isCurrent() || expireUnusedInvite()) return;
-      const result = await joinMusicGrant(signal);
+      const result = await requestMusicUntilConfirmed("join", signal);
       if (!isCurrent() || expireUnusedInvite()) return;
+      musicJoined = true;
       const href = new URL(result.href);
       if (href.origin !== location.origin || href.pathname !== "/join/" || href.search || href.username || href.password)
         throw new Error(JOIN_SIGNAL.SESSION_ENDED);
@@ -628,7 +631,7 @@ audioOptions.addEventListener("click", () => {
 resumeAudio.addEventListener("click", () => {
   if (activeAttempt) void playHostAudio(activeAttempt);
 });
-$("leave").addEventListener("click", () => leave());
+$("leave").addEventListener("click", () => leave(undefined, undefined, true));
 window.addEventListener("hashchange", () => window.location.reload());
 window.addEventListener("pagehide", event => {
   if (musicGrant && event.persisted) {

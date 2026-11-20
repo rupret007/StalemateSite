@@ -7,7 +7,7 @@
     "app.js": {
       "source": "web/join/app.js",
       "baseSha256": "ff699ff308d0e7e4d301ea30486f90bd20bc497555d206b1a08de3472c512662",
-      "sha256": "666763634e3e16ec261e26b1e35f6a56fc1ee2da51efc4fe815c1a4ef3afae43",
+      "sha256": "527869084595bbcb243ab0c8baaa3356a247a7e37d7a53a0339ac150d74f9377",
       "adaptation": "Private beta receive-only joining, retry and playback recovery, focus preservation, and fresh-link recovery that survives page restoration. Explicit microphone recheck after Skip check (107481896f05f8c6c8c21edd3aacda7c78a29bcb) and recovery focus when a checked microphone is lost while Join is focused (867cb2ec4ee647b2e5f26d3d757b3a8cc6ca80f7). The participation page redeems its session-bound Music grant on explicit audio join. Existing Music liveness checks tolerate a bounded busy response and support Safari versions without AbortSignal.any."
     },
     "host/index.html": {
@@ -17,7 +17,7 @@
     },
     "host/host-app.js": {
       "source": "StalemateSite",
-      "sha256": "6533a7aff3cc5072483910d7a498cf630ff99752ce6671ef0cfd214bb17c1435",
+      "sha256": "febb6f19e0b68e2f4d364dddd7dbf5e6bad7c126d5f81fe4ac83a9492548e36e",
       "adaptation": "Local same-origin host handoff, explicit microphone consent and cleanup."
     },
     "host/host-session.js": {

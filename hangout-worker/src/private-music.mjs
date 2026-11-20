@@ -12,7 +12,10 @@ export const stoppingMusic = op => ['stop', 'native-stop', 'host-stop'].includes
 
 export function validMusicBody(body, native) {
     if (!body || !musicRef(body.id) || !musicDigest(body.proof)) return false;
-    if (!native && !browserMusicHostOp(body.op)) return ['check', 'join', 'stop'].includes(body.op) && Object.keys(body).length === 3;
+    if (!native && !browserMusicHostOp(body.op)) {
+        const fields = Object.keys(body).length;
+        return ['check', 'join', 'stop'].includes(body.op) && (fields === 3 || body.op === 'stop' && fields === 4 && body.ifStarted === true);
+    }
     return (native ? nativeMusicOp(body.op) : browserMusicHostOp(body.op)) && musicDigest(body.webjam) && body.webjam.slice(-32) === body.id
         && Number.isInteger(body.generation) && body.generation > 0 && body.generation <= 0xffffffff
         && Object.keys(body).length === 5;
