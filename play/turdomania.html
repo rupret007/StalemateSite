@@ -65,7 +65,7 @@ main.tm { display: contents; }
 .tile.cursor { outline: 3px solid var(--accent-2); outline-offset: -2px; z-index: 3; }
 .tile.popping { opacity: 0; transform: var(--pos) scale(1.6) rotate(25deg) !important; pointer-events: none; }
 .tile.nope { animation: nope 260ms; }
-.tile svg { width:92%; height:92%; pointer-events:none; filter:drop-shadow(0 1px 0 #0005); }
+.tile svg { width:92%; height:92%; pointer-events:none; }
 @keyframes nope { 25% { margin-left: -3px; } 75% { margin-left: 3px; } }
 .float { position: absolute; pointer-events: none; font-weight: 900; color: #fff; text-shadow: 0 2px 0 #000; animation: floatUp 800ms ease-out forwards; z-index: 5; }
 @keyframes floatUp { from { transform: translate(-50%, 0); opacity: 1; } to { transform: translate(-50%, -40px); opacity: 0; } }
@@ -85,6 +85,9 @@ main.tm { display: contents; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 body.reduced .tile, body.reduced .float { transition: none !important; animation: none !important; }
 body.reduced .tile.popping { transform: var(--pos) !important; }
+/* The page's reduced-motion override also applies to the shared backdrop. */
+body.reduced .suite-bg > * { animation: none; will-change: auto; }
+body.reduced .suite-bg-critter { display: none; }
 @media (max-width: 360px), (max-height: 600px) {
   header.hud { padding: 2px 46px 4px; gap: 4px; flex-wrap: nowrap; justify-content: center; }
   header.hud h1 { display: none; }
@@ -264,6 +267,7 @@ window.tmFit = function (levelKey) {
 import * as Core from './games/turdomania-core.js';
 
 const qs = new URLSearchParams(location.search);
+const tileIcons = ['swirl', 'corn', 'splat', 'paper', 'bean', 'cheese'];
 const boardEl = document.getElementById('board');
 const wrap = document.getElementById('boardWrap');
 const overlay = document.getElementById('overlay');
@@ -275,8 +279,10 @@ const els = {
   again: document.getElementById('againBtn'), overUndo: document.getElementById('overUndoBtn'),
   overTitle: document.getElementById('overTitle'), overText: document.getElementById('overText')
 };
-const reduced = () => qs.get('reducedMotion') === '1' || matchMedia('(prefers-reduced-motion: reduce)').matches;
-if (reduced()) document.body.classList.add('reduced');
+const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+const forceReducedMotion = qs.get('reducedMotion') === '1';
+const reduced = () => forceReducedMotion || motionPreference.matches;
+if (forceReducedMotion) document.body.classList.add('reduced');
 // Accessing the storage property itself can throw in private/embedded browsers.
 const safeStorage = (() => { try { return window.localStorage; } catch { return null; } })();
 const hintEl = document.getElementById('startHint');
@@ -322,7 +328,9 @@ function resetView() {
   cursor = { c: 0, r: 0 };
   overlay.classList.remove('show');
   layout();
+  buildRows();
   render();
+  if (state.over) showOver();
   sfx('shuffle');
 }
 
@@ -368,7 +376,7 @@ function layout() {
 // Grid semantics: one role="row" per visual row (top to bottom); each tile lives in its row.
 // Rows are display:contents, so tiles stay positioned against #board.
 const rowEls = [];
-function syncRows() {
+function buildRows() {
   while (rowEls.length < state.rows) {
     const row = document.createElement('div');
     row.setAttribute('role', 'row');
@@ -376,15 +384,16 @@ function syncRows() {
     boardEl.appendChild(row);
     rowEls.push(row);
   }
-  while (rowEls.length > state.rows) rowEls.pop().remove();
   boardEl.setAttribute('aria-rowcount', state.rows);
   boardEl.setAttribute('aria-colcount', state.cols);
 }
 
-function posFor(c, r) { return `translate(${c * cell}px, ${(state.rows - 1 - r) * cell}px)`; }
+// A viewport refit changes --cell without rebuilding tile or result state.
+function posFor(c, r) {
+  return `translate(calc(var(--cell) * ${c}), calc(var(--cell) * ${state.rows - 1 - r}))`;
+}
 
 function render() {
-  syncRows();
   const live = new Set(), moved = [];
   const animate = !reduced();
   state.board.forEach((col, c) => col.forEach((t, r) => {
@@ -401,25 +410,24 @@ function render() {
       art.setAttribute('viewBox', '0 0 64 64');
       art.setAttribute('aria-hidden', 'true');
       const icon = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-      icon.setAttribute('href', './assets/turdomania-tiles.svg#' + ['swirl', 'corn', 'splat', 'paper', 'bean', 'cheese'][t.kind]);
+      icon.setAttribute('href', './assets/turdomania-tiles.svg#' + tileIcons[t.kind]);
       art.appendChild(icon);
       el.appendChild(art);
       el.dataset.id = t.id;
+      el.dataset.kind = t.kind;
+      el.style.setProperty('--k', window.Suite?.turdomaniaKindColor?.(t.kind, kind.color) ?? kind.color);
       tileEls.set(t.id, el);
     }
-    el.classList.remove('popping');
-    const kindValue = String(t.kind), col = String(c), row = String(r);
-    const color = (window.Suite && Suite.turdomaniaKindColor) ? Suite.turdomaniaKindColor(t.kind, kind.color) : kind.color;
-    if (el.dataset.kind !== kindValue) el.dataset.kind = kindValue;
-    if (el.style.getPropertyValue('--k') !== color) el.style.setProperty('--k', color);
-    if (el.dataset.col !== col) el.dataset.col = col;
-    if (el.dataset.row !== row) el.dataset.row = row;
+    const col = String(c), row = String(r);
+    if (el.dataset.col === col && el.dataset.row === row) return;
+    el.dataset.col = col;
+    el.dataset.row = row;
     const rowEl = rowEls[state.rows - 1 - r];
     const pos = posFor(c, r);
     const previous = el.style.transform;
     const from = animate && el.parentNode && el.parentNode !== rowEl ? previous : '';
     if (el.parentNode !== rowEl) rowEl.appendChild(el);
-    if (el.style.getPropertyValue('--pos') !== pos) el.style.setProperty('--pos', pos);
+    el.style.setProperty('--pos', pos);
     if (from && from !== pos) {
       el.style.transition = 'none';
       el.style.transform = from;
@@ -429,8 +437,8 @@ function render() {
     }
     const label = `${kind.name}, column ${c + 1}, row ${r + 1}`;
     const colIndex = String(c + 1);
-    if (el.getAttribute('aria-label') !== label) el.setAttribute('aria-label', label);
-    if (el.getAttribute('aria-colindex') !== colIndex) el.setAttribute('aria-colindex', colIndex);
+    el.setAttribute('aria-label', label);
+    el.setAttribute('aria-colindex', colIndex);
   }));
   for (const [id, el] of tileEls) if (!live.has(id)) { el.remove(); tileEls.delete(id); }
   if (moved.length) {
@@ -446,10 +454,9 @@ function render() {
   els.best.textContent = Math.max(best, state.score);
   els.left.textContent = Core.tileCount(state.board);
   els.undo.disabled = state.history.length === 0;
-  els.level.value = state.level;
+  if (els.level.value !== state.level) els.level.value = state.level;
   clampCursor();
   paintCursor();
-  if (state.over) showOver();
   window.__turdomania = { state, Core };
 }
 
@@ -465,7 +472,7 @@ const tagline = document.getElementById('tagline');
 const defaultTagline = tagline.textContent;
 function clearHot() {
   boardEl.querySelectorAll('.hot').forEach((e) => e.classList.remove('hot'));
-  tagline.textContent = defaultTagline;
+  if (tagline.textContent !== defaultTagline) tagline.textContent = defaultTagline;
 }
 function highlight(c, r) {
   clearHot();
@@ -489,7 +496,6 @@ function paintCursor() {
 }
 
 function floatText(text, c, r) {
-  if (reduced()) return;
   const f = document.createElement('div');
   f.className = 'float';
   f.textContent = text;
@@ -515,22 +521,24 @@ function popAt(c, r) {
     hintEl.hidden = true;
     try { safeStorage?.setItem(HINT_KEY, '1'); } catch { /* session-only when denied */ }
   }
-  const removedEls = res.removed.map((t) => tileEls.get(t.id)).filter(Boolean);
-  removedEls.forEach((el) => el.classList.add('popping'));
-  floatText(res.points ? `+${res.points}` : 'plop', c, r);
+  const animate = !reduced();
+  if (animate) {
+    for (const tile of res.removed) tileEls.get(tile.id)?.classList.add('popping');
+    floatText(res.points ? `+${res.points}` : 'plop', c, r);
+  }
   sfx(res.removed.length >= 6 ? 'ding' : 'blip');
   state = res.state;
   if (state.over) Core.recordBest(safeStorage, state.level, state.score);
   const startedGeneration = generation;
   const finish = () => {
     if (startedGeneration !== generation) return;
-    removedEls.forEach((el) => { el.remove(); tileEls.delete(Number(el.dataset.id)); });
     busy = false;
     render();
+    if (state.over) showOver();
     announce(`Popped ${res.removed.length}${res.points ? `, +${res.points}` : ''}. Score ${state.score}.`);
   };
-  if (reduced()) finish();
-  else { busy = true; popTimer = setTimeout(finish, 170); }
+  if (animate) { busy = true; popTimer = setTimeout(finish, 170); }
+  else finish();
 }
 
 function doUndo() {
@@ -577,7 +585,9 @@ function showOver() {
   resultShare?.setResult(state.moves > 0 ? progressRunResult || { level: state.level, score: state.score, left, cleared: state.cleared } : null);
   sfx(state.cleared ? 'win' : 'lose');
   announce(els.overTitle.textContent + ' ' + els.overText.textContent);
-  setTimeout(() => els.again.focus({ preventScroll: true }), 30);
+  requestAnimationFrame(() => {
+    if (overlay.classList.contains('show')) els.again.focus({ preventScroll: true });
+  });
 }
 
 boardEl.addEventListener('pointerdown', (e) => {
@@ -645,7 +655,7 @@ if (window.Suite && Suite.difficulty) {
   });
 }
 let rz = 0;
-window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (state) { layout(); render(); } }); });
+window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (state) layout(); }); });
 // Fonts and the first-play hint change the toolbar independently of viewport size.
 if (window.ResizeObserver) {
   const chromeObserver = new ResizeObserver(() => window.dispatchEvent(new Event('resize')));
