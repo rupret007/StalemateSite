@@ -271,7 +271,8 @@
 
         function ingestSnap(act, previousPaint) {
             if (!act) return;
-            H.apply(state.room, { type: 'snapshot', state: { strokes: act.strokes || [], video: act.video } });
+            H.apply(state.room, { type: 'snapshot', state: { strokes: act.strokes || [], video: act.video } },
+                { previousSnapshotStrokes: previousPaint?.strokes });
             const strokes = state.room.strokes;
             if (previousPaint && previousPaint.bitmap.width === ui.canvas.width && previousPaint.bitmap.height === ui.canvas.height
                 && samePaintPrefix(previousPaint.strokes, strokes)) {
@@ -461,6 +462,7 @@
             if (after.length < 2 || before.length !== after.length) return false;
             for (let index = 0; index < after.length - 1; index += 1) {
                 const a = before[index], b = after[index];
+                if (a === b) continue;
                 if (a.id !== b.id || a.color !== b.color || a.size !== b.size || a.pts.length !== b.pts.length) return false;
                 for (let point = 0; point < b.pts.length; point += 1) {
                     if (a.pts[point][0] !== b.pts[point][0] || a.pts[point][1] !== b.pts[point][1]) return false;

@@ -91,20 +91,37 @@
         return String(value == null ? '' : value).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
     }
 
-    function cleanStrokeLimit(stroke, limit) {
+    function cleanStrokeLimit(stroke, limit, previous) {
         if (!stroke || typeof stroke !== 'object') return null;
         const id = cleanText(stroke.id, 40);
         const color = COLORS.includes(stroke.color) ? stroke.color : null;
         const size = clampNumber(stroke.size, 1, 48);
-        if (!id || !color || size === null || !Array.isArray(stroke.pts)) return null;
+        const input = stroke.pts;
+        if (!id || !color || size === null || !Array.isArray(input)) return null;
+        // A repeated authoritative snapshot can share the previously validated
+        // stroke after comparing the actual coordinates, even if it arrived as a copy.
+        if (previous && id === previous.id && color === previous.color && size === previous.size
+            && input.length === previous.pts.length && input.length <= limit && samePoints(input, previous.pts)) return previous;
         const pts = [];
-        for (const p of stroke.pts.slice(0, limit)) {
+        const length = Math.min(input.length, limit);
+        for (let i = 0; i < length; i += 1) {
+            const p = input[i];
             const x = clampNumber(p && p[0], 0, 1);
             const y = clampNumber(p && p[1], 0, 1);
             if (x !== null && y !== null) pts.push([Math.round(x * 10000) / 10000, Math.round(y * 10000) / 10000]);
         }
         return pts.length ? { id, color, size, pts } : null;
     }
+
+    function samePoints(input, canonical) {
+        for (let i = 0; i < input.length; i += 1) {
+            const point = input[i];
+            const previous = canonical[i];
+            if (!point || point[0] !== previous[0] || point[1] !== previous[1]) return false;
+        }
+        return true;
+    }
+
     function cleanStroke(stroke) { return cleanStrokeLimit(stroke, LIMITS.strokePoints); }
     function cleanSnapshotStroke(stroke) { return cleanStrokeLimit(stroke, LIMITS.strokeTotalPoints); }
 
@@ -239,7 +256,10 @@
         }
         case 'snapshot': {
             const snap = msg.state || {};
-            const newStrokes = (Array.isArray(snap.strokes) ? snap.strokes : []).map(cleanSnapshotStroke).filter(Boolean);
+            const strokes = Array.isArray(snap.strokes) ? snap.strokes : [];
+            const previous = snap.append ? undefined : meta.previousSnapshotStrokes;
+            const newStrokes = strokes.map((stroke, i) =>
+                cleanStrokeLimit(stroke, LIMITS.strokeTotalPoints, previous?.[i])).filter(Boolean);
             if (snap.append) {
                 for (const stroke of newStrokes) mergeStrokeRange(state, stroke, 0);
             } else {
