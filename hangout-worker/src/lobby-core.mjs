@@ -1054,7 +1054,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         event(chan, `${nickOf(c)} has joined ${chan.name}`);
         const welcome = text => bot(c, text, 'info', chan);
         if (chan.kind === 'lobby') welcome(`welcome to #stalemate, ${c.nick}. One rule: Don’t be a dick. Swear all you want; no hate, threats, creepy stuff or personal info. 🚩 anything gross. /help for commands.`);
-        else if (chan.kind === 'jam') welcome(`welcome to ${chan.name}. Music runs in the WebJam desktop app using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.`);
+        else if (chan.kind === 'jam') welcome(musicProvider && participationSafeMusicOffersConfigured
+            ? `welcome to ${chan.name}. The host can start Music here on their device or use the WebJam Mac app. Headphones are required for browser Music.`
+            : `welcome to ${chan.name}. Music runs in the WebJam desktop app using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.`);
         else if (roomKind(chan) === 'game') welcome('Chat starts when you join. Use the flag beside a message to report it.');
         else if (chan.kind === 'chat') welcome(`welcome to ${chan.name}. The room host runs this conversation; site moderators handle abuse. Chat starts when you join. Start an activity room to draw, watch or use optional cameras.`);
         else welcome(`welcome to ${chan.name}. The room host runs this activity; site moderators handle abuse. Cameras stay off unless you turn yours on (18+).`);

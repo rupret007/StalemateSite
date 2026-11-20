@@ -316,7 +316,7 @@
                 <button class="btn btn--ghost" type="button" data-music-handoff-cancel hidden>Cancel Music invitation</button>
                 <button class="btn btn--ghost jam-room-invite" type="button" data-jam-invite-room aria-haspopup="dialog" hidden>Invite bandmate to room</button>
                 <ol class="small jam-host-steps" id="jam-host-steps" data-jam-host-steps hidden>
-                    <li>On your Mac, open the supplied WebJam beta app and choose <strong>Music → Host</strong>.</li>
+                    <li>For the Mac app, open the supplied WebJam beta and choose <strong>Music → Host</strong>.</li>
                     <li data-jam-direct-step hidden>In Hang Out, choose <strong>Invite to Music</strong> and pick your guest. Confirm the invitation in WebJam.</li>
                     <li data-jam-manual-step>Click <strong data-jam-browser-step>Invite a browser guest → Copy browser invite</strong>.</li>
                 </ol>
@@ -348,10 +348,12 @@
                 </details>
                 <p class="small" data-jam-share-status role="status"></p>
                 <p class="small jam-platform" data-jam-platform>A Mac hosts music in WebJam. Mac and Windows guests can join in a browser. Windows native music needs a signed build; this unsigned beta cannot join natively.</p>
+                <p class="small jam-platform" data-jam-device-platform hidden>Host on your device or use the WebJam Mac app. In-browser Music uses headphones and asks before turning on the microphone.</p>
                 <details class="jam-setup" data-jam-help>
                     <summary>Setup &amp; invitation help</summary>
-                    <p>Use the beta app supplied by your host; the public download may reject this invitation. WebJam connects through a desktop host using Jamulus. Ethernet is recommended; actual delay and dropouts depend on the devices and network.</p>
-                    <p>On a computer, copy the invite, open WebJam, choose Join, and paste it there. Opening the app directly is supported on Mac; Windows and Linux require pasting private invites. Phones can use this room’s chat while music runs on a computer.</p>
+                    <p data-jam-device-help hidden>Choose <strong>Host Music on this device</strong>, pick a guest, and start with your microphone. The guest taps <strong>Accept and join</strong> and decides when to enable audio. Use <strong>Stop Music</strong> to end the browser session on both devices.</p>
+                    <p>For desktop Music, use the beta app supplied by your host. The public download may reject this invitation. The desktop app connects through a Mac host using Jamulus. Ethernet is recommended. Actual delay and dropouts depend on the devices and network.</p>
+                    <p>On a computer, copy the invite, open WebJam, choose Join, and paste it there. Opening the app directly is supported on Mac; Windows and Linux require pasting private invites. <span data-jam-chat-only-help>Phones can use this room’s chat while music runs on a computer.</span></p>
                     <p data-jam-browser-help>Hosting a browser guest: in WebJam’s Music room, click <strong>Copy browser invite</strong>. Wait for <strong>Link copied</strong>, then paste the link above and click <strong>Share</strong>. Keep the Music session open. For desktop guests, paste the entire Copy Invite message instead. Sharing an invite does not turn on your microphone.</p>
                     <p>Invites may expire or admit one guest; ask the host for a fresh one if needed. A rejected paste stays editable while you remain this room’s connected host. Leaving the room or stopping locally clears its controls; it does not revoke an invitation already copied. End the music session or remove the guest in the host app when needed.</p>
                 </details>

@@ -2765,8 +2765,13 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-jam-manual-step]').hidden = !musicButton.hidden;
         musicButton.setAttribute('aria-disabled', String(!!musicHandoff || !!browserMusic));
         const browserMusicButton = $('[data-browser-music-host]');
-        browserMusicButton.hidden = musicButton.hidden || !privateMusicProviderSupported || !navigator.mediaDevices?.getUserMedia;
+        const deviceMusicAvailable = privateMusicProviderSupported && typeof window.BroadcastChannel === 'function' && !!navigator.mediaDevices?.getUserMedia;
+        browserMusicButton.hidden = musicButton.hidden || !deviceMusicAvailable;
         browserMusicButton.setAttribute('aria-disabled', String(!!musicHandoff || !!browserMusic));
+        $('[data-jam-platform]').hidden = deviceMusicAvailable;
+        $('[data-jam-device-platform]').hidden = !deviceMusicAvailable;
+        $('[data-jam-device-help]').hidden = !deviceMusicAvailable;
+        $('[data-jam-chat-only-help]').hidden = deviceMusicAvailable;
         browserMusicStop.hidden = browserMusic?.room !== next.room;
         drawMusicHandoff();
         const desktop = $('[data-jam-desktop]');
@@ -3841,7 +3846,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         $('[data-invite-form]').hidden = isGame;
         $$('[data-invite-named]').forEach(control => { control.hidden = music; });
         $('[data-invite-nick]').disabled = music;
-        $('[data-invite-person-send]').textContent = music
+        $('[data-invite-person-send]').textContent = music === 'browser' ? 'Continue to Music' : music
             ? participationSafeMusicOffersSupported && sharingControls ? 'Send Music invitation' : 'Continue in WebJam'
             : 'Invite selected person';
         $('[data-game-invite-picker]').hidden = !isGame;
