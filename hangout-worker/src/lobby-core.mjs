@@ -1290,7 +1290,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const current = () => musicHosts.get(hostKey) === lease && currentMusicHost(lease)
             && (isHost || liveMusicActivity(lease.id) && musicInvites.get(lease.room) === offer && offer.state === 'handed');
         const close = async () => {
-            while (controlledSettlement) await controlledSettlement;
+            // Explicit Stop reaches here synchronously after committed proof
+            // lookup. Latch retirement before yielding to any room operation.
+            while (!stop && controlledSettlement) await controlledSettlement;
             const activeOffer = musicInvites.get(lease.room);
             retireMusicLease(lease, musicHosts.get(hostKey) === lease && activeOffer?.hostLease === hostKey ? activeOffer : null, stop);
             return controlledRun(finishMusicHost, [hostKey, true, lease], true);

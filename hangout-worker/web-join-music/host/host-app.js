@@ -18,13 +18,16 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     || !Number.isInteger(handoff.generation) || !Number.isSafeInteger(handoff.expires) || handoff.expires <= Date.now()) {
     status.textContent = 'Open a current Music host invitation from your Jam room.';
 } else {
+    const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
     const controller = new AbortController();
     const channel = new BroadcastChannel(`webjam-browser-host-${handoff.request}`);
-    let session, stream, heartbeat, checking = false, lastCheck = 0;
+    let session, stream, heartbeat, deadlineTimer, checking = false, lastCheck = 0;
+    const expired = () => end('The Music connection ended. Start a fresh invitation to rejoin.');
     const end = message => {
         if (controller.signal.aborted) return;
         controller.abort();
         clearInterval(heartbeat);
+        clearTimeout(deadlineTimer);
         session?.close();
         session = null;
         stream?.getTracks().forEach(track => track.stop());
@@ -40,16 +43,27 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     };
     async function request(op, allowBusy = false) {
         const closing = op === 'host-stop';
+        const sentAt = Date.now();
         const deadline = AbortSignal.timeout(8000);
         const response = await fetch('/beta/music', { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
             headers: { 'Content-Type': 'application/json' }, keepalive: closing,
             signal: closing ? deadline : musicSignal(controller.signal, deadline),
             body: JSON.stringify({ op, id: handoff.webjam.slice(-32), proof: handoff.proof, webjam: handoff.webjam, generation: handoff.generation }) });
         if (allowBusy && op === 'host-check' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy'
-            && Date.now() - lastCheck < 15000) return;
+            && Date.now() - lastCheck < MUSIC_HEARTBEAT_WINDOW_MS) return;
         if (!response.ok) throw new Error('Music authority ended.');
-        if (!closing) lastCheck = Date.now();
-        return response.json();
+        const value = await response.json();
+        if (!closing && !controller.signal.aborted) {
+            const receivedAt = Date.now();
+            if (receivedAt >= sentAt + MUSIC_HEARTBEAT_WINDOW_MS
+                || (lastCheck && receivedAt >= lastCheck + MUSIC_HEARTBEAT_WINDOW_MS)) {
+                throw new Error('Music authority ended.');
+            }
+            lastCheck = Math.max(lastCheck, sentAt);
+            clearTimeout(deadlineTimer);
+            deadlineTimer = setTimeout(expired, Math.max(0, lastCheck + MUSIC_HEARTBEAT_WINDOW_MS - Date.now()));
+        }
+        return value;
     }
     async function play() {
         if (!audio.srcObject || controller.signal.aborted) return;
@@ -58,9 +72,10 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     }
     async function check(foreground = false) {
         if (!lastCheck || controller.signal.aborted || !foreground && checking) return;
+        if (Date.now() >= lastCheck + MUSIC_HEARTBEAT_WINDOW_MS) return expired();
         if (!foreground) checking = true;
-        try { await request('host-check', !foreground); }
-        catch { end('The Music connection ended. Start a fresh invitation to rejoin.'); }
+        try { await request('host-check', true); }
+        catch { expired(); }
         finally { if (!foreground) checking = false; }
     }
     status.textContent = 'Confirm headphones and start when you’re ready to invite your guest.';

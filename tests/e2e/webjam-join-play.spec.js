@@ -698,13 +698,15 @@ test('capture arriving after Leave releases only its own tracks during the next 
 // Exercises the packaged protected UI with an inert same-origin issuer and
 // inert session transport. Production cookie/room authority is tested against
 // the actual Worker and lobby in the SQLite authority suite.
-for (const outcome of ['quota refusal', 'revocation after joining', 'revocation on foreground return']) {
+for (const outcome of ['quota refusal', 'revocation after joining', 'revocation on foreground return', 'heartbeat expiring during a pending check']) {
     test(`protected Music ${outcome} respects explicit audio join and capture ownership`, async ({ page, baseURL }) => {
         const requests = [], external = [];
         const grant = '9'.repeat(32), proof = '5'.repeat(64);
         const expires = Math.floor(Date.now() / 1000) + 240;
         let withdrawn = false;
         const foreground = outcome === 'revocation on foreground return';
+        const deadline = outcome === 'heartbeat expiring during a pending check';
+        if (deadline) await page.clock.install();
         await page.addInitScript(({ grant, proof, foreground }) => {
             sessionStorage.setItem(`webjam-private-music-${grant}`, proof);
             window.musicCapture = [];
@@ -749,6 +751,7 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
             if (url.pathname !== '/beta/music') return route.continue();
             const { op, id, proof: supplied } = route.request().postDataJSON();
             requests.push({ op, matched: id === grant && supplied === proof });
+            if (deadline && op === 'check') return;
             if (op === 'join') {
                 if (outcome === 'quota refusal') return route.fulfill({ status: 429, json: { error: 'cap' } });
                 return route.fulfill({ json: {
@@ -779,11 +782,18 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
                 expect(requests.map(request => request.op)).toEqual(['join']);
                 await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
             }
+            if (deadline) {
+                await page.clock.fastForward(4000);
+                await expect.poll(() => requests.map(request => request.op)).toEqual(['join', 'check']);
+                expect(await page.evaluate(() => window.musicCapture[0].readyState)).toBe('live');
+                await page.clock.fastForward(11000);
+            }
             await expect(leave).toBeHidden();
             expect(await page.evaluate(() => window.musicTransportOpen === false && window.musicCapture[0]?.readyState === 'ended')).toBe(true);
         }
         await expect.poll(() => requests.filter(request => request.op === 'stop').length).toBe(1);
         expect(requests.filter(request => request.op === 'join')).toEqual([{ op: 'join', matched: true }]);
+        if (deadline) expect(requests.map(request => request.op)).toEqual(['join', 'check', 'stop']);
         expect(requests.every(request => request.matched)).toBe(true);
         expect(external).toEqual([]);
     });

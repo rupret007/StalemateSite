@@ -35,21 +35,35 @@ if (requiresMusicGrant) {
     if (/^[a-f0-9]{64}$/.test(value)) musicProof = value;
   } catch { /* The protected handoff needs its original tab. */ }
 }
-let musicCheckTimer, grantRetired = false, musicJoinStarted = false;
+let musicCheckTimer, musicDeadlineTimer, grantRetired = false, musicJoinStarted = false;
 
+const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
 let lastMusicCheck = 0;
+
 async function musicRequest(op, signal, allowBusy = false) {
+  const sentAt = Date.now();
   const response = await fetch("/beta/music", {
     method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id: musicGrant, proof: musicProof }),
     signal: signal || AbortSignal.timeout(8000), keepalive: op === "stop",
   });
   if (allowBusy && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy'
-      && Date.now() - lastMusicCheck < 15000) return;
+      && Date.now() - lastMusicCheck < MUSIC_HEARTBEAT_WINDOW_MS) return;
   if (response.status === 429) throw new Error(JOIN_SIGNAL.RELAY_CAP_REACHED);
   if (!response.ok) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
-  if (op === 'check' || op === 'join') lastMusicCheck = Date.now();
-  return response.json();
+  const value = await response.json();
+  if (!grantRetired && (op === 'check' || op === 'join')) {
+    const receivedAt = Date.now();
+    if (receivedAt >= sentAt + MUSIC_HEARTBEAT_WINDOW_MS
+        || (lastMusicCheck && receivedAt >= lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS)) {
+      throw new Error(JOIN_SIGNAL.SESSION_ENDED);
+    }
+    lastMusicCheck = Math.max(lastMusicCheck, sentAt);
+    clearTimeout(musicDeadlineTimer);
+    musicDeadlineTimer = setTimeout(() => leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED)),
+      Math.max(0, lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS - Date.now()));
+  }
+  return value;
 }
 
 function watchMusicGrant() {
@@ -60,8 +74,12 @@ function watchMusicGrant() {
 async function checkMusicGrant(allowBusy = false) {
   clearTimeout(musicCheckTimer);
   if (grantRetired) return false;
+  if (Date.now() >= lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
+    leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
+    return false;
+  }
   try {
-    await musicRequest("check", undefined, allowBusy);
+    await musicRequest("check", activeAttempt?.signal, allowBusy);
     if (grantRetired) return false;
     watchMusicGrant();
     return true;
@@ -378,6 +396,7 @@ function leave(message = "You left the session.", error) {
   if (musicGrant && !grantRetired) {
     grantRetired = true;
     clearTimeout(musicCheckTimer);
+    clearTimeout(musicDeadlineTimer);
     void musicRequest("stop").catch(() => {
       const status = $("status");
       status.textContent += " The room did not confirm the stop.";
@@ -589,7 +608,7 @@ window.addEventListener("pagehide", () => {
 });
 document.addEventListener("visibilitychange", async () => {
   if (document.hidden || expireUnusedInvite()) return;
-  if (musicGrant && lastMusicCheck && (!await checkMusicGrant() || document.hidden)) return;
+  if (musicGrant && lastMusicCheck && (!await checkMusicGrant(true) || document.hidden)) return;
   if (context?.state === "suspended") {
     const attempt = activeAttempt;
     context.resume().catch(() => {
