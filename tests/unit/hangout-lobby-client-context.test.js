@@ -839,10 +839,10 @@ describe('targeted Music invitation', () => {
 });
 
 describe('participation-safe one-tap Music offer', () => {
-    async function setup() {
+    async function setup(features = {}) {
         const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, revision: 1, state: 'authorized',
             available: true, purposes: ['direct-contact', 'external-provider'], canStop: true }) }));
-        const fixture = await visitor('rad-dad', { entrySources: 1, personTargets: 1, participationSafeMusicOffers: 1 },
+        const fixture = await visitor('rad-dad', { entrySources: 1, personTargets: 1, participationSafeMusicOffers: 1, ...features },
             { beta: true, participation: true, secureOrigin: true, fetch });
         await vi.waitFor(() => expect(fixture.window.document.querySelector('[data-sharing-status]').textContent).toContain('Sharing is available'), { timeout: 1000 });
         fixture.welcome(); fixture.join();
@@ -888,6 +888,42 @@ describe('participation-safe one-tap Music offer', () => {
         expect(window.document.body.innerHTML).not.toContain('/join/#k=');
         expect([...Array(window.sessionStorage.length)].map((_, i) => window.sessionStorage.getItem(window.sessionStorage.key(i))).join(' ')).not.toContain('/join/#k=');
         expect([...Array(window.localStorage.length)].map((_, i) => window.localStorage.getItem(window.localStorage.key(i))).join(' ')).not.toContain('/join/#k=');
+    });
+
+    it('keeps browser Music in the guest lobby through a Paint room switch and removes it when the offer ends', async () => {
+        const fixture = await setup({ privateMusicProvider: 1 });
+        const { window, ws } = fixture, { document } = window;
+        window.eval(readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8'));
+        window.open = vi.fn();
+        const offer = { ...invite(), hostMode: 'browser', origin: window.location.origin };
+        ws.receive(offer);
+        const action = document.querySelector('[data-music-invite-action]');
+        expect(action.textContent).toBe('Accept and join');
+        action.click();
+        expect(window.open).not.toHaveBeenCalled();
+        expect(ws.sent.filter(frame => frame.t === 'music-offer-accept')).toEqual([
+            expect.objectContaining({ id: offer.id, joinProof: expect.stringMatching(/^[a-f0-9]{64}$/) }),
+        ]);
+        expect(document.querySelector('[data-music-session-content] iframe')).toBeNull();
+
+        joinJam(fixture, offer);
+        const href = `${offer.origin}/join/#m=${offer.id}&e=${offer.expires / 1000}`;
+        ws.receive({ t: 'music-offer-accepted', version: 1, id: offer.id, request: offer.request,
+            ch: offer.ch, roomInstance: offer.roomInstance, href, expires: offer.expires });
+        const frame = document.querySelector('[data-music-session-content] iframe');
+        expect(frame?.title).toBe('Join private Music');
+        expect(new URL(frame.src).pathname).toBe('/join/guest/');
+        expect(document.querySelector('[data-music-session-panel]').open).toBe(true);
+
+        ws.receive({ t: 'join', ch: { name: '#bobross-rehearsal', kind: 'bobross', keepRef: invitationRoomInstance,
+            title: 'Paint Along', count: 1, modes: {}, names: [{ nick: 'Viewer', prefix: '' }] } });
+        expect(document.querySelector('[data-chat-context]').textContent).toBe('#bobross-rehearsal');
+        expect(document.querySelector('[data-music-session-content] iframe')).toBe(frame);
+        ws.receive({ t: 'music-offer-ended', version: 1, id: offer.id, request: offer.request,
+            ch: offer.ch, roomInstance: offer.roomInstance, status: 'unavailable' });
+        expect(document.querySelector('[data-music-session-content] iframe')).toBeNull();
+        expect(document.querySelector('[data-music-session-panel]').hidden).toBe(true);
+        expect(window.sessionStorage.getItem(`webjam-private-music-${offer.id}`)).toBeNull();
     });
 
     it('keeps the accepted one-tap Music link so a guest who closed the tab can open it again', async () => {
