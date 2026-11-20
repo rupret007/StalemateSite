@@ -59,7 +59,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
             return cached;
         }
         const size = stringSize(value);
-        if (sizes.size < 256) sizes.set(value, size);
+        if (sizes.size < (sizes === keySizes ? 256 : 4096)) sizes.set(value, size);
         return size;
     }
     // Only trusted callers may omit objects whose internals this particular
