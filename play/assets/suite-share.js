@@ -5,6 +5,8 @@
   const points = value => integer(value).toLocaleString('en-US') + ' points';
   const units = (value, single, multiple = single + 's') => `${integer(value).toLocaleString('en-US')} ${integer(value) === 1 ? single : multiple}`;
   const SHARE_ACCENT = '#ed2765';
+  const PNG_HEADER = 'data:image/png;base64,';
+  const IMAGE_PREPARATION_BUDGET_MS = 500;
   const signed = value => (Number.isFinite(value) ? Math.max(-1e9, Math.min(1e9, value)) : 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
   const strength = value => ({ easy: 'Easy', normal: 'Normal', hard: 'Hard', mixed: 'Mixed strength', unknown: 'Strength not recorded', house: 'House rules', friendly: 'Friendly', casual: 'Casual', club: 'Club', sharp: 'Sharp' })[value] || 'Strength not recorded';
   function time(value) {
@@ -127,12 +129,14 @@
     actions.append(button, save); box.append(actions, status, fallback); host.append(box);
     // Keep Enter/Space and copy shortcuts inside sharing, away from game replay.
     box.addEventListener('keydown', event => event.stopPropagation());
-    let result = null, signature = '', file = null, imageUrl = null, version = 0;
+    let result = null, signature = '', imageBlob = null, imageUrl = null, version = 0;
+    let imageTimer;
     function setResult(run) {
       const next = run ? describe(game, run, root.location.href) : null;
       const key = next ? JSON.stringify(next) : '';
       if (key === signature) return;
-      signature = key; result = next; file = null; version++;
+      signature = key; result = next; imageBlob = null; version++;
+      root.clearTimeout(imageTimer);
       if (imageUrl) root.URL.revokeObjectURL(imageUrl);
       imageUrl = null; save.hidden = true; save.removeAttribute('href');
       status.textContent = ''; fallback.hidden = true; button.disabled = false;
@@ -141,14 +145,27 @@
       const current = version;
       try {
         const canvas = drawCard(result, document);
-        canvas.toBlob(blob => {
-          if (!blob || current !== version) return;
-          if (typeof root.File === 'function') file = new root.File([blob], game + '-score.png', { type: 'image/png' });
+        const publishImage = blob => {
+          if (!blob || current !== version || imageBlob) return;
+          imageBlob = blob;
+          root.clearTimeout(imageTimer);
           if (root.URL.createObjectURL) {
             imageUrl = root.URL.createObjectURL(blob);
             save.href = imageUrl; save.hidden = false;
           }
-        }, 'image/png');
+        };
+        // Browsers can defer canvas PNG encoding until idle. If it stalls,
+        // serialize the same small card in a foreground task without waiting for idle.
+        imageTimer = root.setTimeout(() => {
+          if (current !== version || imageBlob) return;
+          try {
+            const png = canvas.toDataURL('image/png');
+            if (!png.startsWith(PNG_HEADER)) return;
+            const bytes = Uint8Array.from(root.atob(png.slice(PNG_HEADER.length)), char => char.charCodeAt(0));
+            publishImage(new root.Blob([bytes], { type: 'image/png' }));
+          } catch (error) { /* Text sharing remains available if canvas is unavailable. */ }
+        }, IMAGE_PREPARATION_BUDGET_MS);
+        canvas.toBlob(publishImage, 'image/png');
       } catch (error) { /* Text sharing remains available if canvas is unavailable. */ }
     }
     button.addEventListener('click', async () => {
@@ -163,9 +180,12 @@
       };
       try {
         let payload = { title: snapshot.name + ' · Stalemate Arcade', text: snapshot.text, url: snapshot.url };
-        if (file && root.navigator.canShare) {
-          const withFile = { title: payload.title, text: fullText, files: [file] };
-          try { if (root.navigator.canShare(withFile)) payload = withFile; } catch (error) { /* Use text. */ }
+        if (imageBlob && root.navigator.canShare && typeof root.File === 'function') {
+          try {
+            const file = new root.File([imageBlob], save.download, { type: 'image/png' });
+            const withFile = { title: payload.title, text: fullText, files: [file] };
+            if (root.navigator.canShare(withFile)) payload = withFile;
+          } catch (error) { /* Use text. */ }
         }
         if (root.navigator.share) {
           try {
