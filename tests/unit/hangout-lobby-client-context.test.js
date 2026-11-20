@@ -962,6 +962,7 @@ describe('participation-safe one-tap Music offer', () => {
         window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
         window.BroadcastChannel = class { addEventListener() {} postMessage() {} close() {} };
         Object.defineProperty(window.crypto, 'subtle', { value: { digest: async () => new Uint8Array(32) } });
+        Object.defineProperty(window.navigator, 'mediaDevices', { value: { getUserMedia: vi.fn() } });
         const self = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
         const guest = { id: 'guest-peer', nick: 'DrumGuest', prefix: '' };
         ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', capabilities: {} });
