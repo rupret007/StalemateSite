@@ -39,7 +39,8 @@ describe('Apache repository-root public boundary', () => {
         '/GPT/', '/backup_restore_point/', '/pr-assets/screenshot.png',
         '/dist/index.html', '/preview-dist/index.html', '/test-results/index.html',
         '/playwright-report/index.html', '/playwright.live.config.js',
-        '/vitest.config.js', '/.gitignore', '/%70ackage.json'
+        '/vitest.config.js', '/.gitignore', '/%70ackage.json',
+        '/r/45662413410ed051/TWO-HOUSE-TEST.md', '/r/45662413410ed051/%54WO-HOUSE-TEST.md'
     ])('returns a missing response for source/config path %s at root and project paths', path => {
         expect(blocked(path), path).toBe(true);
         expect(blocked(`/StalemateSite${path}?source=fixture`), path).toBe(true);
@@ -75,7 +76,8 @@ describe('Apache repository-root public boundary', () => {
         '/play/assets/chess/credits.html', '/play/assets/chess/Chessground-LICENSE.txt',
         '/play/stalemate/manic.m4a', '/assets/manic.mp4',
         '/.well-known/acme-challenge/fixture', '/scripts-night/', '/docs-show/',
-        '/package.json-cover.png', '/events/stalemate-rockin-october-2026.ics'
+        '/package.json-cover.png', '/events/stalemate-rockin-october-2026.ics',
+        '/r/45662413410ed051/fx/NOTICE.md'
     ])('keeps public media, licensing, aliases and neighboring names available: %s', path => {
         expect(blocked(path), path).toBe(false);
         expect(blocked(`/StalemateSite${path}`), path).toBe(false);
