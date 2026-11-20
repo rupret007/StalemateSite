@@ -1205,6 +1205,10 @@
     }
     H.COLORS.slice(0, 8).forEach((c, i) => addSwatch(ui.swatches, c, `Color ${i + 1}`));
     BOB.PALETTE.forEach((p) => addSwatch(ui.bobPalette, p.hex, p.name));
+    const sharedDrawing = $('[data-shared-drawing]');
+    const roomDrawing = sharedDrawing.parentElement;
+    const paintDrawing = $('[data-bob-drawing]');
+    const paintSketch = paintDrawing.closest('details');
     function pickBrush(size) {
         ui.size.value = String(size);
         ui.bobBrushes.querySelectorAll('.brush').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.size) === size)));
@@ -3487,6 +3491,10 @@
         doc.body.classList.toggle('bob-mode', app.bob.on);
         syncSharedLayout();
         ui.bob.hidden = !app.bob.on;
+        if (app.bob.on !== wasOn) {
+            (app.bob.on ? paintDrawing : roomDrawing).append(sharedDrawing);
+            if (!app.bob.on) paintSketch.open = false;
+        }
         ui.bobToggle.setAttribute('aria-pressed', String(app.bob.on));
         ui.bobToggle.textContent = app.bob.on ? 'Exit Paint Along' : '🎨 Paint along with Bob';
         ui.bobHold.classList.toggle('host-only', !app.bob.on);
@@ -3500,7 +3508,7 @@
         layout();
         if (app.bob.on) {
             if (!BOB.PALETTE.some((p) => p.hex === color)) pickColor(BOB.PALETTE[1].hex);
-            const details = ui.bob.querySelector('details');
+            const details = ui.bobEpisodes.closest('details');
             if (details && win.matchMedia && win.matchMedia('(max-width: 820px)').matches) details.open = false;
         }
     }

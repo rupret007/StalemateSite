@@ -89,6 +89,10 @@
                     <summary>Pick an episode (fan faves + easy starters)</summary>
                     <ol class="ep-list" data-bob-episodes></ol>
                 </details>
+                <details class="paint-sketch">
+                    <summary>Draw on the shared canvas</summary>
+                    <div data-bob-drawing></div>
+                </details>
             </div>
             <div class="picks host-only" data-picks>
                 <button type="button" class="pick" data-pick-file="manic">Manic (Stalemate)</button>
@@ -100,14 +104,16 @@
 
         <section class="panel draw" aria-label="Draw together">
             <h2>Draw</h2>
-            <canvas data-canvas width="1200" height="800" aria-label="Shared drawing canvas"></canvas>
-            <div class="tools">
-                <div class="swatches" data-swatches></div>
-                <div class="swatches bob-palette" data-bob-palette role="group" aria-label="Bob Ross palette"></div>
-                <label>Brush <input type="range" min="2" max="44" value="6" data-size></label>
-                <div class="brushes" data-bob-brushes role="group" aria-label="Bob brushes"></div>
-                <button class="btn btn--ghost host-only" type="button" data-clear>Wipe it</button>
-                <button class="btn btn--ghost" type="button" data-save>Save PNG</button>
+            <div data-shared-drawing>
+                <canvas data-canvas width="1200" height="800" aria-label="Shared drawing canvas"></canvas>
+                <div class="tools">
+                    <div class="swatches" data-swatches></div>
+                    <div class="swatches bob-palette" data-bob-palette role="group" aria-label="Bob Ross palette"></div>
+                    <label>Brush <input type="range" min="2" max="44" value="6" data-size></label>
+                    <div class="brushes" data-bob-brushes role="group" aria-label="Bob brushes"></div>
+                    <button class="btn btn--ghost host-only" type="button" data-clear>Wipe it</button>
+                    <button class="btn btn--ghost" type="button" data-save>Save PNG</button>
+                </div>
             </div>
         </section>
 

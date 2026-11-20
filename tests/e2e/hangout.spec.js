@@ -982,6 +982,7 @@ test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and
     await host.click('[data-bob-toggle]');
     if (await host.locator('[data-ask-no]').isVisible()) await host.click('[data-ask-no]');
     await expect(host.locator('[data-bob-episodes] .ep')).toHaveCount(12);
+    await host.getByText('Draw on the shared canvas', { exact: true }).click();
     await expect(host.locator('[data-bob-palette] .swatch')).toHaveCount(12);
     await expect(host.locator('[data-bob-palette]').getByRole('button', { name: 'Phthalo Blue', exact: true })).toBeVisible();
     await expect(host.locator('.draw')).toBeHidden();
@@ -995,6 +996,7 @@ test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and
     await expect(guest.locator('[data-bob-hold]')).toBeVisible();
     await expect(guest.locator('[data-bob-catchup]')).toBeVisible();
 
+    await guest.getByText('Draw on the shared canvas', { exact: true }).click();
     await guest.click('[data-bob-palette] [aria-label="Van Dyke Brown"]');
     await guest.locator('[data-bob-brushes] .brush', { hasText: 'Fan brush' }).click();
     await drawLine(guest);
