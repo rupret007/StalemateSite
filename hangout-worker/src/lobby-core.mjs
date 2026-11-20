@@ -1,4 +1,3 @@
-import { MUSIC_PURPOSE, browserMusicHostOp, equalMusicProof, musicDigest, musicResponse, nativeMusicOp, stoppingMusic, validMusicBody } from './private-music.mjs';
 // Hang Out lobby engine: an old-school IRC network in one authoritative place (one Durable Object, one writer,
 // so no netsplits and no "first in gets @"). Pure logic, no I/O: the Worker DO and the local dev relay both
 // drive it, and unit tests drive it directly. Every permission is checked here, never in the browser.
@@ -91,6 +90,37 @@ export const HELP = [
 ];
 
 // Exact shape checks only: we never fetch, parse or rewrite WebJam's invite (WebJam's invitation_ingress owns that).
+// Shared validation and responses for the lobby Music protocol.
+export const MUSIC_PURPOSE = 'private-music-turn-v1';
+export const musicRef = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
+export const musicDigest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+
+export const nativeMusicOp = op => ['native-check', 'native-join', 'native-stop'].includes(op);
+export const browserMusicHostOp = op => ['host-check', 'host-join', 'host-stop'].includes(op);
+export const stoppingMusic = op => ['stop', 'native-stop', 'host-stop'].includes(op);
+
+export function validMusicBody(body, native) {
+    if (!body || !musicRef(body.id) || !musicDigest(body.proof)) return false;
+    if (!native && !browserMusicHostOp(body.op)) {
+        const fields = Object.keys(body).length;
+        return ['check', 'join', 'stop'].includes(body.op) && (fields === 3 || body.op === 'stop' && fields === 4 && body.ifStarted === true);
+    }
+    return (native ? nativeMusicOp(body.op) : browserMusicHostOp(body.op)) && musicDigest(body.webjam) && body.webjam.slice(-32) === body.id
+        && Number.isInteger(body.generation) && body.generation > 0 && body.generation <= 0xffffffff
+        && Object.keys(body).length === 5;
+}
+
+export function equalMusicProof(left, right) {
+    if (!musicDigest(left) || !musicDigest(right)) return false;
+    let different = 0;
+    for (let i = 0; i < left.length; i++) different |= left.charCodeAt(i) ^ right.charCodeAt(i);
+    return different === 0;
+}
+
+export const musicResponse = (status, body) => Response.json(body, { status, headers: {
+    'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff'
+} });
+
 export function validWebjamInvite(link) {
     const s = String(link || '');
     return /^webjam:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]{8,1800}$/.test(s) && !/[\s<>"`]/.test(s) ? s : '';

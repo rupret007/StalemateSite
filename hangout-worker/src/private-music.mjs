@@ -1,25 +1,10 @@
+export { MUSIC_PURPOSE, browserMusicHostOp, equalMusicProof, musicDigest, musicRef,
+    musicResponse, nativeMusicOp, stoppingMusic, validMusicBody } from './lobby-core.mjs';
+
 // The named issuer binding is available only to the protected Worker. This
 // path never uses the public WebJam credential endpoint as a fallback.
 export const MUSIC_PATH = '/beta/music';
 export const MUSIC_INTERNAL_PATH = '/__private-music';
-export const MUSIC_PURPOSE = 'private-music-turn-v1';
-export const musicRef = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
-export const musicDigest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
-
-export const nativeMusicOp = op => ['native-check', 'native-join', 'native-stop'].includes(op);
-export const browserMusicHostOp = op => ['host-check', 'host-join', 'host-stop'].includes(op);
-export const stoppingMusic = op => ['stop', 'native-stop', 'host-stop'].includes(op);
-
-export function validMusicBody(body, native) {
-    if (!body || !musicRef(body.id) || !musicDigest(body.proof)) return false;
-    if (!native && !browserMusicHostOp(body.op)) {
-        const fields = Object.keys(body).length;
-        return ['check', 'join', 'stop'].includes(body.op) && (fields === 3 || body.op === 'stop' && fields === 4 && body.ifStarted === true);
-    }
-    return (native ? nativeMusicOp(body.op) : browserMusicHostOp(body.op)) && musicDigest(body.webjam) && body.webjam.slice(-32) === body.id
-        && Number.isInteger(body.generation) && body.generation > 0 && body.generation <= 0xffffffff
-        && Object.keys(body).length === 5;
-}
 
 export function nativeMusicRateAddress(ip) {
     if (typeof ip !== 'string' || !/^[0-9a-f:.]{2,45}$/i.test(ip)) return '';
@@ -31,13 +16,6 @@ export function nativeMusicRateAddress(ip) {
         const parts = end === undefined ? head : [...head, ...Array(8 - head.length - tail.length).fill('0'), ...tail];
         return parts.slice(0, 4).join(':') + '/64';
     } catch { return ''; }
-}
-
-export function equalMusicProof(left, right) {
-    if (!musicDigest(left) || !musicDigest(right)) return false;
-    let different = 0;
-    for (let i = 0; i < left.length; i++) different |= left.charCodeAt(i) ^ right.charCodeAt(i);
-    return different === 0;
 }
 
 export function privateMusicOrigin(env) {
@@ -71,7 +49,3 @@ export async function musicJson(request) {
         reader.releaseLock();
     }
 }
-
-export const musicResponse = (status, body) => Response.json(body, { status, headers: {
-    'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff'
-} });
