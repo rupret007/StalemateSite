@@ -1702,11 +1702,16 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             if (l.me) li.classList.add('act');
         }
-        const stick = buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
+        // The server sends the report notice separately from its acknowledgement.
+        // New lines must not scroll a focused report control out of the chat.
+        const active = document.activeElement;
+        const focusedReport = active?.matches('.flag') && buf.contains(active) ? active : null;
+        const stick = !focusedReport && buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
         lines.append(li);
         while (lines.children.length > 300) removeChatRow(lines.firstChild);
         if (stick) buf.scrollTop = buf.scrollHeight;
         else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
+        if (focusedReport) revealFocusedReport(focusedReport);
     }
 
     function drawNewMessages() {
