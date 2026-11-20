@@ -515,6 +515,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const pendingReports = new Map();
     let connectionState = 'offline';
     let roomJoinFocus = null;
+    let startingArtRoom = null;
     let sessionEnded = false;
     let endedPmLabel = null; // Display only; never a view, endpoint or send context.
     let inviteContext = null;
@@ -755,6 +756,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function setConnection(state) {
         connectionState = state;
         if (state !== 'connected') {
+            if (startingArtRoom) { clearStartingArtRoom(); drawChan(); }
             roomJoinFocus = null;
             clearRoomInvites();
             if (gameOpenPending) {
@@ -1448,6 +1450,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             line(m.ch ?? app.active, { notice: true, from: m.from, text: m.text, kind: m.kind });
             if (m.kind === 'error') {
+                if (startingArtRoom) { clearStartingArtRoom(); drawChan(); }
                 if (!roomJoinFocus?.instance) roomJoinFocus = null;
                 const failedGameJoin = !!joiningGameRoom;
                 if (joiningGameRoom) {
@@ -1599,9 +1602,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function revealFocusedReport(button) {
         if (document.activeElement !== button) return;
         requestAnimationFrame(() => {
-            if (document.activeElement === button && button.matches(':focus-visible')) {
-                button.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-            }
+            if (document.activeElement !== button) return;
+            const shortWorkspace = innerWidth <= 900 && innerHeight <= 450;
+            if (shortWorkspace || button.matches(':focus-visible'))
+                button.scrollIntoView({ block: shortWorkspace ? 'center' : 'nearest', inline: 'nearest', behavior: 'instant' });
         });
     }
     function finishReport(id, submitted) {
@@ -1721,6 +1725,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     });
 
     function switchTo(key, { freshJoin = false } = {}) {
+        clearStartingArtRoom();
         const prev = app.active;
         if (prev !== key) { drafts.set(prev, $('[data-text]').value); $('[data-text]').value = drafts.get(key) || ''; }
         app.active = key;
@@ -3232,7 +3237,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const isPm = key.startsWith('pm:');
         const pmLabel = c?.nick || (sessionEnded && endedPmLabel?.key === key ? endedPmLabel.nick : 'unconfirmed visitor');
         $('[data-lobby-welcome]').hidden = sessionEnded || app.localMediaPaused || key !== '#stalemate';
-        $('[data-chat-context]').textContent = isPm ? `PM · ${pmLabel}` : key;
+        const context = $('[data-chat-context]');
+        context.textContent = startingArtRoom?.room ?? (isPm ? `PM · ${pmLabel}` : key);
+        context.toggleAttribute('data-room-opening', !!startingArtRoom);
+        $('[data-say]').inert = !!startingArtRoom;
         $('[data-topic]').textContent = isPm ? `Private chat with ${pmLabel}${c?.open ? '' : ' · replies unconfirmed; draft kept'} · not end-to-end encrypted · report shares selected text · tap their name to block` : c ? `${c.topic || ''}` : '';
         const room = !isPm && c && c.kind !== 'lobby';
         if (inviteContext && (inviteContext !== c || connectionState !== 'connected' || !amOp(c))) closeInviteDialog();
@@ -3466,6 +3474,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     });
 
     // Activity tiles pick a name; plain chat lets guests name their own channel.
+    function clearStartingArtRoom() {
+        if (!startingArtRoom) return;
+        clearTimeout(startingArtRoom.timer);
+        startingArtRoom = null;
+    }
+
     $$('[data-start]').forEach((b) => b.addEventListener('click', () => {
         if (b.dataset.start === 'chat') {
             clearPendingChannel();
@@ -3486,8 +3500,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const suffix = code ? `-${code.slice(0, 4)}x${code.slice(4, 8)}` : '';
         count(`room-start-${kind}`);
         const room = `#${kind}-${label}${suffix}`;
-        if (cmd('join', [room]))
+        if (cmd('join', [room])) {
             roomJoinFocus = document.activeElement === b ? { room, anchor: b } : null;
+            if (kind === 'art') {
+                clearStartingArtRoom();
+                startingArtRoom = { room, timer: setTimeout(() => {
+                    clearStartingArtRoom();
+                    drawChan();
+                }, 8000) };
+                drawChan();
+            }
+        }
     }));
     $('[data-channel-cancel]').addEventListener('click', () => $('[data-channel-dialog]').close());
     $('[data-channel-dialog]').addEventListener('close', () => {
@@ -4133,6 +4156,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
 
     $('[data-say]').addEventListener('submit', (e) => {
         e.preventDefault();
+        if (startingArtRoom) return;
         const input = $('[data-text]');
         const text = input.value.trim();
         if (!text) return;
