@@ -137,17 +137,14 @@ body.tm-hint-space .tm-start-hint[hidden] { display:block!important; visibility:
   html[data-mobile-game="turdomania"] header.hud .stat b { font-size:16px; }
   html[data-mobile-game="turdomania"] .dock { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; align-self:flex-start; margin-top:108px; }
   html[data-mobile-game="turdomania"] .dock #suite-difficulty-mount,
-  html[data-mobile-game="turdomania"] .dock .tm-aim { grid-column:1/-1; }
+  html[data-mobile-game="turdomania"] .dock .tm-aim,
+  html[data-mobile-game="turdomania"] .dock .tm-start-hint { grid-column:1/-1; }
   html[data-mobile-game="turdomania"] .dock .tm-control-label { display:none; }
-  html[data-mobile-game="turdomania"] .dock:has(.tm-start-hint:not([hidden])) { align-self:flex-start; margin-top:136px; }
-  html[data-mobile-game="turdomania"] body.tm-hint-space .dock { margin-top:136px; }
-  html[data-mobile-game="turdomania"] .tm-start-hint { position:fixed; top:108px; right:max(8px,env(safe-area-inset-right)); width:180px; }
 }
 @media(max-width:980px) and (orientation:landscape) and (max-height:340px) {
   html[data-mobile-game="turdomania"] header.hud { top:56px; }
-  html[data-mobile-game="turdomania"] .tm-start-hint { top:100px; line-height:12px; }
-  html[data-mobile-game="turdomania"] .dock:has(.tm-start-hint:not([hidden])),
-  html[data-mobile-game="turdomania"] body.tm-hint-space .dock { margin-top:124px; }
+  html[data-mobile-game="turdomania"] .tm-start-hint { line-height:12px; }
+  html[data-mobile-game="turdomania"] .dock { margin-top:100px; }
 }
 /* A wide window gives the same puzzle a larger board beside its controls.
    Mobile keeps its established layout and logical board dimensions. */
