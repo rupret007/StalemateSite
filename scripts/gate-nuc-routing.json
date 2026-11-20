@@ -1,0 +1,7 @@
+[
+  "music-invite-journey.spec.js",
+  "lobby-private-entry.spec.js",
+  "community-moderation.spec.js",
+  "lobby-accessibility.spec.js",
+  "lobby-status-focus.spec.js"
+]
