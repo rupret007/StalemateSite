@@ -1031,8 +1031,13 @@ test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and
 
     // Any participant can rewind for the room.
     await guest.evaluate(() => window.__ytLog[0].seekTo(100));
+    await expect.poll(() => host.evaluate(() => {
+        const position = window.__ytLog[0].getCurrentTime();
+        return position >= 100 && position < 110;
+    })).toBe(true);
     await guest.click('[data-bob-rewind]');
     await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(95);
+    await expect.poll(() => host.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(95);
 });
 
 test('both participants see a live remote tile in Hang Out and Paint Along phone layout stays separated', async ({ browser }) => {
