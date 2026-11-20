@@ -567,14 +567,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (app.active === channel) drawChan();
         return send({ t: 'cam', ch: channel, on: false });
     }
-    function room(recovering = false) {
-        if (app.sharingStopped || app.localMediaPaused) return null;
-        if (!roomApi && activityRoom(store(app.active)) && typeof window.LobbyRoom?.attach === 'function'
-            && (recovering || !activityToolsNeedsRetry)) {
+    function attachRoomTools() {
+        if (!roomApi && typeof window.LobbyRoom?.attach === 'function') {
             roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params, onCameraFailure: stopLocalCamera });
             activityToolsNeedsRetry = false;
             drawActivityRecovery();
         }
+        return roomApi;
+    }
+    function room(recovering = false) {
+        if (app.sharingStopped || app.localMediaPaused) return null;
+        if (!roomApi && activityRoom(store(app.active)) && (recovering || !activityToolsNeedsRetry)) return attachRoomTools();
         return roomApi;
     }
     const activityRoom = c => c && CREATIVE_ROOM_KINDS.has(c.kind)
@@ -1284,6 +1287,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             app.band = m.band; if (!gameGuest) writeRemembered('hangout-nick', m.nick);
             $('[data-self-nick]').textContent = m.nick;
             $('[data-self-role]').textContent = app.capabilities.configure ? 'Site administrator' : app.capabilities.moderate ? 'Community moderator' : app.verified ? 'Room owner account' : 'Guest access';
+            // Initialize the activity renderer before visitors can request a room.
+            // The relay's join still supplies the room and its authoritative snapshot.
+            if (!wasIn) {
+                try { attachRoomTools(); }
+                catch { failActivitySetup(); }
+            }
             app.kicked = false; retry = 0; setConnection('connected');
             entrySharing.joined();
             if (!gameGuest) returnToKeepRoom();
@@ -1754,8 +1763,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         try {
             const r = room();
             if (r) {
-                if ((prev !== key || freshJoin) && c && c.kind !== 'lobby' && c.kind !== 'jam') r.onJoin(c, c.actSnap);
-                else if (!c || c.kind === 'lobby' || c.kind === 'jam') r.onLeave();
+                if (!activityRoom(c)) r.onLeave();
+                else if (prev !== key || freshJoin) r.onJoin(c, c.actSnap);
             }
         } catch {
             // Optional activity setup must not abort the room's chat join or

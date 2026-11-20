@@ -38,7 +38,8 @@
             onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
             onError: (error) => videoFailure(player.key, error)
         });
-        let videoPublishTimer;
+        let videoPublishTimer, videoSyncTimer, videoSampleTimer;
+        let localSample = null;
         let live = null;
         let pendingPts = [];
         // Cache only within this room generation. Authoritative snapshots and
@@ -198,12 +199,15 @@
         }
 
         function teardown() {
+            if (!state.ch) return;
             roomGeneration += 1; captureVersion += 1;
             resetCanvasBase();
             localSample = null;
             clearTimeout(activity.timer); activity.timer = 0; activity.queue = []; activity.bytes = 0;
             cancelStroke();
             clearTimeout(videoPublishTimer);
+            clearInterval(videoSyncTimer);
+            clearInterval(videoSampleTimer);
             turnClient?.stop(); turnClient = null; turnInit = null; state.ice = null;
             ui.relayStatus.textContent = '';
             cameraFailureNotice = '';
@@ -260,7 +264,11 @@
             ui.cameraSwitch.hidden = chan.kind !== 'bobross' || !phone;
             ui.episodeTitle.hidden = chan.kind !== 'bobross';
             if (paint) { canvasRoomInstance = chan.keepRef; setupCanvas(); }
-            if (video) setupVideoUi();
+            if (video) {
+                setupVideoUi();
+                videoSyncTimer = setInterval(syncVideo, 2000);
+                videoSampleTimer = setInterval(sampleVideo, 250);
+            }
             if (act) ingestSnap(act, previousPaint);
             syncNames(chan);
             if (video && chan.kind === 'bobross' && isOp() && !state.room.video) {
@@ -671,7 +679,7 @@
             }, 100);
         }
         function canDriveVideo() { return state.kind === 'bobross' || isOp(); }
-        setInterval(() => {
+        function syncVideo() {
             if (state.kind !== 'watch' || !isOp()) return syncToState(false);
             const v = state.room.video;
             if (!v || !player.yt || (!player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
@@ -680,9 +688,8 @@
                 actSend({ kind: 'video', source: v.source, playing, pos, rate: 1 }, () =>
                     H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() }));
             }
-        }, 2000);
-        let localSample = null;
-        setInterval(() => {
+        }
+        function sampleVideo() {
             const v = state.room.video;
             if (!canDriveVideo() || !v || !player.yt || player.autoplayBlocked ||
                 player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
@@ -700,7 +707,7 @@
                 }
             }
             localSample = { at, pos, playing };
-        }, 250);
+        }
         document.addEventListener('visibilitychange', () => { if (!document.hidden) syncToState(true); });
 
         /* ---- P2P video (cameras only) ---- */
