@@ -40,6 +40,14 @@ let musicCheckTimer, musicDeadlineTimer, grantRetired = false, musicJoinStarted 
 const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
 let lastMusicCheck = 0;
 
+async function musicRequestSignal(attempt, timeout) {
+  const deadline = AbortSignal.timeout(timeout);
+  if (!attempt) return deadline;
+  const signals = [attempt.signal, deadline];
+  return typeof AbortSignal.any === "function" ? AbortSignal.any(signals)
+    : (await import("./request-signal.js")).musicSignal(...signals);
+}
+
 async function musicRequest(op, signal, allowBusy = false) {
   const sentAt = Date.now();
   const response = await fetch("/beta/music", {
@@ -79,7 +87,9 @@ async function checkMusicGrant(allowBusy = false) {
     return false;
   }
   try {
-    await musicRequest("check", activeAttempt?.signal, allowBusy);
+    const signal = await musicRequestSignal(activeAttempt, 8000);
+    if (grantRetired) return false;
+    await musicRequest("check", signal, allowBusy);
     if (grantRetired) return false;
     watchMusicGrant();
     return true;
@@ -481,9 +491,7 @@ async function startJoin(listenOnly = false) {
     if (!isCurrent() || expireUnusedInvite()) return;
     let grantedCredentials;
     if (musicGrant) {
-      const signals = [attempt.signal, AbortSignal.timeout(12000)];
-      const signal = typeof AbortSignal.any === "function" ? AbortSignal.any(signals)
-        : (await import("./request-signal.js")).musicSignal(...signals);
+      const signal = await musicRequestSignal(attempt, 12000);
       if (!isCurrent() || expireUnusedInvite()) return;
       const result = await musicRequest("join", signal);
       if (!isCurrent() || expireUnusedInvite()) return;
