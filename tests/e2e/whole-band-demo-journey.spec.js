@@ -336,7 +336,7 @@ test('Stalemate to WebJam Music and Art to a private two-phone Hangout and leave
             await inviteToActivity(host, guest, 'art', /^#art-/);
             await drawAndVerify(host, guest, .35);
             await drawAndVerify(guest, host, .65);
-            await sendAndReceive(guest, host, 'The shared painting looks good on my phone.');
+            await sendAndReceive(guest, host, 'The blue brush is ready.');
             for (const page of [host, guest]) {
                 expect(await painted(page, .35)).toBe(true);
                 expect(await painted(page, .65)).toBe(true);
