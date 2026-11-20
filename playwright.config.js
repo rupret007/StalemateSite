@@ -3,6 +3,9 @@ const { defineConfig, devices } = require('@playwright/test');
 const { testBaseURL } = require('./scripts/lib/e2e-test-server.cjs');
 
 const baseURL = testBaseURL(process.env);
+// The whole-band journey is run separately from full G2 qualification.
+const fullGateIgnore = process.env.STALEMATE_FULL_GATE === '1'
+    ? ['**/whole-band-demo-journey.spec.js'] : [];
 
 const phoneProject = (name, use) => ({
     name,
@@ -12,6 +15,7 @@ const phoneProject = (name, use) => ({
 
 module.exports = defineConfig({
     testDir: './tests/e2e',
+    testIgnore: fullGateIgnore,
     // Both CommonJS and ESM specs load the same engine. Keep it native ESM so
     // the CommonJS transform cannot change its exports for the ESM fixtures.
     build: { external: ['**/hangout-worker/src/lobby-core.mjs'] },
@@ -39,7 +43,7 @@ module.exports = defineConfig({
     projects: [
         {
             name: 'chromium',
-            testIgnore: /phones\.spec\.js/,
+            testIgnore: [/phones\.spec\.js/, ...fullGateIgnore],
             use: { browserName: 'chromium' }
         },
         {
