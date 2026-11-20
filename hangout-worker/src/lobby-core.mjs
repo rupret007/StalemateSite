@@ -1309,15 +1309,17 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const browserJoinDeadline = performance.now() + (isHost ? 8_000 : 12_000);
         const authorize = async (start, settleBusy = false) => {
             const blockedBeforeStart = Symbol('participation-busy-before-start');
+            let rechecking = false;
             // Observe only committed room state. The issuer callback runs
             // outside the command gate and may arrive while chat is saving.
             while (true) {
                 while (controlledSettlement) await controlledSettlement;
+                if (rechecking && performance.now() >= browserJoinDeadline) throw busy;
                 const context = await participation.prepare([connectionView(host), connectionView(guest)]);
                 const result = await participation.startProvider(context, musicProviderRequest(lease, role), () => {
                     // Return the marker through the in-process fence. It
                     // deliberately converts thrown callbacks to denials.
-                    if (participationBusy) return blockedBeforeStart;
+                    if (participationBusy || rechecking && performance.now() >= browserJoinDeadline) return blockedBeforeStart;
                     if (!current()) throw Error('participation-denied');
                     return start();
                 });
@@ -1325,6 +1327,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 // Only repeat a fence that never invoked this callback.
                 // A nested or already-started issue is never replayed.
                 if (!settleBusy || native || performance.now() >= browserJoinDeadline) throw busy;
+                rechecking = true;
             }
         };
         if (page || ['check', 'native-check', 'host-check'].includes(op)) {

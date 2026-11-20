@@ -218,12 +218,18 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         expect(f.provider.revoke).not.toHaveBeenCalled();
     });
 
-    it('settles a busy Music authority fence after preparation without preparing or issuing twice', async () => {
+    it.each([
+        [false, 'settles a busy Music authority fence after preparation without preparing or issuing twice'],
+        [true, 'closes a prepared Music join if settlement outlasts its authorization budget'],
+    ])('%s: %s', async (expired, _title) => {
         const f = await setupMusic();
         await f.acceptMusic();
         await f.waitHandoff();
         const preparing = gate(), dispatch = gate(), chatCommit = gate();
         const firstFence = new Promise(resolve => { dispatch.onResult = resolve; });
+        const actualNow = performance.now.bind(performance);
+        let elapsed = 0;
+        const monotonic = expired ? vi.spyOn(performance, 'now').mockImplementation(() => actualNow() + elapsed) : null;
         f.provider.prepare.mockImplementationOnce(async () => { await preparing.wait(); return { status: 200 }; });
         const joining = f.access('join');
         await preparing.entered;
@@ -238,12 +244,18 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
             expect(typeof await firstFence).toBe('symbol');
             expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
             expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+            if (expired) {
+                await new Promise(resolve => setImmediate(resolve));
+                elapsed = 12_001;
+            }
         } finally { chatCommit.release(); }
         await chat;
-        expect((await joining).status).toBe(200);
+        try { expect((await joining).status).toBe(expired ? 403 : 200); }
+        finally { monotonic?.mockRestore(); }
         expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
-        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
-        expect(f.provider.revoke).not.toHaveBeenCalled();
+        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(expired ? ['host'] : ['host', 'guest']);
+        if (expired) expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(['guest', 'host']);
+        else expect(f.provider.revoke).not.toHaveBeenCalled();
     });
 
     it('never exposes a Music page or issues guest credentials if the handoff commit fails', async () => {
