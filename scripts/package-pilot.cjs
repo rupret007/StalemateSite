@@ -7,7 +7,12 @@ const target = process.argv[2] || 'pilot';
 if (!['pilot', 'beta'].includes(target)) throw new Error('Choose pilot or beta assets.');
 const out = path.join(root, `.${target}-assets`);
 fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
-for (const dir of ['r', 'assets', ...(target === 'beta' ? ['join'] : [])]) fs.cpSync(path.join(root, dir), path.join(out, dir), { recursive: true });
+for (const dir of ['r', 'assets', ...(target === 'beta' ? ['join'] : [])]) {
+    fs.cpSync(path.join(root, dir), path.join(out, dir), {
+        recursive: true,
+        filter: source => dir !== 'r' || path.basename(source) !== 'TWO-HOUSE-TEST.md',
+    });
+}
 fs.mkdirSync(path.join(out, 'js'), { recursive: true });
 fs.copyFileSync(path.join(root, 'js', 'music-preference.js'), path.join(out, 'js', 'music-preference.js'));
 if (target === 'beta') {

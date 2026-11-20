@@ -391,7 +391,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
                 const batch = await records.transaction(async tx => {
                     // Like participation cohort preparation, share decoded reads
                     // only inside this native read-only transaction. Each binding
-                    // still gets an independent row and its own live validation.
+                    // still gets its own live validation against those rows.
                     // Never reuse these rows across batches or capture fences.
                     const rows = new Map();
                     const current = Object.freeze({ get: async key => {

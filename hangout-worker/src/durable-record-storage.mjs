@@ -1,13 +1,17 @@
 // Physical record mapping only. The caller supplies ONE rollback-capable async
 // transaction domain shared by authority, consent and effects. No provisioning,
 // production activation, remote authority, key management or provider starts.
-import { Buffer } from 'node:buffer';
-
 export const DURABLE_RECORD_CEILINGS = Object.freeze({ chunkBytes: 65536, recordBytes: 16 * 1024 * 1024,
     transactionReadBytes: 32 * 1024 * 1024, transactionWriteBytes: 16 * 1024 * 1024, rowOperations: 4096, listPage: 4, nodes: 100000, depth: 64 });
 const enc = new TextEncoder(), dec = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const fail = reason => { throw Error(reason); };
-const webSha256 = async bytes => Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
+const hexBytes = Array.from({ length: 256 }, (_, byte) => byte.toString(16).padStart(2, '0'));
+const webSha256 = async bytes => {
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+    let hex = '';
+    for (const byte of digest) hex += hexBytes[byte];
+    return hex;
+};
 const exact = (value, keys) => value && Object.getPrototypeOf(value) === Object.prototype
     && Reflect.ownKeys(value).length === keys.length && keys.every(key => {
         const d = Object.getOwnPropertyDescriptor(value, key); return d?.enumerable && Object.hasOwn(d, 'value');
@@ -90,7 +94,9 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes,
                 const keyOk = key => typeof key === 'string' && /^[\x21-\x7e]{1,512}$/.test(key);
                 const route = key => {
                     if (!keyOk(key)) fail('record-key');
-                    return Buffer.from(key, 'ascii').toString('hex');
+                    let hex = '';
+                    for (let i = 0; i < key.length; i += 1) hex += hexBytes[key.charCodeAt(i)];
+                    return hex;
                 };
                 const manifestKey = base => `${prefix}manifest:${base}`;
                 const partPrefix = base => `${prefix}part:${base}:`;
@@ -194,7 +200,10 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes,
                             if (typeof physical !== 'string' || !physical.startsWith(physicalPrefix)) fail('storage-corrupt');
                             const hex = physical.slice(physicalPrefix.length);
                             if (!/^(?:[0-9a-f]{2}){1,512}$/.test(hex)) fail('storage-corrupt');
-                            const key = Buffer.from(hex, 'hex').toString('latin1');
+                            let key = '';
+                            for (let i = 0; i < hex.length; i += 2) {
+                                key += String.fromCharCode(Number.parseInt(hex.slice(i, i + 2), 16));
+                            }
                             if (!keyOk(key) || !key.startsWith(logicalPrefix) || key <= previous) fail('storage-corrupt');
                             const value = await readRecord(key); if (value === undefined) fail('storage-corrupt');
                             result.set(key, value); previous = key;
