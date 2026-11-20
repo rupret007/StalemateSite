@@ -569,8 +569,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     }
     function room(recovering = false) {
         if (app.sharingStopped || app.localMediaPaused) return null;
-        if (!roomApi && typeof window.LobbyRoom?.attach === 'function'
-            && (recovering || !activityToolsNeedsRetry || !activityRoom(store(app.active)))) {
+        if (!roomApi && activityRoom(store(app.active)) && typeof window.LobbyRoom?.attach === 'function'
+            && (recovering || !activityToolsNeedsRetry)) {
             roomApi = window.LobbyRoom.attach({ app, send, $, previewKey, turnUrl, isLocal, params, onCameraFailure: stopLocalCamera });
             activityToolsNeedsRetry = false;
             drawActivityRecovery();
@@ -2402,16 +2402,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const c = app.chans.get(gameReturn?.room);
         if (connectionState === 'connected' && (c?.kind === 'game' || c?.kind === 'jam')) rememberGameReturn(c);
     });
+    let drawnJamInviteQr = '';
     function clearJamInviteQr() {
+        if (!drawnJamInviteQr) return;
         const canvas = $('[data-jam-invite-qr]');
-        canvas.width = canvas.width; // Reset the backing bitmap and drawing state.
-        canvas.removeAttribute('data-invite-url');
+        canvas.width = canvas.width; // Clear the previously drawn invite.
+        drawnJamInviteQr = '';
     }
     function drawJamInviteQr(link) {
-        clearJamInviteQr();
-        const canvas = $('[data-jam-invite-qr]');
-        if (!link || !window.HangoutQrLite?.draw) { canvas.removeAttribute('data-invite-url'); return; }
-        window.HangoutQrLite.draw(canvas, link);
+        if (drawnJamInviteQr === link || !window.HangoutQrLite?.draw) return;
+        window.HangoutQrLite.draw($('[data-jam-invite-qr]'), link);
+        drawnJamInviteQr = link;
     }
     const musicPanel = $('[data-music-invite]');
     const musicAction = $('[data-music-invite-action]');
@@ -2760,6 +2761,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function drawJam() {
         if (app.sharingStopped || app.localMediaPaused) { resetJamControls(); $('[data-jam]').hidden = true; return; }
         const c = currentJam();
+        if (!c && !jamContext) return;
         const next = c ? { room: c, host: !!amOp(c), invitation: c.jam?.invitation || c.jam?.desktop || '',
             desktop: c.jam?.desktop || '', web: sharingControls ? '' : c.jam?.web || '',
             webReady: !sharingControls && c.jam?.webReady === true } : null;

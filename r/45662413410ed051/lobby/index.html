@@ -14,6 +14,13 @@
     <title>#stalemate · Hang Out</title>
     <link rel="icon" href="../../../assets/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="lobby.css">
+    <link rel="modulepreload" href="lobby.js">
+    <link rel="modulepreload" href="../entry-sites.mjs">
+    <link rel="modulepreload" href="chat-announcements.mjs">
+    <link rel="modulepreload" href="entry-sharing.mjs">
+    <link rel="modulepreload" href="game-night-audio.mjs">
+    <link rel="modulepreload" href="idle-heartbeat.mjs">
+    <link rel="modulepreload" href="game-night.mjs">
 </head>
 <body>
     <!-- Keep native dialogs ahead of the live workspace so Safari exposes their controls to accessibility tools. -->
@@ -468,16 +475,16 @@
     <aside class="guest-check" data-guest-check hidden><p role="status">Checking your guest connection…</p><div data-turnstile></div></aside>
     <!-- Page-level counts only: fixed event names, no query string (the preview key is stripped first), no referrer. -->
     <script data-goatcounter="https://stalemate.goatcounter.com/count" data-goatcounter-settings='{"no_onload": true}' async src="../../../js/count.js"></script>
-    <script src="../names.js"></script>
-    <script src="../sync-core.js"></script>
-    <script src="../video-core.js"></script>
-    <script src="../youtube-player.js"></script>
-    <script src="../turn-client.js"></script>
-    <script src="../bob-ross.js"></script>
-    <script src="discovery-core.js"></script>
-    <script src="lobby-room.js"></script>
-    <script src="qr-lite.js"></script>
-    <script src="lobby-startup.js"></script>
+    <script defer src="../names.js"></script>
+    <script defer src="../sync-core.js"></script>
+    <script defer src="../video-core.js"></script>
+    <script defer src="../youtube-player.js"></script>
+    <script defer src="../turn-client.js"></script>
+    <script defer src="../bob-ross.js"></script>
+    <script defer src="discovery-core.js"></script>
+    <script defer src="lobby-room.js"></script>
+    <script defer src="qr-lite.js"></script>
+    <script defer src="lobby-startup.js"></script>
     <script type="module" data-lobby-module src="lobby.js"></script>
 </body>
 </html>
