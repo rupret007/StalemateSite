@@ -218,8 +218,7 @@ async function preparePhone(context, role, bandOrigin, community, lab) {
     return { page, enter };
 }
 
-async function sendAndReceive(sender, receiver) {
-    const marker = randomUUID();
+async function sendAndReceive(sender, receiver, marker) {
     const composer = sender.getByRole('textbox', { name: 'Message', exact: true });
     await composer.fill(marker);
     await composer.press('Enter');
@@ -294,8 +293,8 @@ test('Stalemate to WebJam Music and Art to a private two-phone Hangout and leave
         });
         await test.step('Redeem the private invite separately and exchange chat', async () => {
             await Promise.all([first.enter('G3Host'), second.enter(guestName)]);
-            await sendAndReceive(host, guest);
-            await sendAndReceive(guest, host);
+            await sendAndReceive(host, guest, 'Ready for the band demo.');
+            await sendAndReceive(guest, host, 'Ready for the private hangout.');
         });
         let jam;
         await test.step('Start and accept the same private Music session', async () => {
@@ -337,7 +336,7 @@ test('Stalemate to WebJam Music and Art to a private two-phone Hangout and leave
             await inviteToActivity(host, guest, 'art', /^#art-/);
             await drawAndVerify(host, guest, .35);
             await drawAndVerify(guest, host, .65);
-            await sendAndReceive(guest, host);
+            await sendAndReceive(guest, host, 'The shared painting looks good on my phone.');
             for (const page of [host, guest]) {
                 expect(await painted(page, .35)).toBe(true);
                 expect(await painted(page, .65)).toBe(true);
