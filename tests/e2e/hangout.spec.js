@@ -982,6 +982,8 @@ test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and
     await host.click('[data-bob-toggle]');
     if (await host.locator('[data-ask-no]').isVisible()) await host.click('[data-ask-no]');
     await expect(host.locator('[data-bob-episodes] .ep')).toHaveCount(12);
+    await expect(host.locator('[data-bob-palette] .swatch')).toHaveCount(12);
+    await expect(host.locator('[data-bob-palette]').getByRole('button', { name: 'Phthalo Blue', exact: true })).toBeVisible();
     await expect(host.locator('.draw')).toBeHidden();
 
     // Picking an episode loads it for everyone and flips guests into Bob mode.
@@ -993,12 +995,33 @@ test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and
     await expect(guest.locator('[data-bob-hold]')).toBeVisible();
     await expect(guest.locator('[data-bob-catchup]')).toBeVisible();
 
+    await guest.click('[data-bob-palette] [aria-label="Van Dyke Brown"]');
+    await guest.locator('[data-bob-brushes] .brush', { hasText: 'Fan brush' }).click();
+    await drawLine(guest);
+    await expect.poll(() => host.evaluate(() => window.__hangout.state.strokes.map(stroke => `${stroke.color}/${stroke.size}`)))
+        .toContain('#221b15/16');
+
+    await guest.click('[data-bob-nudge]');
+    await expect(host.locator('[data-status]')).toContainText('needs a sec');
+
     // Any participant can pause and resume the shared player.
     await guest.click('[data-bob-hold]');
     await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
     await expect(guest.locator('[data-bob-now]')).toContainText('Paused by');
     await guest.click('[data-bob-hold]');
     await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+
+    const catchUp = guest.getByRole('button', { name: 'Catch me up', exact: true });
+    // Displace the local player at click time so periodic sync can't fix it first.
+    await catchUp.evaluate(button => button.addEventListener('click', () => {
+        const localPlayer = window.__ytLog[0];
+        localPlayer.seekTo(400);
+        button.dataset.beforeCatchUp = String(localPlayer.getCurrentTime());
+    }, { capture: true, once: true }));
+    await catchUp.click();
+    expect(Number(await catchUp.getAttribute('data-before-catch-up'))).toBeGreaterThanOrEqual(400);
+    await expect(guest.locator('[data-status]')).toHaveText('Caught up with the host.');
+    await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(30);
 
     // A guest's seek is shared immediately with everyone in Paint Along.
     await guest.evaluate(() => { window.__ytLog[0].seekTo(400); });
