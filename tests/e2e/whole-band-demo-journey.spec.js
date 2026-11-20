@@ -125,9 +125,13 @@ async function preparePhone(context, role, bandOrigin, community, lab) {
     let site;
     await context.exposeBinding('g3Connect', (_source, session) => lab.connectTransport(role, session));
     await context.addInitScript(() => {
-        if (window === window.top) window.g3AudioTracks = [];
-        else if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => {
-            const audio = new AudioContext();
+        if (window === window.top) {
+            window.g3AudioTracks = [];
+            return;
+        }
+        const Audio = window.AudioContext || window.webkitAudioContext;
+        const getUserMedia = async () => {
+            const audio = new Audio();
             const stream = audio.createMediaStreamDestination().stream;
             for (const track of stream.getAudioTracks()) {
                 const stop = track.stop.bind(track);
@@ -136,6 +140,11 @@ async function preparePhone(context, role, bandOrigin, community, lab) {
             }
             return stream;
         };
+        // The WebKit frame can acquire its real mediaDevices object after
+        // the init script runs. Bind the local capture at the navigator.
+        Object.defineProperty(navigator, 'mediaDevices', {
+            value: { getUserMedia, enumerateDevices: async () => [] },
+        });
     });
     await context.route('**/*', async route => {
         const url = new URL(route.request().url());
