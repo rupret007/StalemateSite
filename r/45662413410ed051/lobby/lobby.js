@@ -663,7 +663,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (c.actSnap.strokes.length > 400) c.actSnap.strokes.splice(0, c.actSnap.strokes.length - 400);
     }
     const nickInput = $('[data-nick]');
-    nickInput.value = nickInput.value || readRemembered('hangout-nick') || ''; // blank by default; remembered on this device
+    // An already focused field can have a pending edit even while it is empty.
+    if (!nickInput.value && document.activeElement !== nickInput) {
+        nickInput.value = readRemembered('hangout-nick') || '';
+    }
     $('[data-reroll]').addEventListener('click', (e) => {
         let r;
         try { r = window.StaleNames.roll(); }
