@@ -404,29 +404,33 @@ function render() {
       icon.setAttribute('href', './assets/turdomania-tiles.svg#' + ['swirl', 'corn', 'splat', 'paper', 'bean', 'cheese'][t.kind]);
       art.appendChild(icon);
       el.appendChild(art);
-      el.dataset.kind = String(t.kind);
-      el.style.setProperty('--k', (window.Suite && Suite.turdomaniaKindColor) ? Suite.turdomaniaKindColor(t.kind, kind.color) : kind.color);
       el.dataset.id = t.id;
       tileEls.set(t.id, el);
     }
     el.classList.remove('popping');
-    el.dataset.kind = String(t.kind);
-    el.style.setProperty('--k', (window.Suite && Suite.turdomaniaKindColor) ? Suite.turdomaniaKindColor(t.kind, kind.color) : kind.color);
-    el.dataset.col = c; el.dataset.row = r;
+    const kindValue = String(t.kind), col = String(c), row = String(r);
+    const color = (window.Suite && Suite.turdomaniaKindColor) ? Suite.turdomaniaKindColor(t.kind, kind.color) : kind.color;
+    if (el.dataset.kind !== kindValue) el.dataset.kind = kindValue;
+    if (el.style.getPropertyValue('--k') !== color) el.style.setProperty('--k', color);
+    if (el.dataset.col !== col) el.dataset.col = col;
+    if (el.dataset.row !== row) el.dataset.row = row;
     const rowEl = rowEls[state.rows - 1 - r];
     const pos = posFor(c, r);
-    const from = animate && el.parentNode && el.parentNode !== rowEl ? el.style.transform : '';
+    const previous = el.style.transform;
+    const from = animate && el.parentNode && el.parentNode !== rowEl ? previous : '';
     if (el.parentNode !== rowEl) rowEl.appendChild(el);
-    el.style.setProperty('--pos', pos);
+    if (el.style.getPropertyValue('--pos') !== pos) el.style.setProperty('--pos', pos);
     if (from && from !== pos) {
       el.style.transition = 'none';
       el.style.transform = from;
       moved.push([el, pos]);
-    } else {
+    } else if (previous !== pos) {
       el.style.transform = pos;
     }
-    el.setAttribute('aria-label', `${kind.name}, column ${c + 1}, row ${r + 1}`);
-    el.setAttribute('aria-colindex', c + 1);
+    const label = `${kind.name}, column ${c + 1}, row ${r + 1}`;
+    const colIndex = String(c + 1);
+    if (el.getAttribute('aria-label') !== label) el.setAttribute('aria-label', label);
+    if (el.getAttribute('aria-colindex') !== colIndex) el.setAttribute('aria-colindex', colIndex);
   }));
   for (const [id, el] of tileEls) if (!live.has(id)) { el.remove(); tileEls.delete(id); }
   if (moved.length) {
