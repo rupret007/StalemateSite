@@ -982,10 +982,12 @@ test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and
     await host.click('[data-bob-toggle]');
     if (await host.locator('[data-ask-no]').isVisible()) await host.click('[data-ask-no]');
     await expect(host.locator('[data-bob-episodes] .ep')).toHaveCount(12);
-    await host.getByText('Draw on the shared canvas', { exact: true }).click();
+    await host.locator('[data-more]').click();
+    await host.getByRole('button', { name: 'Draw on the shared canvas', exact: true }).click();
     await expect(host.locator('[data-bob-palette] .swatch')).toHaveCount(12);
     await expect(host.locator('[data-bob-palette]').getByRole('button', { name: 'Phthalo Blue', exact: true })).toBeVisible();
     await expect(host.locator('.draw')).toBeHidden();
+    await host.getByRole('button', { name: 'Close drawing', exact: true }).click();
 
     // Picking an episode loads it for everyone and flips guests into Bob mode.
     await host.click('[data-bob-ep="uj5FE70BcB0"]');
@@ -996,12 +998,14 @@ test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and
     await expect(guest.locator('[data-bob-hold]')).toBeVisible();
     await expect(guest.locator('[data-bob-catchup]')).toBeVisible();
 
-    await guest.getByText('Draw on the shared canvas', { exact: true }).click();
+    await guest.locator('[data-more]').click();
+    await guest.getByRole('button', { name: 'Draw on the shared canvas', exact: true }).click();
     await guest.click('[data-bob-palette] [aria-label="Van Dyke Brown"]');
     await guest.locator('[data-bob-brushes] .brush', { hasText: 'Fan brush' }).click();
     await drawLine(guest);
     await expect.poll(() => host.evaluate(() => window.__hangout.state.strokes.map(stroke => `${stroke.color}/${stroke.size}`)))
         .toContain('#221b15/16');
+    await guest.getByRole('button', { name: 'Close drawing', exact: true }).click();
 
     await guest.click('[data-bob-nudge]');
     await expect(host.locator('[data-status]')).toContainText('needs a sec');

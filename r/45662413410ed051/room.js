@@ -1208,7 +1208,13 @@
     const sharedDrawing = $('[data-shared-drawing]');
     const roomDrawing = sharedDrawing.parentElement;
     const paintDrawing = $('[data-bob-drawing]');
-    const paintSketch = paintDrawing.closest('details');
+    const paintDrawingOpen = $('[data-bob-drawing-open]');
+    paintDrawingOpen.addEventListener('click', () => {
+        if (app.bob.on && !paintDrawing.open) paintDrawing.showModal();
+    });
+    paintDrawing.addEventListener('close', () => {
+        if (app.bob.on && !app.ended) ui.more.focus();
+    });
     function pickBrush(size) {
         ui.size.value = String(size);
         ui.bobBrushes.querySelectorAll('.brush').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.size) === size)));
@@ -3492,8 +3498,9 @@
         syncSharedLayout();
         ui.bob.hidden = !app.bob.on;
         if (app.bob.on !== wasOn) {
+            if (!app.bob.on) paintDrawing.close();
             (app.bob.on ? paintDrawing : roomDrawing).append(sharedDrawing);
-            if (!app.bob.on) paintSketch.open = false;
+            paintDrawingOpen.hidden = !app.bob.on;
         }
         ui.bobToggle.setAttribute('aria-pressed', String(app.bob.on));
         ui.bobToggle.textContent = app.bob.on ? 'Exit Paint Along' : '🎨 Paint along with Bob';

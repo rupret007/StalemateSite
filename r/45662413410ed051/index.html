@@ -89,10 +89,6 @@
                     <summary>Pick an episode (fan faves + easy starters)</summary>
                     <ol class="ep-list" data-bob-episodes></ol>
                 </details>
-                <details class="paint-sketch">
-                    <summary>Draw on the shared canvas</summary>
-                    <div data-bob-drawing></div>
-                </details>
             </div>
             <div class="picks host-only" data-picks>
                 <button type="button" class="pick" data-pick-file="manic">Manic (Stalemate)</button>
@@ -168,6 +164,7 @@
                     <button class="btn btn--ghost" type="button" data-pip hidden>Pop out</button>
                     <button class="btn soundtrack-btn" type="button" data-music-toggle>Music</button>
                     <button class="btn btn--ghost" type="button" data-settings>⚙ Camera &amp; background</button>
+                    <button class="btn btn--bob" type="button" data-bob-drawing-open aria-haspopup="dialog" hidden>Draw on the shared canvas</button>
                     <button class="btn btn--bob" type="button" data-canvas-cam aria-pressed="false">Show my real canvas</button>
                     <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
                 </div>
@@ -194,6 +191,11 @@
             </div>
         </section>
     </main>
+
+    <dialog class="paint-sketch" data-bob-drawing aria-labelledby="paint-sketch-title">
+        <h2 id="paint-sketch-title">Draw on the shared canvas</h2>
+        <form method="dialog"><button class="btn btn--ghost">Close drawing</button></form>
+    </dialog>
 
     <dialog class="ask private-report" data-report-dialog aria-labelledby="private-report-title" aria-describedby="private-report-privacy">
         <h2 id="private-report-title">Report to community staff</h2>
