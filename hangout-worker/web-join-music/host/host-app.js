@@ -33,17 +33,19 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
         start.disabled = true; stop.hidden = true; listen.hidden = true;
         status.textContent = message;
         channel.postMessage({ type: 'ended' }); channel.close();
-        void request('host-stop').catch(() => {});
+        void request('host-stop').catch(() => {
+            status.textContent = `${message} The room did not confirm the stop.`;
+        });
         handoff = null;
     };
-    async function request(op) {
+    async function request(op, allowBusy = false) {
         const closing = op === 'host-stop';
         const deadline = AbortSignal.timeout(8000);
         const response = await fetch('/beta/music', { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
             headers: { 'Content-Type': 'application/json' }, keepalive: closing,
             signal: closing ? deadline : musicSignal(controller.signal, deadline),
             body: JSON.stringify({ op, id: handoff.webjam.slice(-32), proof: handoff.proof, webjam: handoff.webjam, generation: handoff.generation }) });
-        if (op === 'host-check' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy'
+        if (allowBusy && op === 'host-check' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy'
             && Date.now() - lastCheck < 15000) return;
         if (!response.ok) throw new Error('Music authority ended.');
         if (!closing) lastCheck = Date.now();
@@ -54,12 +56,12 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
         try { await audio.play(); listen.hidden = true; }
         catch { if (!controller.signal.aborted) listen.hidden = false; }
     }
-    async function check() {
-        if (checking) return;
-        checking = true;
-        try { await request('host-check'); }
+    async function check(foreground = false) {
+        if (!lastCheck || controller.signal.aborted || !foreground && checking) return;
+        if (!foreground) checking = true;
+        try { await request('host-check', !foreground); }
         catch { end('The Music connection ended. Start a fresh invitation to rejoin.'); }
-        finally { checking = false; }
+        finally { if (!foreground) checking = false; }
     }
     status.textContent = 'Confirm headphones and start when you’re ready to invite your guest.';
     headphones.addEventListener('change', () => { if (!stream && !controller.signal.aborted) start.disabled = !headphones.checked; });
@@ -95,5 +97,6 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     channel.addEventListener('message', ({ data }) => { if (data?.type === 'stop') end('The Music invitation ended.'); });
     stop.addEventListener('click', () => end('Music stopped. You can return to the Jam room.'));
     listen.addEventListener('click', play);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) void check(true); });
     window.addEventListener('pagehide', () => end('Music stopped.'), { once: true });
 }

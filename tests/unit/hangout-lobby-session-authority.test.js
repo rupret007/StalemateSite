@@ -860,7 +860,7 @@ describe('actual HangoutLobby constructs the required participation bridge', () 
 });
 
 describe('private Music through signed beta admission, production lobby and SQLite authority', () => {
-    for (const action of ['Stop', 'Leave', 'Kick', 'Block']) it(`fences a browser Music host and the selected guest to their signed sessions and retires both roles on ${action}`, async () => {
+    for (const action of ['Stop', 'Leave', 'Kick', 'Block', 'late host heartbeat', 'suspended guest']) it(`fences a browser Music host and the selected guest to their signed sessions and retires both roles on ${action}`, async () => {
         const f = await fixture({ participation: true });
         const host = await f.enroll('browser-music-host'), guest = await f.enroll('browser-music-guest');
         const ledger = await participationLedger(f);
@@ -870,13 +870,14 @@ describe('private Music through signed beta admission, production lobby and SQLi
         const issue = vi.fn(async (claim, confirm) => await confirm()
             ? { status: 200, credentials: { role: claim.role } } : { status: 403 });
         const revoke = vi.fn(async () => ({ status: 200 }));
+        const touch = vi.fn(async () => ({ status: 200 }));
         Object.assign(f.env, {
             WEBJAM_WEB_ORIGINS: origin, HANGOUT_TURN_ENABLED: '0', HANGOUT_AI_MODERATION: 'off',
             HANGOUT_BETA_INVITE_KEY: 'offline-music-fixture-key-for-signed-cookies',
             HANGOUT_PREVIEW_KEY: 'offline-music-fixture-preview',
             ASSETS: { fetch: async () => new Response('<html><head></head></html>', { headers: { 'Content-Type': 'text/html' } }) },
             ROOMS: {}, QUOTA: { idFromName: name => name, get: () => ({ fetch: () => new Response(null) }) },
-            WEBJAM_PRIVATE_MUSIC: { prepare, issue, revoke, touch: async () => ({ status: 200 }) }
+            WEBJAM_PRIVATE_MUSIC: { prepare, issue, revoke, touch }
         });
         const app = await productionDo(f);
         const owner = p9SerializedOwner(app.lobby);
@@ -942,7 +943,23 @@ describe('private Music through signed beta admission, production lobby and SQLi
             expect(guestJoin.status).toBe(200);
             expect(await guestJoin.json()).toEqual({ href, credentials: { role: 'guest' } });
             expect(issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
-            if (action === 'Stop') {
+            const hostCheck = () => call('/beta/music', hostCookie, { op: 'host-check', ...requestHost });
+            const guestCheck = () => call('/beta/music', guestCookie, { ...join, op: 'check' });
+            if (action === 'late host heartbeat' || action === 'suspended guest') {
+                // Keep the original sockets and skip maintenance so an access
+                // request itself must observe a missed role deadline.
+                if (action === 'suspended guest') {
+                    for (let i = 0; i < 3; i += 1) {
+                        f.advance(4_000);
+                        expect((await hostCheck()).status).toBe(200);
+                    }
+                    expect(touch.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+                    f.advance(3_001);
+                } else f.advance(15_001);
+                expect((await hostCheck()).status).toBe(403);
+                expect((await guestCheck()).status).toBe(403);
+                expect(touch.mock.calls.map(([claim]) => claim.role)).toEqual(action === 'suspended guest' ? ['host'] : []);
+            } else if (action === 'Stop') {
                 expect((await call('/beta/music', hostCookie, { op: 'host-stop', ...requestHost })).status).toBe(200);
             } else if (action === 'Leave') {
                 await app.message(wb, { t: 'cmd', name: 'part', args: [room.name], ch: room.name });

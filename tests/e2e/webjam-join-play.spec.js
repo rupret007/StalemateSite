@@ -698,13 +698,14 @@ test('capture arriving after Leave releases only its own tracks during the next 
 // Exercises the packaged protected UI with an inert same-origin issuer and
 // inert session transport. Production cookie/room authority is tested against
 // the actual Worker and lobby in the SQLite authority suite.
-for (const outcome of ['quota refusal', 'revocation after joining']) {
+for (const outcome of ['quota refusal', 'revocation after joining', 'revocation on foreground return']) {
     test(`protected Music ${outcome} respects explicit audio join and capture ownership`, async ({ page, baseURL }) => {
         const requests = [], external = [];
         const grant = '9'.repeat(32), proof = '5'.repeat(64);
         const expires = Math.floor(Date.now() / 1000) + 240;
         let withdrawn = false;
-        await page.addInitScript(({ grant, proof }) => {
+        const foreground = outcome === 'revocation on foreground return';
+        await page.addInitScript(({ grant, proof, foreground }) => {
             sessionStorage.setItem(`webjam-private-music-${grant}`, proof);
             window.musicCapture = [];
             Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
@@ -719,7 +720,12 @@ for (const outcome of ['quota refusal', 'revocation after joining']) {
                     return stream;
                 }
             });
-        }, { grant, proof });
+            if (foreground) {
+                // Only the visibility event can send a heartbeat in this case.
+                const schedule = window.setTimeout.bind(window);
+                window.setTimeout = (callback, delay, ...args) => schedule(delay === 4000 ? () => {} : callback, delay, ...args);
+            }
+        }, { grant, proof, foreground });
         await page.route('**/*', async route => {
             const url = new URL(route.request().url());
             if (url.origin !== baseURL) { external.push(url.origin); return route.abort(); }
@@ -769,6 +775,10 @@ for (const outcome of ['quota refusal', 'revocation after joining']) {
             await expect(leave).toBeVisible();
             await expect.poll(() => page.evaluate(() => window.musicTransportOpen === true && window.musicCapture[0]?.readyState === 'live')).toBe(true);
             withdrawn = true;
+            if (foreground) {
+                expect(requests.map(request => request.op)).toEqual(['join']);
+                await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+            }
             await expect(leave).toBeHidden();
             expect(await page.evaluate(() => window.musicTransportOpen === false && window.musicCapture[0]?.readyState === 'ended')).toBe(true);
         }

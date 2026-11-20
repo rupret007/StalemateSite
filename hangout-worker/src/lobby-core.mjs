@@ -160,7 +160,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     const musicOfferRequests = new Map();
     const musicHosts = new Map();
     const stoppedMusicHosts = new WeakSet();
-    const musicHostActivity = new WeakMap();
+    const retiredMusicStops = new Map();
     const musicHostStarts = new Map();
     const musicWork = new Map(); // irreversibly consumed issuance attempts, independent of room rollback
     const musicScope = musicProvider ? { providerScope: 'music' } : {};
@@ -484,7 +484,6 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             }
         }
         for (const [key, host] of musicHosts) if (!currentMusicHost(host)
-            || musicWork.get(host.id)?.phase === 'issued' && !liveMusicHostActivity(host)
             || !musicConsent(conns.get(host.host), false) || !musicConsent(conns.get(host.guest), false)
             || participation.revisionFor(controlled.context, host.host) !== host.hostRevision
             || participation.revisionFor(controlled.context, host.guest) !== host.guestRevision) finishMusicHost(key);
@@ -1115,16 +1114,20 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 peerRevision: isGuest ? offer.hostRevision : offer.guestRevision } : {}) };
     }
 
-    function liveMusicHostActivity(lease) {
-        // Native WebJam normally checks every four seconds. An unreachable or
-        // crashed host must not authorize a new guest for the whole grant TTL.
-        return (musicHostActivity.get(lease) ?? -Infinity) + 15_000 > now();
+    function liveMusicActivity(id) {
+        const attempt = musicWork.get(id);
+        return attempt?.phase === 'issued' && attempt.confirmedAt + 15_000 > now();
     }
 
     function currentMusicHost(lease) {
         const room = ch(lease.room), host = conns.get(lease.host), guest = conns.get(lease.guest);
+        const offer = musicInvites.get(lease.room);
+        const pairedOffer = offer?.hostLease && musicHosts.get(offer.hostLease) === lease ? offer : null;
         return !participationBroken && !stoppedMusicHosts.has(lease) && participationMusicOpen(room) && room.keepRef === lease.instance
             && lease.expires > now() && host?.expiresAt > now() && guest?.expiresAt > now()
+            && (musicWork.get(lease.id)?.phase !== 'issued' || liveMusicActivity(lease.id))
+            && (!pairedOffer || pairedOffer.expires > now() && (musicWork.get(pairedOffer.id)?.phase !== 'issued'
+                || liveMusicActivity(pairedOffer.id) && room.members.has(guest.id)))
             && (!lease.browserHost || lease.boundAt + 90_000 > now() || musicWork.has(lease.id))
             && musicActor(host) === lease.hostActor && musicActor(guest) === lease.guestActor
             && canInviteMusic(host, guest, room)
@@ -1146,7 +1149,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             || !participationAllows(host, 'requestDirectContact', guest) || !participationAllows(guest, 'acceptDirectContact', host)
             || !musicConsent(host) || !musicConsent(guest)) return result('unavailable');
         const key = musicRequestKey(hostActor, frame.request);
-        if (musicHosts.size >= 128 || [...musicHosts.values()].some(value => value.room === room.name
+        if (retiredMusicStop(`host:${frame.webjam.slice(-32)}`) || musicHosts.size >= 128 || [...musicHosts.values()].some(value => value.room === room.name
             || value.request === frame.request || value.webjam === frame.webjam || browserHost && value.hostActor === hostActor)
             || musicInvites.has(room.name)) return result('unavailable');
         const expires = Math.floor(Math.min(now() + 10 * MIN, host.expiresAt, guest.expiresAt) / 1000) * 1000;
@@ -1196,29 +1199,54 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         retryMusicRevocation(attempt);
     }
 
-    function recordMusicHostActivity(lease) {
-        musicHostActivity.set(lease, now());
-        const offer = musicInvites.get(lease.room);
-        const ids = [lease.id];
-        if (offer?.hostLease && musicHosts.get(offer.hostLease) === lease) ids.push(offer.id);
-        for (const id of ids) {
-            const attempt = musicWork.get(id);
-            if (attempt?.phase !== 'issued' || (attempt.touchAt || 0) > now()) continue;
-            attempt.touchAt = now() + 8000;
-            const task = Promise.resolve().then(() => attempt.phase === 'issued' && musicProvider.touch(attempt.claim)).catch(() => {});
+    function recordMusicActivity(id, issued = false) {
+        const attempt = musicWork.get(id);
+        if (attempt?.phase !== 'issued') return;
+        const at = now();
+        attempt.confirmedAt = at;
+        if ((attempt.touchAt || 0) > at) return;
+        attempt.touchAt = at + 8000;
+        if (!issued) {
+            const task = Promise.resolve().then(() => liveMusicActivity(id) && musicProvider.touch(attempt.claim)).catch(() => {});
             musicProvider.keepAlive(task);
         }
     }
 
-    function finishMusicHost(key, finishOffer = true, expected = null) {
+    function retiredMusicStop(key) {
+        const retired = retiredMusicStops.get(key);
+        if (retired?.until > now()) return retired;
+        if (retired) retiredMusicStops.delete(key);
+        return null;
+    }
+
+    function retireMusicLease(lease, offer, explicitStop = false) {
+        stoppedMusicHosts.add(lease);
+        retireMusicWork(lease.id);
+        if (offer) retireMusicWork(offer.id);
+        // Keep only the original proof binding for a lost Stop response. This
+        // bounded lookup cannot authorize pages, heartbeats or a new grant.
+        const until = now() + 60_000;
+        const remember = (key, scope) => {
+            if (!retiredMusicStop(key)) retiredMusicStops.set(key, { ...scope, until });
+        };
+        if (lease.browserHost || explicitStop) {
+            const { webjam, generation, browserHost, hostActor, hostVersion, hostExpiry, proofHash } = lease;
+            remember(`host:${webjam.slice(-32)}`, { lease: { webjam, generation, browserHost, hostActor, hostVersion, hostExpiry, proofHash } });
+        }
+        if (offer?.state === 'handed' && offer.guestProof) {
+            const { guestVersion, guestExpiry } = lease;
+            const { id, guestActor, guestProof, state } = offer;
+            remember(`guest:${id}`, { lease: { guestVersion, guestExpiry }, offer: { id, guestActor, guestProof, state } });
+        }
+        while (retiredMusicStops.size > 512) retiredMusicStops.delete(retiredMusicStops.keys().next().value);
+    }
+
+    function finishMusicHost(key, finishOffer = true, expected = null, removedOffer = null) {
         const host = musicHosts.get(key);
         if (!host || expected && host !== expected) return;
         musicHosts.delete(key);
-        const offer = musicInvites.get(host.room);
-        const retire = () => {
-            retireMusicWork(host.id);
-            if (offer?.hostLease === key) retireMusicWork(offer.id);
-        };
+        const offer = removedOffer || musicInvites.get(host.room);
+        const retire = () => retireMusicLease(host, offer?.hostLease === key ? offer : null);
         if (controlled) controlled.providers.push(retire);
         else retire();
         if (finishOffer && offer?.hostLease === key) finishMusicInvite(host.room, 'unavailable');
@@ -1231,42 +1259,40 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const hostPage = op === 'host-page', guestFrame = op === 'guest-frame-page', page = hostPage || guestFrame || op === 'page';
         const native = nativeMusicOp(op), browserHost = hostPage || browserMusicHostOp(op), isHost = native || browserHost, stop = stoppingMusic(op);
         if (!site && !native || site && native || !page && !validMusicBody(body, native)) return denied();
-        while (!stop && controlledSettlement) await controlledSettlement;
+        const hash = isHost && !hostPage ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body.proof))),
+            byte => byte.toString(16).padStart(2, '0')).join('') : '';
+        while (controlledSettlement) await controlledSettlement;
 
-        let hostKey, lease, offer;
+        let hostKey, lease, offer, retired;
         if (isHost) {
             const match = [...musicHosts].find(([, value]) => hostPage ? value.browserHost && value.hostActor === site.sid
                 : value.webjam.slice(-32) === id && value.webjam === body.webjam && value.generation === body.generation);
-            if (!match) return denied();
-            [hostKey, lease] = match;
-            if (lease.browserHost !== browserHost || browserHost && (lease.hostActor !== site.sid
-                || lease.hostVersion !== site.version || lease.hostExpiry !== site.exp)) return denied();
-            if (!hostPage) {
-                const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body.proof))),
-                    byte => byte.toString(16).padStart(2, '0')).join('');
-                if (!equalMusicProof(lease.proofHash, hash)) return denied();
-            }
+            if (match) [hostKey, lease] = match;
+            else if (stop && (retired = retiredMusicStop(`host:${id}`))) lease = retired.lease;
+            if (!lease || lease.browserHost !== browserHost || browserHost && (lease.hostActor !== site.sid
+                || lease.hostVersion !== site.version || lease.hostExpiry !== site.exp)
+                || !hostPage && (lease.webjam !== body.webjam || lease.generation !== body.generation
+                    || !equalMusicProof(lease.proofHash, hash))) return denied();
         } else {
             if (!page && !['check', 'join', 'stop'].includes(op)) return denied();
             const matches = value => value?.state === 'handed' && value.guestActor === site.sid && (page || value.id === id && equalMusicProof(value.guestProof, body.proof));
             offer = [...musicInvites.values()].find(matches);
-            if (!offer) return denied();
-            hostKey = offer.hostLease;
-            lease = musicHosts.get(hostKey);
+            if (offer) {
+                hostKey = offer.hostLease;
+                lease = musicHosts.get(hostKey);
+            } else if (stop && (retired = retiredMusicStop(`guest:${id}`)) && matches(retired.offer)) lease = retired.lease;
         }
 
-        while (!stop && controlledSettlement) await controlledSettlement;
         const host = conns.get(lease?.host), guest = conns.get(lease?.guest);
         if (!lease || guestFrame && !lease.browserHost || !isHost && (lease.guestVersion !== site.version || lease.guestExpiry !== site.exp)) return denied();
+        if (retired) return musicResponse(200, { closed: true });
         const role = isHost ? 'host' : 'guest', target = isHost ? lease : offer;
         const current = () => musicHosts.get(hostKey) === lease && currentMusicHost(lease)
-            && (isHost || liveMusicHostActivity(lease) && musicInvites.get(lease.room) === offer && offer.state === 'handed' && offer.expires > now()
-                && (musicWork.get(offer.id)?.phase !== 'issued' || ch(lease.room).members.has(guest.id)));
-        const close = () => {
-            stoppedMusicHosts.add(lease);
-            retireMusicWork(lease.id);
+            && (isHost || liveMusicActivity(lease.id) && musicInvites.get(lease.room) === offer && offer.state === 'handed');
+        const close = async () => {
+            while (controlledSettlement) await controlledSettlement;
             const activeOffer = musicInvites.get(lease.room);
-            if (musicHosts.get(hostKey) === lease && activeOffer?.hostLease === hostKey) retireMusicWork(activeOffer.id);
+            retireMusicLease(lease, musicHosts.get(hostKey) === lease && activeOffer?.hostLease === hostKey ? activeOffer : null, stop);
             return controlledRun(finishMusicHost, [hostKey, true, lease], true);
         };
         if (stop) {
@@ -1294,7 +1320,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 await authorize(() => true);
                 while (controlledSettlement) await controlledSettlement;
                 if (!current()) throw Error('participation-denied');
-                if (isHost && !page) recordMusicHostActivity(lease);
+                if (!page) recordMusicActivity(target.id);
                 return musicResponse(200, { expires: target.expires });
             } catch {
                 if (busy) return musicResponse(503, { error: 'busy' });
@@ -1333,8 +1359,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             while (controlledSettlement) await controlledSettlement;
             if (!current() || attempt.phase !== 'issuing') throw Error('music-issuance-ended');
             attempt.phase = 'issued';
-            if (isHost) recordMusicHostActivity(lease);
-            else attempt.touchAt = now() + 8000;
+            recordMusicActivity(target.id, true);
             return musicResponse(200, isHost ? issued.credentials : { href: offer.href, credentials: issued.credentials });
         } catch {
             await close();
@@ -1402,7 +1427,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const retire = () => retireMusicWork(offer.id);
             if (controlled) controlled.providers.push(retire);
             else retire();
-            finishMusicHost(offer.hostLease, false);
+            finishMusicHost(offer.hostLease, false, null, offer);
         }
         if (offer.version === 1) {
             const request = musicOfferRequests.get(offer.requestKey);
@@ -1444,7 +1469,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
         const requestKey = musicRequestKey(hostActor, frame.request);
         const hostLease = musicHosts.get(requestKey);
-        if (musicProvider && (!hostLease || !currentMusicHost(hostLease) || !liveMusicHostActivity(hostLease)
+        if (musicProvider && (!hostLease || !currentMusicHost(hostLease) || !liveMusicActivity(hostLease.id)
             || hostLease.host !== host.id || hostLease.guest !== guest.id || hostLease.instance !== room.keepRef
             || hostLease.webjam !== capability.webjam || hostLease.generation !== capability.generation
             || capability.expires > hostLease.expires || musicWork.get(hostLease.id)?.phase !== 'issued')) return result('unavailable');
@@ -3314,8 +3339,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         for (const [room, offer] of musicInvites) {
             if (offer.expires <= t) finishMusicInvite(room, 'expired');
         }
-        for (const [key, lease] of musicHosts) if (!currentMusicHost(lease) || musicWork.get(lease.id)?.phase === 'issued' && !liveMusicHostActivity(lease))
+        for (const [key, lease] of musicHosts) if (!currentMusicHost(lease))
             finishMusicHost(key);
+        for (const [key, retired] of retiredMusicStops) if (retired.until <= t) retiredMusicStops.delete(key);
         for (const [id, attempt] of musicWork) {
             if (attempt.claim.expires + 60_000 <= t) musicWork.delete(id);
             else if (attempt.phase === 'retired') retryMusicRevocation(attempt);

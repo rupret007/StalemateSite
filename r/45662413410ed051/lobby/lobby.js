@@ -2030,8 +2030,14 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         attempt.channel.close();
         if (attempt.bound) {
             void fetch('/beta/music', { method: 'POST', credentials: 'same-origin', cache: 'no-store', keepalive: true,
+                redirect: 'error', signal: AbortSignal.timeout(8000),
                 headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'host-stop', id: attempt.webjam.slice(-32),
-                    webjam: attempt.webjam, generation: attempt.generation, proof: attempt.proof }) }).catch(() => {});
+                    webjam: attempt.webjam, generation: attempt.generation, proof: attempt.proof }) }).then(response => {
+                if (!response.ok) throw Error('Music Stop could not be confirmed');
+            }).catch(() => {
+                if (!browserMusic && browserMusicStatus.textContent === message)
+                    showBrowserMusicStatus('Music stopped on this device. The room did not confirm the stop.');
+            });
         }
         browserMusicStop.hidden = true;
         showBrowserMusicStatus(message);

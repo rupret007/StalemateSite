@@ -167,7 +167,9 @@ test('a guest joins the invited Music session with one accept tap', async ({ bro
     }
 });
 
-test('the packaged browser Music host waits for explicit audio consent and closes capture when issuance is refused', async ({ page }) => {
+for (const foreground of [false, true]) test(foreground
+    ? 'the packaged browser Music host checks immediately on foreground return and reports an unconfirmed Stop'
+    : 'the packaged browser Music host waits for explicit audio consent and closes capture when issuance is refused', async ({ page }) => {
     const hostAssets = path.resolve(__dirname, '../../.beta-assets/join/host');
     const operations = [];
     await page.route('**/join/host/**', route => {
@@ -176,13 +178,18 @@ test('the packaged browser Music host waits for explicit audio consent and close
         return route.fulfill({ path: path.join(hostAssets, file) });
     });
     await page.route('**/beta/music', route => {
-        operations.push(route.request().postDataJSON().op);
+        const { op } = route.request().postDataJSON();
+        operations.push(op);
+        if (foreground && op === 'host-join') return route.fulfill({ json: {
+            client: 'web', ttl: 120, quota_bytes: 256 * 1024 * 1024,
+            iceServers: [{ urls: 'turn:turn.cloudflare.com:3478?transport=udp', username: 'fixture', credential: 'inert' }],
+        } });
         return route.fulfill({ status: 403, json: { error: 'unavailable' } });
     });
     await page.route('**/music-workspace', route => route.fulfill({ contentType: 'text/html', body: `
         <!doctype html><title>Music workspace fixture</title>
         <details open><summary>Music controls</summary><iframe title="Host private Music" allow="microphone" src="/join/host/"></iframe></details>` }));
-    await page.addInitScript(() => {
+    await page.addInitScript(foreground => {
         if (window === window.top) sessionStorage.setItem('private-music-host', JSON.stringify({ request: 'a'.repeat(32),
             webjam: 'b'.repeat(64), proof: 'c'.repeat(64), generation: 1, expires: Date.now() + 60000 }));
         window.musicCaptureAttempts = 0;
@@ -195,7 +202,17 @@ test('the packaged browser Music host waits for explicit audio consent and close
             return stream;
         };
         Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia } });
-    });
+        if (foreground && window !== window.top) {
+            // Keep signaling and timer heartbeats inactive in this separate
+            // foreground fixture so only visibility can trigger a host check.
+            const interval = window.setInterval.bind(window);
+            window.setInterval = (callback, delay, ...args) => interval(delay === 4000 ? () => {} : callback, delay, ...args);
+            RTCPeerConnection.generateCertificate = () => {
+                window.musicFixtureIssued = true;
+                return new Promise(() => {});
+            };
+        }
+    }, foreground);
     const music = page.frameLocator('iframe[title="Host private Music"]');
     const frame = music.owner();
     try {
@@ -207,11 +224,17 @@ test('the packaged browser Music host waits for explicit audio consent and close
         expect(await frame.evaluate(iframe => iframe.contentWindow.musicCaptureAttempts)).toBe(0);
         expect(operations).toEqual([]);
         await start.click();
-        await expect(music.getByRole('status')).toContainText('Music could not start');
+        if (foreground) {
+            await expect.poll(() => frame.evaluate(iframe => iframe.contentWindow.musicFixtureIssued)).toBe(true);
+            expect(operations).toEqual(['host-join']);
+            await frame.evaluate(iframe => iframe.contentDocument.dispatchEvent(new iframe.contentWindow.Event('visibilitychange')));
+            await expect(music.getByRole('status')).toContainText('The Music connection ended.');
+            await expect(music.getByRole('status')).toContainText('The room did not confirm the stop.');
+        } else await expect(music.getByRole('status')).toContainText('Music could not start');
         expect(await frame.evaluate(iframe => ({ attempts: iframe.contentWindow.musicCaptureAttempts,
             readyState: iframe.contentWindow.musicFixtureTrack.readyState })))
             .toEqual({ attempts: 1, readyState: 'ended' });
-        await expect.poll(() => operations.slice()).toEqual(['host-join', 'host-stop']);
+        await expect.poll(() => operations.slice()).toEqual(foreground ? ['host-join', 'host-check', 'host-stop'] : ['host-join', 'host-stop']);
         await expect(start).toBeDisabled();
         await expect(music.getByRole('button', { name: 'Stop Music' })).toBeHidden();
     } finally { await frame.evaluate(iframe => iframe.contentWindow.musicFixtureContext?.close()).catch(() => {}); }

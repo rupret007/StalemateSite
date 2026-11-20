@@ -79,9 +79,16 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
         saveUsage: async () => { if (providerControls.quotaGate) { const held = providerControls.quotaGate; providerControls.quotaGate = null; await held.wait(); } } });
     const effectCommit = {
         prepare: async () => Object.freeze({}),
-        commit: async (_context, effects, { participation: fence } = {}) => fence
-            ? fence.adapter.commit(fence.context, effects)
-            : { ok: false, reason: 'synthetic-effect-fence-unavailable' }
+        commit: async (_context, effects, { participation: fence, costsOnly } = {}) => {
+            if (!costsOnly && controls.rejectCommitGate) {
+                const held = controls.rejectCommitGate;
+                controls.rejectCommitGate = null;
+                await held.wait();
+                return { ok: false, reason: 'participation-denied' };
+            }
+            return fence ? fence.adapter.commit(fence.context, effects)
+                : { ok: false, reason: 'synthetic-effect-fence-unavailable' };
+        }
     };
     let engine;
     const make = () => createLobby({ now: () => at, participation: enforcement, effectCommit, persist: legacyPersist, directMusicInvites: !!musicOrigin, musicProvider,
@@ -192,6 +199,38 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         expect((await f.access('join')).status).toBe(403);
         expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
     });
+
+    it.each([['host', 'Block'], ['guest', 'Block'], ['host', 'Leave'], ['guest', 'Leave']])(
+        'honors signed %s Stop while a staged %s rolls back', async (role, action) => {
+            const f = await setupMusic(true);
+            await f.acceptMusic(); await f.waitHandoff();
+            expect((await f.access('join')).status).toBe(200);
+            f.advance(8_000);
+            const blocked = gate();
+            f.controls.rejectCommitGate = blocked;
+            const command = action === 'Block'
+                ? f.message('bravo', { t: 'cmd', name: 'block', args: ['Alice'], ch: f.room,
+                    personContext: 1, personPeer: 'alice', roomInstance: f.roomInstance })
+                : f.cmd('bravo', 'part', [f.room], f.room);
+            await blocked.entered;
+            const stop = () => role === 'host' ? f.native('native-stop') : f.access('stop');
+            let pending;
+            try {
+                expect(f.engine._debug.channels.get(f.room).members.has('bravo')).toBe(false);
+                if (action === 'Block') expect(f.engine._debug.conns.get('bravo').blocks.has('dev-alice')).toBe(true);
+                pending = stop();
+            } finally { blocked.release(); }
+            const [response, result] = await Promise.all([pending, command]);
+            expect(result).toEqual({ ok: false, reason: 'participation-denied' });
+            expect(await response.json()).toEqual({ closed: true });
+            expect(response.status).toBe(200);
+            expect((await stop()).status).toBe(200);
+            expect((await f.access('stop', 'peer')).status).toBe(403);
+            expect((await f.native('native-check')).status).toBe(403);
+            expect((await f.access('check')).status).toBe(403);
+            expect(f.provider.touch).not.toHaveBeenCalled();
+            expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(['guest', 'host']);
+        });
 
     it('keeps a single handoff and refuses copied, stale and cross-session grants with no early room or provider access', async () => {
         const f = await setupMusic();

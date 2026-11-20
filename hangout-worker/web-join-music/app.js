@@ -54,15 +54,21 @@ async function musicRequest(op, signal, allowBusy = false) {
 
 function watchMusicGrant() {
   clearTimeout(musicCheckTimer);
-  musicCheckTimer = setTimeout(async () => {
-    try {
-      if (grantRetired) return;
-      await musicRequest("check", undefined, true);
-      if (!grantRetired) watchMusicGrant();
-    } catch {
-      if (!grantRetired) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
-    }
-  }, 4000);
+  musicCheckTimer = setTimeout(() => { void checkMusicGrant(true); }, 4000);
+}
+
+async function checkMusicGrant(allowBusy = false) {
+  clearTimeout(musicCheckTimer);
+  if (grantRetired) return false;
+  try {
+    await musicRequest("check", undefined, allowBusy);
+    if (grantRetired) return false;
+    watchMusicGrant();
+    return true;
+  } catch {
+    if (!grantRetired) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
+    return false;
+  }
 }
 
 let invite;
@@ -372,7 +378,10 @@ function leave(message = "You left the session.", error) {
   if (musicGrant && !grantRetired) {
     grantRetired = true;
     clearTimeout(musicCheckTimer);
-    void musicRequest("stop").catch(() => {});
+    void musicRequest("stop").catch(() => {
+      const status = $("status");
+      status.textContent += " The room did not confirm the stop.";
+    });
     invite = undefined;
   }
   const elements = failureElements();
@@ -578,8 +587,9 @@ window.addEventListener("hashchange", () => window.location.reload());
 window.addEventListener("pagehide", () => {
   if (invite) leave();
 });
-document.addEventListener("visibilitychange", () => {
+document.addEventListener("visibilitychange", async () => {
   if (document.hidden || expireUnusedInvite()) return;
+  if (musicGrant && lastMusicCheck && (!await checkMusicGrant() || document.hidden)) return;
   if (context?.state === "suspended") {
     const attempt = activeAttempt;
     context.resume().catch(() => {
