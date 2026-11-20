@@ -19,7 +19,7 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     status.textContent = 'Open a current Music host invitation from your Jam room.';
 } else {
     const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
-    const MUSIC_RETRY_MS = 1000;
+    const waitForMusicRetry = count => new Promise(resolve => setTimeout(resolve, count === 0 ? 300 : 1000));
     const controller = new AbortController();
     const channel = new BroadcastChannel(`webjam-browser-host-${handoff.request}`);
     let session, stream, heartbeat, deadlineTimer, checking, cachedCapture, lastCheck = 0, inPageCache = false;
@@ -70,11 +70,12 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
         catch { if (!controller.signal.aborted) listen.hidden = false; }
     }
     async function confirmAuthority() {
+        let retries = 0;
         try {
             while (!controller.signal.aborted && !inPageCache && Date.now() < lastCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
                 if (await request('host-check') !== false) return !controller.signal.aborted && !inPageCache;
                 // A staged room write must settle before this check can renew authority.
-                await new Promise(resolve => setTimeout(resolve, MUSIC_RETRY_MS));
+                await waitForMusicRetry(retries++);
             }
         } catch { /* A terminal response or failed request closes capture. */ }
         if (!inPageCache) expired();
@@ -87,11 +88,12 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     }
     async function joinMusic() {
         const deadline = musicSignal(controller.signal, AbortSignal.timeout(8000));
+        let retries = 0;
         while (true) {
             deadline.throwIfAborted();
             const result = await request('host-join', deadline);
             if (result !== false) return result;
-            await new Promise(resolve => setTimeout(resolve, MUSIC_RETRY_MS));
+            await waitForMusicRetry(retries++);
         }
     }
     status.textContent = 'Confirm headphones and start when you’re ready to invite your guest.';

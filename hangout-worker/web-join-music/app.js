@@ -39,8 +39,8 @@ let musicCheckTimer, musicDeadlineTimer, checkingMusic, grantRetired = false, ca
 let musicInPageCache = false, musicJoined = false;
 
 const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
-const MUSIC_RETRY_MS = 1000;
 let lastMusicCheck = 0;
+const waitForMusicRetry = count => new Promise(resolve => setTimeout(resolve, count === 0 ? 300 : 1000));
 
 async function musicRequestSignal(attempt, timeout) {
   const deadline = AbortSignal.timeout(timeout);
@@ -82,6 +82,7 @@ function watchMusicGrant() {
 }
 
 async function confirmMusicGrant() {
+  let retries = 0;
   try {
     while (!grantRetired && !musicInPageCache && Date.now() < lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
       const signal = await musicRequestSignal(activeAttempt, 8000);
@@ -91,7 +92,7 @@ async function confirmMusicGrant() {
         watchMusicGrant();
         return true;
       }
-      await new Promise(resolve => setTimeout(resolve, MUSIC_RETRY_MS));
+      await waitForMusicRetry(retries++);
     }
   } catch { /* A terminal response or failed request closes capture. */ }
   if (!grantRetired && !musicInPageCache) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
@@ -106,11 +107,12 @@ function checkMusicGrant() {
 }
 
 async function requestMusicUntilConfirmed(op, signal) {
+  let retries = 0;
   while (true) {
     signal.throwIfAborted();
     const result = await musicRequest(op, signal);
     if (result !== false) return result;
-    await new Promise(resolve => setTimeout(resolve, MUSIC_RETRY_MS));
+    await waitForMusicRetry(retries++);
   }
 }
 
