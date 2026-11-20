@@ -3819,7 +3819,9 @@
       state.humanDiscardTakes = [];
       state.aiTurns = 0;
       if (state.round === 1) coachIndex = 0;
-      state.dealer = state.round === 1 ? "player" : (state.dealer === "player" ? "ai" : "player");
+      // The non-dealer opens. Let the player take a turn before the bot
+      // can end the first round, then alternate dealers as usual.
+      state.dealer = state.round === 1 ? "ai" : (state.dealer === "player" ? "ai" : "player");
       state.stock = shuffleDeck(createDeck());
       state.discard = [];
       state.playerHand = [];
