@@ -4170,7 +4170,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         // Keep the focused disclosure at the top of the scrollport so a
         // short workspace still shows the instructions directly below it.
         const summary = help.querySelector('summary');
-        panel.scrollTop += summary.getBoundingClientRect().top - panel.getBoundingClientRect().top - panel.clientTop;
+        const offset = summary.getBoundingClientRect().top - panel.getBoundingClientRect().top - panel.clientTop;
+        // Round down so fractional scroll positions keep the top edge visible.
+        panel.scrollTop = Math.floor(panel.scrollTop + offset) - 1;
     });
     $('[data-jam-form]').addEventListener('submit', (e) => {
         e.preventDefault();
