@@ -326,6 +326,19 @@ describe('chat starts when a visitor joins', () => {
         expect(got(guest).find((frame) => frame.t === 'join')).not.toHaveProperty('history');
     });
 
+    it('keeps nearby room event text in a report and the complete event on the wire', () => {
+        boot({ moderationContext: 3 });
+        const speaker = join('Speaker');
+        const witness = join('Witness', { iph: 'witness-home' });
+        later(4000); say(speaker, 'the reported words');
+        const eventText = 'LateVisitor has joined #stalemate';
+        join('LateVisitor', { iph: 'late-visitor-home' });
+        expect(got(witness)).toContainEqual({ t: 'event', ch: LOBBY, text: eventText, ts: expect.any(Number) });
+        const reported = got(witness).find((frame) => frame.t === 'line' && frame.text === 'the reported words');
+        L.message(witness.id, JSON.stringify({ t: 'report', id: reported.id }));
+        expect(L.adminState().reports[0].context).toContain(`* ${eventText}`);
+    });
+
     it('keeps bounded report context separate from visitor join payloads and durable snapshots', () => {
         boot({ moderationContext: 3 });
         const speaker = join('Speaker');

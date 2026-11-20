@@ -584,7 +584,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
     };
     const event = (chan, text) => {
         const msg = { t: 'event', ch: chan.name, text, ts: now() };
-        chan.moderationContext.push(msg);
+        // Report excerpts need only the event text. Keep the full event on the wire.
+        chan.moderationContext.push(text);
         if (chan.moderationContext.length > L.moderationContext) chan.moderationContext.shift();
         cast(chan, msg);
     };
@@ -3169,7 +3170,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
 
     function deleteIds(ids) {
         const set = new Set(ids);
-        for (const chan of channels.values()) chan.moderationContext = chan.moderationContext.filter((h) => !set.has(h.id));
+        for (const chan of channels.values()) chan.moderationContext = chan.moderationContext.filter((entry) =>
+            typeof entry === 'string' || !set.has(entry.id));
         let aiChanged = false;
         for (const id of ids) { lines.delete(id); lineMeta.delete(id); deleteReceipt(id); aiPending.delete(id); if (aiReviews.delete(id)) aiChanged = true; }
         if (aiChanged) saveAiReviews();
@@ -3309,8 +3311,9 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 return bot(c, 'The report queue is full. Try again later or use the moderation contact in House rules.', 'error');
             const chan = ch(l.ch);
             const hist = chan ? chan.moderationContext : [];
-            const at = hist.findIndex((h) => h.id === id);
-            const context = at >= 0 ? hist.slice(Math.max(0, at - 5), at + 6).map((h) => `${h.from ? `<${h.from}> ` : '* '}${h.text}`) : [`<${l.from}> ${l.text}`];
+            const at = hist.findIndex((entry) => typeof entry !== 'string' && entry.id === id);
+            const context = at >= 0 ? hist.slice(Math.max(0, at - 5), at + 6).map((entry) =>
+                typeof entry === 'string' ? `* ${entry}` : `${entry.from ? `<${entry.from}> ` : '* '}${entry.text}`) : [`<${l.from}> ${l.text}`];
             r = { devs: new Set(), iphs: new Set(), ch: l.ch, from: l.from, text: l.text, hidden: false, context, at: now(), authorDev: meta.authorDev,
                 ...(meta.publicOrigin ? { publicOrigin: { ...meta.publicOrigin } } : {}) };
             reports.set(id, r);
