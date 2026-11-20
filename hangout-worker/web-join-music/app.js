@@ -35,7 +35,8 @@ if (requiresMusicGrant) {
     if (/^[a-f0-9]{64}$/.test(value)) musicProof = value;
   } catch { /* The protected handoff needs its original tab. */ }
 }
-let musicCheckTimer, musicDeadlineTimer, checkingMusic, grantRetired = false, musicJoinStarted = false;
+let musicCheckTimer, musicDeadlineTimer, checkingMusic, grantRetired = false, cachedCapture = null;
+let musicInPageCache = false;
 
 const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
 let lastMusicCheck = 0;
@@ -55,11 +56,12 @@ async function musicRequest(op, signal) {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id: musicGrant, proof: musicProof }),
     signal: signal || AbortSignal.timeout(8000), keepalive: op === "stop",
   });
-  if (op === 'check' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy') return false;
+  if (op === 'check' && response.status >= 500) return false;
+  if (op === 'join' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy') return false;
   if (response.status === 429) throw new Error(JOIN_SIGNAL.RELAY_CAP_REACHED);
   if (!response.ok) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
   const value = await response.json();
-  if (!grantRetired && (op === 'check' || op === 'join')) {
+  if (!grantRetired && (op === 'join' || op === 'check' && !musicInPageCache)) {
     const receivedAt = Date.now();
     if (receivedAt >= sentAt + MUSIC_HEARTBEAT_WINDOW_MS
         || (lastMusicCheck && receivedAt >= lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS)) {
@@ -80,26 +82,35 @@ function watchMusicGrant() {
 
 async function confirmMusicGrant() {
   try {
-    while (!grantRetired && Date.now() < lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
+    while (!grantRetired && !musicInPageCache && Date.now() < lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
       const signal = await musicRequestSignal(activeAttempt, 8000);
-      if (grantRetired || Date.now() >= lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS) break;
+      if (grantRetired || musicInPageCache || Date.now() >= lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS) break;
       if (await musicRequest("check", signal) !== false) {
-        if (grantRetired) return false;
+        if (grantRetired || musicInPageCache) return false;
         watchMusicGrant();
         return true;
       }
       await new Promise(resolve => setTimeout(resolve, 300));
     }
   } catch { /* A terminal response or failed request closes capture. */ }
-  if (!grantRetired) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
+  if (!grantRetired && !musicInPageCache) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
   return false;
 }
 
 function checkMusicGrant() {
   clearTimeout(musicCheckTimer);
-  if (grantRetired) return false;
+  if (grantRetired || musicInPageCache) return false;
   checkingMusic ??= confirmMusicGrant().finally(() => { checkingMusic = null; });
   return checkingMusic;
+}
+
+async function joinMusicGrant(signal) {
+  while (true) {
+    signal.throwIfAborted();
+    const result = await musicRequest("join", signal);
+    if (result !== false) return result;
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
 }
 
 let invite;
@@ -406,6 +417,7 @@ async function playHostAudio(attempt) {
 }
 
 function leave(message = "You left the session.", error) {
+  cachedCapture = null;
   if (musicGrant && !grantRetired) {
     grantRetired = true;
     clearTimeout(musicCheckTimer);
@@ -449,7 +461,10 @@ function leave(message = "You left the session.", error) {
     if (view.needsFreshInvite && !view.showRetry) {
       invite = undefined;
     }
-    if (requiresMusicGrant) view.showRetry = false;
+    if (requiresMusicGrant) {
+      view.showRetry = false;
+      if (view.kind === 'interrupted') view.hint = 'Ask your host for a fresh Music invitation.';
+    }
     applyJoinFailure(view, elements);
     elements.status.dataset.failure = "true";
   } else {
@@ -467,8 +482,7 @@ function leave(message = "You left the session.", error) {
 }
 
 async function startJoin(listenOnly = false) {
-  if (expireUnusedInvite() || !invite || session || starting || (!listenOnly && !joinReady()) || musicJoinStarted) return;
-  if (musicGrant) musicJoinStarted = true;
+  if (expireUnusedInvite() || !invite || session || starting || (!listenOnly && !joinReady())) return;
   const elements = failureElements();
   const activeControl = document.activeElement;
   starting = true;
@@ -496,7 +510,7 @@ async function startJoin(listenOnly = false) {
     if (musicGrant) {
       const signal = await musicRequestSignal(attempt, 12000);
       if (!isCurrent() || expireUnusedInvite()) return;
-      const result = await musicRequest("join", signal);
+      const result = await joinMusicGrant(signal);
       if (!isCurrent() || expireUnusedInvite()) return;
       const href = new URL(result.href);
       if (href.origin !== location.origin || href.pathname !== "/join/" || href.search || href.username || href.password)
@@ -572,7 +586,9 @@ async function startJoin(listenOnly = false) {
   } catch (error) {
     stream?.getTracks().forEach((track) => track.stop());
     if (isCurrent()) {
-      if (error.name === "AbortError") {
+      if (musicGrant && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+        leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
+      } else if (error.name === "AbortError") {
         leave(
           undefined,
           new Error(
@@ -614,19 +630,39 @@ resumeAudio.addEventListener("click", () => {
 });
 $("leave").addEventListener("click", () => leave());
 window.addEventListener("hashchange", () => window.location.reload());
-window.addEventListener("pagehide", () => {
+window.addEventListener("pagehide", event => {
+  if (musicGrant && event.persisted) {
+    musicInPageCache = true;
+    cachedCapture = session?.stream?.getAudioTracks().filter(track => track.enabled) || [];
+    cachedCapture.forEach(track => { track.enabled = false; });
+    hostAudio.pause();
+    return;
+  }
   if (invite) leave();
 });
-document.addEventListener("visibilitychange", async () => {
-  if (document.hidden || expireUnusedInvite()) return;
+async function resumeForeground() {
+  if (musicInPageCache || document.hidden || expireUnusedInvite()) return;
   if (musicGrant && lastMusicCheck && (!await checkMusicGrant() || document.hidden)) return;
+  if (cachedCapture) {
+    cachedCapture.forEach(track => { if (track.readyState === 'live') track.enabled = true; });
+    cachedCapture = null;
+    if (activeAttempt && hostAudio.srcObject) void playHostAudio(activeAttempt);
+  }
   if (context?.state === "suspended") {
     const attempt = activeAttempt;
     context.resume().catch(() => {
       if (attempt && !attempt.signal.aborted && activeAttempt === attempt) {
-        leave("Tap Join again to resume audio.");
+        if (musicGrant) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
+        else leave("Tap Join again to resume audio.");
       }
     });
+  }
+}
+document.addEventListener("visibilitychange", resumeForeground);
+window.addEventListener("pageshow", event => {
+  if (musicGrant && event.persisted) {
+    musicInPageCache = false;
+    void resumeForeground();
   }
 });
 refresh();

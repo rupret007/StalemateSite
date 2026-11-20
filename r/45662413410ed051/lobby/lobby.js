@@ -2127,9 +2127,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         endMusicInvite();
         if (joinProof) void confirmBrowserMusicStop({ op: 'stop', id, proof: joinProof });
     });
-    window.addEventListener('pagehide', () => {
+    window.addEventListener('pagehide', event => {
         stopMusicHandoff();
-        stopBrowserMusic('Music stopped.');
+        if (!event.persisted) stopBrowserMusic('Music stopped.');
     });
 
     function resetJamControls() {
@@ -2715,7 +2715,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         drawMusicInvite();
         if (hadFocus && next && !musicPanel.hidden) musicAction.focus();
     });
-    window.addEventListener('pagehide', clearMusicInvite);
+    window.addEventListener('pagehide', event => {
+        if (!event.persisted || !musicOffer?.browserHost) clearMusicInvite();
+    });
 
     function clearJamInvitations() {
         clearMusicInvite();

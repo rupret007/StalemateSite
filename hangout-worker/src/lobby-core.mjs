@@ -1305,17 +1305,27 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             await close();
             return denied();
         }
-        let busy = false;
-        const authorize = async start => {
+        const busy = Symbol('participation-busy');
+        const browserJoinDeadline = performance.now() + (isHost ? 8_000 : 12_000);
+        const authorize = async (start, settleBusy = false) => {
+            const blockedBeforeStart = Symbol('participation-busy-before-start');
             // Observe only committed room state. The issuer callback runs
             // outside the command gate and may arrive while chat is saving.
-            while (controlledSettlement) await controlledSettlement;
-            const context = await participation.prepare([connectionView(host), connectionView(guest)]);
-            return participation.startProvider(context, musicProviderRequest(lease, role), () => {
-                if (participationBusy) { busy = true; throw Error('participation-busy'); }
-                if (!current()) throw Error('participation-denied');
-                return start();
-            });
+            while (true) {
+                while (controlledSettlement) await controlledSettlement;
+                const context = await participation.prepare([connectionView(host), connectionView(guest)]);
+                const result = await participation.startProvider(context, musicProviderRequest(lease, role), () => {
+                    // Return the marker through the in-process fence. It
+                    // deliberately converts thrown callbacks to denials.
+                    if (participationBusy) return blockedBeforeStart;
+                    if (!current()) throw Error('participation-denied');
+                    return start();
+                });
+                if (result !== blockedBeforeStart) return result;
+                // Only repeat a fence that never invoked this callback.
+                // A nested or already-started issue is never replayed.
+                if (!settleBusy || native || performance.now() >= browserJoinDeadline) throw busy;
+            }
         };
         if (page || ['check', 'native-check', 'host-check'].includes(op)) {
             try {
@@ -1324,8 +1334,8 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 if (!current()) throw Error('participation-denied');
                 if (!page) recordMusicActivity(target.id);
                 return musicResponse(200, { expires: target.expires });
-            } catch {
-                if (busy) return musicResponse(503, { error: 'busy' });
+            } catch (error) {
+                if (error === busy) return musicResponse(503, { error: 'busy' });
                 await close();
                 return denied();
             }
@@ -1337,7 +1347,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const attempt = { claim, phase: 'preparing' };
         musicWork.set(target.id, attempt);
         try {
-            await authorize(() => true);
+            try { await authorize(() => true); } catch (error) {
+                // A browser can repeat the same join only when the first fence
+                // never started issuer work. Keep the exact live binding.
+                if (error !== busy || native || attempt.phase !== 'preparing' || musicWork.get(target.id) !== attempt) throw error;
+                musicWork.delete(target.id);
+                return musicResponse(503, { error: 'busy' });
+            }
             const prepared = await musicProvider.prepare(claim, ip);
             attempt.ownsPermit = prepared?.status === 200;
             if (attempt.phase === 'retired') {
@@ -1352,12 +1368,12 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             const issued = await authorize(() => {
                 if (attempt.phase !== 'prepared') throw Error('participation-denied');
                 attempt.phase = 'issuing';
-                return musicProvider.issue(claim, () => authorize(() => attempt.phase === 'issuing'));
-            });
+                return musicProvider.issue(claim, () => authorize(() => attempt.phase === 'issuing', true));
+            }, true);
             if (issued?.status !== 200 || !issued.credentials || attempt.phase !== 'issuing') throw Error('music-issuance-ended');
             if (role === 'guest' && (await controlledRun(enterProtectedMusic, [guest.id, offer, lease], true))?.ok !== true)
                 throw Error('music-room-admission-failed');
-            await authorize(() => true);
+            await authorize(() => true, true);
             while (controlledSettlement) await controlledSettlement;
             if (!current() || attempt.phase !== 'issuing') throw Error('music-issuance-ended');
             attempt.phase = 'issued';

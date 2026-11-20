@@ -698,18 +698,21 @@ test('capture arriving after Leave releases only its own tracks during the next 
 // Exercises the packaged protected UI with an inert same-origin issuer and
 // inert session transport. Production cookie/room authority is tested against
 // the actual Worker and lobby in the SQLite authority suite.
-for (const outcome of ['quota refusal', 'revocation after joining', 'revocation on foreground return', 'heartbeat expiring during a pending check', 'busy foreground check followed by success']) {
+for (const outcome of ['quota refusal', 'revocation after joining', 'revocation on foreground return', 'heartbeat expiring during a pending check',
+    'busy foreground check followed by success', 'unavailable heartbeat followed by success', 'busy join followed by success', 'restored cached page']) {
     test(`protected Music ${outcome} respects explicit audio join and capture ownership`, async ({ page, baseURL }) => {
         const requests = [], external = [];
         const grant = '9'.repeat(32), proof = '5'.repeat(64);
         const expires = Math.floor(Date.now() / 1000) + 240;
         let withdrawn = false;
-        const busy = outcome === 'busy foreground check followed by success';
-        const foreground = outcome === 'revocation on foreground return' || busy;
+        const recoverable = ['busy foreground check followed by success', 'unavailable heartbeat followed by success'].includes(outcome);
+        const joiningBusy = outcome === 'busy join followed by success';
+        const cached = outcome === 'restored cached page';
+        const foreground = outcome === 'revocation on foreground return' || recoverable || cached || joiningBusy;
         const deadline = outcome === 'heartbeat expiring during a pending check';
-        let checks = 0;
+        let checks = 0, joins = 0;
         if (deadline) await page.clock.install();
-        await page.addInitScript(({ grant, proof, foreground, busy }) => {
+        await page.addInitScript(({ grant, proof, foreground, recoverable, cached }) => {
             sessionStorage.setItem(`webjam-private-music-${grant}`, proof);
             window.musicCapture = [];
             Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
@@ -729,7 +732,7 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
                 const schedule = window.setTimeout.bind(window);
                 window.setTimeout = (callback, delay, ...args) => schedule(delay === 4000 ? () => {} : callback, delay, ...args);
             }
-            if (busy) {
+            if (recoverable || cached) {
                 const resume = AudioContext.prototype.resume;
                 const state = Object.getOwnPropertyDescriptor(BaseAudioContext.prototype, 'state');
                 Object.defineProperty(BaseAudioContext.prototype, 'state', { configurable: true,
@@ -742,7 +745,7 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
                     return resume.call(this);
                 };
             }
-        }, { grant, proof, foreground, busy });
+        }, { grant, proof, foreground, recoverable, cached });
         await page.route('**/*', async route => {
             const url = new URL(route.request().url());
             if (url.origin !== baseURL) { external.push(url.origin); return route.abort(); }
@@ -767,10 +770,12 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
             const { op, id, proof: supplied } = route.request().postDataJSON();
             requests.push({ op, matched: id === grant && supplied === proof });
             if (deadline && op === 'check') return;
-            if (busy && op === 'check') return ++checks === 1
-                ? route.fulfill({ status: 503, json: { error: 'busy' } }) : route.fulfill({ json: {} });
+            if (recoverable && op === 'check' && ++checks === 1) return route.fulfill({ status: 503,
+                json: { error: outcome === 'busy foreground check followed by success' ? 'busy' : 'unavailable' } });
+            if ((recoverable || cached) && op === 'check') return route.fulfill({ json: {} });
             if (op === 'join') {
                 if (outcome === 'quota refusal') return route.fulfill({ status: 429, json: { error: 'cap' } });
+                if (joiningBusy && ++joins === 1) return route.fulfill({ status: 503, json: { error: 'busy' } });
                 return route.fulfill({ json: {
                     href: `${baseURL}/join/#k=${Buffer.alloc(32, 1).toString('base64url')}&s=${'2'.repeat(64)}&g=1&e=${expires}`,
                     credentials: { client: 'web', ttl: 120, quota_bytes: 256 * 1024 * 1024, iceServers: [{
@@ -787,6 +792,7 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
         await page.getByRole('button', { name: 'Skip check', exact: true }).click();
         await page.getByRole('checkbox').check();
         await page.getByRole('button', { name: 'Join with microphone', exact: true }).click();
+        const joinOps = joiningBusy ? ['join', 'join'] : ['join'];
         if (outcome === 'quota refusal') {
             await expect(page.locator('#status')).toHaveText('Web Join reached a usage limit.');
             expect(await page.evaluate(() => window.musicCapture.length)).toBe(0);
@@ -796,15 +802,25 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
             await expect.poll(() => page.evaluate(() => window.musicTransportOpen === true && window.musicCapture[0]?.readyState === 'live')).toBe(true);
             withdrawn = true;
             if (foreground) {
-                expect(requests.map(request => request.op)).toEqual(['join']);
-                if (busy) await page.evaluate(() => { window.musicFixtureSuspended = true; });
-                await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+                expect(requests.map(request => request.op)).toEqual(joinOps);
+                if (recoverable || cached) await page.evaluate(() => { window.musicFixtureSuspended = true; });
+                if (cached) {
+                    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })));
+                    expect(requests.map(request => request.op)).toEqual(joinOps);
+                    expect(await page.evaluate(() => ({ state: window.musicCapture[0].readyState,
+                        enabled: window.musicCapture[0].enabled }))).toEqual({ state: 'live', enabled: false });
+                    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+                } else await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
             }
-            if (busy) {
-                await expect.poll(() => requests.map(request => request.op)).toEqual(['join', 'check', 'check']);
+            if (recoverable || cached) {
+                const heartbeat = recoverable ? ['check', 'check'] : ['check'];
+                await expect.poll(() => requests.map(request => request.op)).toEqual([...joinOps, ...heartbeat]);
                 await expect.poll(() => page.evaluate(() => window.musicFixtureResumed)).toBe(true);
                 expect(await page.evaluate(() => window.musicTransportOpen && window.musicCapture[0].readyState)).toBe('live');
-                await leave.click();
+                if (cached) {
+                    expect(await page.evaluate(() => window.musicCapture[0].enabled)).toBe(true);
+                    await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
+                } else await leave.click();
             }
             if (deadline) {
                 await page.clock.fastForward(4000);
@@ -816,9 +832,10 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
             expect(await page.evaluate(() => window.musicTransportOpen === false && window.musicCapture[0]?.readyState === 'ended')).toBe(true);
         }
         await expect.poll(() => requests.filter(request => request.op === 'stop').length).toBe(1);
-        expect(requests.filter(request => request.op === 'join')).toEqual([{ op: 'join', matched: true }]);
+        expect(requests.filter(request => request.op === 'join')).toEqual(joinOps.map(op => ({ op, matched: true })));
         if (deadline) expect(requests.map(request => request.op)).toEqual(['join', 'check', 'stop']);
-        if (busy) expect(requests.map(request => request.op)).toEqual(['join', 'check', 'check', 'stop']);
+        if (recoverable) expect(requests.map(request => request.op)).toEqual(['join', 'check', 'check', 'stop']);
+        if (cached || joiningBusy) expect(requests.map(request => request.op)).toEqual([...joinOps, 'check', 'stop']);
         expect(requests.every(request => request.matched)).toBe(true);
         expect(external).toEqual([]);
     });

@@ -62,10 +62,19 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
             && ['dev', 'account', 'role', 'admin'].every(key => session[key] === connection[key]);
     };
     const enforcement = createParticipationEnforcement({ storage, now: () => at, resolveConnection: async connection => clone(identities.get(connection.id)), validateConnection,
-        providerQualified: () => controls.providerReady, dispatchStart: request => controls.providerStartFailure
-            ? Promise.reject(Error('synthetic provider start failure'))
-            : controls.skipValidate ? request.start() : storage.dispatchStart({
-                validate: async tx => { await request.validate(tx); controls.afterValidate?.(); }, start: request.start }),
+        providerQualified: () => controls.providerReady, dispatchStart: request => {
+            const dispatch = () => controls.providerStartFailure
+                ? Promise.reject(Error('synthetic provider start failure'))
+                : controls.skipValidate ? request.start() : storage.dispatchStart({
+                    validate: async tx => { await request.validate(tx); controls.afterValidate?.(); }, start: request.start });
+            const held = controls.providerDispatchGate;
+            if (!held) return dispatch();
+            controls.providerDispatchGate = null;
+            return held.wait().then(dispatch).then(result => {
+                held.onResult?.(result);
+                return result;
+            });
+        },
         beforeCommit: async ({ costsOnly }) => { if (!costsOnly && controls.commitGate) { const held = controls.commitGate; controls.commitGate = null; await held.wait(); } },
         writeEffects: async ({ tx, effects, costsOnly }) => {
             if (!costsOnly && controls.writeGate) { const held = controls.writeGate; controls.writeGate = null; await held.wait(); }
@@ -180,6 +189,61 @@ describe('scoped Music issuance through the lobby and consent ledger', () => {
         finally { handoffCommit.release(); }
         await f.waitHandoff();
         expect((await f.access('join')).status).toBe(200);
+    });
+
+    it('retries a signed Music join blocked before issuer work and issues exactly once', async () => {
+        const f = await setupMusic();
+        await f.acceptMusic();
+        await f.waitHandoff();
+        const pending = gate(), chatCommit = gate();
+        f.controls.providerDispatchGate = pending;
+        const joining = f.access('join');
+        await pending.entered;
+        f.controls.commitGate = chatCommit;
+        const chat = f.message('alice', { t: 'say', ch: '#stalemate', text: 'While the guest joins.' });
+        await chatCommit.entered;
+        pending.release();
+        try {
+            const busy = await joining;
+            expect(busy.status).toBe(503);
+            expect(await busy.json()).toEqual({ error: 'busy' });
+            expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+            expect(f.provider.revoke).not.toHaveBeenCalled();
+        } finally { chatCommit.release(); }
+        await chat;
+        expect((await f.access('join')).status).toBe(200);
+        expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+        expect((await f.access('join')).status).toBe(403);
+        expect(f.provider.revoke).not.toHaveBeenCalled();
+    });
+
+    it('settles a busy Music authority fence after preparation without preparing or issuing twice', async () => {
+        const f = await setupMusic();
+        await f.acceptMusic();
+        await f.waitHandoff();
+        const preparing = gate(), dispatch = gate(), chatCommit = gate();
+        const firstFence = new Promise(resolve => { dispatch.onResult = resolve; });
+        f.provider.prepare.mockImplementationOnce(async () => { await preparing.wait(); return { status: 200 }; });
+        const joining = f.access('join');
+        await preparing.entered;
+        f.controls.providerDispatchGate = dispatch;
+        preparing.release();
+        await dispatch.entered;
+        f.controls.commitGate = chatCommit;
+        const chat = f.message('alice', { t: 'say', ch: '#stalemate', text: 'While Music is preparing.' });
+        await chatCommit.entered;
+        dispatch.release();
+        try {
+            expect(typeof await firstFence).toBe('symbol');
+            expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+            expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+        } finally { chatCommit.release(); }
+        await chat;
+        expect((await joining).status).toBe(200);
+        expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+        expect(f.provider.revoke).not.toHaveBeenCalled();
     });
 
     it('never exposes a Music page or issues guest credentials if the handoff commit fails', async () => {

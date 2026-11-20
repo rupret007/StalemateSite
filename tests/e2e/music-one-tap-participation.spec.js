@@ -171,14 +171,19 @@ for (const [outcome, title] of [
     ['refused', 'the packaged browser Music host waits for explicit audio consent and closes capture when issuance is refused'],
     ['foreground', 'the packaged browser Music host checks immediately on foreground return and reports an unconfirmed Stop'],
     ['busy', 'the packaged browser Music host keeps capture and resumes playback after a busy foreground check'],
+    ['outage', 'the packaged browser Music host recovers from an edge error without stopping capture'],
+    ['join-busy', 'the packaged browser Music host retries an explicitly busy initial join after one consent tap'],
+    ['cache', 'the packaged browser Music host checks on cache restoration before resuming capture'],
     ['deadline', 'the packaged browser Music host closes capture at the heartbeat deadline during a pending check'],
 ]) test(title, async ({ page }) => {
     const hostAssets = path.resolve(__dirname, '../../.beta-assets/join/host');
     const operations = [];
-    const busy = outcome === 'busy';
-    const foreground = outcome === 'foreground' || busy;
+    const recoverable = outcome === 'busy' || outcome === 'outage';
+    const joiningBusy = outcome === 'join-busy';
+    const cached = outcome === 'cache';
+    const foreground = outcome === 'foreground' || recoverable || joiningBusy || cached;
     const deadline = outcome === 'deadline';
-    let checks = 0;
+    let checks = 0, joins = 0;
     if (deadline) await page.clock.install();
     await page.route('**/join/host/**', route => {
         const file = new URL(route.request().url()).pathname.split('/').at(-1) || 'index.html';
@@ -189,9 +194,12 @@ for (const [outcome, title] of [
         const { op } = route.request().postDataJSON();
         operations.push(op);
         if (deadline && op === 'host-check') return;
-        if (busy && op === 'host-check') return ++checks === 1
-            ? route.fulfill({ status: 503, json: { error: 'busy' } }) : route.fulfill({ json: {} });
-        if (busy && op === 'host-stop') return route.fulfill({ json: { closed: true } });
+        if (recoverable && op === 'host-check' && ++checks === 1) return outcome === 'busy'
+            ? route.fulfill({ status: 503, json: { error: 'busy' } })
+            : route.fulfill({ status: 502, contentType: 'text/html', body: 'Synthetic edge error' });
+        if ((recoverable || cached) && op === 'host-check') return route.fulfill({ json: {} });
+        if ((recoverable || cached) && op === 'host-stop') return route.fulfill({ json: { closed: true } });
+        if (joiningBusy && op === 'host-join' && ++joins === 1) return route.fulfill({ status: 503, json: { error: 'busy' } });
         if (outcome !== 'refused' && op === 'host-join') return route.fulfill({ json: {
             client: 'web', ttl: 120, quota_bytes: 256 * 1024 * 1024,
             iceServers: [{ urls: 'turn:turn.cloudflare.com:3478?transport=udp', username: 'fixture', credential: 'inert' }],
@@ -201,7 +209,7 @@ for (const [outcome, title] of [
     await page.route('**/music-workspace', route => route.fulfill({ contentType: 'text/html', body: `
         <!doctype html><title>Music workspace fixture</title>
         <details open><summary>Music controls</summary><iframe title="Host private Music" allow="microphone" src="/join/host/"></iframe></details>` }));
-    await page.addInitScript(({ foreground, deadline, busy }) => {
+    await page.addInitScript(({ foreground, deadline, recoverable, cached }) => {
         if (window === window.top) sessionStorage.setItem('private-music-host', JSON.stringify({ request: 'a'.repeat(32),
             webjam: 'b'.repeat(64), proof: 'c'.repeat(64), generation: 1, expires: Date.now() + 60000 }));
         window.musicCaptureAttempts = 0;
@@ -222,7 +230,8 @@ for (const [outcome, title] of [
             }
             RTCPeerConnection.generateCertificate = () => {
                 window.musicFixtureIssued = true;
-                if (busy) {
+                if (cached) window.musicFixtureTrack.enabled = true;
+                if (recoverable || cached) {
                     document.querySelector('audio').srcObject = new MediaStream();
                     window.musicFixturePlays = 0;
                     HTMLMediaElement.prototype.play = async function () { window.musicFixturePlays += 1; };
@@ -230,7 +239,7 @@ for (const [outcome, title] of [
                 return new Promise(() => {});
             };
         }
-    }, { foreground, deadline, busy });
+    }, { foreground, deadline, recoverable, cached });
     const music = page.frameLocator('iframe[title="Host private Music"]');
     const frame = music.owner();
     try {
@@ -242,22 +251,33 @@ for (const [outcome, title] of [
         expect(await frame.evaluate(iframe => iframe.contentWindow.musicCaptureAttempts)).toBe(0);
         expect(operations).toEqual([]);
         await start.click();
+        const expected = joiningBusy ? ['host-join', 'host-join'] : ['host-join'];
         if (foreground || deadline) {
             await expect.poll(() => frame.evaluate(iframe => iframe.contentWindow.musicFixtureIssued)).toBe(true);
-            expect(operations).toEqual(['host-join']);
+            expect(operations).toEqual(expected);
             if (deadline) {
                 await page.clock.fastForward(4000);
                 await expect.poll(() => operations.slice()).toEqual(['host-join', 'host-check']);
                 expect(await frame.evaluate(iframe => iframe.contentWindow.musicFixtureTrack.readyState)).toBe('live');
                 await page.clock.fastForward(11000);
+            } else if (cached) {
+                await frame.evaluate(iframe => iframe.contentWindow.dispatchEvent(new iframe.contentWindow.PageTransitionEvent('pagehide', { persisted: true })));
+                expect(operations).toEqual(expected);
+                expect(await frame.evaluate(iframe => ({ state: iframe.contentWindow.musicFixtureTrack.readyState,
+                    enabled: iframe.contentWindow.musicFixtureTrack.enabled }))).toEqual({ state: 'live', enabled: false });
+                await frame.evaluate(iframe => iframe.contentWindow.dispatchEvent(new iframe.contentWindow.PageTransitionEvent('pageshow', { persisted: true })));
             } else {
                 await frame.evaluate(iframe => iframe.contentDocument.dispatchEvent(new iframe.contentWindow.Event('visibilitychange')));
             }
-            if (busy) {
-                await expect.poll(() => operations.slice()).toEqual(['host-join', 'host-check', 'host-check']);
+            if (recoverable || cached) {
+                const heartbeat = recoverable ? ['host-check', 'host-check'] : ['host-check'];
+                await expect.poll(() => operations.slice()).toEqual([...expected, ...heartbeat]);
                 await expect.poll(() => frame.evaluate(iframe => iframe.contentWindow.musicFixturePlays)).toBe(1);
                 expect(await frame.evaluate(iframe => iframe.contentWindow.musicFixtureTrack.readyState)).toBe('live');
-                await music.getByRole('button', { name: 'Stop Music' }).click();
+                if (cached) {
+                    expect(await frame.evaluate(iframe => iframe.contentWindow.musicFixtureTrack.enabled)).toBe(true);
+                    await frame.evaluate(iframe => iframe.contentWindow.dispatchEvent(new iframe.contentWindow.PageTransitionEvent('pagehide')));
+                } else await music.getByRole('button', { name: 'Stop Music' }).click();
             } else {
                 await expect(music.getByRole('status')).toContainText('The Music connection ended.');
                 await expect(music.getByRole('status')).toContainText('The room did not confirm the stop.');
@@ -266,9 +286,8 @@ for (const [outcome, title] of [
         expect(await frame.evaluate(iframe => ({ attempts: iframe.contentWindow.musicCaptureAttempts,
             readyState: iframe.contentWindow.musicFixtureTrack.readyState })))
             .toEqual({ attempts: 1, readyState: 'ended' });
-        const expected = ['host-join'];
         if (foreground || deadline) expected.push('host-check');
-        if (busy) expected.push('host-check');
+        if (recoverable) expected.push('host-check');
         await expect.poll(() => operations.slice()).toEqual([...expected, 'host-stop']);
         await expect(start).toBeDisabled();
         await expect(music.getByRole('button', { name: 'Stop Music' })).toBeHidden();

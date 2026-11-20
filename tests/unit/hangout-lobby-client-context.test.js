@@ -954,6 +954,28 @@ describe('participation-safe one-tap Music offer', () => {
         expect(notice.closest('[hidden]')).toBeNull();
     });
 
+    it('keeps the guest Music frame for a cached lobby page and clears it on actual exit', async () => {
+        const fixture = await setup({ privateMusicProvider: 1 });
+        const { window, ws } = fixture, { document } = window;
+        const offer = { ...invite(), hostMode: 'browser', origin: window.location.origin };
+        ws.receive(offer);
+        document.querySelector('[data-music-invite-action]').click();
+        joinJam(fixture, offer);
+        ws.receive({ t: 'music-offer-accepted', version: 1, id: offer.id, request: offer.request,
+            ch: offer.ch, roomInstance: offer.roomInstance,
+            href: `${offer.origin}/join/#m=${offer.id}&e=${offer.expires / 1000}`, expires: offer.expires });
+        const panel = document.querySelector('[data-music-session-panel]');
+        const frame = panel.querySelector('iframe');
+        const key = `webjam-private-music-${offer.id}`;
+        expect(frame?.title).toBe('Join private Music');
+        window.dispatchEvent(new window.PageTransitionEvent('pagehide', { persisted: true }));
+        expect(panel.querySelector('iframe')).toBe(frame);
+        expect(window.sessionStorage.getItem(key)).toMatch(/^[a-f0-9]{64}$/);
+        window.dispatchEvent(new window.PageTransitionEvent('pagehide'));
+        expect(panel.querySelector('iframe')).toBeNull();
+        expect(window.sessionStorage.getItem(key)).toBeNull();
+    });
+
     it('shows unconfirmed host End Music feedback while Paint is active', async () => {
         const { window, ws } = await setup({ privateMusicProvider: 1 });
         const { document } = window;

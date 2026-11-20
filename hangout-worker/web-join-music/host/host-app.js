@@ -21,7 +21,7 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
     const controller = new AbortController();
     const channel = new BroadcastChannel(`webjam-browser-host-${handoff.request}`);
-    let session, stream, heartbeat, deadlineTimer, checking, lastCheck = 0;
+    let session, stream, heartbeat, deadlineTimer, checking, cachedCapture, lastCheck = 0, inPageCache = false;
     const expired = () => end('The Music connection ended. Start a fresh invitation to rejoin.');
     const end = message => {
         if (controller.signal.aborted) return;
@@ -41,18 +41,18 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
         });
         handoff = null;
     };
-    async function request(op) {
+    async function request(op, deadline = AbortSignal.timeout(8000)) {
         const closing = op === 'host-stop';
         const sentAt = Date.now();
-        const deadline = AbortSignal.timeout(8000);
         const response = await fetch('/beta/music', { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error',
             headers: { 'Content-Type': 'application/json' }, keepalive: closing,
             signal: closing ? deadline : musicSignal(controller.signal, deadline),
             body: JSON.stringify({ op, id: handoff.webjam.slice(-32), proof: handoff.proof, webjam: handoff.webjam, generation: handoff.generation }) });
-        if (op === 'host-check' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy') return false;
+        if (op === 'host-check' && response.status >= 500) return false;
+        if (op === 'host-join' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy') return false;
         if (!response.ok) throw new Error('Music authority ended.');
         const value = await response.json();
-        if (!closing && !controller.signal.aborted) {
+        if (!closing && !controller.signal.aborted && (op === 'host-join' || !inPageCache)) {
             const receivedAt = Date.now();
             if (receivedAt >= sentAt + MUSIC_HEARTBEAT_WINDOW_MS
                 || (lastCheck && receivedAt >= lastCheck + MUSIC_HEARTBEAT_WINDOW_MS)) {
@@ -71,19 +71,28 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     }
     async function confirmAuthority() {
         try {
-            while (!controller.signal.aborted && Date.now() < lastCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
-                if (await request('host-check') !== false) return !controller.signal.aborted;
+            while (!controller.signal.aborted && !inPageCache && Date.now() < lastCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
+                if (await request('host-check') !== false) return !controller.signal.aborted && !inPageCache;
                 // A staged room write must settle before this check can renew authority.
                 await new Promise(resolve => setTimeout(resolve, 300));
             }
         } catch { /* A terminal response or failed request closes capture. */ }
-        expired();
+        if (!inPageCache) expired();
         return false;
     }
     function check() {
-        if (!lastCheck || controller.signal.aborted) return false;
+        if (!lastCheck || controller.signal.aborted || inPageCache) return false;
         checking ??= confirmAuthority().finally(() => { checking = null; });
         return checking;
+    }
+    async function joinMusic() {
+        const deadline = musicSignal(controller.signal, AbortSignal.timeout(8000));
+        while (true) {
+            deadline.throwIfAborted();
+            const result = await request('host-join', deadline);
+            if (result !== false) return result;
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
     }
     status.textContent = 'Confirm headphones and start when you’re ready to invite your guest.';
     headphones.addEventListener('change', () => { if (!stream && !controller.signal.aborted) start.disabled = !headphones.checked; });
@@ -98,7 +107,7 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
             stream = captured;
             controller.signal.throwIfAborted();
             for (const track of stream.getAudioTracks()) track.addEventListener('ended', () => end('The microphone stopped.'));
-            const credentials = validateCredentials(await request('host-join'));
+            const credentials = validateCredentials(await joinMusic());
             controller.signal.throwIfAborted();
             heartbeat = setInterval(check, 4000);
             const expires = Math.floor(Math.min(handoff.expires, credentials.expiresAt) / 1000);
@@ -119,8 +128,23 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     channel.addEventListener('message', ({ data }) => { if (data?.type === 'stop') end('The Music invitation ended.'); });
     stop.addEventListener('click', () => end('Music stopped. You can return to the Jam room.'));
     listen.addEventListener('click', play);
-    document.addEventListener('visibilitychange', async () => {
-        if (!document.hidden && await check() && !document.hidden) void play();
+    async function resumeForeground() {
+        if (document.hidden || !await check() || document.hidden) return;
+        cachedCapture?.forEach(track => { if (track.readyState === 'live') track.enabled = true; });
+        cachedCapture = null;
+        void play();
+    }
+    document.addEventListener('visibilitychange', resumeForeground);
+    window.addEventListener('pageshow', event => {
+        if (!event.persisted) return;
+        inPageCache = false;
+        void resumeForeground();
     });
-    window.addEventListener('pagehide', () => end('Music stopped.'), { once: true });
+    window.addEventListener('pagehide', event => {
+        if (!event.persisted) return end('Music stopped.');
+        inPageCache = true;
+        cachedCapture = stream?.getAudioTracks().filter(track => track.enabled) || [];
+        cachedCapture.forEach(track => { track.enabled = false; });
+        audio.pause();
+    });
 }
