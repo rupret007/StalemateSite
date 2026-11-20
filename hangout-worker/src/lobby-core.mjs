@@ -1230,7 +1230,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const hostPage = op === 'host-page', guestFrame = op === 'guest-frame-page', page = hostPage || guestFrame || op === 'page';
         const native = nativeMusicOp(op), browserHost = hostPage || browserMusicHostOp(op), isHost = native || browserHost, stop = stoppingMusic(op);
         if (!site && !native || site && native || !page && !validMusicBody(body, native)) return denied();
-        if (!stop && controlledSettlement) await controlledSettlement;
+        while (!stop && controlledSettlement) await controlledSettlement;
 
         let hostKey, lease, offer;
         if (isHost) {
@@ -1254,7 +1254,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             lease = musicHosts.get(hostKey);
         }
 
-        if (!stop && controlledSettlement) await controlledSettlement;
+        while (!stop && controlledSettlement) await controlledSettlement;
         const host = conns.get(lease?.host), guest = conns.get(lease?.guest);
         if (!lease || guestFrame && !lease.browserHost || !isHost && (lease.guestVersion !== site.version || lease.guestExpiry !== site.exp)) return denied();
         const role = isHost ? 'host' : 'guest', target = isHost ? lease : offer;
@@ -1280,7 +1280,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         const authorize = async start => {
             // Observe only committed room state. The issuer callback runs
             // outside the command gate and may arrive while chat is saving.
-            if (controlledSettlement) await controlledSettlement;
+            while (controlledSettlement) await controlledSettlement;
             const context = await participation.prepare([connectionView(host), connectionView(guest)]);
             return participation.startProvider(context, musicProviderRequest(lease, role), () => {
                 if (participationBusy) { busy = true; throw Error('participation-busy'); }
@@ -2426,7 +2426,13 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
                 }
             }
             if (!closing) { out(t, { t: 'pm-closed', with: c.nick }); out(c, { t: 'pm-closed', with: t.nick }); }
-            if (mediaChanged) refreshBlockedMedia(c, t.dev);
+            if (mediaChanged) {
+                refreshBlockedMedia(c, t.dev);
+                for (const [key, lease] of musicHosts) {
+                    const peer = lease.host === c.id ? lease.guest : lease.guest === c.id ? lease.host : null;
+                    if (peer && conns.get(peer)?.dev === t.dev) finishMusicHost(key);
+                }
+            }
             bot(c, `Blocked ${t.nick || 'this visitor'}. They can't PM you and you won't see them.`);
             return personPreferences(c);
         },

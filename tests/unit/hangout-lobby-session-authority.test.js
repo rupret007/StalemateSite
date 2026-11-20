@@ -860,7 +860,7 @@ describe('actual HangoutLobby constructs the required participation bridge', () 
 });
 
 describe('private Music through signed beta admission, production lobby and SQLite authority', () => {
-    it('fences a browser Music host and the selected guest to their signed sessions and retires both roles on Stop', async () => {
+    for (const action of ['Stop', 'Leave', 'Kick', 'Block']) it(`fences a browser Music host and the selected guest to their signed sessions and retires both roles on ${action}`, async () => {
         const f = await fixture({ participation: true });
         const host = await f.enroll('browser-music-host'), guest = await f.enroll('browser-music-guest');
         const ledger = await participationLedger(f);
@@ -942,7 +942,16 @@ describe('private Music through signed beta admission, production lobby and SQLi
             expect(guestJoin.status).toBe(200);
             expect(await guestJoin.json()).toEqual({ href, credentials: { role: 'guest' } });
             expect(issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
-            expect((await call('/beta/music', hostCookie, { op: 'host-stop', ...requestHost })).status).toBe(200);
+            if (action === 'Stop') {
+                expect((await call('/beta/music', hostCookie, { op: 'host-stop', ...requestHost })).status).toBe(200);
+            } else if (action === 'Leave') {
+                await app.message(wb, { t: 'cmd', name: 'part', args: [room.name], ch: room.name });
+            } else {
+                const actor = action === 'Kick' ? wa : wb, peer = actor === wa ? wb : wa;
+                await app.message(actor, { t: 'cmd', name: action.toLowerCase(), args: [actor === wa ? 'PhoneGuest' : 'PhoneHost'],
+                    ch: room.name, personContext: 1, personPeer: peer.attachment.id, roomInstance: room.keepRef });
+            }
+            if (action !== 'Stop') expect(wb.frames.some(frame => frame.t === 'music-offer-ended' && frame.id === offer.id)).toBe(true);
             expect((await call('/join/host/', hostCookie)).status).toBe(403);
             expect((await call('/beta/music', guestCookie, join)).status).toBe(403);
             await vi.waitFor(() => expect(revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(['guest', 'host']));
