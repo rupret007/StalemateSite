@@ -35,7 +35,7 @@ if (requiresMusicGrant) {
     if (/^[a-f0-9]{64}$/.test(value)) musicProof = value;
   } catch { /* The protected handoff needs its original tab. */ }
 }
-let musicCheckTimer, musicDeadlineTimer, grantRetired = false, musicJoinStarted = false;
+let musicCheckTimer, musicDeadlineTimer, checkingMusic, grantRetired = false, musicJoinStarted = false;
 
 const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
 let lastMusicCheck = 0;
@@ -48,15 +48,14 @@ async function musicRequestSignal(attempt, timeout) {
     : (await import("./request-signal.js")).musicSignal(...signals);
 }
 
-async function musicRequest(op, signal, allowBusy = false) {
+async function musicRequest(op, signal) {
   const sentAt = Date.now();
   const response = await fetch("/beta/music", {
     method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ op, id: musicGrant, proof: musicProof }),
     signal: signal || AbortSignal.timeout(8000), keepalive: op === "stop",
   });
-  if (allowBusy && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy'
-      && Date.now() - lastMusicCheck < MUSIC_HEARTBEAT_WINDOW_MS) return;
+  if (op === 'check' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy') return false;
   if (response.status === 429) throw new Error(JOIN_SIGNAL.RELAY_CAP_REACHED);
   if (!response.ok) throw new Error(JOIN_SIGNAL.SESSION_ENDED);
   const value = await response.json();
@@ -76,27 +75,31 @@ async function musicRequest(op, signal, allowBusy = false) {
 
 function watchMusicGrant() {
   clearTimeout(musicCheckTimer);
-  musicCheckTimer = setTimeout(() => { void checkMusicGrant(true); }, 4000);
+  musicCheckTimer = setTimeout(() => { void checkMusicGrant(); }, 4000);
 }
 
-async function checkMusicGrant(allowBusy = false) {
+async function confirmMusicGrant() {
+  try {
+    while (!grantRetired && Date.now() < lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
+      const signal = await musicRequestSignal(activeAttempt, 8000);
+      if (grantRetired || Date.now() >= lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS) break;
+      if (await musicRequest("check", signal) !== false) {
+        if (grantRetired) return false;
+        watchMusicGrant();
+        return true;
+      }
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+  } catch { /* A terminal response or failed request closes capture. */ }
+  if (!grantRetired) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
+  return false;
+}
+
+function checkMusicGrant() {
   clearTimeout(musicCheckTimer);
   if (grantRetired) return false;
-  if (Date.now() >= lastMusicCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
-    leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
-    return false;
-  }
-  try {
-    const signal = await musicRequestSignal(activeAttempt, 8000);
-    if (grantRetired) return false;
-    await musicRequest("check", signal, allowBusy);
-    if (grantRetired) return false;
-    watchMusicGrant();
-    return true;
-  } catch {
-    if (!grantRetired) leave(undefined, new Error(JOIN_SIGNAL.SESSION_ENDED));
-    return false;
-  }
+  checkingMusic ??= confirmMusicGrant().finally(() => { checkingMusic = null; });
+  return checkingMusic;
 }
 
 let invite;
@@ -616,7 +619,7 @@ window.addEventListener("pagehide", () => {
 });
 document.addEventListener("visibilitychange", async () => {
   if (document.hidden || expireUnusedInvite()) return;
-  if (musicGrant && lastMusicCheck && (!await checkMusicGrant(true) || document.hidden)) return;
+  if (musicGrant && lastMusicCheck && (!await checkMusicGrant() || document.hidden)) return;
   if (context?.state === "suspended") {
     const attempt = activeAttempt;
     context.resume().catch(() => {

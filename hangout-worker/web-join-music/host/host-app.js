@@ -21,7 +21,7 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     const MUSIC_HEARTBEAT_WINDOW_MS = 15000;
     const controller = new AbortController();
     const channel = new BroadcastChannel(`webjam-browser-host-${handoff.request}`);
-    let session, stream, heartbeat, deadlineTimer, checking = false, lastCheck = 0;
+    let session, stream, heartbeat, deadlineTimer, checking, lastCheck = 0;
     const expired = () => end('The Music connection ended. Start a fresh invitation to rejoin.');
     const end = message => {
         if (controller.signal.aborted) return;
@@ -41,7 +41,7 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
         });
         handoff = null;
     };
-    async function request(op, allowBusy = false) {
+    async function request(op) {
         const closing = op === 'host-stop';
         const sentAt = Date.now();
         const deadline = AbortSignal.timeout(8000);
@@ -49,8 +49,7 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
             headers: { 'Content-Type': 'application/json' }, keepalive: closing,
             signal: closing ? deadline : musicSignal(controller.signal, deadline),
             body: JSON.stringify({ op, id: handoff.webjam.slice(-32), proof: handoff.proof, webjam: handoff.webjam, generation: handoff.generation }) });
-        if (allowBusy && op === 'host-check' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy'
-            && Date.now() - lastCheck < MUSIC_HEARTBEAT_WINDOW_MS) return;
+        if (op === 'host-check' && response.status === 503 && (await response.json().catch(() => null))?.error === 'busy') return false;
         if (!response.ok) throw new Error('Music authority ended.');
         const value = await response.json();
         if (!closing && !controller.signal.aborted) {
@@ -70,13 +69,21 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
         try { await audio.play(); listen.hidden = true; }
         catch { if (!controller.signal.aborted) listen.hidden = false; }
     }
-    async function check(foreground = false) {
-        if (!lastCheck || controller.signal.aborted || !foreground && checking) return;
-        if (Date.now() >= lastCheck + MUSIC_HEARTBEAT_WINDOW_MS) return expired();
-        if (!foreground) checking = true;
-        try { await request('host-check', true); }
-        catch { expired(); }
-        finally { if (!foreground) checking = false; }
+    async function confirmAuthority() {
+        try {
+            while (!controller.signal.aborted && Date.now() < lastCheck + MUSIC_HEARTBEAT_WINDOW_MS) {
+                if (await request('host-check') !== false) return !controller.signal.aborted;
+                // A staged room write must settle before this check can renew authority.
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        } catch { /* A terminal response or failed request closes capture. */ }
+        expired();
+        return false;
+    }
+    function check() {
+        if (!lastCheck || controller.signal.aborted) return false;
+        checking ??= confirmAuthority().finally(() => { checking = null; });
+        return checking;
     }
     status.textContent = 'Confirm headphones and start when you’re ready to invite your guest.';
     headphones.addEventListener('change', () => { if (!stream && !controller.signal.aborted) start.disabled = !headphones.checked; });
@@ -112,6 +119,8 @@ if (!ref(handoff?.request) || !/^[a-f0-9]{64}$/.test(handoff?.webjam) || !/^[a-f
     channel.addEventListener('message', ({ data }) => { if (data?.type === 'stop') end('The Music invitation ended.'); });
     stop.addEventListener('click', () => end('Music stopped. You can return to the Jam room.'));
     listen.addEventListener('click', play);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) void check(true); });
+    document.addEventListener('visibilitychange', async () => {
+        if (!document.hidden && await check() && !document.hidden) void play();
+    });
     window.addEventListener('pagehide', () => end('Music stopped.'), { once: true });
 }

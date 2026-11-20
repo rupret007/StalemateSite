@@ -926,6 +926,77 @@ describe('participation-safe one-tap Music offer', () => {
         expect(window.sessionStorage.getItem(`webjam-private-music-${offer.id}`)).toBeNull();
     });
 
+    it.each(['non-2xx', 'transport rejection', 'unacknowledged 2xx', 'confirmed'])('reports guest End Music with %s in the outer lobby', async outcome => {
+        const fixture = await setup({ privateMusicProvider: 1 });
+        const { window, ws } = fixture, { document } = window;
+        const offer = { ...invite(), hostMode: 'browser', origin: window.location.origin };
+        ws.receive(offer);
+        document.querySelector('[data-music-invite-action]').click();
+        joinJam(fixture, offer);
+        ws.receive({ t: 'music-offer-accepted', version: 1, id: offer.id, request: offer.request,
+            ch: offer.ch, roomInstance: offer.roomInstance,
+            href: `${offer.origin}/join/#m=${offer.id}&e=${offer.expires / 1000}`, expires: offer.expires });
+        const { joinProof } = ws.sent.find(frame => frame.t === 'music-offer-accept');
+        const panel = document.querySelector('[data-music-session-panel]');
+        const notice = document.querySelector('[data-music-stop-status]');
+        expect(panel.open).toBe(true);
+        if (outcome === 'transport rejection') window.fetch.mockRejectedValueOnce(Error('Synthetic network loss'));
+        else window.fetch.mockResolvedValueOnce({ ok: outcome !== 'non-2xx', json: async () => ({ closed: outcome === 'confirmed' }) });
+        panel.querySelector('[data-music-session-close]').click();
+        expect(panel.querySelector('iframe')).toBeNull();
+        expect(window.sessionStorage.getItem(`webjam-private-music-${offer.id}`)).toBeNull();
+        expect(window.fetch).toHaveBeenCalledWith('/beta/music', expect.objectContaining({
+            redirect: 'error', keepalive: true, signal: expect.anything(), body: JSON.stringify({ op: 'stop', id: offer.id, proof: joinProof })
+        }));
+        expect(notice.textContent).toContain('Waiting for the room to confirm.');
+        await vi.waitFor(() => expect(notice.textContent).toContain(outcome === 'confirmed'
+            ? 'The room confirmed that Music stopped.' : 'The room did not confirm the stop.'));
+        expect(notice.closest('[hidden]')).toBeNull();
+    });
+
+    it('shows unconfirmed host End Music feedback while Paint is active', async () => {
+        const { window, ws } = await setup({ privateMusicProvider: 1 });
+        const { document } = window;
+        window.eval(readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8'));
+        window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+        window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
+        window.BroadcastChannel = class { addEventListener() {} postMessage() {} close() {} };
+        Object.defineProperty(window.crypto, 'subtle', { value: { digest: async () => new Uint8Array(32) } });
+        const self = { id: 'host-peer', nick: 'Viewer', prefix: '@' };
+        const guest = { id: 'guest-peer', nick: 'DrumGuest', prefix: '' };
+        ws.receive({ t: 'welcome', id: self.id, nick: self.nick, role: 'fan', capabilities: {} });
+        ws.receive({ t: 'join', ch: { name: '#stalemate', kind: 'lobby', modes: {}, names: [self, guest] } });
+        ws.receive({ t: 'join', ch: { name: '#jam-rehearsal', kind: 'jam', keepRef: invitationRoomInstance, modes: { i: true }, names: [self] } });
+        const host = document.querySelector('[data-browser-music-host]');
+        expect(host.hidden).toBe(false);
+        host.click();
+        const roster = document.querySelector('[data-invite-options]');
+        roster.value = guest.id;
+        roster.dispatchEvent(new window.Event('change'));
+        document.querySelector('[data-invite-person-send]').click();
+        await vi.waitFor(() => expect(ws.sent.at(-1)?.t).toBe('music-host-bind'));
+        const { request, webjam, generation } = ws.sent.at(-1);
+        ws.receive({ t: 'music-host-bound', version: 1, request, status: 'bound', expires: Date.now() + 60000 });
+        const { proof } = JSON.parse(window.sessionStorage.getItem('private-music-host'));
+        const panel = document.querySelector('[data-music-session-panel]');
+        expect(panel.querySelector('iframe')?.title).toBe('Host private Music');
+        ws.receive({ t: 'join', ch: { name: '#bobross-rehearsal', kind: 'bobross', keepRef: 'b'.repeat(32),
+            title: 'Paint Along', modes: {}, names: [self] } });
+        expect(document.querySelector('[data-chat-context]').textContent).toBe('#bobross-rehearsal');
+        expect(document.querySelector('[data-jam]').hidden).toBe(true);
+        window.fetch.mockResolvedValueOnce({ ok: false, status: 503 });
+        panel.querySelector('[data-music-session-close]').click();
+        expect(panel.querySelector('iframe')).toBeNull();
+        expect(window.sessionStorage.getItem('private-music-host')).toBeNull();
+        expect(window.fetch).toHaveBeenCalledWith('/beta/music', expect.objectContaining({
+            body: JSON.stringify({ op: 'host-stop', id: webjam.slice(-32), webjam, generation, proof })
+        }));
+        const notice = document.querySelector('[data-music-stop-status]');
+        expect(notice.textContent).toContain('Waiting for the room to confirm.');
+        await vi.waitFor(() => expect(notice.textContent).toContain('The room did not confirm the stop.'));
+        expect(notice.closest('[hidden]')).toBeNull();
+    });
+
     it('keeps the accepted one-tap Music link so a guest who closed the tab can open it again', async () => {
         const fixture = await setup(), { window, ws } = fixture, offer = invite();
         const popup = { closed: false, opener: window, document: { title: '', body: { textContent: '' } },

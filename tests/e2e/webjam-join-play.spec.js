@@ -698,16 +698,18 @@ test('capture arriving after Leave releases only its own tracks during the next 
 // Exercises the packaged protected UI with an inert same-origin issuer and
 // inert session transport. Production cookie/room authority is tested against
 // the actual Worker and lobby in the SQLite authority suite.
-for (const outcome of ['quota refusal', 'revocation after joining', 'revocation on foreground return', 'heartbeat expiring during a pending check']) {
+for (const outcome of ['quota refusal', 'revocation after joining', 'revocation on foreground return', 'heartbeat expiring during a pending check', 'busy foreground check followed by success']) {
     test(`protected Music ${outcome} respects explicit audio join and capture ownership`, async ({ page, baseURL }) => {
         const requests = [], external = [];
         const grant = '9'.repeat(32), proof = '5'.repeat(64);
         const expires = Math.floor(Date.now() / 1000) + 240;
         let withdrawn = false;
-        const foreground = outcome === 'revocation on foreground return';
+        const busy = outcome === 'busy foreground check followed by success';
+        const foreground = outcome === 'revocation on foreground return' || busy;
         const deadline = outcome === 'heartbeat expiring during a pending check';
+        let checks = 0;
         if (deadline) await page.clock.install();
-        await page.addInitScript(({ grant, proof, foreground }) => {
+        await page.addInitScript(({ grant, proof, foreground, busy }) => {
             sessionStorage.setItem(`webjam-private-music-${grant}`, proof);
             window.musicCapture = [];
             Object.defineProperty(Object.getPrototypeOf(navigator.mediaDevices), 'getUserMedia', {
@@ -727,7 +729,20 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
                 const schedule = window.setTimeout.bind(window);
                 window.setTimeout = (callback, delay, ...args) => schedule(delay === 4000 ? () => {} : callback, delay, ...args);
             }
-        }, { grant, proof, foreground });
+            if (busy) {
+                const resume = AudioContext.prototype.resume;
+                const state = Object.getOwnPropertyDescriptor(BaseAudioContext.prototype, 'state');
+                Object.defineProperty(BaseAudioContext.prototype, 'state', { configurable: true,
+                    get() { return window.musicFixtureSuspended ? 'suspended' : state.get.call(this); } });
+                AudioContext.prototype.resume = function () {
+                    if (window.musicFixtureSuspended) {
+                        window.musicFixtureSuspended = false;
+                        window.musicFixtureResumed = true;
+                    }
+                    return resume.call(this);
+                };
+            }
+        }, { grant, proof, foreground, busy });
         await page.route('**/*', async route => {
             const url = new URL(route.request().url());
             if (url.origin !== baseURL) { external.push(url.origin); return route.abort(); }
@@ -752,6 +767,8 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
             const { op, id, proof: supplied } = route.request().postDataJSON();
             requests.push({ op, matched: id === grant && supplied === proof });
             if (deadline && op === 'check') return;
+            if (busy && op === 'check') return ++checks === 1
+                ? route.fulfill({ status: 503, json: { error: 'busy' } }) : route.fulfill({ json: {} });
             if (op === 'join') {
                 if (outcome === 'quota refusal') return route.fulfill({ status: 429, json: { error: 'cap' } });
                 return route.fulfill({ json: {
@@ -780,7 +797,14 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
             withdrawn = true;
             if (foreground) {
                 expect(requests.map(request => request.op)).toEqual(['join']);
+                if (busy) await page.evaluate(() => { window.musicFixtureSuspended = true; });
                 await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+            }
+            if (busy) {
+                await expect.poll(() => requests.map(request => request.op)).toEqual(['join', 'check', 'check']);
+                await expect.poll(() => page.evaluate(() => window.musicFixtureResumed)).toBe(true);
+                expect(await page.evaluate(() => window.musicTransportOpen && window.musicCapture[0].readyState)).toBe('live');
+                await leave.click();
             }
             if (deadline) {
                 await page.clock.fastForward(4000);
@@ -794,6 +818,7 @@ for (const outcome of ['quota refusal', 'revocation after joining', 'revocation 
         await expect.poll(() => requests.filter(request => request.op === 'stop').length).toBe(1);
         expect(requests.filter(request => request.op === 'join')).toEqual([{ op: 'join', matched: true }]);
         if (deadline) expect(requests.map(request => request.op)).toEqual(['join', 'check', 'stop']);
+        if (busy) expect(requests.map(request => request.op)).toEqual(['join', 'check', 'check', 'stop']);
         expect(requests.every(request => request.matched)).toBe(true);
         expect(external).toEqual([]);
     });

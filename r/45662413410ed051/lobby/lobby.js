@@ -1997,8 +1997,12 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const browserMusicStop = $('[data-browser-music-stop]');
     const musicSessionPanel = $('[data-music-session-panel]');
     const musicSessionContent = $('[data-music-session-content]');
+    const musicStopStatus = $('[data-music-stop-status]');
+    let musicStopSequence = 0;
     function mountMusicFrame(title, src) {
         if (musicSessionContent.childElementCount) throw Error('Music is already open');
+        musicStopSequence += 1;
+        musicStopStatus.hidden = true;
         const frame = document.createElement('iframe');
         frame.title = title;
         frame.allow = 'microphone';
@@ -2019,6 +2023,20 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         browserMusicStatus.textContent = message;
         browserMusicStatus.hidden = !message;
     }
+    async function confirmBrowserMusicStop(body) {
+        const sequence = ++musicStopSequence;
+        musicStopStatus.hidden = false;
+        musicStopStatus.textContent = 'Music stopped on this device. Waiting for the room to confirm.';
+        let confirmed = false;
+        try {
+            const response = await fetch('/beta/music', { method: 'POST', credentials: 'same-origin', cache: 'no-store', keepalive: true,
+                redirect: 'error', signal: AbortSignal.timeout(8000),
+                headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            confirmed = response.ok && (await response.json())?.closed === true;
+        } catch { /* Keep local capture closed and report that room confirmation is missing. */ }
+        if (sequence === musicStopSequence) musicStopStatus.textContent = confirmed
+            ? 'The room confirmed that Music stopped.' : 'Music stopped on this device. The room did not confirm the stop.';
+    }
     function stopBrowserMusic(message) {
         const attempt = browserMusic;
         if (!attempt) return;
@@ -2029,15 +2047,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         removeMusicFrame(attempt.frame);
         attempt.channel.close();
         if (attempt.bound) {
-            void fetch('/beta/music', { method: 'POST', credentials: 'same-origin', cache: 'no-store', keepalive: true,
-                redirect: 'error', signal: AbortSignal.timeout(8000),
-                headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'host-stop', id: attempt.webjam.slice(-32),
-                    webjam: attempt.webjam, generation: attempt.generation, proof: attempt.proof }) }).then(response => {
-                if (!response.ok) throw Error('Music Stop could not be confirmed');
-            }).catch(() => {
-                if (!browserMusic && browserMusicStatus.textContent === message)
-                    showBrowserMusicStatus('Music stopped on this device. The room did not confirm the stop.');
-            });
+            void confirmBrowserMusicStop({ op: 'host-stop', id: attempt.webjam.slice(-32),
+                webjam: attempt.webjam, generation: attempt.generation, proof: attempt.proof });
         }
         browserMusicStop.hidden = true;
         showBrowserMusicStatus(message);
@@ -2113,11 +2124,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (browserMusic) return stopBrowserMusic('Music stopped.');
         if (!musicOffer?.browserHost) return;
         const { id, joinProof } = musicOffer;
-        if (joinProof) {
-            void fetch('/beta/music', { method: 'POST', credentials: 'same-origin', cache: 'no-store', keepalive: true,
-                headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'stop', id, proof: joinProof }) }).catch(() => {});
-        }
         endMusicInvite();
+        if (joinProof) void confirmBrowserMusicStop({ op: 'stop', id, proof: joinProof });
     });
     window.addEventListener('pagehide', () => {
         stopMusicHandoff();
