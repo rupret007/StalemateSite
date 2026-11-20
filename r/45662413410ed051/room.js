@@ -1610,7 +1610,7 @@
      * Every receiver has its own sender, so people only get our sharp feed when they're
      * watching us big (speaker view, pin, spotlight); everyone else gets a thumbnail. */
     // Capture and play both start inside this tap: iOS refuses them anywhere else.
-    ui.avResume.addEventListener('click', () => { unblockFaces(); resumeLocalMedia(true); });
+    ui.avResume.addEventListener('click', () => { void resumeLocalMedia(true); });
     /* Faces that stopped reconnecting (rebuild budget spent, see rebuildPc): an honest line that
      * stays put, with one small button to try again. Chat and drawing never depend on it. */
     ui.facesRetry = doc.createElement('p');
@@ -1646,17 +1646,19 @@
     });
 
     // The button stays up while remote playback or the local camera/mic still needs a tap.
-    const avResumeWhy = { playback: false, video: false, audio: false };
+    const remoteFacesNeedingTap = new WeakSet();
+    const remoteFaceVideos = () => ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video');
+    const avResumeWhy = { video: false, audio: false };
     function paintAvResume() {
         if (!app.av.cam || app.av.screen) avResumeWhy.video = false;
         if (!app.av.mic) avResumeWhy.audio = false;
-        const needsTap = avResumeWhy.playback || avResumeWhy.video || avResumeWhy.audio;
+        const needsTap = avResumeWhy.video || avResumeWhy.audio
+            || [...remoteFaceVideos()].some((video) => remoteFacesNeedingTap.has(video));
         if (!needsTap && doc.activeElement === ui.avResume && !ui.room.hidden) {
             ui.callControls.focus({ preventScroll: true });
         }
         ui.avResume.hidden = !needsTap;
     }
-    function showAvResume(on) { avResumeWhy.playback = Boolean(on); paintAvResume(); }
     function captureNeedsTap(kind, on) { avResumeWhy[kind] = Boolean(on); paintAvResume(); }
     function avFlags() {
         return { mic: app.av.mic, cam: app.av.cam, canvas: app.av.canvas, screen: Boolean(app.av.screen), hand: app.av.hand, away: app.av.away };
@@ -2465,34 +2467,18 @@
         renderHands();
     }
 
-    function remoteFacesWaiting() {
-        return [...ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')].some((video) => video.srcObject && video.paused);
-    }
     // Remote autoplay is blocked on iOS until a tap. One tap plays and unmutes every face.
-    function playRemoteFace(video) {
-        if (!video) return;
-        let attempt;
-        try { attempt = video.play(); } catch (error) {
-            showAvResume(true);
-            return;
+    async function playRemoteFace(video, gesture = false) {
+        const stream = video.srcObject;
+        if (!stream?.active || (!gesture && remoteFacesNeedingTap.has(video))) return;
+        try {
+            await video.play();
+        } catch (error) {
+            // Reattaching the stream can abort an earlier play while the new one starts.
+            if (error?.name === 'AbortError' || !video.paused || video.srcObject !== stream || !ui.tiles.contains(video)) return;
+            remoteFacesNeedingTap.add(video);
+            paintAvResume();
         }
-        if (!attempt || typeof attempt.then !== 'function') return;
-        attempt.then(() => {
-            if (!remoteFacesWaiting()) showAvResume(false);
-        }).catch((error) => {
-            // Interrupted by a re-attach (renderTile) that already started a newer play(): that one decides.
-            if (error && error.name === 'AbortError' && !video.paused) return;
-            showAvResume(true);
-        });
-    }
-    function unblockFaces() {
-        ensureAudioCtx();
-        if (app.av.ac && app.av.ac.state === 'suspended') app.av.ac.resume().catch(() => {});
-        for (const video of ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')) {
-            video.muted = false;
-            playRemoteFace(video);
-        }
-        if (!remoteFacesWaiting()) showAvResume(false);
     }
 
     function bars(tier) {
@@ -2514,6 +2500,11 @@
             v.setAttribute('playsinline', '');
             v.setAttribute('webkit-playsinline', '');
             v.muted = id === 'me';
+            if (id !== 'me') {
+                v.addEventListener('playing', () => {
+                    if (!v.paused && v.readyState >= v.HAVE_FUTURE_DATA && remoteFacesNeedingTap.delete(v)) paintAvResume();
+                });
+            }
             const cap = doc.createElement('figcaption');
             const nm = doc.createElement('span');
             nm.className = 'nm';
@@ -2552,7 +2543,7 @@
         if (lateFace) v.srcObject = null;
         if (v.srcObject !== (stream || null)) v.srcObject = stream || null;
         v.__hangoutFace = face;
-        if (id !== 'me' && stream && (v.paused || lateFace)) playRemoteFace(v);
+        if (id !== 'me' && stream && (v.paused || lateFace)) void playRemoteFace(v);
         const isCanvas = id === 'me' ? app.av.canvas : app.av.canvasPeers.has(id);
         const isScreen = id === 'me' ? Boolean(app.av.screen) : app.av.screenPeers.has(id);
         const camOn = id === 'me' ? app.av.cam : app.av.camPeers.has(id);
@@ -2884,9 +2875,9 @@
             video: app.av.rawCam || localCapture('video')
         });
         // Everything that needs the tap starts here, before the first await.
+        const playJob = gesture ? resumeRemotePlayback(true) : null;
         const camJob = plan.video ? restartCam(gesture) : null;
         const micPrimed = plan.audio && app.av.mic ? primeMic() : null;
-        const playJob = gesture ? resumeRemotePlayback() : null;
         const busyCam = camJob && (await camJob) === 'busy';
         let busyMic = false;
         if (micPrimed) {
@@ -2916,15 +2907,15 @@
         if (!busyCam && !busyMic && (avResumeWhy.video || avResumeWhy.audio)) say('Tap “Tap to resume video” to bring your camera and mic back.');
         layout();
     }
-    async function resumeRemotePlayback() {
-        const videos = [...ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video')];
-        let blocked = false;
-        await Promise.all(videos.map(async (video) => {
-            if (!video.paused || !video.srcObject) return;
-            try { await video.play(); }
-            catch (error) { blocked = true; }
+    async function resumeRemotePlayback(gesture = false) {
+        if (gesture) {
+            ensureAudioCtx();
+            if (app.av.ac && app.av.ac.state === 'suspended') app.av.ac.resume().catch(() => {});
+        }
+        await Promise.all([...remoteFaceVideos()].map((video) => {
+            if (gesture) video.muted = false;
+            if (gesture || video.paused) return playRemoteFace(video, gesture);
         }));
-        showAvResume(blocked);
     }
     async function setMusic(on) {
         app.av.music = Boolean(on);
