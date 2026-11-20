@@ -139,7 +139,14 @@ async function preparePhone(context, role, bandOrigin, community, lab) {
     });
     await context.route('**/*', async route => {
         const url = new URL(route.request().url());
-        if (url.href === release && route.request().isNavigationRequest()) return route.fulfill({ status: 204 });
+        if (url.href === release && route.request().isNavigationRequest()) {
+            // A release page is a navigation. A 204 leaves the previous page loaded.
+            return route.fulfill({
+                status: 200,
+                contentType: 'text/html',
+                body: '<!doctype html><title>WebJam release</title>',
+            });
+        }
         if (url.hostname === 'www.youtube.com' && url.pathname === '/iframe_api') return route.fulfill({
             path: path.join(__dirname, 'support/fake-youtube.js'), contentType: 'text/javascript',
         });
@@ -282,6 +289,7 @@ test('Stalemate to WebJam Music and Art to a private two-phone Hangout and leave
                 link.click(),
             ]);
             expect(navigation.method()).toBe('GET');
+            await expect(host).toHaveURL(release);
             await chooseNativeMusicAndArt();
         });
         await test.step('Redeem the private invite separately and exchange chat', async () => {
