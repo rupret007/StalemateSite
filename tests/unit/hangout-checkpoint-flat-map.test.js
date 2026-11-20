@@ -72,6 +72,19 @@ it('preserves exact byte/node limits independently of flat private storage size'
     }
 });
 
+it('matches baseline UTF-8 charges and clock calls for repeated keys and values that start with a surrogate pair', () => {
+    function capture(make) {
+        const timer = vi.spyOn(performance, 'now').mockReturnValue(0);
+        const first = { '🎸room': '🎸member', '': '' };
+        const graph = [first, { ...first }, { ...first }];
+        const { metrics } = make(graph);
+        const clockCalls = timer.mock.calls.length;
+        vi.restoreAllMocks();
+        return { metrics, clockCalls };
+    }
+    expect(capture(candidate)).toEqual(capture(baseline));
+});
+
 it('restores distinct nested Maps shared as keys and values across another Map and Set', () => {
     for (const make of [baseline, candidate]) {
         vi.spyOn(performance, 'now').mockReturnValue(0);

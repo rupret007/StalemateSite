@@ -45,15 +45,17 @@ export function createParticipationCheckpoint(roots, options = {}) {
     }
     // Property names and short values such as room member IDs repeat in the
     // graph. Capture-local caches still charge each occurrence in full and
-    // perform the same clock check as scanning a short string.
+    // preserve the existing clock checks for keys and values.
     const keySizes = new Map();
     const valueSizes = new Map();
     function shortStringSize(value, sizes) {
-        if (!value.length || value.length > 64) return stringSize(value);
+        if (value.length > 64 || !value.length && sizes === valueSizes) return stringSize(value);
         const cached = sizes.get(value);
         if (cached !== undefined) {
             if (cached > limits.maxBytes - bytes) exceeded();
-            timeCheck();
+            // Cached keys always check the clock. A fresh value scan advances
+            // past a leading surrogate pair before its first possible check.
+            if (sizes === keySizes || value.codePointAt(0) < 0x10000) timeCheck();
             return cached;
         }
         const size = stringSize(value);
