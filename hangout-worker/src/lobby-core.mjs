@@ -423,6 +423,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             }
         } finally {
             controlled = null; participationBusy = false; pendingCommits -= 1;
+            // Publish settlement synchronously before any waiter can resume.
             controlledSettlement = null;
             settle();
         }
@@ -1291,6 +1292,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         if (page || ['check', 'native-check', 'host-check'].includes(op)) {
             try {
                 await authorize(() => true);
+                while (controlledSettlement) await controlledSettlement;
                 if (!current()) throw Error('participation-denied');
                 if (isHost && !page) recordMusicHostActivity(lease);
                 return musicResponse(200, { expires: target.expires });
@@ -1328,6 +1330,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
             if (role === 'guest' && (await controlledRun(enterProtectedMusic, [guest.id, offer, lease], true))?.ok !== true)
                 throw Error('music-room-admission-failed');
             await authorize(() => true);
+            while (controlledSettlement) await controlledSettlement;
             if (!current() || attempt.phase !== 'issuing') throw Error('music-issuance-ended');
             attempt.phase = 'issued';
             if (isHost) recordMusicHostActivity(lease);
