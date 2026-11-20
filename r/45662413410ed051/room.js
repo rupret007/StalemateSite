@@ -696,6 +696,8 @@
 
     function endSession(reason) {
         app.ended = true; app.connected = false;
+        const drawingWasOpen = paintDrawing.open;
+        if (drawingWasOpen) paintDrawing.close();
         cancelRecovery();
         for (const job of snapshotJobs.values()) clearTimeout(job.timer);
         snapshotJobs.clear();
@@ -725,6 +727,7 @@
         ui.room.hidden = true; ui.gate.hidden = false; ui.enter.disabled = true;
         syncSharedLayout();
         setGate(reason); say(reason);
+        if (drawingWasOpen) ui.gateStatus.focus();
     }
 
     async function onRelay(raw, ws, work) {

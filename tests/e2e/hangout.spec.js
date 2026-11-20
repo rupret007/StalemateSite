@@ -1042,6 +1042,16 @@ test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and
     await guest.click('[data-bob-rewind]');
     await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(95);
     await expect.poll(() => host.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(95);
+
+    await guest.locator('[data-more]').click();
+    await guest.getByRole('button', { name: 'Draw on the shared canvas', exact: true }).click();
+    const drawing = guest.getByRole('dialog', { name: 'Draw on the shared canvas', exact: true });
+    await expect(drawing).toBeVisible();
+    await guest.evaluate(() => window.__hangout.ws.close(4401));
+    await expect(drawing).toBeHidden();
+    const terminalStatus = guest.locator('[data-gate-status]');
+    await expect(terminalStatus).toContainText('Your private invitation or sign-in expired');
+    await expect(terminalStatus).toBeFocused();
 });
 
 test('both participants see a live remote tile in Hang Out and Paint Along phone layout stays separated', async ({ browser }) => {
