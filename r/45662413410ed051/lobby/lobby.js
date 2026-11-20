@@ -4167,9 +4167,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     $('[data-jam-help]').addEventListener('toggle', (e) => {
         const help = e.currentTarget, panel = $('[data-jam]');
         if (!help.open || panel.hidden || !currentJam()) return;
-        // Reveal the first steps immediately, including while a toast uses
-        // workspace height. Keep native keyboard focus on the summary.
-        panel.scrollTop += help.getBoundingClientRect().top - panel.getBoundingClientRect().top - 8;
+        // Keep the focused disclosure at the top of the scrollport so a
+        // short workspace still shows the instructions directly below it.
+        const summary = help.querySelector('summary');
+        panel.scrollTop += summary.getBoundingClientRect().top - panel.getBoundingClientRect().top - panel.clientTop;
     });
     $('[data-jam-form]').addEventListener('submit', (e) => {
         e.preventDefault();
