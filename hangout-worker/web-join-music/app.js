@@ -453,9 +453,11 @@ async function startJoin(listenOnly = false) {
     if (!isCurrent() || expireUnusedInvite()) return;
     let grantedCredentials;
     if (musicGrant) {
-      const { musicSignal } = await import("./request-signal.js");
+      const signals = [attempt.signal, AbortSignal.timeout(12000)];
+      const signal = typeof AbortSignal.any === "function" ? AbortSignal.any(signals)
+        : (await import("./request-signal.js")).musicSignal(...signals);
       if (!isCurrent() || expireUnusedInvite()) return;
-      const result = await musicRequest("join", musicSignal(attempt.signal, AbortSignal.timeout(12000)));
+      const result = await musicRequest("join", signal);
       if (!isCurrent() || expireUnusedInvite()) return;
       const href = new URL(result.href);
       if (href.origin !== location.origin || href.pathname !== "/join/" || href.search || href.username || href.password)
