@@ -1,13 +1,12 @@
 // @vitest-environment node
 // The 🎲 name generator: thousands of combos, all family-friendly, every one passes the server nick filter.
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { checkNick } from '../../hangout-worker/src/filter.mjs';
 
 import { productFile } from '../support/product-room.cjs';
-const src = readFileSync(fileURLToPath(productFile('names.js')), 'utf8');
+const src = readFileSync(productFile('names.js'), 'utf8');
 const ctx = {};
 vm.runInNewContext(src, ctx);
 const { roll, all, LEGENDARY } = ctx.StaleNames;
