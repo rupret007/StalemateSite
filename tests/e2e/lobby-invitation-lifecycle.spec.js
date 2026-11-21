@@ -4,7 +4,7 @@ const { test, expect } = require('@playwright/test');
 const { readFile } = require('node:fs/promises');
 const { join: joinPath } = require('node:path');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
-const { TEST_SLUG } = require('./support/lobby-fixture');
+const { TEST_SLUG, productRoomPath } = require('./support/lobby-fixture');
 
 const FIRST = 'webjam://join?v=3&r=fixture&i=first_synthetic_capability';
 const SECOND = 'webjam://join?v=3&r=fixture&i=second_synthetic_capability';
@@ -545,6 +545,7 @@ for (const { viewport, submitFromNickname } of [
         const origin = new URL(baseURL).origin;
         const guestPath = '/beta/game-night/guest';
         const lobbyPath = `/r/${TEST_SLUG}/lobby/`;
+        const productLobbyPath = productRoomPath('lobby/');
         const tableId = '11111111-1111-4111-8111-111111111111';
         const reason = 'That nickname is taken. Choose another.';
         const requestBodies = [];
@@ -554,7 +555,7 @@ for (const { viewport, submitFromNickname } of [
             LOBBY: {}, ROOMS: {}, QUOTA: {}, BETA_SESSIONS: {},
             ASSETS: { async fetch(request) {
                 const asset = new URL(request.url).pathname;
-                expect(['game-night-guest.js', 'game-night.mjs', 'game-night-audio.mjs'].map(name => lobbyPath + name)).toContain(asset);
+                expect(['game-night-guest.js', 'game-night.mjs', 'game-night-audio.mjs'].map(name => productRoomPath('lobby/') + name)).toContain(asset);
                 return new Response(await readFile(joinPath(__dirname, '../..', asset)));
             } }
         };
@@ -562,7 +563,7 @@ for (const { viewport, submitFromNickname } of [
         const context = await browser.newContext({ viewport, isMobile, hasTouch: isMobile });
         try {
             await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.fallback() : route.abort());
-            const guestAssets = [guestPath, guestPath + '.js', '/beta/style.css', lobbyPath + 'game-night.mjs', lobbyPath + 'game-night-audio.mjs'];
+            const guestAssets = [guestPath, guestPath + '.js', '/beta/style.css', lobbyPath + 'game-night.mjs', lobbyPath + 'game-night-audio.mjs', productLobbyPath + 'game-night.mjs', productLobbyPath + 'game-night-audio.mjs'];
             await context.route(url => guestAssets.includes(url.pathname), async route => {
                 const response = await betaFetch(new Request(route.request().url()), env);
                 await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
@@ -576,9 +577,9 @@ for (const { viewport, submitFromNickname } of [
                 requestBodies.push(route.request().postDataJSON());
                 return requestBodies.length === 1
                     ? route.fulfill({ status: 422, json: { error: reason } })
-                    : route.fulfill({ json: { next: lobbyPath + '?game-guest=1', tableId } });
+                    : route.fulfill({ json: { next: productLobbyPath + '?game-guest=1', tableId } });
             });
-            await context.route(url => url.pathname === lobbyPath && url.searchParams.has('game-guest'),
+            await context.route(url => url.pathname === productLobbyPath && url.searchParams.has('game-guest'),
                 route => route.fulfill({ body: 'Synthetic seat destination' }));
             const page = await context.newPage();
             await page.addInitScript(() => {
@@ -610,7 +611,7 @@ for (const { viewport, submitFromNickname } of [
                 await expect(join).toBeFocused();
             }
             await page.keyboard.press('Enter');
-            await expect(page).toHaveURL(origin + lobbyPath + '?game-guest=1&table=' + tableId);
+            await expect(page).toHaveURL(origin + productLobbyPath + '?game-guest=1&table=' + tableId);
             expect(requestBodies).toHaveLength(2);
             expect(requestBodies[0]).toMatchObject({ nick: 'TakenName', age13: true, attempt: 'fixture-attempt' });
             expect(requestBodies[1]).toEqual({ ...requestBodies[0], nick: 'AvailableName' });
@@ -624,14 +625,15 @@ const gameGuestPath = '/beta/game-night/guest';
 const gameLobbyPath = `/r/${TEST_SLUG}/lobby/`;
 async function gameNightEntryFixture(context, origin) {
     const { betaFetch } = await import('../../hangout-worker/src/beta-entry.mjs');
-    const sharedAssets = ['game-night.mjs', 'game-night-audio.mjs'].map(name => gameLobbyPath + name);
+    const productLobbyPath = productRoomPath('lobby/');
+    const sharedAssets = ['game-night.mjs', 'game-night-audio.mjs'].map(name => productLobbyPath + name);
     const env = {
         HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1',
         HANGOUT_HMAC_KEY: 'h'.repeat(40), HANGOUT_BETA_INVITE_KEY: 'i'.repeat(40), HANGOUT_PREVIEW_KEY: 'p'.repeat(40),
         LOBBY: {}, ROOMS: {}, QUOTA: {}, BETA_SESSIONS: {},
         ASSETS: { async fetch(request) {
             const asset = new URL(request.url).pathname;
-            expect([gameLobbyPath + 'game-night-guest.js', ...sharedAssets]).toContain(asset);
+            expect([productLobbyPath + 'game-night-guest.js', ...sharedAssets]).toContain(asset);
             return new Response(await readFile(joinPath(__dirname, '../..', asset)));
         } }
     };
