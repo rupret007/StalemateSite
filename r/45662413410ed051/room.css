@@ -503,7 +503,7 @@ body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .callbar [data-rea
     body.is-host:not(.bob-mode):not(.shared-layout) [data-room-workspace] > .call > .host-call{display:flex}
     body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .callbar{justify-content:flex-start}
     body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .callbar [data-room-chat-open]{
-        padding-inline:6px;min-width:44px;font-size:.8rem;
+        padding-inline:6px;min-width:48px;font-size:.8rem;
     }
     /* Only the primary call buttons need condensed labels to stay in view. */
     body:not(.bob-mode):not(.shared-layout) [data-room-workspace] .callbar .btn[data-ico]:is([data-mic],[data-cam],[data-hangup]){
