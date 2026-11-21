@@ -1,0 +1,81 @@
+{
+  "at": "2026-11-07T13:56:15.630587+00:00",
+  "websiteSource": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "websiteVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "scope": "Current hosted entrance/privacy/accessibility/report-submission evidence and re-read existing packaged MP3 CI. No physical capture, human moderation, live Shared Track, Webex, second-network or full accessibility qualification.",
+  "payloads": {
+    "hosted-three-entrances-current-nov07.json": {
+      "sha256": "ecfb097d9ca20ce0501595a4ab762de42fd6b423ca4c58347d2e1efaf4f7915e",
+      "sourceFile": "hosted-three-entrances-current-nov07.json",
+      "transform": "exact bytes"
+    },
+    "hosted-three-entrances-final-readback-nov07.json": {
+      "sha256": "577abd28100c3815d00ef3be540ccff799dc2edac63cf207c738c505a0b824f8",
+      "sourceFile": "hosted-three-entrances-final-readback-nov07.json",
+      "transform": "exact bytes"
+    },
+    "hosted-axe-current-nov07.json": {
+      "sha256": "5fa0cf257ae16d8babac10cbb982f0f74e7564f6451c569d2c01132843db1baa",
+      "sourceFile": "hosted-axe-current-nov07.json",
+      "transform": "exact bytes"
+    },
+    "hosted-axe-final-readback-nov07.json": {
+      "sha256": "28968a031beb1ba3c513cdefe83cb0cd22c6a4b16209bc50ff8801821651b4a7",
+      "sourceFile": "hosted-axe-final-readback-nov07.json",
+      "transform": "exact bytes"
+    },
+    "hosted-axe-focused-source-review-nov07.json": {
+      "sha256": "ee2700ca980d077ca6f29e8bcee66176b73f90a26b18750e0197428bfd7dc1a2",
+      "sourceFile": "hosted-axe-focused-source-review-nov07.json",
+      "transform": "exact bytes"
+    },
+    "axe-core-official-metadata-nov07.json": {
+      "sha256": "0d20a7c09f11087eebc84554c1ff851fb5b9a69953721c75b4877c63f5ac49ad",
+      "sourceFile": "axe-core-official-metadata-nov07.json",
+      "transform": "exact bytes"
+    },
+    "axe-core-isolated-preparation-nov07.json": {
+      "sha256": "6bc56e976e3d566b43bbf211a2cc2fe1307b8c46e2dde18c771cc29adffa422d",
+      "sourceFile": "axe-core-isolated-preparation-nov07.json",
+      "transform": "exact bytes"
+    },
+    "hosted-axe-first-formatting-stop-nov07.json": {
+      "sha256": "7afd940c0e22d31f8cde98178669158e9c702ad7a2d099ac654b438c677df66a",
+      "sourceFile": "hosted-axe-first-formatting-stop-nov07.json",
+      "transform": "exact bytes"
+    },
+    "packaged-mp3-existing-ci-reviewed-nov07.json": {
+      "sha256": "cf463e2ad79037b59eb04866ef9ab072513ac4ec8efc9aa05bab2a372af76fcd",
+      "sourceFile": "packaged-mp3-existing-ci-reviewed-nov07.json",
+      "transform": "exact bytes"
+    },
+    "packaged-mp3-source-review-nov07.json": {
+      "sha256": "396cfb130026e230762e3f8b132e6b81935149ed7075dd705845cbd7fc9364fd",
+      "sourceFile": "packaged-mp3-source-review-nov07.json",
+      "transform": "exact bytes"
+    },
+    "public-return-destination-readback-nov07.json": {
+      "sha256": "0485933beb36d5e55bba11e874614ec186401d41232f0d30a1ed05bf2b21af87",
+      "sourceFile": "public-return-destination-readback-nov07.json",
+      "transform": "exact bytes"
+    },
+    "hosted-moderation-submission-current-nov07.json": {
+      "sha256": "1c4dde5d5651406a4e210c85f1c5c8284046d8ed083345a82cd0ac521539e406",
+      "originalSourceSha256": "ef21e081221016bb062bc36a6196efe1ce2156e970a14d932b51db40d58ac886",
+      "sourceFile": "hosted-moderation-submission-current-nov07.json",
+      "transform": "unique synthetic report text/lookup marker omitted; declared public excerpt; owner-only original retained"
+    },
+    "hosted-moderation-submission-final-readback-nov07.json": {
+      "sha256": "110bd1fbf4519c2633250333f8ce44a304d29c8f941e9565a45b39f56062710d",
+      "originalSourceSha256": "c2c5af1754a865e2085f9c6c825fa3ba59856383f5c4a86f8e67a878016319b5",
+      "sourceFile": "hosted-moderation-submission-final-readback-nov07.json",
+      "transform": "unique synthetic report text/lookup marker omitted; declared public excerpt; owner-only original retained"
+    }
+  },
+  "privateReportCorrelationRetainedOwnerOnly": true,
+  "allOriginalPrivateReceiptsRetained": true,
+  "runtimeOrWorkflowOrSharedOpsChanged": false,
+  "privateValuesAndCredentialPatternsCheckedWithoutPrintingValues": true
+}

@@ -3,9 +3,15 @@
 // production activation, remote authority, key management or provider starts.
 export const DURABLE_RECORD_CEILINGS = Object.freeze({ chunkBytes: 65536, recordBytes: 16 * 1024 * 1024,
     transactionReadBytes: 32 * 1024 * 1024, transactionWriteBytes: 16 * 1024 * 1024, rowOperations: 4096, listPage: 4, nodes: 100000, depth: 64 });
-const enc = new TextEncoder(), dec = new TextDecoder('utf-8', { fatal: true });
+const enc = new TextEncoder(), dec = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const fail = reason => { throw Error(reason); };
-const digest = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(n => n.toString(16).padStart(2, '0')).join('');
+const hexBytes = Array.from({ length: 256 }, (_, byte) => byte.toString(16).padStart(2, '0'));
+const webSha256 = async bytes => {
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+    let hex = '';
+    for (const byte of digest) hex += hexBytes[byte];
+    return hex;
+};
 const exact = (value, keys) => value && Object.getPrototypeOf(value) === Object.prototype
     && Reflect.ownKeys(value).length === keys.length && keys.every(key => {
         const d = Object.getOwnPropertyDescriptor(value, key); return d?.enumerable && Object.hasOwn(d, 'value');
@@ -45,9 +51,32 @@ function encode(value, limit) {
     return bytes;
 }
 
-export function createDurableRecordStorage({ storage, namespace, maxRecordBytes } = {}) {
+function decode(bytes, limit) {
+    const json = dec.decode(bytes), value = JSON.parse(json);
+    // JSON.parse has already produced a tree of own data properties. Check
+    // the same node and depth ceilings without taking a descriptor snapshot.
+    let nodes = 0;
+    function check(item, depth) {
+        if (++nodes > DURABLE_RECORD_CEILINGS.nodes || depth > DURABLE_RECORD_CEILINGS.depth) fail('record-capacity');
+        if (typeof item === 'number' && (!Number.isFinite(item) || Object.is(item, -0))) fail('record-format');
+        if (Array.isArray(item)) {
+            for (let i = 0; i < item.length; i += 1) check(item[i], depth + 1);
+        } else if (item && typeof item === 'object') {
+            for (const key of Object.keys(item)) check(item[key], depth + 1);
+        }
+    }
+    check(value, 0);
+    // Preserve canonical encoding even in the presence of inherited hooks.
+    const inheritedSerializer = Object.hasOwn(Object.prototype, 'toJSON') || Object.hasOwn(Array.prototype, 'toJSON');
+    const canonical = inheritedSerializer ? dec.decode(encode(value, limit)) : JSON.stringify(value);
+    if (canonical !== json) fail('storage-corrupt');
+    return value;
+}
+
+export function createDurableRecordStorage({ storage, namespace, maxRecordBytes, sha256 = webSha256 } = {}) {
     if (typeof storage?.transaction !== 'function' || typeof namespace !== 'string' || !/^[a-z][a-z0-9-]{1,47}$/.test(namespace)
-        || !Number.isSafeInteger(maxRecordBytes) || maxRecordBytes < 1 || maxRecordBytes > DURABLE_RECORD_CEILINGS.recordBytes)
+        || !Number.isSafeInteger(maxRecordBytes) || maxRecordBytes < 1 || maxRecordBytes > DURABLE_RECORD_CEILINGS.recordBytes
+        || typeof sha256 !== 'function')
         throw TypeError('Explicit transaction storage, namespace and record bound required');
     const prefix = `durable-record:v1:${namespace}:`;
     return Object.freeze({
@@ -65,7 +94,9 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                 const keyOk = key => typeof key === 'string' && /^[\x21-\x7e]{1,512}$/.test(key);
                 const route = key => {
                     if (!keyOk(key)) fail('record-key');
-                    return [...key].map(char => char.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+                    let hex = '';
+                    for (let i = 0; i < key.length; i += 1) hex += hexBytes[key.charCodeAt(i)];
+                    return hex;
                 };
                 const manifestKey = base => `${prefix}manifest:${base}`;
                 const partPrefix = base => `${prefix}part:${base}:`;
@@ -91,7 +122,10 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                     const bytes = new Uint8Array(meta.bytes);
                     for (let i = 0; i < meta.chunks; i += DURABLE_RECORD_CEILINGS.listPage) {
                         const count = Math.min(DURABLE_RECORD_CEILINGS.listPage, meta.chunks - i);
-                        const parts = await row('list', { prefix: partPrefix(base), limit: count, ...(i ? { startAfter: partKey(base, i - 1) } : {}) });
+                        // A partial final page can also prove no trailing part exists,
+                        // without exceeding the unchanged four-row page ceiling.
+                        const finalPartial = i + count === meta.chunks && count < DURABLE_RECORD_CEILINGS.listPage;
+                        const parts = await row('list', { prefix: partPrefix(base), limit: count + (finalPartial ? 1 : 0), ...(i ? { startAfter: partKey(base, i - 1) } : {}) });
                         if (!(parts instanceof Map) || parts.size !== count) fail('storage-corrupt');
                         let index = i;
                         for (const [physical, part] of parts) {
@@ -101,14 +135,13 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                             bytes.set(part, offset); index += 1;
                         }
                     }
-                    const extra = await row('list', { prefix: partPrefix(base), startAfter: partKey(base, meta.chunks - 1), limit: 1 });
-                    if (!(extra instanceof Map) || extra.size) fail('storage-corrupt');
-                    if (await digest(bytes) !== meta.sha256) fail('storage-corrupt');
-                    let value;
-                    try { value = JSON.parse(dec.decode(bytes)); } catch { fail('storage-corrupt'); }
-                    try { if (await digest(encode(value, maxRecordBytes)) !== meta.sha256) fail('storage-corrupt'); }
+                    if (meta.chunks % DURABLE_RECORD_CEILINGS.listPage === 0) {
+                        const extra = await row('list', { prefix: partPrefix(base), startAfter: partKey(base, meta.chunks - 1), limit: 1 });
+                        if (!(extra instanceof Map) || extra.size) fail('storage-corrupt');
+                    }
+                    if (await sha256(bytes) !== meta.sha256) fail('storage-corrupt');
+                    try { return decode(bytes, maxRecordBytes); }
                     catch { fail('storage-corrupt'); }
-                    return value;
                 };
                 const run = task => {
                     if (!active || failure || busy) {
@@ -132,11 +165,13 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                         const base = route(key), bytes = encode(value, maxRecordBytes);
                         writtenBytes += bytes.byteLength;
                         if (writtenBytes > DURABLE_RECORD_CEILINGS.transactionWriteBytes) fail('record-capacity');
-                        const old = await metadata(base), chunks = Math.ceil(bytes.byteLength / DURABLE_RECORD_CEILINGS.chunkBytes), sha256 = await digest(bytes);
+                        const old = await metadata(base), chunks = Math.ceil(bytes.byteLength / DURABLE_RECORD_CEILINGS.chunkBytes);
+                        const hash = await sha256(bytes);
+                        if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) fail('storage-unavailable');
                         if (old) await readRecord(key, old);
                         for (let i = 0; i < chunks; i += 1) await row('put', partKey(base, i), bytes.slice(i * DURABLE_RECORD_CEILINGS.chunkBytes, (i + 1) * DURABLE_RECORD_CEILINGS.chunkBytes));
                         for (let i = chunks; i < (old?.chunks || 0); i += 1) await row('delete', partKey(base, i));
-                        await row('put', manifestKey(base), { v: 1, bytes: bytes.byteLength, chunks, sha256 });
+                        await row('put', manifestKey(base), { v: 1, bytes: bytes.byteLength, chunks, sha256: hash });
                     }),
                     delete: key => run(async () => {
                         const base = route(key), old = await metadata(base);
@@ -165,7 +200,10 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                             if (typeof physical !== 'string' || !physical.startsWith(physicalPrefix)) fail('storage-corrupt');
                             const hex = physical.slice(physicalPrefix.length);
                             if (!/^(?:[0-9a-f]{2}){1,512}$/.test(hex)) fail('storage-corrupt');
-                            const key = String.fromCharCode(...hex.match(/../g).map(n => parseInt(n, 16)));
+                            let key = '';
+                            for (let i = 0; i < hex.length; i += 2) {
+                                key += String.fromCharCode(Number.parseInt(hex.slice(i, i + 2), 16));
+                            }
                             if (!keyOk(key) || !key.startsWith(logicalPrefix) || key <= previous) fail('storage-corrupt');
                             const value = await readRecord(key); if (value === undefined) fail('storage-corrupt');
                             result.set(key, value); previous = key;

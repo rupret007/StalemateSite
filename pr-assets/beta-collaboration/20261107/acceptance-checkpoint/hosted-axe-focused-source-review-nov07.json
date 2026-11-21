@@ -1,0 +1,106 @@
+{
+  "at": "2026-11-07T13:38:49.505780+00:00",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "currentCssSha256": "6a158948c849993bb4dd56ffa56c87b1cbc00c923f50ac1522132047984680f5",
+  "scope": "Source-based focused review of axe incomplete items; not full WCAG, screenshot pixel, hardware or speech-input qualification",
+  "contrastChecks": [
+    {
+      "case": "gate muted on unmarked background",
+      "foreground": "#a1aaa2",
+      "backgroundRgb": [
+        0.050980392156862744,
+        0.06274509803921569,
+        0.06666666666666667
+      ],
+      "contrastRatio": 7.993123943557587,
+      "requiredForNormalText": 4.5,
+      "passesWithoutRoundingThreshold": true
+    },
+    {
+      "case": "gate muted on maximum dot coverage",
+      "foreground": "#a1aaa2",
+      "backgroundRgb": [
+        0.10196078431372549,
+        0.12156862745098039,
+        0.1150326797385621
+      ],
+      "contrastRatio": 6.984974430366825,
+      "requiredForNormalText": 4.5,
+      "passesWithoutRoundingThreshold": true
+    },
+    {
+      "case": "gate cream on maximum dot coverage",
+      "foreground": "#eeeeda",
+      "backgroundRgb": [
+        0.10196078431372549,
+        0.12156862745098039,
+        0.1150326797385621
+      ],
+      "contrastRatio": 14.211264568991593,
+      "requiredForNormalText": 4.5,
+      "passesWithoutRoundingThreshold": true
+    },
+    {
+      "case": "gate lime on maximum dot coverage",
+      "foreground": "#d1fa78",
+      "backgroundRgb": [
+        0.10196078431372549,
+        0.12156862745098039,
+        0.1150326797385621
+      ],
+      "contrastRatio": 14.035495321995006,
+      "requiredForNormalText": 4.5,
+      "passesWithoutRoundingThreshold": true
+    },
+    {
+      "case": "window chrome muted",
+      "foreground": "#a1aaa2",
+      "backgroundRgb": [
+        0.10196078431372549,
+        0.12941176470588237,
+        0.10588235294117647
+      ],
+      "contrastRatio": 6.879425280276997,
+      "requiredForNormalText": 4.5,
+      "passesWithoutRoundingThreshold": true
+    },
+    {
+      "case": "starter text on welcome panel",
+      "foreground": "#c4d8ac",
+      "backgroundRgb": [
+        0.09019607843137255,
+        0.11764705882352941,
+        0.08235294117647059
+      ],
+      "contrastRatio": 11.164274520930867,
+      "requiredForNormalText": 4.5,
+      "passesWithoutRoundingThreshold": true
+    },
+    {
+      "case": "starter text on hovered panel",
+      "foreground": "#c4d8ac",
+      "backgroundRgb": [
+        0.16862745098039217,
+        0.2235294117647059,
+        0.12941176470588237
+      ],
+      "contrastRatio": 8.050158842448777,
+      "requiredForNormalText": 4.5,
+      "passesWithoutRoundingThreshold": true
+    }
+  ],
+  "gradientModel": "Maximum 0x55 alpha dot coverage over --ink; unmarked background separately checked. CSS foreground/background colors, not anti-aliased pixels.",
+  "symbolicCommandsButton": {
+    "visibleSymbol": "/",
+    "accessibleName": "Commands",
+    "interpretation": "Symbol represents the Commands action; W3C SC2.5.3 symbolic-character guidance calls for the function name, rather than the symbolic character. Actual speech-control/assistive-technology behavior remains untested."
+  },
+  "decorativeArtSymbols": "aria-hidden icons accompany visible text labels in the source; not all raster/emoji pixel colors are qualified by this color calculation",
+  "remaining": "Inspect clipped/overlapping elements visually and with assistive technology; retain original axe incomplete results. No blanket accessibility claim.",
+  "primarySources": [
+    "https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html",
+    "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html"
+  ],
+  "applicationChanged": false,
+  "newBrowserOrGuest": false
+}

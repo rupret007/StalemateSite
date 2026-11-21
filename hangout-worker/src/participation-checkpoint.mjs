@@ -4,7 +4,8 @@ const CEILINGS = Object.freeze({ maxBytes: 8 * 1024 * 1024, maxNodes: 100000, ma
 const OPAQUE_MAX = 4096;
 const unsupported = () => { throw new Error('Unsupported participation checkpoint graph'); };
 const exceeded = () => { throw new Error('Participation checkpoint limit exceeded'); };
-const clock = () => globalThis.performance.now();
+const timer = globalThis.performance;
+const clock = () => timer.now();
 const dataDescriptor = descriptor => descriptor && Object.hasOwn(descriptor, 'value');
 const mapSize = Object.getOwnPropertyDescriptor(Map.prototype, 'size').get;
 const setSize = Object.getOwnPropertyDescriptor(Set.prototype, 'size').get;
@@ -18,7 +19,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
         || !Number.isFinite(limits.maxMs) || limits.maxMs <= 0 || limits.maxMs > CEILINGS.maxMs)
         throw new Error('Invalid participation checkpoint limits');
     if (!roots || typeof roots !== 'object') unsupported();
-    const started = clock(), seen = new WeakMap(), records = [], pending = [];
+    const started = clock(), seen = new WeakSet(), records = [], pending = [];
     const opaque = new WeakSet();
     let bytes = 0, nodes = 0, entries = 0, opaqueObjects = 0;
     function timeCheck(start = started) { if (clock() - start > limits.maxMs) exceeded(); }
@@ -40,6 +41,25 @@ export function createParticipationCheckpoint(roots, options = {}) {
             if (size > available) exceeded();
             if ((i & 255) === 0) timeCheck(start);
         }
+        return size;
+    }
+    // Property names and short values such as room member IDs repeat in the
+    // graph. Capture-local caches still charge each occurrence in full and
+    // preserve the existing clock checks for keys and values.
+    const keySizes = new Map();
+    const valueSizes = new Map();
+    function shortStringSize(value, sizes) {
+        if (value.length > 64 || !value.length && sizes === valueSizes) return stringSize(value);
+        const cached = sizes.get(value);
+        if (cached !== undefined) {
+            if (cached > limits.maxBytes - bytes) exceeded();
+            // Cached keys always check the clock. A fresh value scan advances
+            // past a leading surrogate pair before its first possible check.
+            if (sizes === keySizes || value.codePointAt(0) < 0x10000) timeCheck();
+            return cached;
+        }
+        const size = stringSize(value);
+        if (sizes.size < (sizes === keySizes ? 256 : 4096)) sizes.set(value, size);
         return size;
     }
     // Only trusted callers may omit objects whose internals this particular
@@ -74,12 +94,12 @@ export function createParticipationCheckpoint(roots, options = {}) {
     }
     function visit(value) {
         if (value === null || value === undefined || typeof value === 'boolean' || typeof value === 'number') { charge(8); return; }
-        if (typeof value === 'string') { charge(16 + stringSize(value)); return; }
+        if (typeof value === 'string') { charge(16 + shortStringSize(value, valueSizes)); return; }
         if (typeof value !== 'object') unsupported();
         charge(8);
         if (seen.has(value)) return;
         if (opaque.has(value)) {
-            seen.set(value, null); charge(32, 1); opaqueObjects += 1; return;
+            seen.add(value); charge(32, 1); opaqueObjects += 1; return;
         }
         const prototype = Object.getPrototypeOf(value);
         const kind = prototype === Map.prototype ? 'map' : prototype === Set.prototype ? 'set'
@@ -88,8 +108,8 @@ export function createParticipationCheckpoint(roots, options = {}) {
         if (!kind) unsupported();
         if (kind === 'array' && value.length > limits.maxNodes) exceeded();
         charge(64, 1);
-        const record = { value, prototype, kind, extensible: Object.isExtensible(value), properties: [], contents: [] };
-        seen.set(value, record); records.push(record); pending.push(record);
+        const record = { value, prototype, kind, extensible: Object.isExtensible(value), properties: [], contents: kind === 'map' || kind === 'set' ? [] : null };
+        seen.add(value); records.push(record); pending.push(record);
     }
     visit(roots);
     while (pending.length) {
@@ -100,15 +120,18 @@ export function createParticipationCheckpoint(roots, options = {}) {
             if (typeof key !== 'string') unsupported();
             const descriptor = Object.getOwnPropertyDescriptor(item.value, key);
             if (!dataDescriptor(descriptor)) unsupported();
-            charge(48 + stringSize(key), 1); entries += 1;
-            item.properties.push([key, { ...descriptor }]);
+            charge(48 + shortStringSize(key, keySizes), 1); entries += 1;
+            // getOwnPropertyDescriptor already returned a fresh private record.
+            // Keep it directly rather than allocate an identical second record.
+            // Flat private pairs avoid a separate allocation for every property.
+            item.properties.push(key, descriptor);
             visit(descriptor.value);
         }
         if (item.kind === 'map') {
             if (mapSize.call(item.value) > limits.maxNodes - nodes) exceeded();
             for (const [key, value] of Map.prototype.entries.call(item.value)) {
                 charge(32, 1); entries += 1; visit(key); visit(value);
-                item.contents.push([key, value]);
+                item.contents.push(key, value);
             }
         } else if (item.kind === 'set') {
             if (setSize.call(item.value) > limits.maxNodes - nodes) exceeded();
@@ -139,7 +162,8 @@ export function createParticipationCheckpoint(roots, options = {}) {
                 if (item.kind === 'map') inspected += mapSize.call(item.value);
                 if (item.kind === 'set') inspected += setSize.call(item.value);
                 if (inspected > limits.maxNodes) exceeded();
-                const wanted = new Map(item.properties), remove = [];
+                const wanted = new Map(), remove = [];
+                for (let i = 0; i < item.properties.length; i += 2) wanted.set(item.properties[i], item.properties[i + 1]);
                 for (const key of keys) {
                     timeCheck(restoreStarted);
                     if (typeof key !== 'string') unsupported();
@@ -155,7 +179,7 @@ export function createParticipationCheckpoint(roots, options = {}) {
                     if (!current.configurable && (desired.configurable || desired.enumerable !== current.enumerable
                         || !dataDescriptor(current) || !current.writable && (desired.writable || !Object.is(current.value, desired.value)))) unsupported();
                 }
-                if (!item.extensible && item.properties.some(([key]) => !Object.hasOwn(item.value, key))) unsupported();
+                if (!item.extensible && item.properties.some((key, index) => index % 2 === 0 && !Object.hasOwn(item.value, key))) unsupported();
                 plans.push({ item, remove });
             }
             timeCheck(restoreStarted);
@@ -163,11 +187,14 @@ export function createParticipationCheckpoint(roots, options = {}) {
                 if (Object.getPrototypeOf(item.value) !== item.prototype) Object.setPrototypeOf(item.value, item.prototype);
                 for (const key of remove) if (!Reflect.deleteProperty(item.value, key)) unsupported();
                 // Array length comes last, after original indices/extra entries.
-                for (const [key, descriptor] of item.properties) if (item.kind !== 'array' || key !== 'length') Object.defineProperty(item.value, key, descriptor);
-                if (item.kind === 'array') Object.defineProperty(item.value, 'length', item.properties.find(([key]) => key === 'length')[1]);
+                for (let i = 0; i < item.properties.length; i += 2) {
+                    const key = item.properties[i], descriptor = item.properties[i + 1];
+                    if (item.kind !== 'array' || key !== 'length') Object.defineProperty(item.value, key, descriptor);
+                }
+                if (item.kind === 'array') Object.defineProperty(item.value, 'length', item.properties[item.properties.indexOf('length') + 1]);
                 if (item.kind === 'map') {
                     Map.prototype.clear.call(item.value);
-                    for (const [key, value] of item.contents) Map.prototype.set.call(item.value, key, value);
+                    for (let i = 0; i < item.contents.length; i += 2) Map.prototype.set.call(item.value, item.contents[i], item.contents[i + 1]);
                 } else if (item.kind === 'set') {
                     Set.prototype.clear.call(item.value);
                     for (const value of item.contents) Set.prototype.add.call(item.value, value);

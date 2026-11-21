@@ -1,0 +1,146 @@
+import { gameNightPassRecord, readGameNightPass, validGameNightPassHash, validGameNightTableId } from './game-night-pass.mjs';
+import { GAME_INVITE_UNAVAILABLE, gameNightInvite, gameNightLabels, gameNightRoomName, webJamRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { DEMO_INVITE_TTL } from './beta-auth.mjs';
+import { arcadeRoomRequest } from './game-night-sockets.mjs';
+
+export const GAME_GUEST_PATH = '/beta/game-night/guest';
+export const GAME_INVITATION_PATH = '/beta/game-night/invitation';
+const STORAGE_PREFIX = 'game-night-invitation:';
+const CLAIM_TTL = 60_000;
+const LINK_CAP = 100;
+const LINK_CAP_PER_HOST = 8;
+const codePattern = /^[a-f0-9]{32}$/;
+const sidPattern = /^[a-z0-9-]{16,64}$/;
+const randomCode = () => crypto.randomUUID().replaceAll('-', '');
+const digest = async value => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))),
+    byte => byte.toString(16).padStart(2, '0')).join('');
+export const gameGuestSessionRef = sid => digest('game-guest-session:' + sid);
+const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+export { GAME_INVITE_UNAVAILABLE };
+const unavailable = () => reply({ error: GAME_INVITE_UNAVAILABLE }, 410);
+
+function invitationTableId(table, scope) {
+    return scope.watch ? table.watchTableId(scope) : table.guestTableId(scope, scope.match, scope.host);
+}
+
+export function gameGuestEnabled(env) {
+    return env.HANGOUT_BETA_MODE === 'protected' && env.HANGOUT_OPEN !== '0' && env.HANGOUT_GAME_NIGHT_GUESTS === '1';
+}
+
+export function gameGuestScope(value, allowWebJamChess = false) {
+    const game = gameNightInvite(value?.game, value?.match);
+    const validRoom = gameNightRoomName(value?.room) ||
+        (allowWebJamChess && game?.game === 'chess' && webJamRoomName(value?.room));
+    if (!game || !validRoom || !codePattern.test(value.ref || '') || !sidPattern.test(value.host || '')
+        || !Number.isInteger(value.nameSeed) || value.nameSeed < 0 || value.nameSeed > 0xffffffff) return null;
+    if (value.tableId !== undefined && !validGameNightTableId(value.tableId)) return null;
+    if (value.nick !== undefined && (typeof value.nick !== 'string' || !/^[A-Za-z][A-Za-z0-9_\-\[\]{}^`|]{2,19}$/.test(value.nick))) return null;
+    if (value.watch !== undefined && (value.watch !== true || game.game !== 'turdspades')) return null;
+    return { ...game, room: value.room, ref: value.ref, host: value.host, nameSeed: value.nameSeed,
+        ...(value.watch ? { watch: true } : {}),
+        ...(value.nick === undefined ? {} : { nick: value.nick }),
+        ...(value.tableId === undefined ? {} : { tableId: value.tableId }) };
+}
+
+// Called within the lobby's serialized event path. Only the Worker sends a trusted session for issuance.
+export async function gameInvitationRequest(lobby, operation, body, session) {
+    if (operation === 'release') {
+        const scope = gameGuestScope(body.scope, true);
+        if (!scope || !sidPattern.test(body.sid || '')) return reply({ ok: false }, 400);
+        if (!scope.watch) await lobby.arcade.get(scope.game).releaseGuestClaim(scope, body.sid);
+        return reply({ ok: true });
+    }
+    if (!gameGuestEnabled(lobby.env)) return reply({ error: 'Game invitations are unavailable.' }, 404);
+    const now = Date.now();
+    const storage = lobby.state.storage;
+    if (operation === 'resume') {
+        const record = await readGameNightPass(storage, body.tableId, body.pass);
+        const scope = gameGuestScope(record?.scope, lobby.env.HANGOUT_GAME_NIGHT_ROOM_GRANTS === '1');
+        if (!scope || scope.tableId !== body.tableId || !sidPattern.test(record.sid || '') || record.exp <= now ||
+            record.version !== String(lobby.env.HANGOUT_BETA_INVITE_VERSION || '1') || !lobby.arcadeAvailable(scope.game)) return unavailable();
+        const nightEndsAt = await lobby.arcade.get(scope.game).guestNightEndsAt(scope);
+        if (nightEndsAt <= now) return unavailable();
+        return reply({ scope, sid: record.sid, exp: record.exp });
+    }
+    if (operation === 'issue') {
+        const { actor, room, ref, game, match, watch } = body;
+        const scope = arcadeRoomRequest({ actor, room, ref });
+        const host = scope && lobby.arcadeBinding(scope);
+        const [nameSeed] = crypto.getRandomValues(new Uint32Array(1));
+        const guest = gameGuestScope({ room, ref, game, match, host: host?.betaSid, nameSeed, watch });
+        const issueError = watch === true ? 'Open a full four-player Spades table before inviting someone to watch.'
+            : 'Open a game table with an available seat before inviting a friend.';
+        if (!guest || !host.canOpen || !host.canPlay || host.gameGuest || session?.betaSid !== host.betaSid
+            || !await lobby.sessionActive(host) || !lobby.arcadeAvailable(game)) {
+            return reply({ error: issueError }, 403);
+        }
+        const tableId = await invitationTableId(lobby.arcade.get(game), guest);
+        if (!tableId) return reply({ error: issueError }, 403);
+        if (!await lobby.controlBudget.take(host.socket, actor)) return reply({ error: 'Game invitation allowance reached. Try again in a few minutes.' }, 429);
+        const rows = await storage.list({ prefix: STORAGE_PREFIX, limit: LINK_CAP });
+        const expired = [...rows].filter(([, record]) => record.until <= now).map(([key]) => key);
+        if (expired.length) await storage.delete(expired);
+        const hostCount = [...rows.values()].filter(record => record.until > now && record.scope.host === host.betaSid && !record.redeemer).length;
+        if (rows.size - expired.length >= LINK_CAP || hostCount >= LINK_CAP_PER_HOST) {
+            return reply({ error: 'Too many invitations are still on record. Share a current link for this game or try again later.' }, 429);
+        }
+        const demo = session.demo === true;
+        const accessUntil = demo ? session.exp : null;
+        if (demo && (!Number.isFinite(accessUntil) || accessUntil <= now)) return unavailable();
+        const code = randomCode();
+        const until = demo ? Math.min(now + DEMO_INVITE_TTL, accessUntil) : now + DEMO_INVITE_TTL;
+        await storage.put(STORAGE_PREFIX + await digest(code), { scope: { ...guest, tableId }, until, version: host.betaInviteVersion,
+            ...(demo ? { demo, accessUntil } : {}) });
+        return reply({ code, until });
+    }
+
+    if (!['details', 'accept'].includes(operation) || !codePattern.test(body.code || '')
+        || operation === 'accept' && (body.age13 !== true || !codePattern.test(body.attempt || '') ||
+            body.passHash !== undefined && !validGameNightPassHash(body.passHash))) {
+        return reply({ error: 'Open the original invitation and confirm the age and house rules to join.' }, 400);
+    }
+    const key = STORAGE_PREFIX + await digest(body.code);
+    const record = await storage.get(key);
+    if (!record || record.until <= now || record.version !== String(lobby.env.HANGOUT_BETA_INVITE_VERSION || '1')) return unavailable();
+    let scope = gameGuestScope(record.scope);
+    if (!scope) return unavailable();
+    const attempt = operation === 'accept' ? await digest(body.attempt) : null;
+    if (record.redeemer && record.redeemer !== attempt) return unavailable();
+    if (record.redeemer) {
+        if (record.exp <= now) return unavailable();
+        if (scope.watch && (!lobby.arcadeAvailable(scope.game) ||
+            await lobby.arcade.get(scope.game).guestNightEndsAt(scope) <= now)) return unavailable();
+        return reply({ scope, sid: record.sid, exp: record.exp });
+    }
+
+    const actor = lobby.engine.invitedGameHost(scope);
+    const binding = actor && lobby.arcadeBinding({ actor, room: scope.room, ref: scope.ref });
+    if (!binding?.canPlay || !await lobby.sessionActive(binding)) return unavailable();
+    const table = lobby.arcade.get(scope.game);
+    if (!table || !lobby.arcadeAvailable(scope.game)) return unavailable();
+    const tableId = await invitationTableId(table, scope);
+    if (!tableId || scope.tableId && scope.tableId !== tableId) return unavailable();
+    if (operation === 'details') {
+        return reply({ game: gameNightLabels[scope.game], host: binding.nick, inviteExpiresAt: record.until,
+            guestName: lobby.engine.gameGuestNick(scope.nameSeed).nick || '',
+            ...(scope.watch ? { watch: true } : {}) });
+    }
+    scope = { ...scope, tableId };
+    if (body.nick !== undefined) {
+        if (typeof body.nick !== 'string' || body.nick.length > 20) return reply({ error: 'Choose a nickname with 3 to 20 characters.' }, 422);
+        const name = lobby.engine.availableGameGuestNick(body.nick);
+        if (!name.ok) return reply({ error: name.reason }, 422);
+        scope.nick = name.nick;
+    }
+    const sid = crypto.randomUUID();
+    const nightEndsAt = await table.guestNightEndsAt(scope);
+    const exp = Math.min(nightEndsAt, record.accessUntil ?? (record.demo ? record.until : Infinity));
+    if (!Number.isFinite(exp) || exp <= now) return unavailable();
+    const accepted = { ...record, scope, sid, exp, redeemer: attempt };
+    if (scope.watch) {
+        await storage.put({ [key]: accepted, ...gameNightPassRecord(accepted, body.passHash, record.version) });
+    } else if (!await table.reserveGuestSeat(scope, sid, Math.min(now + CLAIM_TTL, exp), key, accepted, body.passHash)) {
+        return unavailable();
+    }
+    return reply({ scope, sid, exp });
+}

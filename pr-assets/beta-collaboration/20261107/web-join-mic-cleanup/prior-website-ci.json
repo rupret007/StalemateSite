@@ -1,0 +1,59 @@
+{
+  "at": "2026-11-07T21:46:33.216563+00:00",
+  "head": "66909130659ae2574884540bfc7024c5355cb99b",
+  "tree": "13720fb8fe38dfabce010e3d9479c6fa301694d7",
+  "actualPrCiCheckout": "ac2390a446a5f5736dccb8710ca9e8d47244995b",
+  "prCheckoutWholeTreeEqualsHead": true,
+  "runs": [
+    {
+      "id": 42413174118,
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "sha": "66909130659ae2574884540bfc7024c5355cb99b",
+      "event": "pull_request"
+    },
+    {
+      "id": 42413147687,
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "sha": "66909130659ae2574884540bfc7024c5355cb99b",
+      "event": "push"
+    }
+  ],
+  "jobs": [
+    {
+      "id": 128525462864,
+      "name": "test",
+      "conclusion": "success"
+    },
+    {
+      "id": 128535930757,
+      "name": "Deploy GitHub Pages",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 128525383783,
+      "name": "test",
+      "conclusion": "success"
+    },
+    {
+      "id": 128533396096,
+      "name": "Deploy GitHub Pages",
+      "conclusion": "skipped"
+    }
+  ],
+  "completeBothJobLogsReviewed": true,
+  "prLogSha256": "d7b369d2da9cba28e9bd2b993c1ad56c3144391805c9c47097cefb061bfaa7c6",
+  "pushLogSha256": "5d9c4298d217c14caac3542f83e3375c00913f7b6d37b16db27a543931809d9e",
+  "eachRunCounts": {
+    "unitFiles": 137,
+    "units": 2074,
+    "browser": 813,
+    "rootSmoke": 34,
+    "projectSmoke": 34
+  },
+  "noReportedRetryOrFailureSummaries": true,
+  "notEvidenceForUncommitted5ddeOverlay": true
+}

@@ -199,6 +199,32 @@ describe('transition alerts, quota warning thresholds and private state', () => 
     });
 });
 
+describe('stable Node paths across Homebrew upgrades', () => {
+    function brewFixture(formula = 'node') {
+        const prefix = directory(), binary = path.join(prefix, 'Cellar', formula, '26.12.0', 'bin', 'node');
+        fs.mkdirSync(path.dirname(binary), { recursive: true });
+        fs.writeFileSync(binary, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
+        const alias = path.join(prefix, 'opt', formula, 'bin', 'node');
+        fs.mkdirSync(path.dirname(alias), { recursive: true });
+        fs.symlinkSync(binary, alias);
+        return { prefix, binary, alias };
+    }
+    it.each(['node', 'node@24'])('uses the matching stable opt alias for %s', formula => {
+        const { binary, alias } = brewFixture(formula);
+        expect(installer.stableNode(binary)).toBe(alias);
+    });
+    it('rejects a missing alias instead of persisting a versioned executable', () => {
+        const { binary, alias } = brewFixture(); fs.unlinkSync(alias);
+        expect(() => installer.stableNode(binary)).toThrow('stable-node-path-required');
+    });
+    it('does not silently select a different Node installation', () => {
+        const { prefix, binary, alias } = brewFixture(); fs.unlinkSync(alias);
+        const other = path.join(prefix, 'another-node'); fs.writeFileSync(other, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
+        fs.symlinkSync(other, alias);
+        expect(() => installer.stableNode(binary)).toThrow('stable-node-path-required');
+    });
+});
+
 describe('reversible user LaunchAgent installation, without installing in tests', () => {
     function plan(home = directory()) { return installer.createPlan({ home, configPath: config(home), nodePath: process.execPath, platform: 'darwin', uid: 501 }); }
     it('produces a private five-minute GUI job with config path only and XML-escaped paths', () => {

@@ -2,9 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
-import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
-import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
-import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
+import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs';
 
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
@@ -30,11 +28,10 @@ async function visitor(features = { messageResults: 1, privateMessageContext: 1,
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing,
-        createChatAnnouncements: log => createChatAnnouncements(log, { frame: fn => window.setTimeout(fn, 16), cancel: id => window.clearTimeout(id) }) };
+    window.HangoutClientTestModules = createHangoutClientTestModules(window);
     window.eval(discovery);
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
-    window.eval(`const {${imports}} = window.HangoutClientTestModules;\n${client.replace(/^import .*$/gm, '')}`);
+    window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     const $ = selector => window.document.querySelector(selector);
     $('[data-nick]').value = 'Viewer'; $('[data-enter]').click();
     await vi.waitFor(() => expect(sockets.length).toBe(1));

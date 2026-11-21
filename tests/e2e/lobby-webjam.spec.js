@@ -1,6 +1,7 @@
 // The site relays the app's invitation unchanged. WebJam owns parsing and admission.
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
+const jsQR = require('jsqr');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 // Full clipboard format from WebJam build_invite_message and direct_stun_invite.
 // This opaque transport fixture is never sent to a WebJam service.
@@ -32,7 +33,7 @@ test('two visitors can copy an unchanged app invite, with a fallback when clipbo
         await guest.evaluate((channel) => __lobby.cmd('join', [channel]), channel);
         await expect(guest.locator('[data-toast]')).toContainText('invite-only');
         await host.evaluate(() => __lobby.cmd('invite', ['InviteGuest']));
-        await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(guest.locator('[data-jam]')).toBeVisible();
         await expect(guest.locator('[data-jam-copy]')).toBeHidden();
         await host.fill('[data-jam-link]', INVITE); await host.locator('[data-jam-form] button[type="submit"]').click();
@@ -64,7 +65,7 @@ const WEB_INVITE = 'https://webjam.example/join/#k=synthetic_browser_capability&
 async function browserRoom(browser, baseURL, configured, viewport) {
     const contexts = [], external = [];
     const relay = hangoutRelayWsBase(baseURL, `${configured ? 'webjam-browser-' : 'webjam-off-'}${randomUUID()}`);
-    const join = async (nick, controls = false) => {
+    const join = async (nick, controls = false, onLobbySocket) => {
         const context = await browser.newContext({ viewport,
             ...(controls && browser.browserType().name() === 'chromium' ? { permissions: ['local-network-access'] } : {}) }); contexts.push(context);
         await context.route('**/*', route => {
@@ -95,6 +96,10 @@ async function browserRoom(browser, baseURL, configured, viewport) {
             };
         });
         const page = await context.newPage();
+        if (onLobbySocket) await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
+            socket.connectToServer();
+            onLobbySocket(socket);
+        });
         await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
         try { await expect(page.locator('[data-connection]')).toHaveText('Connected'); }
@@ -110,10 +115,59 @@ async function browserRoom(browser, baseURL, configured, viewport) {
     };
     return { join, external, close: () => Promise.all(contexts.map(context => context.close())) };
 }
+
+test('Music room help and share controls are at least 48 pixels on a short phone', async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 375, height: 667 });
+    try {
+        const host = await f.join('ShortPhoneMusicHost');
+        await host.click('[data-show="rooms"]');
+        await host.click('[data-start="jam"]');
+        const help = host.locator('[data-jam-help] summary');
+        const share = host.locator('[data-jam-form] button[type="submit"]');
+        for (const target of [help, share]) {
+            await target.scrollIntoViewIfNeeded();
+            await expect(target).toBeInViewport({ ratio: 1 });
+            const box = await target.boundingBox();
+            expect(box?.width).toBeGreaterThanOrEqual(48);
+            expect(box?.height).toBeGreaterThanOrEqual(48);
+        }
+        await host.screenshot({ path: testInfo.outputPath('music-room-share-375x667.png') });
+        await help.click();
+        await expect(host.locator('[data-jam-help]')).toHaveAttribute('open', '');
+        expect(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
 const paste = async (page, value) => {
     await page.fill('[data-jam-link]', value);
     await page.locator('[data-jam-form] button[type="submit"]').click();
 };
+
+test('first-invite guidance follows current host power without opening setup help', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true, { width: 1440, height: 900 });
+    try {
+        const host = await f.join('SetupHost'), peer = await f.join('SetupPeer');
+        await host.click('[data-start="jam"]');
+        // Commands target the admitted active channel, not a pending room join.
+        await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
+        await host.evaluate(() => __lobby.cmd('invite', ['SetupPeer']));
+        await peer.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
+        await expect(host.locator('[data-jam-host-steps]')).toBeInViewport();
+        await expect(peer.locator('[data-jam-host-steps]')).toBeHidden();
+        await host.evaluate(() => __lobby.cmd('op', ['SetupPeer']));
+        await expect(peer.locator('[data-jam-host-steps]')).toBeVisible();
+        await peer.evaluate(() => __lobby.cmd('deop', ['SetupHost']));
+        await expect(host.locator('[data-jam-host-steps]')).toBeHidden();
+        await expect(host.locator('[data-jam-wait]')).toBeVisible();
+        await expect(host.locator('[data-jam-form]')).toBeHidden();
+        for (const page of [host, peer]) {
+            await expect(page.locator('[data-jam-help]')).not.toHaveAttribute('open');
+            expect(await page.evaluate(() => window.audioRequests)).toBe(0);
+            expect(await page.evaluate(() => window.browserOpens)).toEqual([]);
+        }
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
 
 for (const width of [375, 390]) test(`host can share desktop and browser invitations through the visible form at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const f = await browserRoom(browser, baseURL, true, { width, height: 844 });
@@ -122,21 +176,39 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await host.click('[data-show="rooms"]');
         await host.click('[data-start="jam"]');
         await expect(host.locator('[data-jam]')).toBeVisible();
+        // First-time hosts get their next steps without opening a help panel.
+        await expect(host.locator('[data-jam-help]')).not.toHaveAttribute('open');
+        await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
+        await expect(host.locator('[data-jam-host-steps]')).toContainText('Music → Host');
+        await expect(host.getByRole('textbox', { name: 'WebJam invitation' })).toHaveAccessibleDescription(/Copy browser invite[\s\S]*Paste that link here and click Share/);
+        const share = host.locator('[data-jam-form] button[type="submit"]');
+        await expect(share).toBeInViewport();
+        for (const target of [share, host.locator('[data-jam-invite-room]'), host.locator('[data-jam-help] summary')]) {
+            const box = await target.boundingBox();
+            expect(box?.width).toBeGreaterThanOrEqual(48);
+            expect(box?.height).toBeGreaterThanOrEqual(48);
+        }
         const channel = await host.evaluate(() => __lobby.active);
         await host.evaluate(() => __lobby.cmd('invite', ['BrowserGuest']));
-        await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(guest.locator('[data-jam]')).toBeVisible();
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
         await expect(guest.locator('[data-jam-form]')).toBeHidden();
+        await expect(guest.locator('[data-jam-host-steps]')).toBeHidden();
+        await expect(guest.locator('[data-jam-wait]')).toContainText('no app needed');
         await paste(host, INVITE);
         // Each socket confirms independently. A replacement announcement
         // clears an old editor; wait for the host's own confirmation before
         // typing the next invitation, even if the guest received it first.
         await expect(host.locator('[data-jam-copy]')).toBeVisible();
+        await expect(host.locator('[data-jam-host-steps]')).toBeHidden();
         await expect(guest.locator('[data-jam-copy]')).toBeVisible();
         await paste(host, ` \n${WEB_INVITE}\n `);
         await expect(host.locator('[data-jam-web]')).toBeEnabled();
         await expect(guest.locator('[data-jam-web]')).toBeEnabled();
+        const browserJoin = await guest.locator('[data-jam-web]').boundingBox();
+        expect(browserJoin?.width).toBeGreaterThanOrEqual(48);
+        expect(browserJoin?.height).toBeGreaterThanOrEqual(48);
         await expect(guest.locator('[data-jam-web]')).toHaveAttribute('title', /headphones and audio consent/);
         await expect(guest.locator('[data-jam-wait]')).toBeHidden();
         expect(await guest.evaluate(() => window.browserOpens)).toEqual([]);
@@ -155,6 +227,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
             // Platform limits must remain visible without expanding setup help.
             await expect(page.locator('[data-jam-platform]')).toBeVisible();
             await expect(page.locator('[data-jam-platform]')).toContainText('A Mac hosts music');
+            await expect(page.locator('[data-jam-platform]')).toContainText('Mac and Windows guests can join in a browser');
             await expect(page.locator('[data-jam-platform]')).toContainText('this unsigned beta cannot join natively');
             expect(await page.locator('#jam-title').evaluate(title => {
                 const panel = title.closest('[data-jam]').getBoundingClientRect(), rect = title.getBoundingClientRect();
@@ -171,6 +244,7 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         const help = guest.locator('[data-jam-help]'), summary = help.locator('summary');
         await summary.focus(); await summary.press('Enter');
         await expect(help).toHaveAttribute('open'); await expect(summary).toBeFocused();
+        await expect(help).toContainText('click Copy browser invite. Wait for Link copied, then paste the link above and click Share.');
         await expect(help).toContainText('Sharing an invite does not turn on your microphone');
         await expect(help.locator('p').first()).toBeInViewport({ ratio: 0.5, timeout: 1000 });
         expect(await summary.evaluate(element => {
@@ -195,6 +269,8 @@ for (const width of [375, 390]) test(`host can share desktop and browser invitat
         await expect(guest.locator('[data-jam-web]')).toBeDisabled();
         await expect(guest.locator('[data-jam-copy]')).toBeHidden();
         await expect(guest.locator('[data-jam-wait]')).toBeVisible();
+        await expect(host.locator('[data-jam-host-steps]')).toBeVisible();
+        await expect(guest.locator('[data-jam-host-steps]')).toBeHidden();
         expect(f.external).toEqual([]);
     } finally { await f.close(); }
 });
@@ -206,7 +282,9 @@ test('browser invitations reject unconfigured origins and let hosts correct reje
             const host = await f.join('RejectedHost'); await host.click('[data-start="jam"]');
             const rejected = configured ? 'https://unapproved.example/join/#synthetic' : WEB_INVITE;
             await paste(host, rejected);
-            await expect(host.locator('[data-toast]')).toContainText('Browser joining is not configured');
+            const guidance = configured ? 'Copy a fresh browser invite in WebJam and try again.' : 'Browser joining is not configured';
+            await expect(host.locator('[data-toast]')).toContainText(guidance);
+            await expect(host.locator('[data-jam-share-status]')).toContainText(configured ? guidance : 'Use a desktop invitation instead.');
             await expect(host.locator('[data-jam-web]')).toBeDisabled();
             expect(await host.evaluate(() => __lobby.chans.get(__lobby.active).jam.web)).toBe('');
             // A socket send is not confirmation. Retain a rejected paste so
@@ -228,13 +306,42 @@ test('browser invitations reject unconfigured origins and let hosts correct reje
     }
 });
 
+test('a cached browser Join action becomes inactive after a server stop on a browser-enabled room', async ({ browser, baseURL }) => {
+    const f = await browserRoom(browser, baseURL, true);
+    try {
+        let lobbySocket;
+        const host = await f.join('ServerStopHost', false, socket => { lobbySocket = socket; });
+        await host.click('[data-start="jam"]'); await expect(host.locator('[data-jam]')).toBeVisible();
+        await paste(host, WEB_INVITE);
+        const join = host.locator('[data-jam-web]');
+        await expect(join).toBeEnabled();
+        await join.evaluate(button => { window.oldBrowserJoin = button.onclick; });
+        await host.evaluate(() => window.oldBrowserJoin());
+        expect(await host.evaluate(() => window.browserOpens.length)).toBe(1);
+        await host.evaluate(() => { window.browserOpens = []; });
+
+        lobbySocket.send(JSON.stringify({ t: 'sharing-stopped' }));
+        await expect(host.locator('[data-text]')).toBeDisabled();
+        await expect(join).toBeDisabled();
+        await expect(host.locator('[data-jam-copy-value]')).toHaveValue('');
+        await host.evaluate(() => window.oldBrowserJoin());
+        expect(await host.evaluate(() => window.browserOpens)).toEqual([]);
+        expect(await host.evaluate(() => window.audioRequests)).toBe(0);
+        expect(f.external).toEqual([]);
+    } finally { await f.close(); }
+});
+
 test('a cached browser Join action stays inactive after local Stop when server withdrawal is unconfirmed', async ({ browser, baseURL }) => {
     const f = await browserRoom(browser, baseURL, true);
     try {
         const host = await f.join('StopBrowserHost', true);
         await host.click('[data-start="jam"]'); await expect(host.locator('[data-jam]')).toBeVisible();
-        await paste(host, WEB_INVITE); await expect(host.locator('[data-jam-web]')).toBeEnabled();
-        await host.locator('[data-jam-web]').evaluate(button => { window.oldBrowserJoin = button.onclick; });
+        await paste(host, WEB_INVITE);
+        const join = host.locator('[data-jam-web]');
+        await expect(join).toBeHidden();
+        await expect(join).toBeDisabled();
+        await expect(host.locator('[data-jam-browser-note]')).toContainText('unavailable under this community’s sharing policy');
+        await join.evaluate(button => { window.oldBrowserJoin = button.onclick; });
         await host.locator('[data-sharing-controls] summary').click();
         await expect(host.locator('[data-sharing-status]')).toContainText('Sharing is available');
         await host.click('[data-sharing-stop]'); await host.click('[data-sharing-accept]');
@@ -251,8 +358,8 @@ test('a cached browser Join action stays inactive after local Stop when server w
     } finally { await f.close(); }
 });
 
-test('copy invite link and QR encode the shared browser invitation', async ({ browser, baseURL }) => {
-    const f = await browserRoom(browser, baseURL, true, { width: 390, height: 844 });
+for (const width of [375, 390]) test(`copy invite link and QR encode the shared browser invitation at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+    const f = await browserRoom(browser, baseURL, true, { width, height: 844 });
     try {
         const host = await f.join('QrHost');
         await host.click('[data-show="rooms"]');
@@ -265,18 +372,49 @@ test('copy invite link and QR encode the shared browser invitation', async ({ br
         await host.click('[data-jam-invite-qr-toggle]');
         const canvas = host.locator('[data-jam-invite-qr]');
         await expect(canvas).toBeVisible();
-        await expect(canvas).toHaveAttribute('data-invite-url', WEB_INVITE);
-        expect(await canvas.evaluate((node) => {
-            const ctx = node.getContext('2d');
-            const { data, width, height } = ctx.getImageData(0, 0, node.width, node.height);
-            let dark = 0;
-            for (let i = 0; i < data.length; i += 4) if (data[i] < 32) dark += 1;
-            return dark > width * height * 0.05;
+        await expect.poll(() => canvas.evaluate(node => {
+            const rect = node.getBoundingClientRect(), panel = node.closest('[data-jam]').getBoundingClientRect();
+            return rect.top >= Math.max(0, panel.top) && rect.bottom <= Math.min(innerHeight, panel.bottom)
+                && rect.left >= 0 && rect.right <= innerWidth;
         })).toBe(true);
+        for (const selector of ['[data-text]', '[data-send]']) {
+            expect(await host.locator(selector).evaluate(node => {
+                const rect = node.getBoundingClientRect();
+                return rect.top >= 0 && rect.bottom <= innerHeight && rect.left >= 0 && rect.right <= innerWidth;
+            })).toBe(true);
+        }
+        const pixels = await canvas.evaluate(node => {
+            const { data, width, height } = node.getContext('2d').getImageData(0, 0, node.width, node.height);
+            return { data: Array.from(data), width, height };
+        });
+        const decoded = jsQR(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height);
+        expect(decoded?.data).toBe(WEB_INVITE);
+        const modules = 17 + 4 * decoded.version;
+        expect(pixels.width % (modules + 8)).toBe(0);
+        const quiet = 4 * pixels.width / (modules + 8);
+        let darkestQuietPixel = 255;
+        for (let y = 0; y < pixels.height; y++) for (let x = 0; x < pixels.width; x++) {
+            if (x >= quiet && y >= quiet && x < pixels.width - quiet && y < pixels.height - quiet) continue;
+            darkestQuietPixel = Math.min(darkestQuietPixel, pixels.data[(y * pixels.width + x) * 4]);
+        }
+        expect(darkestQuietPixel, 'every pixel in the QR quiet zone must be light').toBeGreaterThan(200);
+        await expect(canvas).not.toHaveAttribute('data-invite-url');
+        expect(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await host.screenshot({ path: testInfo.outputPath(`qr-${width}.png`), fullPage: true });
+        await host.click('[data-jam-invite-qr-toggle]');
+        expect(await canvas.evaluate(node => node.getContext('2d').getImageData(0, 0, node.width, node.height).data.every(value => value === 0))).toBe(true);
+        await host.click('[data-jam-invite-qr-toggle]');
         await host.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('blocked'); }; });
         await host.click('[data-jam-invite-copy]');
         await expect(host.locator('[data-jam-invite-copy-value]')).toBeVisible();
         await expect(host.locator('[data-jam-invite-copy-value]')).toHaveValue(WEB_INVITE);
+        await host.fill('[data-text]', '/part');
+        await host.press('[data-text]', 'Enter');
+        await expect(host.locator('[data-jam-invite-qr-panel]')).toBeHidden();
+        await expect(canvas).not.toHaveAttribute('data-invite-url');
+        expect(await canvas.evaluate(node => node.getContext('2d').getImageData(0, 0, node.width, node.height).data.every(value => value === 0))).toBe(true);
+        await expect(host.locator('[data-jam-invite-copy-value]')).toHaveValue('');
+
     } finally { await f.close(); }
 });
 
@@ -330,19 +468,25 @@ test('a bandmate reaches the jam room within three clicks of opening the copied 
             body: `<!doctype html><html><head><meta http-equiv="refresh" content="0;url=${lobbyEntry.replace(/"/g, '&quot;')}"></head><body></body></html>`
         }));
         await bandmate.evaluate(() => sessionStorage.setItem('hangout-count-invite-clicks', '1'));
-        await bandmate.goto(browserInvite, { waitUntil: 'networkidle' });
+        // WebKit can report the refresh document before it follows the lobby
+        // redirect. The nick gate is on that lobby page, so wait for it before
+        // deciding whether Let me in still has to be tapped.
+        await bandmate.goto(browserInvite, { waitUntil: 'commit' });
+        await bandmate.waitForURL(/\/r\/45662413410ed051\/lobby\//, { timeout: 5000 });
         if (await bandmate.locator('[data-gate]').isVisible()) {
             await bandmate.fill('[data-nick]', 'LinkBandmate');
             await bandmate.click('[data-enter]');
         }
         await expect(bandmate.locator('[data-connection]')).toHaveText('Connected');
-        await host.fill('[data-text]', '/invite LinkBandmate');
-        await host.press('[data-text]', 'Enter');
-        const joinToast = bandmate.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true });
-        await expect(joinToast).toBeVisible();
-        await joinToast.click();
+        // The room link and the earlier invitation already admit the bandmate.
+        // A repeated invitation must not ask someone in the room to join it.
         await expect(bandmate.locator('[data-jam]')).toBeVisible();
         await expect(bandmate.locator('[data-chat-context]')).toHaveText(channel);
+        await host.fill('[data-text]', '/invite LinkBandmate');
+        await host.press('[data-text]', 'Enter');
+        await expect(host.locator('[data-buffer]')).toContainText(`Invited LinkBandmate to ${channel}.`);
+        await expect(bandmate.locator('[data-game-offer]')).toBeHidden();
+        await expect(bandmate.locator('[data-toast] button')).toHaveCount(0);
         expect(await bandmate.evaluate(() => window.__bandmateClicks ?? 0)).toBeLessThanOrEqual(3);
         await bandmateContext.close();
     } finally { await f.close(); }

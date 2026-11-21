@@ -1,0 +1,822 @@
+// Private admission is simulated explicitly; the WebSocket upgrade failure uses
+// the real loopback HTTP handler. This does not prove live cookie expiration.
+const { test, expect } = require('@playwright/test');
+const { randomUUID } = require('node:crypto');
+const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
+const ROOT = '/r/45662413410ed051/lobby/';
+
+for (const width of [390, 1440]) test(`protected newcomer reaches a shared room and leaves safely at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity(), contexts = [], pageErrors = [], sentinels = [];
+    const otherWidth = width === 390 ? 1440 : 390;
+    async function entry(viewWidth, source) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width: viewWidth, height: viewWidth === 390 ? 844 : 900 },
+            hasTouch: viewWidth === 390, reducedMotion: 'reduce' });
+        contexts.push(context);
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        sentinels.push(sentinel);
+        const page = await context.newPage();
+        page.on('pageerror', error => pageErrors.push(error.name));
+        const entryUrl = community.origin + '/beta/?via=' + source;
+        return { page, context, entryUrl, source, sentinel };
+    }
+    async function admit(visitor) {
+        const { page, context, entryUrl } = visitor;
+        await page.goto(entryUrl + '#invite=' + community.invitation);
+        const proceed = page.getByRole('link', { name: /Choose a nickname and join/ });
+        await expect(proceed).toBeVisible();
+        await expect(page.getByLabel('Invitation code')).toBeHidden();
+        expect(new URL(page.url()).hash).toBe('');
+        expect(await page.evaluate(invite => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(invite), community.invitation)).toBe(false);
+        const cookie = (await context.cookies()).find(cookie => cookie.name === community.sessionCookieName);
+        // Assert the application's existing betaCookie policy exactly.
+        expect(cookie).toMatchObject({ secure: true, httpOnly: true, sameSite: 'Lax', path: '/' });
+        await visitor.sentinel.assertClean();
+        await proceed.press('Enter');
+        await expect(page.locator('[data-entry-label]').first()).toHaveText('via ' + (visitor.source === 'rad-dad' ? 'Rad Dad' : 'Stalemate'));
+        expect(await page.evaluate(() => typeof navigator.mediaDevices?.getUserMedia === 'function')).toBe(true);
+        await visitor.sentinel.assertClean();
+    }
+    async function nick(page, name) {
+        const input = page.getByRole('textbox', { name: 'Your nick', exact: true });
+        await input.press('ControlOrMeta+A'); await input.press('Backspace'); await input.pressSequentially(name);
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        await page.locator('[data-enter]').press('Enter');
+    }
+    async function send(page, message) {
+        const input = page.getByRole('textbox', { name: 'Message', exact: true });
+        await input.pressSequentially(message); await input.press('Enter');
+    }
+    async function show(page, section) {
+        const navigation = page.locator(`nav [data-show="${section}"]`);
+        if (await navigation.isVisible()) await navigation.click();
+    }
+    const capture = async (page, name) => {
+        for (const sentinel of sentinels) await sentinel.assertClean();
+        return page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`) });
+    };
+    try {
+        // Independent browser contexts can open together; admission/chat still
+        // happen in order so the no-history assertion has a real earlier line.
+        const [host, guest] = await Promise.all([
+            entry(otherWidth, width === 390 ? 'stalemate' : 'rad-dad'),
+            entry(width, width === 390 ? 'rad-dad' : 'stalemate')
+        ]);
+        await admit(host); await nick(host.page, 'StudioHost');
+        await expect(host.page.locator('[data-connection]')).toHaveText('Connected');
+        await send(host.page, 'Earlier conversation stays in its connected session.');
+        expect((await guest.context.request.get(community.origin + ROOT)).status()).toBe(401);
+        expect((await guest.context.request.get(community.origin + ROOT + 'lobby.js')).status()).toBe(401);
+        await guest.page.goto(guest.entryUrl + '#invite=rejected-fixture-only');
+        await expect(guest.page.locator('#status')).toHaveText('This invitation didn’t work. Check the link or code, or ask your host for a new invitation.');
+        await expect(guest.page.getByRole('link', { name: /Choose a nickname and join/ })).toBeHidden();
+        expect(new URL(guest.page.url()).hash).toBe('');
+        await capture(guest.page, '01-rejected-private-entry');
+        await admit(guest);
+        await nick(guest.page, 'StudioHost');
+        const name = guest.page.getByRole('textbox', { name: 'Your nick', exact: true });
+        await expect(name).toBeFocused();
+        await expect(name).toHaveAccessibleDescription('That nick is taken right now.');
+        await capture(guest.page, '02-nickname-conflict');
+        await nick(guest.page, 'StudioGuest');
+        await expect(guest.page.locator('[data-connection]')).toHaveText('Connected');
+        await expect(guest.page.getByRole('region', { name: 'Chat', exact: true })).toBeFocused();
+        const log = guest.page.getByRole('log', { name: 'Conversation' });
+        await expect(log).not.toContainText('Earlier conversation stays in its connected session.');
+        await send(guest.page, 'Hello from the other band entrance.');
+        await expect(host.page.getByRole('log', { name: 'Conversation' })).toContainText('Hello from the other band entrance.');
+        await capture(guest.page, '03-shared-lobby-chat');
+
+        await show(host.page, 'rooms'); await host.page.locator('[data-start="chat"]').click();
+        const channel = host.page.getByRole('dialog', { name: 'Your own #channel', exact: true });
+        await channel.getByRole('textbox', { name: 'Channel name', exact: true }).pressSequentially('#studio-chat');
+        await channel.getByRole('button', { name: 'Join / create', exact: true }).press('Enter');
+        await expect(channel).toBeHidden();
+        await expect(host.page.locator('[data-chat-context]')).toHaveText('#studio-chat');
+        await show(guest.page, 'rooms');
+        await guest.page.getByRole('searchbox', { name: 'Find a room' }).pressSequentially('studio-chat');
+        await expect(guest.page.locator('[data-roomlist] button[data-room="#studio-chat"]')).toBeVisible();
+        await capture(guest.page, '04-room-discovered');
+        await host.page.locator('[data-roomtools]').press('Enter');
+        await host.page.getByRole('dialog', { name: 'Commands', exact: true }).getByRole('button', { name: 'Invite guest', exact: true }).press('Enter');
+        const invite = host.page.getByRole('dialog', { name: 'Invite a guest', exact: true });
+        const roster = invite.getByRole('combobox', { name: 'Online guests', exact: true });
+        await expect(roster).toBeVisible(); await expect(roster).toBeFocused();
+        await roster.selectOption({ label: 'StudioGuest' });
+        await invite.getByRole('button', { name: 'Invite selected person', exact: true }).press('Enter');
+        await expect(invite).toBeHidden();
+        const offer = guest.page.locator('[data-room-invite]');
+        const join = offer.getByRole('button', { name: 'Join', exact: true });
+        await expect(join).toBeInViewport({ ratio: 1 });
+        await capture(guest.page, '05-room-invitation');
+        await join.press('Enter');
+        await expect(guest.page.locator('[data-chat-context]')).toHaveText('#studio-chat');
+        await expect(guest.page.getByRole('tab', { name: '#studio-chat', exact: true })).toBeFocused();
+        await send(guest.page, 'We are together in the invited room.');
+        await expect(host.page.getByRole('log', { name: 'Conversation' })).toContainText('We are together in the invited room.');
+        const input = guest.page.getByRole('textbox', { name: 'Message', exact: true });
+        await expect(input).toBeInViewport({ ratio: 1 });
+        await expect(guest.page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        expect(await guest.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await capture(guest.page, '06-invited-room-first-message');
+        await guest.page.locator('[data-roombar]').getByRole('button', { name: 'Leave', exact: true }).press('Enter');
+        await expect(guest.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+        await send(guest.page, 'Back in the lobby after leaving.');
+        await capture(guest.page, '07-left-room');
+        for (const visitor of [host, guest]) await visitor.sentinel.assertClean();
+        // Reuse the visitor's tab to leave the beta, rather than starting a third
+        // WebKit page. This still exercises the real cookie revocation and 401.
+        const access = guest.page;
+        await access.goto(guest.entryUrl);
+        await access.getByRole('button', { name: 'Leave this beta', exact: true }).press('Enter');
+        await expect(access.getByRole('heading', { name: 'Your private invitation', exact: true })).toBeVisible();
+        expect((await guest.context.request.get(community.origin + ROOT + 'lobby.js')).status()).toBe(401);
+        for (const visitor of [host, guest]) await visitor.sentinel.assertClean();
+        expect(community.diagnostics().admittedUpgrades).toBeGreaterThanOrEqual(2);
+        expect(community.diagnostics().failures).toEqual([]); expect(pageErrors).toEqual([]);
+        await testInfo.attach('protected-newcomer-scope', { contentType: 'application/json', body: JSON.stringify(community.diagnostics()) });
+    } finally {
+        const closed = await Promise.allSettled(contexts.map(context => context.close()));
+        await community.close();
+        const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (failures.length) throw new AggregateError(failures, 'Owned newcomer contexts did not close cleanly');
+    }
+});
+
+for (const width of [390, 1440]) for (const retained of [false, true]) {
+    test(`protected room reconnect preserves ${retained ? 'a draft' : 'a blank composer'} at ${width}px`, async ({ browser }, testInfo) => {
+        const { privateCommunity } = await import('./helpers/private-community.mjs');
+        const community = await privateCommunity(), contexts = [], errors = [], sentinels = [];
+        async function enter(name, via, viewWidth) {
+            const context = await browser.newContext({ ignoreHTTPSErrors: true,
+                viewport: { width: viewWidth, height: viewWidth === 390 ? 844 : 900 },
+                hasTouch: viewWidth === 390, reducedMotion: 'reduce' });
+            contexts.push(context);
+            await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+            const sentinel = await installNoCaptureSentinel(context);
+            sentinels.push(sentinel);
+            const page = await context.newPage();
+            page.on('pageerror', error => errors.push(error.name));
+            await page.goto(community.origin + '/beta/?via=' + via + '#invite=' + community.invitation);
+            await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+            await page.getByRole('textbox', { name: 'Your nick', exact: true }).pressSequentially(name);
+            await expect(page.locator('[data-enter]')).toBeEnabled();
+            await page.locator('[data-enter]').press('Enter');
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+            return { page, context, sentinel };
+        }
+        async function send(page, message) {
+            const input = page.getByRole('textbox', { name: 'Message', exact: true });
+            await input.pressSequentially(message); await input.press('Enter');
+        }
+        async function rooms(page) {
+            const button = page.locator('nav [data-show="rooms"]');
+            if (await button.isVisible()) await button.click();
+        }
+        const capture = async (page, state) => {
+            for (const sentinel of sentinels) await sentinel.assertClean();
+            return page.screenshot({ path: testInfo.outputPath(`${state}-${width}-${retained ? 'draft' : 'blank'}.png`) });
+        };
+        try {
+            // Preparation is independent. Both protected cookies and welcomes
+            // finish before either visitor joins the shared room.
+            const [host, guest] = await Promise.all([
+                enter('RecoveryHost', 'stalemate', width === 390 ? 1440 : 390),
+                enter('RecoveryGuest', 'rad-dad', width)
+            ]);
+            await send(host.page, '/join #recovery-studio');
+            await expect(host.page.locator('[data-chat-context]')).toHaveText('#recovery-studio');
+            await rooms(guest.page);
+            const search = guest.page.getByRole('searchbox', { name: 'Find a room' });
+            await search.pressSequentially('recovery-studio');
+            const room = guest.page.locator('[data-roomlist] button[data-room="#recovery-studio"]');
+            await expect(room).toBeVisible();
+            await room.press('Enter');
+            await expect(guest.page.locator('[data-chat-context]')).toHaveText('#recovery-studio');
+            const earlier = 'This room message belongs to the earlier connection.';
+            await send(host.page, earlier);
+            await expect(guest.page.getByRole('log', { name: 'Conversation' })).toContainText(earlier);
+            const input = guest.page.getByRole('textbox', { name: 'Message', exact: true });
+            const draft = retained ? 'My private unsent room draft survives the interruption.' : '';
+            if (draft) await input.pressSequentially(draft);
+            await expect(input).toHaveValue(draft);
+            await capture(guest.page, '01-before-room-interruption');
+            const cookie = (await guest.context.cookies()).find(cookie => cookie.name === community.sessionCookieName);
+            expect(cookie).toMatchObject({ secure: true, httpOnly: true, sameSite: 'Lax' });
+            community.interruptGuest(cookie.value);
+            // Observe a genuinely new admission, not the old Connected label.
+            await expect.poll(() => community.diagnostics().admittedUpgrades).toBe(3);
+            await expect(guest.page.locator('[data-connection]')).toHaveText('Connected');
+            await expect(guest.page.locator('[data-chat-context]')).toHaveText('#stalemate');
+            await expect(input).toHaveValue('');
+            await expect(guest.page.getByRole('log', { name: 'Conversation' })).not.toContainText(earlier);
+            const guidance = 'Connected. Room ownership and settings are kept; chat starts fresh. Choose a room to rejoin. Cameras stay off.';
+            await expect(guest.page.locator('#toast-message')).toHaveText(guidance);
+            await expect(guest.page.locator('#toast-message')).toBeVisible();
+            const announcement = guest.page.locator('[data-toast-announcement]');
+            await expect(announcement).toHaveText(guidance);
+            await expect(announcement).toHaveAttribute('role', 'status');
+            await expect(announcement).toHaveAttribute('aria-atomic', 'true');
+            await capture(guest.page, '02-fresh-lobby-recovery');
+            await rooms(guest.page);
+            await search.fill('recovery-studio');
+            await expect(room).toBeVisible();
+            if (width === 390) await room.tap(); else await room.press('Enter');
+            await expect(guest.page.locator('[data-chat-context]')).toHaveText('#recovery-studio');
+            await expect(guest.page.getByRole('tab', { name: '#recovery-studio', exact: true })).toBeFocused();
+            await expect(input).toHaveValue(draft);
+            await expect(input).toBeInViewport({ ratio: 1 });
+            await expect(guest.page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+            await expect(guest.page.getByRole('log', { name: 'Conversation' })).not.toContainText(earlier);
+            const hostLog = host.page.getByRole('log', { name: 'Conversation' });
+            if (draft) {
+                await expect(hostLog).not.toContainText(draft);
+                expect(await guest.page.evaluate(text => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(text), draft)).toBe(false);
+            }
+            await capture(guest.page, '03-room-rejoined-draft-not-sent');
+            const message = draft || 'A deliberate new message after room recovery.';
+            if (!draft) await input.pressSequentially(message);
+            await input.press('Enter');
+            await expect(hostLog.getByRole('listitem').filter({ hasText: message })).toHaveCount(1);
+            await expect(input).toHaveValue('');
+            expect(await guest.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await capture(guest.page, '04-deliberate-message-received');
+            for (const visitor of [host, guest]) await visitor.sentinel.assertClean();
+            expect(community.diagnostics().interruptions).toBe(1);
+            expect(community.diagnostics().failures).toEqual([]); expect(errors).toEqual([]);
+            await testInfo.attach('protected-reconnect-scope', { contentType: 'application/json', body: JSON.stringify(community.diagnostics()) });
+        } finally {
+            const closed = await Promise.allSettled(contexts.map(context => context.close()));
+            await community.close();
+            const failed = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+            if (failed.length) throw new AggregateError(failed, 'Owned reconnect contexts did not close cleanly');
+        }
+    });
+}
+
+for (const method of ['getUserMedia', 'getDisplayMedia']) test(`no-capture evidence survives beta navigation and a separate access page for ${method}`, async ({ browser }) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity();
+    const context = await browser.newContext({ ignoreHTTPSErrors: true });
+    try {
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        const page = await context.newPage();
+        await page.goto(community.origin + '/beta/');
+        await sentinel.assertClean();
+        await page.evaluate(async method => {
+            try { await navigator.mediaDevices[method]({ video: true }); } catch {}
+        }, method);
+        await page.goto(community.origin + '/beta/?after-navigation');
+        await expect(sentinel.assertClean()).rejects.toThrow('Unexpected capture attempts: 1');
+        const access = await context.newPage();
+        await access.goto(community.origin + '/beta/');
+        await access.evaluate(async method => {
+            try { await navigator.mediaDevices[method]({ video: true }); } catch {}
+        }, method);
+        await access.reload();
+        expect(sentinel.calls).toEqual([method, method]);
+        await expect(sentinel.assertClean()).rejects.toThrow('Unexpected capture attempts: 2');
+    } finally {
+        await context.close(); await community.close();
+    }
+});
+
+async function contained(page, locator) {
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const bounds = await locator.boundingBox(); expect(bounds).not.toBeNull();
+    expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize().width);
+}
+
+for (const { width, status } of [{ width: 375, status: 401 }, { width: 390, status: 401 }, { width: 390, status: 503 }]) {
+    test(`a refused initial upgrade shows truthful private-entry recovery for HTTP ${status} at ${width}px`, async ({ browser, baseURL }, testInfo) => {
+        const context = await browser.newContext({ viewport: { width, height: 844 } });
+        let checks = 0;
+        try {
+            await context.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
+            // A named local private-shell fixture, not a real session cookie.
+            // The upgrade is rejected by the actual loopback HTTP handler.
+            await context.route('**/beta/bootstrap.js', route => route.fulfill({ contentType: 'text/javascript', body: '// Private-shell marker only.' }));
+            await context.route('**/beta/', route => route.fulfill({ contentType: 'text/html', body: '<h1>Your private invitation</h1>' }));
+            await context.route('**/beta/state', route => { checks++; return route.fulfill({ status, contentType: 'text/plain', body: status === 401 ? 'Private invitation required.' : 'Temporarily unavailable.' }); });
+            await context.route(url => url.pathname === ROOT, async route => {
+                const response = await route.fetch();
+                await route.fulfill({ response, body: (await response.text()).replace('<head>', '<head><script src="/beta/bootstrap.js"></script>') });
+            });
+            const page = await context.newPage();
+            const relay = hangoutRelayWsBase(baseURL, `private-entry-${randomUUID()}`) + '/unavailable';
+            await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+            await page.fill('[data-nick]', 'ReturningGuest'); await page.click('[data-enter]');
+            const notice = page.locator('[data-gate-status]');
+            const entry = page.getByRole('link', { name: 'Open private entry', exact: true });
+            await expect(notice).toHaveText(status === 401
+                ? 'Your private access needs renewal. Reopen your invitation link or enter its code.'
+                : 'Couldn’t connect. Try again shortly, or ask the host if this continues.');
+            await expect(page.locator('[data-nick]')).toHaveValue('ReturningGuest');
+            await expect(page.locator('[data-gate]')).toBeVisible();
+            if (status === 401) {
+                await expect(entry).toBeVisible(); await expect(entry).toHaveAttribute('href', '/beta/');
+                await entry.focus(); await expect(entry).toBeFocused(); await contained(page, entry);
+                await page.screenshot({ path: testInfo.outputPath(`private-entry-renewal-${width}.png`) });
+                await entry.press('Enter'); await expect(page).toHaveURL(baseURL + '/beta/');
+                await expect(page.getByRole('heading', { name: 'Your private invitation' })).toBeVisible();
+            } else {
+                await expect(entry).toBeHidden(); await contained(page, page.locator('[data-enter]'));
+                await page.screenshot({ path: testInfo.outputPath('private-entry-outage-390.png') });
+            }
+            expect(checks).toBe(1);
+        } finally { await context.close(); }
+    });
+}
+
+test('an open connection without a welcome times out and the guest can retry', async ({ page, baseURL }) => {
+    const { createLobby } = await import('../../hangout-worker/src/lobby-core.mjs');
+    await page.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
+    let attempts = 0, staleClosed = false, active;
+    const offers = [];
+    const engine = createLobby({ send: (_id, frame) => active.send(JSON.stringify(frame.t === 'hello'
+        ? { ...frame, deviceToken: 'inline-synthetic-device' } : frame)) });
+    await page.routeWebSocket(url => url.pathname.endsWith('/lobby'), socket => {
+        attempts++;
+        const params = new URL(socket.url()).searchParams;
+        offers.push([params.get('device-in-hello'), params.get('dev')]);
+        if (attempts === 1) {
+            socket.onClose(() => { staleClosed = true; });
+            socket.send(JSON.stringify({ t: 'device', token: 'synthetic-device' }));
+            return;
+        }
+        active = socket;
+        socket.onMessage(raw => void engine.message('timeout-retry', String(raw)));
+        socket.onClose(() => void engine.disconnect('timeout-retry'));
+        engine.connect({ id: 'timeout-retry', dev: 'device-retry', iph: 'ip-retry', role: 'fan', account: '', admin: false });
+    });
+    await page.clock.install();
+    const relay = hangoutRelayWsBase(baseURL, 'join-timeout');
+    await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+    await page.fill('[data-nick]', 'RetryGuest');
+    await page.click('[data-enter]');
+    await expect.poll(() => attempts).toBe(1);
+    await expect(page.locator('[data-connection]')).toHaveText('Connecting…');
+    await expect(page.locator('[data-enter]')).toBeDisabled();
+    await page.clock.runFor(20_001);
+
+    await expect(page.locator('[data-connection]')).toHaveText('Offline');
+    await expect(page.locator('[data-gate-status]')).toHaveText('Hang Out took too long to respond. Try again.');
+    await expect(page.locator('[data-nick]')).toHaveValue('RetryGuest');
+    await expect(page.locator('[data-enter]')).toBeEnabled();
+    await expect.poll(() => staleClosed).toBe(true);
+    expect(attempts).toBe(1);
+
+    await page.locator('[data-enter]').press('Enter');
+    await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('hangout-dev'))).toBe('inline-synthetic-device');
+    expect(offers).toEqual([['1', null], ['1', 'synthetic-device']]);
+    await page.clock.runFor(20_001);
+    await expect(page.locator('[data-connection]')).toHaveText('Connected');
+    expect(attempts).toBe(2);
+});
+
+// Abort only the main module after actual private admission. No app patch,
+// live provider, browser permission grant or capture is involved.
+for (const width of [375, 390, 1440]) test(`protected module download failure offers explicit reload at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity();
+    let context, blocked = 0;
+    try {
+        context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width, height: width <= 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        const moduleUrl = community.origin + ROOT + 'lobby.js';
+        const failModule = route => { blocked++; return route.abort('failed'); };
+        await context.route(moduleUrl, failModule);
+        const page = await context.newPage();
+        await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+        await sentinel.assertClean();
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await expect.poll(() => blocked).toBe(1);
+        await expect(page.locator('[data-enter]')).toBeDisabled();
+        expect(community.diagnostics().admittedUpgrades).toBe(0);
+        await sentinel.assertClean();
+        await page.screenshot({ path: testInfo.outputPath(`01-main-module-failed-${width}.png`) });
+        const recovery = page.locator('[data-startup-recovery]');
+        const reload = page.getByRole('button', { name: 'Reload chat', exact: true });
+        await expect(recovery).toBeVisible();
+        await expect(recovery).toHaveAttribute('role', 'status');
+        await expect(recovery).toContainText('Chat could not load. Check your connection, then reload chat. Your camera and microphone are off.');
+        await expect(reload).toBeVisible(); await expect(reload).toBeEnabled();
+        await reload.scrollIntoViewIfNeeded();
+        await expect(reload).toBeInViewport({ ratio: 1 });
+        const bounds = await reload.boundingBox();
+        expect(bounds.width).toBeGreaterThanOrEqual(48); expect(bounds.height).toBeGreaterThanOrEqual(48);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath(`02-explicit-startup-recovery-${width}.png`) });
+        await sentinel.assertClean();
+        await context.unroute(moduleUrl, failModule);
+        await Promise.all([page.waitForEvent('domcontentloaded'), reload.press('Enter')]);
+        await expect(recovery).toBeHidden();
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        expect(community.diagnostics().admittedUpgrades).toBe(0);
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('StartupGuest');
+        await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await expect(page.getByRole('region', { name: 'Chat', exact: true })).toBeFocused();
+        const message = page.getByRole('textbox', { name: 'Message', exact: true });
+        await message.fill('A deliberate message after reloading chat.'); await message.press('Enter');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('A deliberate message after reloading chat.');
+        await expect(message).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        expect(community.diagnostics().admittedUpgrades).toBe(1);
+        expect(community.diagnostics().failures).toEqual([]);
+        await sentinel.assertClean();
+        await page.screenshot({ path: testInfo.outputPath(`03-reloaded-first-chat-${width}.png`) });
+    } finally {
+        try { await context?.close(); } finally { await community.close(); }
+    }
+});
+
+// The private gateway admits the visitor, but only its initial bootstrap fails.
+// Keep media-attempt evidence outside the page so reload cannot reset it.
+for (const { width, fault } of [{ width: 375, fault: 'network' }, { width: 390, fault: '503' }, { width: 1440, fault: 'network' }]) {
+    test(`protected bootstrap failure offers explicit recovery at ${width}px for ${fault}`, async ({ browser }, testInfo) => {
+        const { privateCommunity } = await import('./helpers/private-community.mjs');
+        const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
+        const community = await privateCommunity(); let context, failures = 0;
+        try {
+            context = await browser.newContext({ ignoreHTTPSErrors: true,
+                viewport: { width, height: width <= 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+            await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+            const sentinel = await installNoCaptureSentinel(context);
+            const bootstrap = community.origin + '/beta/bootstrap.js';
+            const unavailable = route => {
+                failures++;
+                return fault === 'network' ? route.abort('failed') : route.fulfill({ status: 503,
+                    contentType: 'text/javascript', body: '/* Synthetic unavailable private bootstrap. */' });
+            };
+            await context.route(bootstrap, unavailable);
+            const page = await context.newPage();
+            await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+            await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+            await page.waitForLoadState('load');
+            await expect.poll(() => failures).toBe(1);
+            expect(await page.evaluate(() => !!window.HangoutBootstrap)).toBe(false);
+            expect(community.diagnostics().admittedUpgrades).toBe(0);
+            await sentinel.assertClean();
+            await page.screenshot({ path: testInfo.outputPath(`01-bootstrap-unavailable-${width}.png`) });
+            const recovery = page.locator('[data-startup-recovery]');
+            await expect(recovery).toBeVisible();
+            await expect(recovery).toHaveAttribute('role', 'status');
+            await expect(recovery).toContainText('Chat could not load. Check your connection, then reload chat. Your camera and microphone are off.');
+            await expect(page.locator('[data-gate-copy]')).not.toContainText('Not open yet');
+            const reload = page.getByRole('button', { name: 'Reload chat', exact: true });
+            await reload.scrollIntoViewIfNeeded(); await expect(reload).toBeInViewport({ ratio: 1 });
+            const bounds = await reload.boundingBox();
+            expect(bounds.width).toBeGreaterThanOrEqual(48); expect(bounds.height).toBeGreaterThanOrEqual(48);
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+            await page.screenshot({ path: testInfo.outputPath(`02-bootstrap-recovery-action-${width}.png`) });
+            await context.unroute(bootstrap, unavailable);
+            await Promise.all([page.waitForEvent('domcontentloaded'), reload.press('Enter')]);
+            await expect(recovery).toBeHidden(); await expect(page.locator('[data-enter]')).toBeEnabled();
+            expect(community.diagnostics().admittedUpgrades).toBe(0);
+            await sentinel.assertClean();
+            await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('BootstrapGuest');
+            await page.locator('[data-enter]').press('Enter');
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+            await expect(page.getByRole('region', { name: 'Chat', exact: true })).toBeFocused();
+            const message = page.getByRole('textbox', { name: 'Message', exact: true });
+            await message.fill('Back after recovering the private session setup.'); await message.press('Enter');
+            await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('Back after recovering the private session setup.');
+            await expect(message).toBeInViewport({ ratio: 1 });
+            await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+            await sentinel.assertClean();
+            expect(community.diagnostics().admittedUpgrades).toBe(1); expect(community.diagnostics().failures).toEqual([]);
+            await page.screenshot({ path: testInfo.outputPath(`03-private-bootstrap-recovered-chat-${width}.png`) });
+        } finally {
+            try { await context?.close(); } finally { await community.close(); }
+        }
+    });
+}
+
+// Random-name delivery is optional: a failed first-party script must not make
+// keyboard nickname entry confusing or overwrite a name already being typed.
+for (const width of [375, 390, 1440]) test(`protected nickname picker failure explains manual entry at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity(); let context, blocked = 0;
+    const errors = [];
+    try {
+        context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        await context.route(community.origin + '/r/45662413410ed051/names.js', route => { blocked++; return route.abort('failed'); });
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.waitForLoadState('load'); await expect.poll(() => blocked).toBe(1);
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        expect(community.diagnostics().admittedUpgrades).toBe(0);
+        const nick = page.getByRole('textbox', { name: 'Your nick', exact: true });
+        await nick.fill('FirstChoice');
+        const roll = page.getByRole('button', { name: 'Make me a name — random fun nickname', exact: true });
+        await roll.press('Enter');
+        await sentinel.assertClean();
+        await page.screenshot({ path: testInfo.outputPath(`01-random-name-unavailable-${width}.png`) });
+        await testInfo.attach('nickname-picker-scope', { contentType: 'application/json',
+            body: JSON.stringify({ scriptFailures: blocked, pageErrorNames: errors, admittedUpgrades: community.diagnostics().admittedUpgrades }) });
+        const explanation = 'Random names aren’t available right now. Type a nickname to join.';
+        await expect(nick).toBeFocused(); await expect(nick).toHaveValue('FirstChoice');
+        await expect(nick).toHaveAccessibleDescription(explanation);
+        await expect(page.locator('[data-gate-status]')).toHaveText(explanation);
+        await expect(page.locator('[data-gate-status]')).toBeVisible();
+        await expect(page.locator('[data-gate-status]')).toBeInViewport({ ratio: 1 });
+        await expect(nick).toBeInViewport({ ratio: 1 });
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        expect(community.diagnostics().admittedUpgrades).toBe(0); expect(errors).toEqual([]);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath(`02-manual-name-guidance-${width}.png`) });
+        // A deliberate choice of nickname and Enter is still required; no
+        // fallback generation, reload or automatic join hides the failure.
+        await nick.press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        await expect(page.getByRole('region', { name: 'Chat', exact: true })).toBeFocused();
+        const message = page.getByRole('textbox', { name: 'Message', exact: true });
+        await message.fill('I joined with my own nickname after the picker failed.'); await message.press('Enter');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText('I joined with my own nickname after the picker failed.');
+        await expect(message).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        await sentinel.assertClean(); expect(errors).toEqual([]);
+        expect(community.diagnostics().admittedUpgrades).toBe(1); expect(community.diagnostics().failures).toEqual([]);
+        await page.screenshot({ path: testInfo.outputPath(`03-manual-name-first-chat-${width}.png`) });
+    } finally {
+        try { await context?.close(); } finally { await community.close(); }
+    }
+});
+
+
+// Both visitors use actual private admission/relay and actual paint controls.
+// Only the guest's activity-script delivery is interrupted; no camera is used.
+for (const { width, height, moveFocus } of [{ width: 375, height: 667, moveFocus: false }, { width: 390, height: 844, moveFocus: true }, { width: 1440, height: 900, moveFocus: true }]) {
+    test(`protected activity tools retry keeps drawing and draft at ${width}px`, async ({ browser }, testInfo) => {
+        const { privateCommunity } = await import('./helpers/private-community.mjs');
+        const community = await privateCommunity(), contexts = [], errors = [], routes = new Set();
+        let requests = 0, release;
+        const delivery = new Promise(resolve => { release = resolve; });
+        async function enter(name, viewWidth, viewHeight, blocked) {
+            const context = await browser.newContext({ ignoreHTTPSErrors: true,
+                viewport: { width: viewWidth, height: viewHeight }, reducedMotion: 'reduce' });
+            contexts.push(context);
+            await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+            const sentinel = await installNoCaptureSentinel(context);
+            if (blocked) await context.route(community.origin + ROOT + 'lobby-room.js', route => {
+                requests++;
+                if (requests === 1) return route.abort('failed');
+                const pending = delivery.then(() => route.continue()); routes.add(pending);
+                return pending.finally(() => routes.delete(pending));
+            });
+            const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+            await page.goto(community.origin + '/beta/?via=' + (blocked ? 'rad-dad' : 'stalemate') + '#invite=' + community.invitation);
+            await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+            await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(name);
+            await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+            await expect(page.locator('[data-connection]')).toHaveText('Connected');
+            return { page, context, sentinel };
+        }
+        async function rooms(page) {
+            const tab = page.locator('nav [data-show="rooms"]');
+            if (await tab.isVisible()) await tab.click();
+        }
+        async function draw(page, color) {
+            await page.getByRole('button', { name: color + ' brush', exact: true }).click();
+            const canvas = page.locator('[data-act-canvas]'); await canvas.scrollIntoViewIfNeeded();
+            const geometry = await canvas.evaluate(node => {
+                const r = node.getBoundingClientRect();
+                let left = Math.max(0, r.left), top = Math.max(0, r.top), right = Math.min(innerWidth, r.right), bottom = Math.min(innerHeight, r.bottom);
+                for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+                    const style = getComputedStyle(parent), box = parent.getBoundingClientRect();
+                    if (/(auto|scroll|hidden|clip)/.test(style.overflowX)) { left = Math.max(left, box.left); right = Math.min(right, box.right); }
+                    if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) { top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom); }
+                }
+                const start = { x: left + (right - left) * .2, y: top + (bottom - top) * .2 };
+                const end = { x: left + (right - left) * .7, y: top + (bottom - top) * .6 };
+                return { width: right - left, height: bottom - top, start, end,
+                    uncovered: document.elementFromPoint(start.x, start.y) === node && document.elementFromPoint(end.x, end.y) === node };
+            });
+            expect(geometry.width).toBeGreaterThanOrEqual(64); expect(geometry.height).toBeGreaterThanOrEqual(48); expect(geometry.uncovered).toBe(true);
+            await page.mouse.move(geometry.start.x, geometry.start.y); await page.mouse.down();
+            await page.mouse.move(geometry.end.x, geometry.end.y, { steps: 6 }); await page.mouse.up();
+        }
+        const strokes = page => page.evaluate(() => window.__lobbyRoom?.state?.room?.strokes?.length || 0);
+        const pixels = page => page.locator('[data-act-canvas]').evaluate(async node => {
+            const data = node.getContext('2d').getImageData(0, 0, node.width, node.height).data;
+            const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+            return Array.from(digest, value => value.toString(16).padStart(2, '0')).join('');
+        });
+        try {
+            const [host, guest] = await Promise.all([enter('ToolsHost', 1440, 900, false), enter('ToolsGuest', width, height, true)]);
+            await rooms(host.page); await host.page.locator('[data-start="art"]').click();
+            await expect(host.page.locator('[data-act-canvas]')).toBeVisible();
+            const room = await host.page.locator('[data-chat-context]').innerText();
+            await rooms(guest.page);
+            await guest.page.getByRole('searchbox', { name: 'Find a room' }).fill(room.slice(1));
+            await guest.page.locator('[data-roomlist] button[data-room="' + room + '"]').press('Enter');
+            await expect(guest.page.locator('[data-chat-context]')).toHaveText(room);
+            expect(await guest.page.evaluate(() => typeof window.LobbyRoom)).toBe('undefined'); expect(requests).toBe(1);
+            await draw(host.page, 'Sky blue'); await expect.poll(() => strokes(host.page)).toBe(1);
+            await expect.poll(() => guest.page.evaluate(() => window.__lobby.chans.get(window.__lobby.active).actSnap?.strokes?.length || 0)).toBe(1);
+            const input = guest.page.getByRole('textbox', { name: 'Message', exact: true }), draft = 'My unsent draft stays while the activity tools recover.';
+            await input.fill(draft);
+            await host.page.getByRole('textbox', { name: 'Message', exact: true }).fill('Chat still works while drawing tools are unavailable.');
+            await host.page.getByRole('button', { name: 'Send', exact: true }).press('Enter');
+            await expect(guest.page.getByRole('log', { name: 'Conversation' })).toContainText('Chat still works while drawing tools are unavailable.');
+            await guest.sentinel.assertClean();
+            await guest.page.screenshot({ path: testInfo.outputPath(`01-activity-tools-unavailable-${width}.png`) });
+            const recovery = guest.page.locator('[data-activity-recovery]'), retry = guest.page.getByRole('button', { name: 'Retry activity', exact: true });
+            await expect(retry).toBeVisible();
+            await expect(recovery).toContainText('Activity tools couldn’t load. Chat still works. Retry the activity.');
+            await expect(retry).toBeInViewport({ ratio: 1 });
+            const box = await retry.boundingBox(); expect(box.width).toBeGreaterThanOrEqual(48); expect(box.height).toBeGreaterThanOrEqual(48);
+            await retry.press('Enter'); await expect.poll(() => requests).toBe(2); await expect(retry).toBeDisabled();
+            await expect(recovery).toContainText('Loading activity tools… Chat still works.');
+            if (moveFocus) await input.click();
+            await draw(host.page, 'Ochre'); await expect.poll(() => strokes(host.page)).toBe(2);
+            await expect.poll(() => guest.page.evaluate(() => window.__lobby.chans.get(window.__lobby.active).actSnap?.strokes?.length || 0)).toBe(2);
+            const priorHash = await pixels(host.page); release();
+            await expect(guest.page.locator('[data-act-canvas]')).toBeVisible(); await expect(recovery).toBeHidden();
+            await expect.poll(() => strokes(guest.page)).toBe(2); await expect.poll(() => pixels(guest.page)).toBe(priorHash);
+            await expect(input).toHaveValue(draft); await expect(guest.page.locator('[data-chat-context]')).toHaveText(room);
+            if (moveFocus) await expect(input).toBeFocused(); else await expect(guest.page.locator('[data-activity] > summary')).toBeFocused();
+            expect(community.diagnostics().admittedUpgrades).toBe(2);
+            await expect(host.page.getByRole('log', { name: 'Conversation' })).not.toContainText(draft);
+            expect(await guest.page.evaluate(text => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(text), draft)).toBe(false);
+            await guest.page.screenshot({ path: testInfo.outputPath(`02-activity-tools-recovered-${width}.png`) });
+            await draw(guest.page, 'Pink'); await expect.poll(() => strokes(guest.page)).toBe(3); await expect.poll(() => strokes(host.page)).toBe(3);
+            const finalHash = await pixels(guest.page); expect(finalHash).not.toBe(priorHash); await expect.poll(() => pixels(host.page)).toBe(finalHash);
+            await expect(input).toHaveValue(draft); await input.press('Enter');
+            await expect(host.page.getByRole('log', { name: 'Conversation' })).toContainText(draft);
+            for (const visitor of [host, guest]) {
+                await visitor.sentinel.assertClean();
+                expect(await visitor.page.evaluate(() => ({ cam: window.__lobbyRoom.state.camOn, stream: !!window.__lobbyRoom.state.stream, peers: window.__lobbyRoom.state.pcs.size }))).toEqual({ cam: false, stream: false, peers: 0 });
+            }
+            expect(errors).toEqual([]); expect(community.diagnostics().failures).toEqual([]);
+            await guest.page.screenshot({ path: testInfo.outputPath(`03-both-draw-and-chat-${width}.png`) });
+        } finally {
+            release(); await Promise.allSettled([...routes]);
+            const closed = await Promise.allSettled(contexts.map(context => context.close())); await community.close();
+            const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+            if (failures.length) throw new AggregateError(failures, 'Owned activity-recovery contexts did not close');
+        }
+    });
+}
+
+// Actual renderer and private admission; only one onJoin exception is injected
+// at the exported API boundary. No media or synthetic canvas pixels are used.
+for (const width of [390, 1440]) test(`protected activity setup failure waits for another Retry at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity(), contexts = [], sentinels = [], errors = [];
+    let scriptRequests = 0;
+    async function enter(name, faulty) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width: faulty ? width : 1440, height: faulty && width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        contexts.push(context);
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        sentinels.push(await installNoCaptureSentinel(context));
+        if (faulty) {
+            await context.route(community.origin + ROOT + 'lobby-room.js', route => ++scriptRequests === 1 ? route.abort('failed') : route.continue());
+            await context.addInitScript(() => {
+                const state = window.activitySetupFixture = { attaches: 0, joins: 0, leaves: 0, fail: true };
+                let exported;
+                Object.defineProperty(window, 'LobbyRoom', { configurable: true, get: () => exported, set(value) {
+                    exported = { ...value, attach(...options) {
+                        state.attaches++;
+                        const api = value.attach(...options);
+                        return { ...api, onJoin(...args) {
+                            state.joins++;
+                            if (state.fail) { state.fail = false; throw new Error('Fixture: room setup failed'); }
+                            return api.onJoin(...args);
+                        }, onLeave(...args) { state.leaves++; return api.onLeave(...args); } };
+                    } };
+                } });
+            });
+        }
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        await page.goto(community.origin + '/beta/?via=' + (faulty ? 'rad-dad' : 'stalemate') + '#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill(name);
+        await expect(page.locator('[data-enter]')).toBeEnabled();
+        await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        return page;
+    }
+    try {
+        const host = await enter('SetupHost', false), guest = await enter('SetupGuest', true);
+        await host.locator('[data-start="art"]').click();
+        const room = await host.locator('[data-chat-context]').textContent();
+        const input = guest.getByRole('textbox', { name: 'Message', exact: true });
+        await input.fill('/join ' + room); await input.press('Enter');
+        await expect(guest.locator('[data-chat-context]')).toHaveText(room);
+        const draft = 'My unsent note survives the activity setup error.';
+        await input.fill(draft);
+        const retry = guest.getByRole('button', { name: 'Retry activity', exact: true });
+        const recovery = guest.locator('[data-activity-recovery]');
+        await expect(retry).toBeVisible();
+        await retry.press('Enter');
+        await expect.poll(() => guest.evaluate(() => window.activitySetupFixture.leaves)).toBe(1);
+        await expect(retry).toBeFocused();
+        await expect(retry).toBeEnabled();
+        await expect(retry).toBeInViewport({ ratio: 1 });
+        await guest.screenshot({ path: testInfo.outputPath(`01-setup-failed-${width}.png`) });
+        // A real room update arrives while setup is unavailable. It must not
+        // mount another renderer behind the still-visible Retry control.
+        const topic = 'Activity recovery still needs a deliberate tap.';
+        await host.getByRole('textbox', { name: 'Message', exact: true }).fill('/topic ' + topic);
+        await host.getByRole('textbox', { name: 'Message', exact: true }).press('Enter');
+        await expect(guest.locator('[data-topic]')).toHaveText(topic);
+        expect(await guest.evaluate(() => window.activitySetupFixture.attaches)).toBe(1);
+        await expect(recovery).toBeVisible(); await expect(guest.locator('[data-cam]')).toBeDisabled();
+        await expect(input).toHaveValue(draft); await expect(retry).toBeFocused();
+        await guest.screenshot({ path: testInfo.outputPath(`02-no-silent-restart-${width}.png`) });
+        await retry.press('Enter');
+        await expect(recovery).toBeHidden(); await expect(guest.locator('[data-act-canvas]')).toBeVisible();
+        expect(await guest.evaluate(() => ({ attaches: window.activitySetupFixture.attaches, joins: window.activitySetupFixture.joins }))).toEqual({ attaches: 2, joins: 2 });
+        await expect(guest.locator('[data-activity] > summary')).toBeFocused();
+        await expect(input).toHaveValue(draft); await expect(input).toBeInViewport({ ratio: 1 });
+        await expect(guest.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        expect(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await guest.screenshot({ path: testInfo.outputPath(`03-deliberate-setup-retry-${width}.png`) });
+        for (const sentinel of sentinels) await sentinel.assertClean();
+        expect(errors).toEqual([]); expect(scriptRequests).toBe(2);
+        expect(community.diagnostics().admittedUpgrades).toBe(2); expect(community.diagnostics().failures).toEqual([]);
+    } finally {
+        const closed = await Promise.allSettled(contexts.map(context => context.close())); await community.close();
+        const failures = closed.filter(result => result.status === 'rejected').map(result => result.reason);
+        if (failures.length) throw new AggregateError(failures, 'Owned setup-failure contexts did not close');
+    }
+});
+
+// First-room entry uses the available real renderer. Only its first onJoin is
+// made to throw; the application must contain this optional-tool exception.
+for (const width of [375, 390, 1440]) test(`protected first activity setup failure keeps chat and offers Retry at ${width}px`, async ({ browser }, testInfo) => {
+    const { privateCommunity } = await import('./helpers/private-community.mjs');
+    const community = await privateCommunity(), errors = []; let context;
+    try {
+        context = await browser.newContext({ ignoreHTTPSErrors: true,
+            viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
+        await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
+        const sentinel = await installNoCaptureSentinel(context);
+        await context.addInitScript(() => {
+            const state = window.firstSetupFixture = { joins: 0, leaves: 0, fail: true }; let exported;
+            Object.defineProperty(window, 'LobbyRoom', { configurable: true, get: () => exported, set(value) {
+                exported = { ...value, attach(...options) {
+                    const api = value.attach(...options);
+                    return { ...api, onJoin(...args) {
+                        state.joins++;
+                        if (state.fail) { state.fail = false; throw new Error('Fixture: first room setup failed'); }
+                        return api.onJoin(...args);
+                    }, onLeave(...args) { state.leaves++; return api.onLeave(...args); } };
+                } };
+            } });
+        });
+        const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
+        await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
+        await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');
+        await page.getByRole('textbox', { name: 'Your nick', exact: true }).fill('FirstSetupGuest');
+        await expect(page.locator('[data-enter]')).toBeEnabled(); await page.locator('[data-enter]').press('Enter');
+        await expect(page.locator('[data-connection]')).toHaveText('Connected');
+        const leavesBefore = await page.evaluate(() => window.firstSetupFixture.leaves);
+        if (width < 901) await page.locator('nav [data-show="rooms"]').click();
+        await page.locator('[data-start="art"]').press('Enter');
+        await expect(page.locator('[data-chat-context]')).toHaveText(/^#art-/);
+        const retry = page.getByRole('button', { name: 'Retry activity', exact: true });
+        const recovery = page.locator('[data-activity-recovery]');
+        await expect(retry).toBeVisible(); await expect(retry).toBeInViewport({ ratio: 1 });
+        const bounds = await retry.boundingBox(); expect(bounds.width).toBeGreaterThanOrEqual(48); expect(bounds.height).toBeGreaterThanOrEqual(48);
+        expect(await page.evaluate(() => window.firstSetupFixture.leaves)).toBe(leavesBefore + 1);
+        await expect(page.locator('[data-cam]')).toBeDisabled();
+        await sentinel.assertClean(); await page.screenshot({ path: testInfo.outputPath(`01-first-setup-failed-${width}.png`) });
+        const input = page.getByRole('textbox', { name: 'Message', exact: true });
+        const message = 'Chat stays usable after the first activity setup fails.';
+        await input.fill(message); await input.press('Enter');
+        await expect(page.getByRole('log', { name: 'Conversation' })).toContainText(message);
+        const draft = 'My private unsent draft survives the first Retry.';
+        await input.fill(draft); await expect(recovery).toBeVisible();
+        expect(await page.evaluate(() => window.firstSetupFixture.joins)).toBe(1);
+        await page.screenshot({ path: testInfo.outputPath(`02-first-setup-chat-${width}.png`) });
+        await retry.press('Enter');
+        await expect(recovery).toBeHidden(); await expect(page.locator('[data-act-canvas]')).toBeVisible();
+        expect(await page.evaluate(() => window.firstSetupFixture.joins)).toBe(2);
+        await expect(page.locator('[data-activity] > summary')).toBeFocused();
+        await expect(input).toHaveValue(draft); await expect(input).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+        await expect(page.getByRole('log', { name: 'Conversation' })).not.toContainText(draft);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect(await page.evaluate(text => JSON.stringify({ ...localStorage, ...sessionStorage }).includes(text), draft)).toBe(false);
+        await sentinel.assertClean(); expect(errors).toEqual([]);
+        expect(community.diagnostics().admittedUpgrades).toBe(1); expect(community.diagnostics().failures).toEqual([]);
+        await page.screenshot({ path: testInfo.outputPath(`03-first-setup-recovered-${width}.png`) });
+    } finally {
+        try { await context?.close(); } finally { await community.close(); }
+    }
+});

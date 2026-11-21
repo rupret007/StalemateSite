@@ -1,0 +1,41 @@
+{
+  "scope": "Local browser fixtures; QR encodes an inert webjam.example invitation, not an active credential. No physical-camera or hosted-guest proof.",
+  "fullUnits": {
+    "passed": 2057,
+    "files": 137,
+    "receiptLogSha256": "a963a7b8990bf98e8c9614b49eded877f629f9ab2eb079c83bf2289b3a2a7d12"
+  },
+  "invitationBrowserSuite": {
+    "passed": 52,
+    "engines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "retries": 0,
+    "scope": "Before final display-only pane scroll correction; final QR visibility matrix passed after it."
+  },
+  "additionalPhoneQrMatrix": {
+    "passed": 4,
+    "widths": [
+      375,
+      390
+    ],
+    "engines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "retries": 0,
+    "overlap": "390px behavior also covered in the prior52-case suite; counts are not summed.",
+    "visibility": "Complete QR bounds inside music pane and viewport; composer and Send remain visible."
+  },
+  "portedDraft193UnitCases": 37,
+  "screenshots": {
+    "webkit-390.png": "5ab0ab2b83dfa31827b4cea4e52fcd7230a3b039b64bc2a115d8d349402e71b5",
+    "webkit-375.png": "740416ae24b48b640dbbe939c1908b98a471e003a4cbf553c7bc84535e7ae4e0"
+  },
+  "priorVisibilityRun": "Four failures reproduced panel clipping after visual inspection; corrected by scrolling only the music pane.",
+  "productionFileSha256": {
+    "r/45662413410ed051/lobby/lobby.js": "a7feb2de554eb762408d1c5f380559088370d33eabe4dbe423863bbbacd0d40f",
+    "r/45662413410ed051/lobby/qr-lite.js": "ab9e2f8092c32a5a3887444915ec019291e4d1713783a551e134ee062e2d29d0"
+  }
+}

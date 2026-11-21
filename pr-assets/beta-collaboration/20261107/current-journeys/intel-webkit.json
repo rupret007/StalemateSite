@@ -1,0 +1,93 @@
+{
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "activeVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "engine": "webkit",
+  "scope": "Actual invitation-protected Cloudflare service; isolated synthetic guests, no live media, provider credentials, signed identity fixtures, or human moderation.",
+  "startedAt": "2026-11-07T06:44:00.960Z",
+  "checks": [
+    "Uninvited guests cannot read private state or Web Join JavaScript",
+    "Stalemate invitation, nickname and connected chat",
+    "Rad Dad invitation, nickname and connected chat",
+    "Both entrances share one lobby and display the arrival-site badge",
+    "Private runtime JavaScript and styles match the candidate exactly",
+    "Mobile chat contains page width and keeps input and Send visible at 375 and 390px",
+    "Manual reconnect retains an unsent draft and starts fresh scrollback",
+    "Two guests create and join an Art room with a received canvas stroke",
+    "The server allows the room host and refuses an ordinary guest topic change",
+    "A Jam host can invite a guest and share a browser destination on the preserved origin",
+    "Both own QA rooms close through the normal host command",
+    "Logout revokes copied cookies and protected code and closes the active page"
+  ],
+  "captureRequests": 0,
+  "assets": [
+    "join/app.js",
+    "join/audio.js",
+    "join/config.js",
+    "join/crypto.js",
+    "join/errors.js",
+    "join/index.html",
+    "join/mailbox.js",
+    "join/policy.js",
+    "join/prejoin.js",
+    "join/session.js",
+    "join/style.css",
+    "r/45662413410ed051/lobby/lobby.css",
+    "r/45662413410ed051/lobby/lobby.js"
+  ],
+  "logout": [
+    200,
+    200
+  ],
+  "browserVersion": "27.2",
+  "executionEndpoint": "Intel MacBook macOS 15.7.9",
+  "mobile": [
+    {
+      "viewport": 375,
+      "pageWidth": 375,
+      "inputLeft": 46,
+      "inputRight": 294,
+      "sendRight": 357,
+      "sendLeft": 299,
+      "fontSize": "16px"
+    },
+    {
+      "viewport": 390,
+      "pageWidth": 390,
+      "inputLeft": 46,
+      "inputRight": 309,
+      "sendRight": 372,
+      "sendLeft": 314,
+      "fontSize": "16px"
+    }
+  ],
+  "reconnectMs": 208,
+  "reconnectSenderState": {
+    "modes": {
+      "m": false,
+      "i": false,
+      "k": false,
+      "l": 150,
+      "t": true,
+      "S": 3,
+      "C": false,
+      "Q": false,
+      "locked": false
+    },
+    "connection": "connected",
+    "budget": "ok",
+    "lock": "off"
+  },
+  "browserInvitationShared": true,
+  "setupMs": [
+    {
+      "source": "stalemate",
+      "ms": 1671
+    },
+    {
+      "source": "rad-dad",
+      "ms": 906
+    }
+  ],
+  "status": "passed",
+  "completedAt": "2026-11-07T06:44:19.443Z"
+}

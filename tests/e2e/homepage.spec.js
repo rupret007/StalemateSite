@@ -286,3 +286,10 @@ test.describe('repeat show button', () => {
         }
     });
 });
+
+test('the band homepage links to WebJam for Music and Art', async ({ page }) => {
+    await page.goto('/');
+    const webjam = page.getByRole('link', { name: 'Music and Art in WebJam', exact: true });
+    await expect(webjam).toBeVisible();
+    await expect(webjam).toHaveAttribute('href', 'https://github.com/rupret007/webjam/releases/latest');
+});

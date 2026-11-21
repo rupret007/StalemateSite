@@ -1,0 +1,22 @@
+{
+  "at": "2026-11-07T15:59:50.352461+00:00",
+  "state": "ORIGINAL_REAL8H_OBSERVER_FAILED_IDLE_TERMINAL_STATE_ASSERTION",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "originalProofSha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+  "originalState": "FAILED_INSPECT_ORIGINAL",
+  "failureStage": "terminal UI and socket expiry",
+  "expiresAt": "2026-11-07T15:55:23.162Z",
+  "observationEndedAt": "2026-11-07T15:56:10.782Z",
+  "quietSocketStillOpenAndUiConnectedAtFailure": true,
+  "cleanupLogoutHttpStatus": 401,
+  "allOwnedBrowserResourcesClosedReported": true,
+  "sameExpiredSignedTokenReplayExecuted": false,
+  "postExpiryMessageReceptionTested": false,
+  "serverAuthenticationBypassEstablished": false,
+  "firstSourceFinding": "Legacy lobby alarm is scheduled every60000ms. The observer allowed45000ms after expiry for ended UI. No exact-expiry alarm scheduling occurs on legacy admission. Source supports a scheduling-gap hypothesis; it does not establish the actual Cloudflare alarm phase or cause.",
+  "nextAction": "Preserve original failure and failed finalizer. Independently verify cleanup/current versions. Reproduce last-minute idle expiry scheduling locally before deciding whether a product fix is required. Do not loosen the original observer, change TTL/clocks/limits, fake PASS, or execute the prepared delivery gate.",
+  "privateDeliveryAttempted": false,
+  "publicSitesChanged": false,
+  "physicalCapture": false
+}

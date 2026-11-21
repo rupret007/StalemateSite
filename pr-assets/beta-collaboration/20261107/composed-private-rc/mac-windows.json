@@ -1,0 +1,75 @@
+{
+  "at": "2026-11-07T05:59:35.558Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "scope": "One Mac Chromium guest and one real Windows Chrome guest, ordinary hosted browser HTTP/WebSockets on each machine; controller input timing includes SSH/CDP overhead. No native host, recording, live media or separate-household claim.",
+  "roles": [
+    {
+      "site": "stalemate",
+      "kind": "guest",
+      "role": "fan"
+    },
+    {
+      "site": "rad-dad",
+      "kind": "guest",
+      "role": "fan"
+    }
+  ],
+  "assets": [
+    "r/45662413410ed051/lobby/lobby.js",
+    "r/45662413410ed051/lobby/lobby.css",
+    "join/app.js",
+    "join/errors.js",
+    "join/mailbox.js"
+  ],
+  "logout": [
+    200,
+    200
+  ],
+  "copiedCookieReplay": [
+    401,
+    401
+  ],
+  "physicalCapture": false,
+  "simulatedMicDenial": true,
+  "newRooms": 0,
+  "windowsBrowser": "156.0.8078.80",
+  "freshJoinHasNoEarlierChat": true,
+  "reciprocalBrandedChat": true,
+  "namedListInActualWindowsBrowser": true,
+  "windowsMobile": [
+    {
+      "viewport": 375,
+      "pageWidth": 375,
+      "fontSize": "16px",
+      "inputLeft": 46,
+      "inputRight": 294,
+      "sendLeft": 299,
+      "sendRight": 357
+    },
+    {
+      "viewport": 390,
+      "pageWidth": 390,
+      "fontSize": "16px",
+      "inputLeft": 46,
+      "inputRight": 309,
+      "sendLeft": 314,
+      "sendRight": 372
+    }
+  ],
+  "windowsDraftAndFreshReconnect": true,
+  "windowsPermissionRecoveryPresented": true,
+  "setupMs": [
+    {
+      "site": "stalemate",
+      "ms": 1371
+    },
+    {
+      "site": "rad-dad",
+      "ms": 1176
+    }
+  ],
+  "status": "passed",
+  "originalWindowsPagesPreserved": true,
+  "completedAt": "2026-11-07T05:59:46.364Z"
+}

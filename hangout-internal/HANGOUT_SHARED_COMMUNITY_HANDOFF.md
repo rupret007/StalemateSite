@@ -1,18 +1,33 @@
 # Shared-community integration and release handoff
 
-Current continuation, October 31: start with the
-[website integration guide](HANGOUT_WEBSITE_INTEGRATION.md) and
-[current private evidence](HANGOUT_PRIVATE_DEMO_PROGRESS_20261031.md). Private
-source4ed/versiona972 and native sourcebf24 supersede the dated revisions below.
-The repository now supplies `hangout-worker/tools/package-community-toolkit.mjs` for the
+For the current private runtime, start with the
+[November 8 readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+and [website integration guide](HANGOUT_WEBSITE_INTEGRATION.md). Website source
+`ac9b82f42c8d6952193f5cbefbf11fc04816821d`, merge
+`84e77d6d8513a4f8ecce713835b97aa3a547b66c`, is delivered as private version
+`449fe7d2-0ac3-41b8-b622-fda2453b38db`. Native packages remain source
+`76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c`. Current Intel WebKit and Windows
+Chrome hosted journeys and independent cleanup passed. The previous C227 real
+eight-hour expiry also passed, with five recovered interruptions retained;
+it does not prove eight-hour behavior on 449. The separate 110-minute heartbeat
+observation passed with ten ping/pong pairs and no closures, with independent
+cleanup and separate metadata readback; original postcheck failures are retained. Essential physical music and
+operator checks remain pending. Revalidate live state before future delivery.
+
+The repository supplies `hangout-worker/tools/package-community-toolkit.mjs` for the
 documented self-contained, committed-source entry toolkit. Its manifest binds
 the exported public files; the toolkit does not contain or deploy the full app.
 Jeff's October30 direction makes application code, project CI, docs and PRs
 independent of StoryPool/Karen. Shared core/services/operational state and all
 existing provider/trust/public-release holds remain outside these changes.
 The older ownership/review statements below are historical, not new gates.
+Adding the two entrance links does not require a community backend deployment.
+The recorded heartbeat observation is terminal; do not restart it. Keep public
+navigation unchanged until the release is ready.
 
-Application source assessment, October 25, 2026. This is a reviewable handoff to
+## Historical architecture baseline
+
+Application source assessment, October 25, 2026. This was a reviewable handoff to
 StoryPool 10-21-26, which owns core, Karen, deployments and shared operations. It
 does not execute a deployment, change a hold, choose a public launch date or
 claim legal/platform readiness. Read [the product/integration description](HANGOUT_SHARED_COMMUNITY.md)

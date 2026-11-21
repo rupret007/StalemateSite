@@ -99,7 +99,7 @@ async function scenario(browser, baseURL) {
         expect(await page.evaluate(() => window.__admin.state.capabilities)).toMatchObject({ moderate: true, configure: false });
         return page;
     }
-    return { guest, moderator, adminUrl, websiteOrigins: () => websites.map(server => `http://127.0.0.1:${server.address().port}`),
+    return { guest, moderator, context, adminUrl, websiteOrigins: () => websites.map(server => `http://127.0.0.1:${server.address().port}`),
         close: async () => {
             await Promise.all(contexts.map(value => value.close()));
             await Promise.all(websites.map(server => new Promise(resolve => { server.closeIdleConnections(); server.close(resolve); })));
@@ -153,8 +153,25 @@ test('three entrances share a guest-hosted creative room, real report review and
         for (const page of [author, witness, observer]) await expect(received(page, text)).toHaveCount(1);
         expect(await witness.evaluate(() => window.__lobby.capabilities.moderate)).toBe(false);
 
-        await received(witness, text).locator('.flag').click();
-        await expect(received(witness, text).locator('.flag')).toHaveText('✓');
+        const normalViewport = witness.viewportSize();
+        await witness.setViewportSize({ width: 320, height: 188 });
+        const flag = received(witness, text).locator('.flag');
+        await flag.press('Enter');
+        await expect(flag).toHaveText('✓');
+        await expect(flag).toHaveAttribute('aria-disabled', 'true');
+        await expect(flag).toHaveAttribute('tabindex', '-1');
+        await expect(flag).toBeFocused();
+        await expect.poll(() => flag.evaluate(button => {
+            const flagBounds = button.getBoundingClientRect();
+            const chatBounds = button.closest('.chat').getBoundingClientRect();
+            const bufferBounds = button.closest('.buffer').getBoundingClientRect();
+            const composerBounds = document.querySelector('[data-say]').getBoundingClientRect();
+            return flagBounds.top >= Math.max(0, chatBounds.top, bufferBounds.top) &&
+                flagBounds.bottom <= Math.min(innerHeight, chatBounds.bottom, bufferBounds.bottom, composerBounds.top);
+        })).toBe(true);
+        await witness.keyboard.press('Enter');
+        await expect(flag).toBeFocused();
+        await witness.setViewportSize(normalViewport);
         await expect(reportRow(moderator, text)).toContainText('StaleAuthor');
         expect(await moderator.evaluate(id => window.__admin.state.reports.find(item => item.id === id).count, messageId)).toBe(1);
         await expect(moderator.locator('[data-panic]')).toBeHidden();
@@ -322,7 +339,27 @@ test('one fixture-verified account keeps ownership across entries and revokes an
 
         // New browser storage/device; only the adapter's authenticated account
         // is the same. Website source is deliberately changed.
-        const returnedOwner = await app.guest('rad-dad', 'ReturnedOwner', null, { account, viewport: { width: 390, height: 844 } });
+        const returnedContext = await app.context({ viewport: { width: 390, height: 844 } });
+        const heldOwnership = [];
+        let holdingOwnership = true, releaseOwnership;
+        await returnedContext.routeWebSocket(url => url.pathname.endsWith('/lobby-owner'), socket => {
+            const server = socket.connectToServer();
+            socket.onMessage(raw => server.send(raw));
+            server.onMessage(raw => {
+                const frame = JSON.parse(String(raw));
+                // Preserve wire order while pausing immediately after the
+                // owner's channel snapshot and before its ownership details.
+                if (holdingOwnership && (heldOwnership.length || frame.t === 'ownership' && frame.ch === room)) {
+                    heldOwnership.push(raw); return;
+                }
+                socket.send(raw);
+            });
+            releaseOwnership = () => {
+                holdingOwnership = false;
+                for (const raw of heldOwnership.splice(0)) socket.send(raw);
+            };
+        });
+        const returnedOwner = await app.guest('rad-dad', 'ReturnedOwner', returnedContext, { account });
         expect(await returnedOwner.evaluate(() => localStorage.getItem('hangout-dev'))).not.toBe(oldDevice);
         await returnedOwner.click('nav [data-show="rooms"]');
         await returnedOwner.selectOption('[data-room-filter]', 'mine');
@@ -334,6 +371,20 @@ test('one fixture-verified account keeps ownership across entries and revokes an
         expect(await returnedOwner.evaluate(name => window.__lobby.chans.get(name).names.find(person => person.nick === window.__lobby.me).owner, room)).toBe(true);
         expect(await returnedOwner.evaluate(() => window.__lobby.capabilities.moderate)).toBe(false);
         await returnedOwner.click('[data-roomtools]');
+        await expect.poll(() => heldOwnership.length).toBeGreaterThan(0);
+        const removeOfflineHost = returnedOwner.getByRole('button', { name: 'Remove verified co-host: RadCoHost', exact: true });
+        await expect(removeOfflineHost).toHaveCount(0);
+        const focusedCommand = returnedOwner.locator('[data-palette]').getByRole('button', { name: 'Invite guest', exact: true });
+        await focusedCommand.focus();
+        releaseOwnership();
+        await expect(removeOfflineHost).toBeVisible();
+        await expect(focusedCommand).toBeFocused();
+        for (const width of [375, 390]) {
+            await returnedOwner.setViewportSize({ width, height: 844 });
+            await removeOfflineHost.scrollIntoViewIfNeeded();
+            expect(await returnedOwner.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+            await returnedOwner.screenshot({ path: testInfo.outputPath(`late-owner-tools-${width}.png`) });
+        }
         returnedOwner.once('dialog', dialog => dialog.accept());
         await returnedOwner.getByRole('button', { name: 'Remove verified co-host: RadCoHost', exact: true }).click();
         await expect.poll(() => returnedOwner.evaluate(name => window.__lobby.chans.get(name).cohosts.length, room)).toBe(0);

@@ -1,3 +1,5 @@
+import { MUSIC_INTERNAL_PATH, musicJson, musicResponse, privateMusicOrigin, stoppingMusic } from './private-music.mjs';
+import { sweepGameNightPasses } from './game-night-pass.mjs';
 // The #stalemate lobby Durable Object + its Worker-side admission. Everything that can be refused is refused here,
 // before a DO request is spent. Missing config/secrets => 503 (fail closed).
 import { originAllowed, previewKeyOk } from './core.mjs';
@@ -6,7 +8,7 @@ import { createLobby, LOBBY_LIMITS } from './lobby-core.mjs';
 import { LOG_TTL } from './community-state.mjs';
 import { createAiModerator } from './ai-moderation.mjs';
 import { aiEligibility } from './ai-eligibility.mjs';
-import { activeBetaSession, validBetaSession } from './beta-session-client.mjs';
+import { activeBetaSession, registryRequest, validBetaSession } from './beta-session-client.mjs';
 import { INTERNAL_HEALTH_PATH, aiHealth, dailyUsage, healthJson } from './beta-ops.mjs';
 import { createPrivateReportQueue, privateReportRef, validatePrivateReportControl, LIMITS as PRIVATE_REPORT_LIMITS } from './private-reports.mjs';
 import { createSocketDelivery } from './socket-delivery.mjs';
@@ -17,6 +19,11 @@ import { lobbyAuthorityMode, createLobbySessionAuthority, createLobbyAuthoritySt
 import { createLobbyParticipation, lobbyParticipationMode, participationConfigurationValid } from './lobby-participation.mjs';
 import { PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 import { lobbyIncidentSourceMode, incidentSourceConfigurationValid } from './lobby-incident-sources.mjs';
+import { arcadeEnabled, arcadeGame, arcadeGames, arcadePath, arcadeRoomRequest, arcadeSocketGame, createArcadeTransport, isArcadeSocket } from './arcade-transport.mjs';
+import { createGameNightMedia, isMediaSocket, mediaEnabled, mediaPath } from './game-night-media.mjs';
+import { GAME_INVITATION_PATH, gameGuestEnabled, gameInvitationRequest } from './game-night-invitations.mjs';
+import { GAME_ROOM_GRANT_PATH, gameRoomGrantsEnabled, lobbyRoomGrants } from './game-night-room-grant-routes.mjs';
+import { issueGameNightTurn } from './turn.mjs';
 
 const privateReportResponse = (value) => new Response(JSON.stringify(value), {
     status: value.ok ? 200 : Number.isInteger(value.status) ? value.status : 503,
@@ -251,6 +258,25 @@ export class HangoutLobby {
         this.participationStartOwner = null;
         this.authorityMode = lobbyAuthorityMode(env);
         this.liveBindings = new Map();
+        this.arcadeDepartures = [];
+        this.arcadeConfigurationReady = false;
+        this.roomGrants = lobbyRoomGrants(this);
+        this.arcade = new Map(arcadeGames.map(name => [name, createArcadeTransport({
+            name, state, current: scope => this.arcadeBinding(scope, name), active: binding => this.sessionActive(binding),
+            guestActivity: binding => this.gameNightActivity(binding),
+            charge: (socket, actor) => this.controlBudget.take(socket, actor),
+            approve: async actor => (await this.engine.approveArcade(actor))?.ok === true,
+            allowed: () => this.arcadeAvailable(name) && !this.authorityUnavailable
+        })]));
+        this.gameMedia = createGameNightMedia({
+            state, current: scope => this.arcadeBinding(scope), active: binding => this.sessionActive(binding),
+            charge: (socket, actor) => this.controlBudget.take(socket, actor),
+            approve: async (...args) => (await this.engine.approveGameMedia(...args))?.ok === true,
+            allowed: () => mediaEnabled(env) && !this.authorityUnavailable,
+            mintRelay: env.HANGOUT_ARCADE_TURN === '1' ? (ref, dev) => issueGameNightTurn(env, ref, dev) : null,
+            serialize: operation => retirementGate(this, operation),
+            submitReport: report => this.submitGameNightReport(report)
+        });
         this.ready = state.blockConcurrencyWhile(async () => {
             try { await this.start(); }
             catch (error) { if (!this.authorityMode) throw error; this.storageFailureToken = {}; this.authorityUnavailable = true; this.evidenceStorage = 'degraded'; }
@@ -311,10 +337,25 @@ export class HangoutLobby {
         const participationStartOwner = this.participationMode ? {
             engine: null, authority: this.authority, failureToken: this.storageFailureToken
         } : null;
+        this.engine?.retireMusic();
+        const musicOrigin = privateMusicOrigin(env);
+        const musicProvider = musicOrigin ? {
+            origin: musicOrigin,
+            prepare: (claim, ip) => env.WEBJAM_PRIVATE_MUSIC.prepare(claim, ip),
+            issue: (claim, confirm) => env.WEBJAM_PRIVATE_MUSIC.issue(claim, confirm),
+            touch: claim => env.WEBJAM_PRIVATE_MUSIC.touch(claim),
+            revoke: claim => env.WEBJAM_PRIVATE_MUSIC.revoke(claim),
+            keepAlive: task => this.state.waitUntil?.(task)
+        } : null;
         this.engine = createLobby({
+            storageRequired: true,
+            musicProvider,
             incidentSources: !!this.incidentSourceMode,
+            gameNight: env.HANGOUT_BETA_MODE === 'protected',
+            directMusicInvites: env.HANGOUT_BETA_MODE === 'protected',
+            webJamChess: gameRoomGrantsEnabled(env) && arcadeEnabled(env, 'chess'),
             ...(this.authorityMode ? { effectCommit: this.authority.effectCommit } : {}),
-            ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority,
+            ...(this.participationMode ? { participation: createLobbyParticipation({ env, authority: this.authority, musicProvider,
                 dispatchStart: request => this.dispatchParticipationStart(request, participationStartOwner) }) } : {}),
             deferPresence: marker => this.presence.mark(marker),
             aiModerationStatus: () => ({ ...this.aiModerator.status(), requested: eligibility.requested,
@@ -330,6 +371,10 @@ export class HangoutLobby {
                 if (ws) {
                     if (this.closedSockets.has(ws)) return;
                     const a = ws.deserializeAttachment() || {};
+                    if (arcadeEnabled(env) && msg.t === 'part' && a.betaSid) {
+                        const ref = this.engine.arcadeRoomRef(msg.ch, gameRoomGrantsEnabled(env));
+                        if (ref) this.arcadeDepartures.push({ scope: { room: msg.ch, ref }, subject: a.betaSid });
+                    }
                     if (socketIdentityInvalid(a, env) || this.authorityMode && !this.bindingLive(a)) {
                         if (!a.sessionEnded) {
                             closeTransport(this, ws, 4401, 'sign in again');
@@ -382,7 +427,7 @@ export class HangoutLobby {
         // Hibernation preserves the browser's actual connection. Restore metadata only:
         // never send hello/join or erase its connected-session scrollback on an idle wake.
         const live = [], sockets = new Map(), betaChecks = new Map();
-        for (const ws of state.getWebSockets()) {
+        for (const ws of this.lobbySockets()) {
             const a = ws.deserializeAttachment() || {};
             if (!a.id) { ws.close(4401, 'session unavailable'); continue; }
             if (this.closedSockets.has(ws) || socketIdentityInvalid(a, env) || this.authorityMode && !this.bindingLive(a)) { ws.close(4401, 'sign in again'); continue; }
@@ -403,7 +448,7 @@ export class HangoutLobby {
         if (this.participationMode) await confirmRestore(this.engine.refreshParticipation());
         const currentRooms = this.engine.roomSnapshot();
         if (JSON.stringify(currentRooms) !== roomsBeforeResume) await this.persistRequired('rooms', currentRooms);
-        const currentSessions = this.engine.sessionSnapshot();
+        const currentSessions = this.engine.sessionStorageSnapshot();
         if (JSON.stringify(savedSessions) !== JSON.stringify(currentSessions)) await this.persistRequired('sessions', currentSessions);
         if (recovered) {
             const resumed = new Set(restored.resumed);
@@ -418,7 +463,28 @@ export class HangoutLobby {
         if (recovered) this.engine.restoreLog(recovered.state.modlog);
         else { const logs = await state.storage.list({ prefix: 'log:', reverse: true, limit: 2000 }); this.engine.restoreLog([...logs.values()].reverse()); }
         if (this.authorityMode) { await this.authority.schedule(); this.privateQueueActor = null; }
-        else if (!(await state.storage.getAlarm())) await state.storage.setAlarm(Date.now() + 60 * 1000);
+        else await this.scheduleLegacyAlarm();
+        if (env.HANGOUT_BETA_MODE === 'protected') await this.restoreArcadeConfiguration().catch(() => {});
+        for (const service of this.arcade.values()) service.reconcile();
+        this.gameMedia.reconcile();
+    }
+
+    async scheduleLegacyAlarm(expiresAt, afterAlarm = false) {
+        const now = Date.now();
+        let next = now + 60000;
+        const include = value => { if (Number.isFinite(value)) next = Math.min(next, Math.max(now, value)); };
+        if (expiresAt === undefined) {
+            for (const ws of this.lobbySockets()) {
+                if (ws.readyState === 3 || this.closedSockets?.has(ws)) continue;
+                const attachment = ws.deserializeAttachment() || {};
+                if (!attachment.sessionEnded && !attachment.betaEnded) include(attachment.expiresAt);
+            }
+        } else include(expiresAt);
+        const current = await this.state.storage.getAlarm();
+        // Admission must not postpone an existing due alarm. After an alarm
+        // fires, its old deadline is consumed; retain only a future earlier one.
+        if (Number.isFinite(current) && (!afterAlarm || current > now)) next = Math.min(next, current);
+        if (afterAlarm || current !== next) await this.state.storage.setAlarm(next);
     }
 
     bindingLive(value) {
@@ -426,6 +492,58 @@ export class HangoutLobby {
         const saved = this.liveBindings.get(value.id);
         return !!saved && saved.expiresAt > Date.now() && ['id', 'betaSid', 'betaInviteVersion', 'dev', 'iph', 'account', 'role', 'admin', 'expiresAt', 'authorityRef', 'authorityRevision']
             .every(key => saved[key] === value[key]);
+    }
+    lobbySockets() { return this.state.getWebSockets().filter(socket => !isArcadeSocket(socket) && !isMediaSocket(socket)); }
+    arcadeBinding(scope, game) {
+        const socket = this.byId(scope.actor), a = socket?.deserializeAttachment();
+        if (!a || socket.readyState !== 1 || this.closedSockets.has(socket) ||
+            socketIdentityInvalid(a, this.env) || this.authorityMode && !this.bindingLive(a)) return null;
+        const member = this.engine.arcadeActor(scope, game === 'chess' && gameRoomGrantsEnabled(this.env));
+        return member ? { ...a, ...member, socket } : null;
+    }
+    arcadeAvailable(name) {
+        return this.arcadeConfigurationReady && arcadeEnabled(this.env, name);
+    }
+    async restoreArcadeConfiguration() {
+        const key = 'game-night-enabled:v1', storage = this.state.storage;
+        const enabled = arcadeGames.filter(name => arcadeEnabled(this.env, name));
+        const saved = await storage.get(key);
+        const previous = saved === undefined ? [] : Array.isArray(saved) && saved.length <= arcadeGames.length
+            && saved.every(name => this.arcade.has(name)) ? saved : arcadeGames;
+        for (const name of arcadeGames) {
+            if (previous.includes(name) && !enabled.includes(name)) await this.arcade.get(name).retireDisabled();
+        }
+        if (JSON.stringify(previous) !== JSON.stringify(enabled)) {
+            if (enabled.length) await storage.put(key, enabled);
+            else await storage.delete(key);
+        }
+        // Failed cleanup fences arcade admission until maintenance can retry.
+        this.arcadeConfigurationReady = true;
+    }
+    async reconcileArcade() {
+        if (mediaEnabled(this.env)) this.gameMedia.reconcile();
+        if (!arcadeEnabled(this.env)) return;
+        for (const departure of this.arcadeDepartures.splice(0)) {
+            let retired = true;
+            for (const service of this.arcade.values()) {
+                if (!await service.revoke(departure.scope, departure.subject)) retired = false;
+            }
+            if (!retired) this.arcadeDepartures.push(departure);
+        }
+        for (const service of this.arcade.values()) service.reconcile();
+    }
+    async maintainArcade() {
+        if (this.env.HANGOUT_BETA_MODE === 'protected' && !this.arcadeConfigurationReady) {
+            await this.restoreArcadeConfiguration().catch(() => {});
+        }
+        for (const [name, service] of this.arcade) if (this.arcadeAvailable(name)) await service.maintain().catch(() => {});
+        if (gameGuestEnabled(this.env)) await sweepGameNightPasses(this.state.storage, Date.now()).catch(() => {});
+        if (gameRoomGrantsEnabled(this.env)) await this.roomGrants.sweep(Date.now()).catch(() => {});
+    }
+    async gameNightActivity(binding) {
+        const value = { sid: binding.betaSid, exp: binding.expiresAt, version: binding.betaInviteVersion };
+        if (this.authorityMode) await this.authority.gameNightActivity(value);
+        else await registryRequest(this.env, 'game-night-activity', value);
     }
     async sessionActive(value) {
         if (!this.authorityMode) return activeBetaSession(this.env, value);
@@ -445,22 +563,30 @@ export class HangoutLobby {
         const denied = () => Error('participation-denied');
         if (!request || typeof request !== 'object' || this.usedParticipationStarts.has(request)) throw denied();
         this.usedParticipationStarts.add(request);
-        const fields = Object.getOwnPropertyDescriptors(request), keys = ['actorId', 'validate', 'start'];
+        const fields = Object.getOwnPropertyDescriptors(request);
+        const hasPeer = Object.hasOwn(fields, 'peerId');
+        const keys = ['actorId', 'validate', 'start', ...(hasPeer ? ['peerId'] : [])];
         if (Object.keys(fields).length !== keys.length || keys.some(key => !Object.hasOwn(fields[key] || {}, 'value'))) throw denied();
-        const actorId = fields.actorId.value, validate = fields.validate.value, start = fields.start.value;
-        if (typeof actorId !== 'string' || !actorId || actorId.length > 128 || typeof validate !== 'function' || typeof start !== 'function') throw denied();
+        const actorId = fields.actorId.value, peerId = fields.peerId?.value, validate = fields.validate.value, start = fields.start.value;
+        const validId = id => typeof id === 'string' && id.length > 0 && id.length <= 128;
+        if (!validId(actorId) || hasPeer && (!validId(peerId) || peerId === actorId)
+            || typeof validate !== 'function' || typeof start !== 'function') throw denied();
         await this.ready;
-        const socket = this.byId(actorId), binding = this.liveBindings.get(actorId);
+        const participants = (hasPeer ? [actorId, peerId] : [actorId]).map(id => ({
+            id, socket: this.byId(id), binding: this.liveBindings.get(id)
+        }));
         const current = () => {
             try {
                 if (!owner || owner !== this.participationStartOwner || owner.engine !== this.engine || owner.authority !== this.authority
                     || owner.failureToken !== this.storageFailureToken || !this.authorityMode || !this.participationMode
                     || !lobbyAuthorityMode(this.env) || !lobbyParticipationMode(this.env) || this.authorityUnavailable !== false
-                    || this.evidenceStorage !== 'ready' || !socket || !binding || this.byId(actorId) !== socket
-                    || this.liveBindings.get(actorId) !== binding || this.closedSockets.has(socket)
-                    || socket.readyState !== undefined && socket.readyState !== 1) return false;
-                const attachment = socket.deserializeAttachment() || {};
-                return attachment.id === actorId && !socketIdentityInvalid(attachment, this.env) && this.bindingLive(attachment);
+                    || this.evidenceStorage !== 'ready') return false;
+                return participants.every(({ id, socket, binding }) => {
+                    if (!socket || !binding || this.byId(id) !== socket || this.liveBindings.get(id) !== binding || this.closedSockets.has(socket)
+                        || socket.readyState !== undefined && socket.readyState !== 1) return false;
+                    const attachment = socket.deserializeAttachment() || {};
+                    return attachment.id === id && !socketIdentityInvalid(attachment, this.env) && this.bindingLive(attachment);
+                });
             } catch { return false; }
         };
         if (!current()) throw denied();
@@ -494,7 +620,7 @@ export class HangoutLobby {
             rememberRetirement(this, id, sid); this.liveBindings.delete(id);
         }
         let closed = true;
-        for (const ws of this.state.getWebSockets()) {
+        for (const ws of this.lobbySockets()) {
             const attachment = ws.deserializeAttachment() || {};
             if (attachment.betaSid !== sid) continue;
             if (!closeTransport(this, ws, 4401, 'beta session ended', { betaEnded: true }).acknowledged) closed = false;
@@ -502,6 +628,7 @@ export class HangoutLobby {
         const selected = [...(this.pendingClosed?.values() || [])].filter(entry => entry.sid === sid && !attempted?.has(entry.id))
             .slice(0, Math.max(0, CLOSED_RETIREMENT_BATCH - (attempted?.size || 0)));
         for (const entry of selected) { attempted?.add(entry.id); if (!await retireClosed(this, entry, gate, !!attempted)) closed = false; }
+        if (arcadeEnabled(this.env) || mediaEnabled(this.env)) await this.reconcileArcade();
         return closed && !pendingSid(this, sid);
     }
     async closeAuthoritySession(record, localClosed) {
@@ -608,6 +735,7 @@ export class HangoutLobby {
                         let cleanup = 'confirmed';
                         try { const refreshed = await this.engine.refreshParticipation(); if (refreshed?.ok === false) cleanup = 'unconfirmed'; }
                         catch { cleanup = 'unconfirmed'; }
+                        if (mediaEnabled(this.env)) this.gameMedia.reconcile();
                         return reply(200, 'sharing withdrawn', { ...result, cleanup });
                     }
                     return reply(200, 'own sharing', result);
@@ -691,6 +819,27 @@ export class HangoutLobby {
         try { const result = await this.privateReportQueue.resolve(id, action); await this.refreshPrivateReports(); return result; }
         finally { this.privateQueueActor = null; }
     }
+    async submitGameNightReport({ binding, scope, witness, target, request, reason }) {
+        if (!this.privateReportQueue) return { ok: false, status: 503 };
+        const key = this.env.HANGOUT_HMAC_KEY;
+        const report = { type: 'private-report', v: 1, request, kind: 'member',
+            target: 'p' + witness.id, claimedName: witness.nick, excerpt: '', reason: 'Game Night call · ' + reason, consent: true };
+        const checked = validatePrivateReportControl(report);
+        if (!checked.ok) return checked;
+        const [reporterRef, roomRef, targetSessionRef] = await Promise.all([
+            privateReportRef('reporter', binding.betaSid, key),
+            privateReportRef('room', 'game-night-' + scope.ref, key),
+            target ? privateReportRef('target', target.betaSid, key) : null
+        ]);
+        this.privateQueueActor = { binding };
+        try {
+            const result = await this.privateReportQueue.submit(checked.report, { reporterRef, roomRef,
+                reporterConnection: 'p' + scope.actor, targetConnection: report.target, targetSessionRef,
+                targetMembership: target ? 'live' : 'unverified' });
+            await this.refreshPrivateReports();
+            return result;
+        } finally { this.privateQueueActor = null; }
+    }
     async receivePrivateReport(request) {
         if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'POST' || !this.privateReportQueue) {
             return privateReportResponse({ ok: false, error: 'unavailable', status: 503 });
@@ -718,6 +867,7 @@ export class HangoutLobby {
     storageFailed() {
         this.storageFailureToken = {};
         this.evidenceStorage = 'degraded';
+        this.engine?.retireMusic();
         this.engine?.notifyAiStatus();
     }
     persistState(key, value) {
@@ -774,7 +924,7 @@ export class HangoutLobby {
             };
             const schedule = async () => {
                 const earlier = this.pendingClosed.size ? await this.state.storage.getAlarm() : null;
-                await this.authority.schedule();
+                await this.authority.schedule({ afterAlarm: true });
                 if (Number.isFinite(earlier) && earlier > Date.now()) {
                     const next = await this.state.storage.getAlarm();
                     if (next === null || next === undefined || next > earlier) await this.state.storage.setAlarm(earlier);
@@ -786,7 +936,7 @@ export class HangoutLobby {
                     for (const entry of [...this.pendingClosed.values()].slice(0, CLOSED_RETIREMENT_BATCH)) {
                         entry.retryUsed = true; attempted.add(entry.id); await retireClosed(this, entry, gate, true);
                     }
-                    for (const ws of this.state.getWebSockets()) {
+                    for (const ws of this.lobbySockets()) {
                         const a = ws.deserializeAttachment() || {};
                         if (this.closedSockets.has(ws) || socketIdentityInvalid(a, this.env) || !await this.sessionActive(a)) {
                             const { entry } = closeTransport(this, ws, 4401, 'sign in again', { betaEnded: true });
@@ -802,6 +952,8 @@ export class HangoutLobby {
                     const ticked = await this.engine.tick();
                     if (this.participationMode && ticked?.ok === false) throw Error('participation tick unavailable');
                     await this.pruneLogs();
+                    await this.maintainArcade();
+                    if (mediaEnabled(this.env)) await this.gameMedia.maintain().catch(() => {});
                     this.privateQueueActor = { kind: 'maintenance' };
                     try { await this.refreshPrivateReports(); } finally { this.privateQueueActor = null; }
                     due = await this.authority.due(); await schedule();
@@ -823,7 +975,7 @@ export class HangoutLobby {
         }
         return retirementGate(this, async gate => {
             const betaChecks = new Map();
-            for (const ws of this.state.getWebSockets()) {
+            for (const ws of this.lobbySockets()) {
                 const a = ws.deserializeAttachment() || {};
                 let ended = socketIdentityInvalid(a, this.env);
                 if (!ended && this.env.HANGOUT_BETA_MODE === 'protected') {
@@ -833,15 +985,55 @@ export class HangoutLobby {
                 if (this.closedSockets.has(ws) || ended) { const { entry } = closeTransport(this, ws, 4401, 'sign in again'); await retireClosed(this, entry, gate); }
             }
             await this.engine.tick(); await this.pruneLogs();
+            await this.maintainArcade();
+            if (mediaEnabled(this.env)) await this.gameMedia.maintain().catch(() => {});
             await this.refreshPrivateReports();
-            await this.state.storage.setAlarm(Date.now() + 60000);
+            await this.scheduleLegacyAlarm(undefined, true);
         });
     }
     async fetch(request) {
         await this.ready;
-        const path = new URL(request.url).pathname;
+        const { pathname: path, searchParams } = new URL(request.url);
         if (path.startsWith(LOBBY_AUTHORITY_PATH)) return this.authorityRequest(request, path.slice(LOBBY_AUTHORITY_PATH.length));
+        if (path === MUSIC_INTERNAL_PATH) {
+            if (!privateMusicOrigin(this.env) || request.method !== 'POST' || searchParams.size || !this.engine)
+                return musicResponse(503, { error: 'unavailable' });
+            const body = await musicJson(request);
+            if ((this.authorityUnavailable || this.evidenceStorage !== 'ready') && !stoppingMusic(body?.op))
+                return musicResponse(503, { error: 'unavailable' });
+            let site;
+            try { site = JSON.parse(request.headers.get('X-Hangout-Music-Session')); } catch { return musicResponse(403, { error: 'unavailable' }); }
+            return this.engine.musicAccess(body, site, request.headers.get('CF-Connecting-IP'));
+        }
         if (this.authorityUnavailable) return new Response('community authority unavailable', { status: 503 });
+        const roomGrant = path.startsWith(GAME_ROOM_GRANT_PATH + '/');
+        if ((roomGrant || path.startsWith(GAME_INVITATION_PATH + '/')) && request.method === 'POST') {
+            return retirementGate(this, async () => {
+                try {
+                    const { body, session } = await request.json();
+                    if (roomGrant) return await this.roomGrants.request(path.slice(GAME_ROOM_GRANT_PATH.length + 1), body, session);
+                    return await gameInvitationRequest(this, path.slice(GAME_INVITATION_PATH.length + 1), body, session);
+                } catch { return new Response('Game invitations are temporarily unavailable.', { status: 503 }); }
+            });
+        }
+        if (arcadePath(path) || mediaPath(path)) {
+            const media = mediaPath(path), game = arcadeGame(path);
+            if (!(media ? mediaEnabled(this.env) : this.arcadeAvailable(game))) return new Response('not found', { status: 404 });
+            const service = media ? this.gameMedia : this.arcade.get(game);
+            let trusted;
+            try { trusted = JSON.parse(request.headers.get('X-Hangout-Arcade')); } catch { /* deny below */ }
+            if (!trusted?.session?.betaSid) return new Response('session required', { status: 403 });
+            return retirementGate(this, () => {
+                if (path.endsWith('-ticket') && request.method === 'POST') {
+                    const scope = arcadeRoomRequest(trusted.scope);
+                    return scope ? service.issue(scope, trusted.session) : new Response('room required', { status: 403 });
+                }
+                if (!path.endsWith('-ticket') && request.method === 'GET' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+                    return service.upgrade(request.headers.get('Sec-WebSocket-Protocol'), trusted.session);
+                }
+                return new Response('invalid request', { status: 400 });
+            });
+        }
         if (new URL(request.url).pathname === '/__beta/private-report') {
             return this.state.blockConcurrencyWhile(() => this.receivePrivateReport(request));
         }
@@ -865,7 +1057,7 @@ export class HangoutLobby {
         try { identity = JSON.parse(request.headers.get('X-Hangout-Identity')); } catch (e) { return new Response('no', { status: 400 }); }
         if (this.env.PILOT_MODE === 'protected' && new URL(request.url).pathname === '/__pilot/disconnect' && request.method === 'POST' && /^[a-z0-9-]{16,64}$/.test(identity?.pilotSid || '')) {
             return this.state.blockConcurrencyWhile(async () => {
-                for (const ws of this.state.getWebSockets()) {
+                for (const ws of this.lobbySockets()) {
                     const a = ws.deserializeAttachment() || {};
                     if (a.pilotSid === identity.pilotSid) { this.delivery.forget(ws); ws.close(4401, 'pilot identity changed'); await this.engine.disconnect(a.id); }
                 }
@@ -874,17 +1066,23 @@ export class HangoutLobby {
         }
         if (this.env.HANGOUT_BETA_MODE === 'protected' && new URL(request.url).pathname === '/__beta/disconnect' && request.method === 'POST' && /^[a-z0-9-]{16,64}$/.test(identity?.betaSid || '')) {
             return this.state.blockConcurrencyWhile(async () => {
-                for (const ws of this.state.getWebSockets()) {
+                for (const ws of this.lobbySockets()) {
                     const a = ws.deserializeAttachment() || {};
                     if (a.betaSid === identity.betaSid) { this.delivery.forget(ws); ws.serializeAttachment({ ...a, betaEnded: true }); ws.close(4401, 'beta session ended'); await this.engine.disconnect(a.id); }
                 }
+                await this.reconcileArcade();
                 return new Response('ok');
             });
         }
         return retirementGate(this, async gate => {
         if (!identity || !identity.dev) return new Response('no', { status: 400 });
+        if (identity.gameGuest && !gameGuestEnabled(this.env)) return new Response('game invitations unavailable', { status: 403 });
         if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
         if (this.env.HANGOUT_BETA_MODE === 'protected' && !await this.sessionActive(identity)) return new Response('beta session required', { status: 403 });
+        if (!this.authorityMode) {
+            try { await this.scheduleLegacyAlarm(identity.expiresAt ?? null); }
+            catch { return new Response('community admission unavailable', { status: 503 }); }
+        }
         if (socketIdentityInvalid(identity, this.env)) return new Response('session required', { status: 403 });
         const id = `c${crypto.randomUUID().replaceAll('-', '')}`;
         let trusted = { ...identity, id };
@@ -915,12 +1113,28 @@ export class HangoutLobby {
         pair[1].serializeAttachment({ id, pilotSid: this.env.PILOT_MODE === 'protected' ? identity.pilotSid : undefined,
             betaSid: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaSid : undefined,
             betaInviteVersion: this.env.HANGOUT_BETA_MODE === 'protected' ? identity.betaInviteVersion : undefined,
+            ...(identity.gameGuest ? { gameGuest: identity.gameGuest } : {}),
             ...(this.authorityMode ? { authorityRef: id, authorityRevision: 1 } : {}),
             dev: identity.dev, iph: identity.iph, role: identity.role, email: identity.email, account: identity.account, expiresAt: identity.expiresAt, admin: identity.admin });
-        if (identity.devToken) this.delivery.send(pair[1], { t: 'device', token: identity.devToken });
+        // Fresh browsers can read the device token from the hello. Some
+        // WebKit clients miss the second frame sent during a local upgrade.
+        const deviceInHello = searchParams.get('device-in-hello') === '1';
+        if (identity.devToken && !deviceInHello) this.delivery.send(pair[1], { t: 'device', token: identity.devToken });
         for (const frame of initialFrames) {
             if (frame.t === 'admin' && this.env.HANGOUT_BETA_MODE === 'protected') this.sendPrivateAdmin(pair[1], id, frame);
-            else this.delivery.send(pair[1], frame);
+            else this.delivery.send(pair[1], frame.t === 'hello'
+                ? { ...frame, features: { ...frame.features, transportPing: 1, ...(gameGuestEnabled(this.env) && !identity.gameGuest ? { gameGuestInvites: 1 } : {}), ...(this.arcadeAvailable('chess') ? { arcadeChess: 1 } : {}),
+                    ...(this.arcadeAvailable('chess') && gameRoomGrantsEnabled(this.env) && !identity.gameGuest ? { webJamChess: 1 } : {}),
+                    ...(this.arcadeAvailable('crapeights') ? { arcadeCrapeights: 1 } : {}),
+                    ...(this.arcadeAvailable('turdrummy') ? { arcadeTurdRummy: 1 } : {}),
+                    ...(this.arcadeAvailable('turdspades') ? { arcadeTurdSpades: 1 } : {}),
+                    ...(this.arcadeAvailable('turdjack') ? { arcadeTurdJack: 1 } : {}),
+                    ...(this.arcadeAvailable('turdtris') ? { arcadeTurdtris: 1 } : {}),
+                    ...(this.arcadeAvailable('turdomania') ? { arcadeTurdomania: 1 } : {}),
+                    ...(this.arcadeAvailable('turdrush') ? { arcadeTurdRush: 1 } : {}),
+                    ...(this.arcadeAvailable('turdanoid') ? { arcadeTurdanoid: 1 } : {}),
+                    ...(mediaEnabled(this.env) && !identity.gameGuest ? { arcadeMedia: 1 } : {}) },
+                    ...(deviceInHello && identity.devToken ? { deviceToken: identity.devToken } : {}) } : frame);
         }
         return new Response(null, { status: 101, webSocket: pair[0] });
         } catch {
@@ -935,6 +1149,13 @@ export class HangoutLobby {
     async webSocketMessage(ws, raw) {
         if (this.closedSockets?.has(ws)) return;
         await this.ready;
+        if (isMediaSocket(ws)) {
+            const relay = await retirementGate(this, () => this.gameMedia.receive(ws, raw));
+            if (relay) await relay();
+            return;
+        }
+        const game = arcadeSocketGame(ws);
+        if (game) return retirementGate(this, () => this.arcade.get(game).receive(ws, raw));
         if (this.closedSockets?.has(ws)) return;
         if (this.authorityUnavailable) { ws.close(1011, 'community authority unavailable'); return; }
         return retirementGate(this, async gate => {
@@ -947,16 +1168,17 @@ export class HangoutLobby {
             if (typeof raw === 'string' && raw.length <= LOBBY_LIMITS.actFrameBytes) {
                 let control;
                 try { control = JSON.parse(raw); } catch { /* The engine refuses malformed application frames. */ }
-                if (control?.t === 'transport-ack') {
+                if (control?.t === 'transport-ack' || control?.t === 'transport-ping' && Object.keys(control).length === 1) {
                     if (!await this.controlBudget.take(ws, a.id)) {
                         const { entry } = closeTransport(this, ws, 4413, 'community control allowance unavailable');
                         return await retireClosed(this, entry, gate);
                     }
-                    return this.delivery.acknowledge(ws, control.seq);
+                    return control.t === 'transport-ping' ? this.delivery.heartbeat(ws) : this.delivery.acknowledge(ws, control.seq);
                 }
                 if (control?.t === 'hello' && !this.delivery.negotiate(ws, control.transport)) return;
             }
             const result = await this.engine.message(this.state.getTags(ws)[0], typeof raw === 'string' ? raw : '');
+            await this.reconcileArcade();
             if (result?.privateReportAction) {
                 let resolved;
                 try { resolved = await this.resolvePrivateReport(result.privateReportAction); }
@@ -974,12 +1196,32 @@ export class HangoutLobby {
     async webSocketClose(ws, code) {
         const replyCode = Number.isInteger(code) && (code >= 1000 && code <= 1014 && ![1004, 1005, 1006].includes(code)
             || code >= 3000 && code <= 4999) ? code : 1000;
+        const game = arcadeSocketGame(ws);
+        if (game || isMediaSocket(ws)) {
+            const scope = ws.deserializeAttachment();
+            if (game) {
+                try { ws.serializeAttachment({ ...scope, retired: true }); } catch { /* already closed */ }
+            }
+            try { ws.close(replyCode); } catch { /* already closed */ }
+            if (isMediaSocket(ws)) {
+                await this.ready;
+                return retirementGate(this, () => this.gameMedia.reconcile());
+            }
+            if (game) {
+                await this.ready;
+                if (this.arcadeAvailable(game)) return retirementGate(this, () => this.arcade.get(game).presenceChanged(scope));
+            }
+            return;
+        }
         // The attachment and WeakSet fence queued frames before any await;
         // acknowledgement/credit release do not claim semantic retirement.
         const { entry } = closeTransport(this, ws, replyCode);
         await this.ready;
         if (this.authorityUnavailable) return;
-        return retirementGate(this, gate => retireClosed(this, entry, gate));
+        return retirementGate(this, async gate => {
+            await retireClosed(this, entry, gate);
+            if (arcadeEnabled(this.env) || mediaEnabled(this.env)) await this.reconcileArcade();
+        });
     }
     async webSocketError(ws) { return this.webSocketClose(ws); }
 }

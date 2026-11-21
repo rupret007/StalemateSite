@@ -1,0 +1,33 @@
+{
+  "scope": "Observed November9CT on the private deployed c83 frontend, actual Mini Chrome/Safari using already-approved synthetic guests; no provider configuration readback performed after the later hold continuity stop",
+  "websiteRuntimeSource": "c83dfaff1fe924ea0a70cfc902731234113f0c09",
+  "lastVerifiedSiteVersion": "49f19821-e3cf-4699-8698-3dd3f446ca3b",
+  "actualJourneys": {
+    "sharedEntryChat": "Stalemate/RadDad guest text both ways; source badge hide/show; fresh join excluded earlier authored text",
+    "creativeRooms": "Ordinary guests created/joined Draw and Paint; strokes reached both; real Grandeur then custom Northern Lights loaded; host/guest pause matched at observed seven seconds",
+    "roomControls": "Guest topic refused; host topic/+m worked; guest message refused with local saved copy; Restore did not send, explicit Return delivered; own disposable channel closed",
+    "privateMessages": "Two-minute warmup enforced; explicit acceptance required; text both ways; exact-message peer block closed both PMs; attempted reply retained its original local draft; test block undone and draft cleared",
+    "humanAudio": "Jeff confirmed hearing Bob Ross on the Mini; not Music/SharedTrack/Webex hearing proof"
+  },
+  "cleanup": "Own test connections ended, test room closed, test block undone, synthetic draft cleared, Safari nickname restored, own Chrome test tabs closed",
+  "microphoneCameraMusicRelayAiOrRecordingStarted": false,
+  "credentialsInvitationsOrTokensIncluded": false,
+  "limitations": [
+    "No current6b physical Music or SharedTrack/Webex result",
+    "No current Windows/Linux/physical iPhone/VoiceOver qualification",
+    "Native Safari member-dialog AX omission remains unexplained; documented Option-Tab and visible action worked",
+    "Fresh human moderator sign-in/review/revocation still pending",
+    "No all-ages/public launch or legal compliance approval"
+  ],
+  "historySha256": "e9ac617f5e16e680d06abcae8e066a6f2e280bdd364814207c22181aa7757c8a",
+  "screenshots": {
+    "live-safari-option-tab.png": {
+      "bytes": 82337,
+      "sha256": "318de54f5b45d18f77526557759b2dbf5b2180cef13979ba4dfc90e690d61644"
+    },
+    "live-mac-private-chat.png": {
+      "bytes": 161913,
+      "sha256": "6307c987d9da2f6815818e1262c86add6419858d02ea6905c947fde93cd39631"
+    }
+  }
+}

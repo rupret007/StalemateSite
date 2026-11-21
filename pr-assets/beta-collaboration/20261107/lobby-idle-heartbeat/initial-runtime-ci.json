@@ -1,0 +1,28 @@
+{
+  "head": "8f88e0bd2bcc0c256d9aae3e736aef9eb1799184",
+  "state": "FIRST_RUNTIME_CI_FAILED_EXACT_GREETING_EXPECTATION_PRESERVED",
+  "runs": [
+    {
+      "id": 42424328135,
+      "event": "pull_request",
+      "job": 128559244414,
+      "logSha256": "33db38cdb25818dcc5ff8bc8d3b64bd77104744b6845f9246381b726b83a34a1"
+    },
+    {
+      "id": 42424294011,
+      "event": "push",
+      "job": 128559143077,
+      "logSha256": "3b0c456cbc1d1272cf9c323a34a43997aee410f677a2b3eac88bc81d37da15c3"
+    }
+  ],
+  "failure": {
+    "type": "AssertionError",
+    "file": "tests/runtime/lobby-session-authority/runner.mjs",
+    "line": 294,
+    "actualAddedField": "transportPing: 1",
+    "correction": "Add the advertised capability to the exact expected greeting. Preserve every existing field and the fan-role check."
+  },
+  "workflowChanged": false,
+  "productionCodeChangedForCorrection": false,
+  "newExactHeadCiRequired": true
+}

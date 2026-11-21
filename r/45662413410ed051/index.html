@@ -32,8 +32,8 @@
     <header class="hang-head">
         <img src="../../assets/mark.svg" alt="" width="40" height="40">
         <div>
-            <h1>Hang Out</h1>
-            <p class="tag">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p>
+            <h1>Hang Out <span class="mode-pill" data-mode-pill hidden>🎨 Paint Along</span></h1>
+            <details class="room-description" open><summary class="tag">Room details</summary><p class="tag">Draw together. Watch together. Yell at each other. Bring your own bad ideas.</p></details>
         </div>
         <a class="show-link lobby-link" href="lobby/">← #stalemate lobby</a>
         <a class="show-link" data-next-show data-starts-at="2026-10-24T16:45:00-05:00" href="../../#home">Next show: Sat Oct 24 · Los Amigo’s, Plano →</a>
@@ -52,21 +52,23 @@
                 <p class="small" data-check-out role="status"></p>
                 <button class="btn btn--ghost" data-check-done type="button">Looks good</button>
             </div>
-            <p class="status" data-gate-status role="status"></p>
+            <p class="status" data-gate-status role="status" tabindex="-1"></p>
         </div>
     </section>
 
-    <main class="room" data-room hidden>
+    <main class="room" data-room data-room-workspace hidden>
         <div class="bar">
             <span class="peers" data-peers>Just you</span>
             <button class="btn" data-copy type="button">Copy invite link</button>
-            <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">Paint along with Bob</button>
+            <button class="btn btn--ghost" type="button" data-workspace-only data-room-controls-jump hidden>Call controls</button>
+            <button class="btn btn--ghost host-only watch-room-toggle" data-watch-toggle type="button">Watch a Movie Together</button>
+            <button class="btn btn--bob" data-bob-toggle type="button" aria-pressed="false">🎨 Paint along with Bob</button>
             <button class="btn btn--ghost" data-private-report type="button" hidden>Report a problem to staff</button>
             <span class="status" data-status role="status"></span>
         </div>
 
         <section class="panel watch" aria-label="Watch together">
-            <h2>Watch</h2>
+            <h2 data-watch-title>Watch</h2>
             <div class="screen"><div id="yt-player" data-yt></div><video data-file playsinline controls hidden></video></div>
             <p class="small" data-host-note></p>
             <p class="small" data-video-status role="status" hidden></p>
@@ -98,36 +100,74 @@
 
         <section class="panel draw" aria-label="Draw together">
             <h2>Draw</h2>
-            <canvas data-canvas width="1200" height="800" aria-label="Shared drawing canvas"></canvas>
-            <div class="tools">
-                <div class="swatches" data-swatches></div>
-                <div class="swatches bob-palette" data-bob-palette role="group" aria-label="Bob Ross palette"></div>
-                <label>Brush <input type="range" min="2" max="44" value="6" data-size></label>
-                <div class="brushes" data-bob-brushes role="group" aria-label="Bob brushes"></div>
-                <button class="btn btn--ghost host-only" type="button" data-clear>Wipe it</button>
-                <button class="btn btn--ghost" type="button" data-save>Save PNG</button>
+            <div data-shared-drawing>
+                <canvas data-canvas width="1200" height="800" aria-label="Shared drawing canvas"></canvas>
+                <div class="tools">
+                    <div class="swatches" data-swatches></div>
+                    <div class="swatches bob-palette" data-bob-palette role="group" aria-label="Bob Ross palette"></div>
+                    <label>Brush <input type="range" min="2" max="44" value="6" data-size></label>
+                    <div class="brushes" data-bob-brushes role="group" aria-label="Bob brushes"></div>
+                    <button class="btn btn--ghost host-only" type="button" data-clear>Wipe it</button>
+                    <button class="btn btn--ghost" type="button" data-save>Save PNG</button>
+                </div>
             </div>
         </section>
 
         <section class="panel call" aria-label="Camera and mic">
             <h2>Faces &amp; voices</h2>
             <p class="small">Off until you turn it on. Cameras are for adults 18+. Up to 8 people on camera. Video goes straight between browsers when it can.</p>
+            <p class="small bob-camera-hint">Point your camera at your canvas so everyone can paint along.</p>
             <p class="small" data-turn-status role="status"></p>
             <p class="small jam-note" data-jam-note hidden>🎸 Jam room: your music goes through the WebJam app (plug in Ethernet). The browser mic is just for talking between songs, so it starts off and nobody hears you twice.</p>
             <p class="hands" data-hands hidden></p>
-            <div class="tiles" data-tiles data-view="grid"></div>
+            <section class="consent" data-consent data-state="idle" aria-labelledby="consent-title" hidden>
+                <h3 id="consent-title" data-consent-title>Join with camera and mic</h3>
+                <div class="consent-preview">
+                    <video data-consent-video autoplay playsinline muted></video>
+                    <p class="consent-placeholder" data-consent-placeholder>📷 Your preview shows here. Nothing turns on until you tap the button.</p>
+                </div>
+                <label class="consent-meter" data-consent-meter-wrap hidden>Mic <meter data-consent-meter min="0" max="1" low="0.1" high="0.8" optimum="0.5" value="0"></meter></label>
+                <p class="small consent-copy" data-consent-copy>One tap asks your browser for camera and mic together. Cameras are for adults 18+. Only people in this room see and hear you.</p>
+                <label class="consent-mic" data-consent-mic-wrap hidden><input type="checkbox" data-consent-mic checked> Join with my mic on</label>
+                <p class="consent-error" data-consent-error role="alert" hidden></p>
+                <div class="consent-actions">
+                    <button class="btn consent-go" data-consent-on type="button">Turn on camera</button>
+                    <button class="btn btn--ghost" data-consent-skip type="button">Join without camera</button>
+                </div>
+            </section>
+            <div class="room-stage-empty" data-workspace-only>
+                <strong>Video is off</strong>
+                <p>Start video, use your mic, or keep chatting.</p>
+                <button class="btn" type="button" data-workspace-start-video hidden>Start video</button>
+            </div>
+            <button class="btn faces-play" type="button" data-faces-play data-av-resume hidden>Tap to resume video</button>
+            <div class="tiles" data-tiles data-view="grid" role="group" aria-label="Participants"></div>
             <div class="react-float" data-react-float aria-live="polite"></div>
-            <div class="tools callbar" role="toolbar" aria-label="Call controls">
-                <button class="btn" type="button" data-mic>Turn on my mic</button>
-                <button class="btn" type="button" data-cam>Turn on my camera</button>
-                <button class="btn btn--ghost desk-only" type="button" data-share aria-pressed="false">Share screen</button>
-                <button class="btn btn--ghost" type="button" data-hand aria-pressed="false">Raise hand</button>
-                <span class="reacts" data-reacts role="group" aria-label="Reactions"></span>
-                <button class="btn btn--ghost" type="button" data-view-toggle hidden>Speaker view</button>
-                <button class="btn btn--ghost" type="button" data-pip hidden>Pop out</button>
-                <button class="btn btn--ghost" type="button" data-settings>⚙ Camera &amp; background</button>
-                <button class="btn btn--bob" type="button" data-canvas-cam aria-pressed="false">Show my real canvas</button>
-                <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
+            <div class="tools callbar" id="room-call-controls" tabindex="-1" role="group" aria-label="Call controls">
+                <div class="callbar-main">
+                    <button class="btn" type="button" data-mic aria-pressed="false">Turn on my mic</button>
+                    <button class="btn" type="button" data-cam aria-pressed="false">Turn on my camera</button>
+                    <button class="btn soundtrack-btn" type="button" data-soundtrack aria-expanded="false" aria-controls="soundtrack-pop" aria-pressed="true" title="Volume of the shared video">Video sound</button>
+                    <button class="btn btn--ghost" type="button" data-chat-toggle data-room-chat-open aria-expanded="true" aria-controls="room-chat" data-ico="💬" data-short="Chat">Chat</button>
+                    <button class="btn btn--ghost more-btn" type="button" data-more aria-expanded="false" aria-controls="callbar-more" data-ico="⋯" data-short="More">More</button>
+                    <a class="btn btn--ghost leave-room" href="lobby/" data-ico="🚪" data-short="Leave">Leave</a>
+                </div>
+                <div class="soundtrack-pop" id="soundtrack-pop" data-soundtrack-pop role="group" aria-label="Video sound" hidden>
+                    <label>Video volume <input type="range" min="0" max="100" step="5" value="80" data-soundtrack-vol></label>
+                    <button class="btn" type="button" data-soundtrack-mute aria-pressed="false">Mute video</button>
+                </div>
+                <div class="callbar-more" id="callbar-more" data-callbar-more>
+                    <button class="btn btn--ghost desk-only" type="button" data-share aria-pressed="false">Share screen</button>
+                    <button class="btn btn--ghost" type="button" data-hand aria-pressed="false">Raise hand</button>
+                    <span class="reacts" data-reacts role="group" aria-label="Reactions"></span>
+                    <button class="btn btn--ghost" type="button" data-view-toggle hidden>Speaker view</button>
+                    <button class="btn btn--ghost" type="button" data-pip hidden>Pop out</button>
+                    <button class="btn soundtrack-btn" type="button" data-music-toggle>Music</button>
+                    <button class="btn btn--ghost" type="button" data-settings>⚙ Camera &amp; background</button>
+                    <button class="btn btn--bob" type="button" data-bob-drawing-open aria-haspopup="dialog" hidden>Draw on the shared canvas</button>
+                    <button class="btn btn--bob" type="button" data-canvas-cam aria-pressed="false">Show my real canvas</button>
+                    <button class="btn btn--ghost" type="button" data-hangup hidden>Turn both off</button>
+                </div>
             </div>
             <div class="tools host-only host-call">
                 <button class="btn btn--ghost" type="button" data-lock aria-pressed="false">Lock faces</button>
@@ -135,17 +175,27 @@
             </div>
         </section>
 
-        <section class="panel chat" aria-label="Chat">
-            <h2>Chat</h2>
-            <p class="small" data-sync-status role="status" hidden></p>
-            <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>
-            <ol class="log" data-log aria-live="polite"></ol>
-            <form class="say" data-say>
-                <input data-text maxlength="400" placeholder="Say something dumb" aria-label="Message">
-                <button class="btn" type="submit">Send</button>
-            </form>
+        <section class="panel chat" id="room-chat" aria-labelledby="room-chat-title">
+            <div class="room-chat-heading">
+                <h2 id="room-chat-title" tabindex="-1">Chat</h2>
+                <button class="btn btn--ghost" type="button" data-workspace-only data-room-chat-close hidden>Close chat</button>
+            </div>
+            <div data-chat-details>
+                <p class="small" data-sync-status role="status" hidden></p>
+                <button class="btn btn--ghost" type="button" data-sync-retry hidden>Retry room sync</button>
+                <ol class="log" data-log aria-live="polite"></ol>
+                <form class="say" data-say>
+                    <input data-text maxlength="400" placeholder="Say something dumb" aria-label="Message">
+                    <button class="btn" type="submit">Send</button>
+                </form>
+            </div>
         </section>
     </main>
+
+    <dialog class="paint-sketch" data-bob-drawing aria-labelledby="paint-sketch-title">
+        <h2 id="paint-sketch-title">Draw on the shared canvas</h2>
+        <form method="dialog"><button class="btn btn--ghost">Close drawing</button></form>
+    </dialog>
 
     <dialog class="ask private-report" data-report-dialog aria-labelledby="private-report-title" aria-describedby="private-report-privacy">
         <h2 id="private-report-title">Report to community staff</h2>
@@ -178,9 +228,9 @@
         </form>
     </dialog>
 
-    <dialog class="ask" data-ask>
-        <h2 data-ask-title>Use your camera?</h2>
-        <p data-ask-copy></p>
+    <dialog class="ask" data-ask aria-labelledby="room-consent-title" aria-describedby="room-consent-copy">
+        <h2 id="room-consent-title" data-ask-title>Use your camera?</h2>
+        <p id="room-consent-copy" data-ask-copy></p>
         <div class="tools">
             <button class="btn" data-ask-yes type="button">OK, ask my browser</button>
             <button class="btn btn--ghost" data-ask-no type="button">Not now</button>
@@ -211,6 +261,7 @@
     <dialog class="ask tile-menu" data-tile-menu></dialog>
 
     <script src="../../countdown.js" defer></script>
+    <script src="../../js/music-preference.js"></script>
     <script src="sync-core.js"></script>
     <script src="private-snapshot.js"></script>
     <script src="private-recovery.js"></script>
@@ -218,7 +269,9 @@
     <script src="youtube-player.js"></script>
     <script src="turn-client.js"></script>
     <script src="bob-ross.js"></script>
+    <script src="shared-layout.js"></script>
     <script src="names.js"></script>
     <script src="room.js"></script>
+    <script src="room-workspace.js" defer></script>
 </body>
 </html>

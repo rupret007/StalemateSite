@@ -1,0 +1,72 @@
+{
+  "state": "PASSED_FINAL_HOSTED_ANONYMOUS_RECOVERY_SCREENSHOTS_AWAIT_VISUAL_REVIEW",
+  "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "startedAt": "2026-11-07T17:15:54.453808+00:00",
+  "runtimeBefore": {
+    "deployment": "1a83f7e5-7ed1-4aa7-8af5-bd68fb6a8fcf",
+    "version": "c2271048-aaa3-4649-8e9e-48dd46212da5"
+  },
+  "physicalCapture": false,
+  "credentialsSuppliedToBrowserOrRemote": false,
+  "harnessSha256": "8c7f0914164f1743e03d60abab4b2bdec156df7face3947b0cbc286bd4e97e46",
+  "result": {
+    "exitCode": 0,
+    "proof": {
+      "state": "PASSED_HOSTED_ANONYMOUS_LOBBY_RECOVERY",
+      "pid": 1029691,
+      "startedAt": "2026-11-07T17:15:59.996Z",
+      "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+      "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+      "checks": [
+        "All known lobby bookmarks retain 401, no cookie and the exact reviewed recovery document",
+        "375px and 390px recovery button fits, receives keyboard focus and leads to the invitation form",
+        "APIs and protected browser code remain denied after the recovery link"
+      ],
+      "captureRequests": 0,
+      "ordinaryGuestsMinted": 0,
+      "credentialsSupplied": false,
+      "physicalCapture": false,
+      "securityOrUserAgentOverrides": false,
+      "browserVersion": "156.0.8078.4",
+      "mobile": [
+        {
+          "width": 375,
+          "pageWidth": 375,
+          "buttonBounds": {
+            "x": 16,
+            "y": 260.78125,
+            "width": 343,
+            "height": 48.390625
+          },
+          "screenshot": ".local/idle-expiry-anonymous-lobby-recovery-375-nov07.png",
+          "sha256": "593b6a716d42170454170321c9e5c24f4289459bc9beb3fb6c5b964529ae7e75"
+        },
+        {
+          "width": 390,
+          "pageWidth": 390,
+          "buttonBounds": {
+            "x": 16,
+            "y": 260.78125,
+            "width": 358,
+            "height": 48.390625
+          },
+          "screenshot": ".local/idle-expiry-anonymous-lobby-recovery-390-nov07.png",
+          "sha256": "c10f7b6e5812c971fa7145fadb7d2d2695f79be6ecd814f74fa9aac29a6abd8f"
+        }
+      ],
+      "allOwnedBrowserResourcesClosed": true,
+      "completedAt": "2026-11-07T17:16:01.775Z"
+    },
+    "proofSha256": "2d533a2106944fa201f5c50ca30fa9732dd0bf35fb9d702d75df149b3d9d21a8",
+    "harnessSha256": "8c7f0914164f1743e03d60abab4b2bdec156df7face3947b0cbc286bd4e97e46",
+    "ownedNodeGone": true,
+    "guardBefore": {
+      "load1": 0.85400390625,
+      "memoryAvailableGiB": 14.380271911621094,
+      "swapPercent": 14.55373764038086,
+      "freeGiB": 721.8674392700195
+    }
+  },
+  "completedAt": "2026-11-07T17:15:57.521306+00:00"
+}

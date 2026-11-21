@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-11-07T09:16:47.759184+00:00",
+  "state": "STOPPED_INSPECT_EXISTING_STATE",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "ordinaryGuests": 9,
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "storyPoolUsed": false,
+  "guard": {
+    "load": 2.11767578125,
+    "swapPercent": 5.322265625,
+    "freeGiB": 21.86,
+    "nativeProcessesAbsent": true
+  },
+  "harnessSha256": "c6161de9f32b44aee463a8d39b6b751eb0280bb4ebf3d1c12f1f6f55d56aceb5",
+  "failureType": "KeyError",
+  "completedAt": "2026-11-07T09:17:16.067201+00:00",
+  "postInspection": {
+    "at": "2026-11-07T09:18:23.941628+00:00",
+    "state": "TERMINAL_RUNNER_PROOF_PASSED",
+    "originalControllerFailurePreserved": true,
+    "failureCause": "Summary code expected proof.checks; reused workload proof has metrics instead. Terminal proof was already copied before KeyError. No test was restarted or relaxed.",
+    "remoteReadback": {
+      "proofSha256": "80e07a12080009bdfb0f83ac6661c013c7dcde52a0527af11b4700166766f051",
+      "proofStatus": "passed",
+      "ownRunnerProcesses": 0,
+      "load": 2.1220703125,
+      "freeGiB": 21.97
+    },
+    "proof": "hosted-three-room-workload-nov07.json"
+  }
+}

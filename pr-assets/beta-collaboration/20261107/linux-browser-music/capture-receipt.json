@@ -1,0 +1,25 @@
+{
+  "at": "2026-11-07T11:31:56.064695+00:00",
+  "state": "TWO_ORIGINAL_CAPTURE_HASHES_AND_FINAL_REMOTE_PROOF_VERIFIED",
+  "files": [
+    {
+      "name": "hosted-chromium-375-b35e5fc-nov07.png",
+      "bytes": 70995,
+      "sha256": "3534b354f88ce50c2494700446573c2eb409a81f62a08f35b4e99c4c7d890259"
+    },
+    {
+      "name": "hosted-chromium-390-b35e5fc-nov07.png",
+      "bytes": 71661,
+      "sha256": "d399990ed86a728dbef1bc4759f5c74fbbe00c10a684784b0a7388a93b5eb885"
+    }
+  ],
+  "originalProofSha256": "83c91fce17b69d1718ed8d97308d4fef013363dc5600a44ba81ee8f4368348ea",
+  "ownHarnessProcessesRemaining": [],
+  "visualInspectionPending": false,
+  "physicalCapture": false,
+  "visuallyInspectedWidths": [
+    375,
+    390
+  ],
+  "visualFinding": "Chat and welcome wrap; page width contained, input and Send visible. Starter row uses its own horizontal scrolling. Test nicknames only; no private invitation in these captures."
+}

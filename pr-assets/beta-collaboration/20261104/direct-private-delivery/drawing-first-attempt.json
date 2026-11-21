@@ -1,0 +1,49 @@
+{
+  "source": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "runtime": "dbcaddf5-dd3f-48e3-9826-0d7998ffdbc0",
+  "at": "2026-11-04T08:29:34.755Z",
+  "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "scope": "Actual existing private service: ordinary synthetic guests, Chromium/WebKit, one unique art room. Verified current private deployment; no staff/media/provider action or physical music claim.",
+  "stages": [
+    "guest-A-connected",
+    "guest-B-connected"
+  ],
+  "uniqueGuestArtRoom": true,
+  "chromiumToWebKit": true,
+  "webKitToChromium": true,
+  "layout": [
+    {
+      "engine": "chromium",
+      "geometry": {
+        "width": 375,
+        "pageWidth": 375,
+        "bodyWidth": 375,
+        "inputFont": 16,
+        "inputRight": 294,
+        "sendRight": 357,
+        "inputLeft": 46,
+        "sendLeft": 299
+      },
+      "screenshot": "site201-chromium-375.png"
+    },
+    {
+      "engine": "chromium",
+      "geometry": {
+        "width": 390,
+        "pageWidth": 390,
+        "bodyWidth": 390,
+        "inputFont": 16,
+        "inputRight": 309,
+        "sendRight": 372,
+        "inputLeft": 46,
+        "sendLeft": 314
+      },
+      "screenshot": "site201-chromium-390.png"
+    }
+  ],
+  "ok": false,
+  "failure": {
+    "phase": "phone-layout",
+    "name": "AssertionError"
+  }
+}

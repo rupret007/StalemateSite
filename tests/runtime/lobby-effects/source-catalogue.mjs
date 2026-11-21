@@ -13,6 +13,7 @@ export const NATIVE_LOBBY_INPUTS = Object.freeze([
     ].map(name => 'application/hangout-worker/src/' + name),
     'application/r/45662413410ed051/sync-core.js',
     'application/r/45662413410ed051/entry-sites.mjs',
+    'application/r/45662413410ed051/lobby/game-night.mjs',
     ...[
         'index.mjs', 'index.js', 'censor/TextCensor.js', 'matcher/BlacklistedTerm.js',
         'censor/BuiltinStrategies.js', 'matcher/MatchPayload.js', 'matcher/Matcher.js',

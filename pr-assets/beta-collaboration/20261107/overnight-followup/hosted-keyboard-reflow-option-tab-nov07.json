@@ -1,0 +1,898 @@
+{
+  "startedAt": "2026-11-07T09:09:09.281Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "scope": "Actual protected Worker keyboard entry, dialog recovery and responsive reflow; not native browser zoom, screen-reader speech or complete WCAG qualification",
+  "engine": "WebKit",
+  "endpoint": "Intel MacBook",
+  "ordinaryGuests": 1,
+  "keyboardChord": "Option-Tab (Alt+Tab in Playwright)",
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "roomCreations": 0,
+  "messagesToOtherPeople": 0,
+  "checks": [
+    "Invitation, nickname and entry use actual keyboard events",
+    "Named-channel error and Escape return keyboard focus without creating a room",
+    "Composer and Send stay contained and uncovered through four responsive sizes",
+    "A keyboard command receives its normal help response without publishing a message"
+  ],
+  "geometries": [
+    {
+      "viewport": {
+        "width": 375,
+        "height": 844
+      },
+      "pageWidth": 375,
+      "input": {
+        "left": 46,
+        "right": 294,
+        "top": 710,
+        "bottom": 758,
+        "width": 248,
+        "height": 48
+      },
+      "send": {
+        "left": 299,
+        "right": 357,
+        "top": 716,
+        "bottom": 752,
+        "width": 58,
+        "height": 36
+      },
+      "inputUncovered": true,
+      "sendUncovered": true,
+      "fontSize": "16px",
+      "reducedMotion": true,
+      "focusOutline": {
+        "width": "2px",
+        "style": "solid"
+      },
+      "activeSend": true
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "pageWidth": 390,
+      "input": {
+        "left": 46,
+        "right": 309,
+        "top": 710,
+        "bottom": 758,
+        "width": 263,
+        "height": 48
+      },
+      "send": {
+        "left": 314,
+        "right": 372,
+        "top": 716,
+        "bottom": 752,
+        "width": 58,
+        "height": 36
+      },
+      "inputUncovered": true,
+      "sendUncovered": true,
+      "fontSize": "16px",
+      "reducedMotion": true,
+      "focusOutline": {
+        "width": "2px",
+        "style": "solid"
+      },
+      "activeSend": true
+    },
+    {
+      "viewport": {
+        "width": 640,
+        "height": 512
+      },
+      "pageWidth": 640,
+      "input": {
+        "left": 46,
+        "right": 559,
+        "top": 378,
+        "bottom": 426,
+        "width": 513,
+        "height": 48
+      },
+      "send": {
+        "left": 564,
+        "right": 622,
+        "top": 384,
+        "bottom": 420,
+        "width": 58,
+        "height": 36
+      },
+      "inputUncovered": true,
+      "sendUncovered": true,
+      "fontSize": "16px",
+      "reducedMotion": true,
+      "focusOutline": {
+        "width": "2px",
+        "style": "solid"
+      },
+      "activeSend": true
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 256
+      },
+      "pageWidth": 320,
+      "input": {
+        "left": 46,
+        "right": 243,
+        "top": 210,
+        "bottom": 256,
+        "width": 197,
+        "height": 46
+      },
+      "send": {
+        "left": 246,
+        "right": 304,
+        "top": 217,
+        "bottom": 249,
+        "width": 58,
+        "height": 32
+      },
+      "inputUncovered": true,
+      "sendUncovered": true,
+      "fontSize": "16px",
+      "reducedMotion": true,
+      "focusOutline": {
+        "width": "2px",
+        "style": "solid"
+      },
+      "activeSend": true
+    }
+  ],
+  "resourceChecks": [
+    {
+      "at": "2026-11-07T09:09:09.284Z",
+      "load": 1.89990234375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.91
+    },
+    {
+      "at": "2026-11-07T09:09:13.048Z",
+      "load": 1.90771484375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.87
+    }
+  ],
+  "logout": [
+    200
+  ],
+  "browserVersion": "27.2",
+  "keyboardTargets": [
+    {
+      "target": "getByLabel('Invitation code')",
+      "visited": [
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        }
+      ],
+      "tabs": 1
+    },
+    {
+      "target": "getByRole('button', { name: /Enter the community/ })",
+      "visited": [
+        {
+          "tag": "INPUT",
+          "id": "code",
+          "role": null,
+          "label": null,
+          "type": "password"
+        }
+      ],
+      "tabs": 1
+    },
+    {
+      "target": "getByRole('link', { name: /Choose a nickname/ })",
+      "visited": [
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        }
+      ],
+      "tabs": 1
+    },
+    {
+      "target": "locator('[data-nick]')",
+      "visited": [
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        }
+      ],
+      "tabs": 1
+    },
+    {
+      "target": "locator('[data-enter]')",
+      "visited": [
+        {
+          "tag": "INPUT",
+          "id": "",
+          "role": null,
+          "label": "Your nick",
+          "type": null
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": "Make me a name \u2014 random fun nickname",
+          "type": "button"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "checkbox"
+        }
+      ],
+      "tabs": 3
+    },
+    {
+      "target": "locator('[data-start=\"chat\"]')",
+      "visited": [
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "SELECT",
+          "id": "",
+          "role": null,
+          "label": "Room directory",
+          "type": null
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "role": null,
+          "label": "Find a room",
+          "type": "search"
+        },
+        {
+          "tag": "A",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        }
+      ],
+      "tabs": 5
+    },
+    {
+      "target": "locator('nav [data-show=\"chat\"]')",
+      "visited": [
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": "tab",
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        }
+      ],
+      "tabs": 16
+    },
+    {
+      "target": "locator('[data-text]')",
+      "visited": [
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "A",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": "tab",
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        }
+      ],
+      "tabs": 17
+    },
+    {
+      "target": "locator('[data-send]')",
+      "visited": [
+        {
+          "tag": "INPUT",
+          "id": "",
+          "role": null,
+          "label": "Message",
+          "type": null
+        }
+      ],
+      "tabs": 1
+    },
+    {
+      "target": "locator('nav [data-show=\"chat\"]')",
+      "visited": [
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "submit"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        }
+      ],
+      "tabs": 2
+    },
+    {
+      "target": "locator('[data-text]')",
+      "visited": [
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "A",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": "tab",
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        }
+      ],
+      "tabs": 17
+    },
+    {
+      "target": "locator('[data-send]')",
+      "visited": [
+        {
+          "tag": "INPUT",
+          "id": "",
+          "role": null,
+          "label": "Message",
+          "type": null
+        }
+      ],
+      "tabs": 1
+    },
+    {
+      "target": "locator('nav [data-show=\"chat\"]')",
+      "visited": [
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "submit"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        }
+      ],
+      "tabs": 2
+    },
+    {
+      "target": "locator('[data-text]')",
+      "visited": [
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "A",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": "tab",
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        }
+      ],
+      "tabs": 17
+    },
+    {
+      "target": "locator('[data-send]')",
+      "visited": [
+        {
+          "tag": "INPUT",
+          "id": "",
+          "role": null,
+          "label": "Message",
+          "type": null
+        }
+      ],
+      "tabs": 1
+    },
+    {
+      "target": "locator('nav [data-show=\"chat\"]')",
+      "visited": [
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "submit"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        }
+      ],
+      "tabs": 2
+    },
+    {
+      "target": "locator('[data-text]')",
+      "visited": [
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "A",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": "tab",
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": "Commands",
+          "type": "button"
+        }
+      ],
+      "tabs": 7
+    },
+    {
+      "target": "locator('[data-send]')",
+      "visited": [
+        {
+          "tag": "INPUT",
+          "id": "",
+          "role": null,
+          "label": "Message",
+          "type": null
+        }
+      ],
+      "tabs": 1
+    },
+    {
+      "target": "locator('[data-text]')",
+      "visited": [
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "submit"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BODY",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "A",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": null
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": "tab",
+          "label": null,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "role": null,
+          "label": "Commands",
+          "type": "button"
+        }
+      ],
+      "tabs": 9
+    },
+    {
+      "target": "locator('[data-text]')",
+      "visited": [],
+      "tabs": 0
+    }
+  ],
+  "status": "passed",
+  "captureRequests": 0,
+  "originalCookieStateAfterLogout": 401,
+  "copiedCookieStateAfterLogout": 401,
+  "contextsClosed": true,
+  "pageErrorTypes": [],
+  "completedAt": "2026-11-07T09:09:13.367Z"
+}

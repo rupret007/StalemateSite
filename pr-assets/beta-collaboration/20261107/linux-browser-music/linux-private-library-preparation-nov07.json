@@ -1,0 +1,69 @@
+{
+  "state": "THREE_PRIVATE_LIBRARY_PACKAGES_READY_NO_GLOBAL_INSTALL",
+  "startedAt": "2026-11-07T11:25:09.318795+00:00",
+  "physicalCapture": false,
+  "globalSystemChange": false,
+  "exitCode": 0,
+  "proof": {
+    "state": "THREE_PRIVATE_LIBRARY_PACKAGES_READY_NO_GLOBAL_INSTALL",
+    "startedAt": "2026-11-07T11:25:12.820393+00:00",
+    "noSystemPackageInstallation": true,
+    "noMaintainerScripts": true,
+    "noGlobalLibraryPathChange": true,
+    "noSecurityPolicyChange": true,
+    "physicalCapture": false,
+    "newGuest": false,
+    "originalFailurePreserved": true,
+    "packages": [
+      {
+        "name": "libnspr4",
+        "version": "2:4.38.2-1ubuntu1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/n/nspr/libnspr4_4.38.2-1ubuntu1_amd64.deb",
+        "sha256": "2f28284b35765aaccad1785ab017425e1ca378c395256331f9c662d04335d43f",
+        "bytes": 118396,
+        "extractionExitCode": 0
+      },
+      {
+        "name": "libnss3",
+        "version": "2:3.120-1ubuntu2.2",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/n/nss/libnss3_3.120-1ubuntu2.2_amd64.deb",
+        "sha256": "7c5843f5e49c10c267893ae7f13af6032ed1b96e7c1ae586a5f44435f804dd85",
+        "bytes": 1513938,
+        "extractionExitCode": 0
+      },
+      {
+        "name": "libasound2t64",
+        "version": "1.2.15.3-1ubuntu1.1",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2t64_1.2.15.3-1ubuntu1.1_amd64.deb",
+        "sha256": "96e20cf5c9095ef54ba46fccffea5c01cf2de17a1012c5683a67e43504a6d726",
+        "bytes": 415812,
+        "extractionExitCode": 0
+      }
+    ],
+    "cachedSignedReleaseFiles": [
+      {
+        "file": "archive.ubuntu.com_ubuntu_dists_resolute-backports_InRelease",
+        "sha256": "3e9c041b37802a6c5942427af4239d4a45d0e34c3936dec67ca6ae61e56109a0",
+        "signatureExitCode": 0
+      },
+      {
+        "file": "archive.ubuntu.com_ubuntu_dists_resolute-updates_InRelease",
+        "sha256": "c62aff116d5a319319ecbc757617a44414ddecad6ad4ca44293742b7a5dc70ad",
+        "signatureExitCode": 0
+      },
+      {
+        "file": "archive.ubuntu.com_ubuntu_dists_resolute_InRelease",
+        "sha256": "45f95ce276cdba3e41870516a130e03c58b8b7a79e9546b0efe9e526d255740c",
+        "signatureExitCode": 0
+      },
+      {
+        "file": "security.ubuntu.com_ubuntu_dists_resolute-security_InRelease",
+        "sha256": "d57ebfb450afb301b5e4779ce424185fa889a79e78e9098d2791d3c98e107deb",
+        "signatureExitCode": 0
+      }
+    ],
+    "remainingMissingLibraries": [],
+    "completedAt": "2026-11-07T11:25:16.168837+00:00"
+  },
+  "completedAt": "2026-11-07T11:25:13.478394+00:00"
+}

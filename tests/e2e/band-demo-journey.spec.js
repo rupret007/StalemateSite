@@ -42,7 +42,14 @@ async function stalemateEntrySite(href) {
 async function lobbyContext(browser, baseURL, { trackClicks = false, webJoinFixtures = false } = {}) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     let clicks = 0;
-    if (trackClicks) context.on('page', (page) => page.on('click', () => { clicks += 1; }));
+    if (trackClicks) {
+        await context.exposeBinding('__qaBandmateClick', () => { clicks += 1; });
+        await context.addInitScript(() => {
+            document.addEventListener('click', (event) => {
+                if (event.isTrusted) void window.__qaBandmateClick().catch(() => {});
+            }, true);
+        });
+    }
     await context.route(/youtube\.com|ytimg|googlevideo|goatcounter/, (route) => route.abort());
     if (webJoinFixtures) {
         await context.route('https://webjam.example/**', async (route) => {
@@ -70,9 +77,10 @@ async function lobbyContext(browser, baseURL, { trackClicks = false, webJoinFixt
     return { page, context, clicks: () => clicks };
 }
 
-test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
+// The isolated guest context provides its own synthetic MediaStream.
+// Chromium-only launch switches prevent Linux WebKit from starting.
 
-test('Stalemate entry through jam room to connected browser Web Join with few bandmate clicks', async ({ browser, baseURL }) => {
+test('Stalemate entry through jam room to connected browser Web Join with few bandmate clicks', async ({ browser, baseURL }, testInfo) => {
     const { communityIntegration, communityJoinLink } = await import('../../hangout-worker/src/community-integration.mjs');
     const integration = communityIntegration({ version: 1, communityAddress: `${baseURL}/r/45662413410ed051/lobby/`, sites: [
         { id: 'stalemate', label: 'Stalemate', origins: ['https://stalemate.band'], returnUrl: 'https://stalemate.band/', permissions: ['link', 'badge', 'return'], enabled: true, domainVerified: true }
@@ -109,13 +117,34 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         const roomName = await hostCtx.page.locator('[data-chat-context]').textContent();
         await expect(roomName).toMatch(/^#jam-/);
 
-        await hostCtx.page.click('[data-roomtools]');
-        await hostCtx.page.getByRole('button', { name: 'Invite guest', exact: true }).click();
-        await hostCtx.page.getByLabel('Guest nickname', { exact: true }).fill('DemoMate');
+        const inviteBandmate = hostCtx.page.getByRole('button', { name: 'Invite bandmate to room', exact: true });
+        const guestNickname = hostCtx.page.getByLabel('Guest nickname', { exact: true });
+        await expect(inviteBandmate).toBeInViewport({ ratio: 1 });
+        await hostCtx.page.setViewportSize({ width: 375, height: 667 });
+        await expect(inviteBandmate).toBeInViewport({ ratio: 1 });
+        expect(await hostCtx.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+        await inviteBandmate.press('Enter');
+        await expect(guestNickname).toBeFocused();
+        await hostCtx.page.keyboard.press('Escape');
+        await expect(inviteBandmate).toBeFocused();
+        const outlineOverhang = await inviteBandmate.evaluate(button => {
+            const { outlineOffset, outlineStyle, outlineWidth } = getComputedStyle(button);
+            if (outlineStyle === 'none' || parseFloat(outlineWidth) <= 0) return Infinity;
+            return parseFloat(outlineOffset) + parseFloat(outlineWidth);
+        });
+        expect(outlineOverhang).toBeLessThanOrEqual(0);
+        await inviteBandmate.press('Enter');
+        await guestNickname.fill('DemoMate');
         await hostCtx.page.getByRole('button', { name: 'Send invitation', exact: true }).click();
-        await mateCtx.page.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await mateCtx.page.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(mateCtx.page.locator('[data-chat-context]')).toHaveText(roomName);
+        await expect(mateCtx.page.locator('[data-jam-invite-room]')).toBeHidden();
+        await expect.poll(mateCtx.clicks).toBeGreaterThanOrEqual(3);
         expect(mateCtx.clicks()).toBeLessThanOrEqual(4);
+        await testInfo.attach('bandmate-click-count', {
+            body: JSON.stringify({ project: testInfo.project.name, trustedClicksFromEntryThroughRoomJoin: mateCtx.clicks(), transport: 'mocked' }),
+            contentType: 'application/json'
+        });
 
         await hostCtx.page.fill('[data-jam-link]', invite.href);
         await hostCtx.page.locator('[data-jam-form] button[type="submit"]').click();
@@ -126,7 +155,8 @@ test('Stalemate entry through jam room to connected browser Web Join with few ba
         await mateCtx.page.click('[data-jam-web]');
         const joinPage = await joinPopup;
         await expect(joinPage).toHaveURL(/webjam\.example\/join\/#/);
-        await expect(joinPage.locator('h1')).toContainText('Join your band');
+        await expect(joinPage.getByRole('heading', { name: 'Check your audio', exact: true })).toBeVisible();
+        await joinPage.getByRole('button', { name: 'Skip check', exact: true }).click();
         await joinPage.getByRole('checkbox').check();
         await joinPage.getByRole('button', { name: 'Join with microphone', exact: true }).click();
         await expect(joinPage.locator('#status')).toContainText('Connected — Web Join');

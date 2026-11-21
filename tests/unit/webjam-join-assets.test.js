@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
 
 const root = fileURLToPath(new URL('../../join/', import.meta.url));
 const provenance = JSON.parse(readFileSync(resolve(root, 'PROVENANCE.json')));
@@ -45,4 +45,46 @@ describe('pinned WebJam browser assets', () => {
         expect(read('_headers')).toContain('Permissions-Policy: camera=(), geolocation=(), microphone=(self)');
         expect(read('config.js')).toContain('https://webjam-turn-credentials.jeffstory007.workers.dev');
     });
+});
+
+
+it('ships the reviewed Chess receiver only in the protected beta package', () => {
+    const repo = resolve(root, '..');
+    const overlay = join(repo, 'hangout-worker/web-join-chess');
+    const pin = JSON.parse(readFileSync(join(overlay, 'PROVENANCE.json')));
+    expect(pin.repository).toBe(provenance.repository);
+    expect(pin.license).toBe(provenance.license);
+    expect(pin.commit).toMatch(/^[a-f0-9]{40}$/);
+    const overlayFiles = ['game-offer.js', 'index.html', 'session.js'];
+    expect(Object.keys(pin.files).sort()).toEqual(overlayFiles);
+    expect(readdirSync(overlay).sort()).toEqual([...overlayFiles, 'PROVENANCE.json'].sort());
+    for (const file of overlayFiles) {
+        const bytes = readFileSync(join(overlay, file));
+        expect(createHash('sha256').update(bytes).digest('hex'), file).toBe(pin.files[file].sha256);
+    }
+
+    expect(read('session.js')).not.toContain('./game-offer.js');
+    expect(read('index.html')).not.toContain('id="game-offer"');
+    expect(existsSync(join(root, 'game-offer.js'))).toBe(false);
+    expect(readFileSync(join(overlay, 'session.js'), 'utf8')).toContain('from "./game-offer.js"');
+    expect(readFileSync(join(overlay, 'index.html'), 'utf8')).toContain('id="game-offer" hidden');
+});
+
+it('ships listen-only and playback recovery controls only in the protected overlays', () => {
+    const repo = resolve(root, '..');
+    const music = join(repo, 'hangout-worker/web-join-music');
+    const pin = JSON.parse(readFileSync(join(music, 'PROVENANCE.json'), 'utf8'));
+    expect(pin.baseCommit).toBe(provenance.commit);
+    expect(pin.files['app.js'].baseSha256).toBe(provenance.files['app.js'].shippedSha256);
+    expect(createHash('sha256').update(readFileSync(join(music, 'app.js'))).digest('hex')).toBe(pin.files['app.js'].sha256);
+    const chess = join(repo, 'hangout-worker/web-join-chess');
+    const privateHtml = readFileSync(join(chess, 'index.html'), 'utf8');
+    for (const id of ['listen', 'resume-audio']) {
+        expect(read('index.html')).not.toContain(`id="${id}"`);
+        expect(privateHtml).toContain(`id="${id}"`);
+    }
+    expect(readFileSync(join(chess, 'session.js'), 'utf8')).toContain('audio.direction = "recvonly"');
+    expect(readFileSync(join(repo, 'scripts/package-pilot.cjs'), 'utf8')).toContain(
+        "for (const file of ['app.js', 'handoff.html', 'handoff.js'])",
+    );
 });

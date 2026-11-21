@@ -81,3 +81,36 @@ test('restarting the check releases the previous preview and closes the latest o
     await tracksEnded(page);
     expect(await page.evaluate(() => window.checkConnections.every((pc) => pc.closed))).toBe(true);
 });
+
+test('missing mediaDevices explains how to open video while chat still works', async ({ page, browser }) => {
+    const hint = 'Video needs Safari or Chrome. Tap ⋯ or Share, then Open in Safari (iPhone) or Open in Chrome (Android). Chat and games still work here.';
+    await page.addInitScript(() => { delete Navigator.prototype.mediaDevices; });
+    await page.goto(`/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
+    expect(await page.evaluate(() => navigator.mediaDevices)).toBeUndefined();
+
+    await page.click('[data-check-btn]');
+    await page.click('[data-ask-yes]');
+    await expect(page.locator('[data-check-out]')).toHaveText(hint);
+    await page.click('[data-check-done]');
+
+    await page.fill('[data-name]', 'Host');
+    await page.click('[data-enter]');
+    await expect(page.locator('[data-room]')).toBeVisible();
+    await page.click('[data-cam]');
+    await expect(page.locator('[data-status]')).toHaveText(hint);
+    await page.click('[data-mic]');
+    await expect(page.locator('[data-status]')).toHaveText(hint);
+
+    const guest = await browser.newPage();
+    try {
+        await guest.goto(page.url());
+        await guest.fill('[data-name]', 'Guest');
+        await guest.click('[data-enter]');
+        await expect(guest.locator('[data-peers]')).toContainText('2 here');
+        await page.fill('[data-text]', 'chat still works');
+        await page.press('[data-text]', 'Enter');
+        await expect(guest.locator('[data-log]')).toContainText('Host: chat still works');
+    } finally {
+        await guest.close();
+    }
+});

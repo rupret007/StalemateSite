@@ -12,6 +12,9 @@ const phoneProject = (name, use) => ({
 
 module.exports = defineConfig({
     testDir: './tests/e2e',
+    // Both CommonJS and ESM specs load the same engine. Keep it native ESM so
+    // the CommonJS transform cannot change its exports for the ESM fixtures.
+    build: { external: ['**/hangout-worker/src/lobby-core.mjs'] },
     timeout: 30000,
     expect: {
         timeout: 5000
@@ -36,14 +39,14 @@ module.exports = defineConfig({
     projects: [
         {
             name: 'chromium',
-            testIgnore: /phones\.spec\.js/,
+            testIgnore: [/phones\.spec\.js/],
             use: { browserName: 'chromium' }
         },
         {
             name: 'webkit-community',
             // Phone projects select a different file set. Exercise the shared
             // entrance and invitation/Stop journeys in WebKit explicitly.
-            testMatch: /(?:community-entry|lobby-webjam|lobby-invitation-lifecycle)\.spec\.js$/,
+            testMatch: /(?:community-entry|community-moderation|lobby-webjam|lobby-invitation-lifecycle|webjam-join-play|band-demo-journey|whole-band-demo-journey|lobby-workspace|lobby-idle-heartbeat|lobby-private-entry|lobby-accessibility|lobby-status-focus|ux-polish-screens|paint-along-sync|paint-along-focus|music-invite-journey|music-one-tap-participation|hangout-room-workspace)\.spec\.js$/,
             use: { browserName: 'webkit' }
         },
         phoneProject('webkit-iphone-se', {

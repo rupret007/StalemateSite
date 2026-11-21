@@ -1,0 +1,20 @@
+{
+  "at": "2026-11-07T07:40:13.862214+00:00",
+  "version": "0.7.1",
+  "sourceUrl": "https://existential.audio/downloads/BlackHole16ch-0.7.1.pkg",
+  "homebrewMetadataUrl": "https://formulae.brew.sh/api/cask/blackhole-16ch.json",
+  "sha256": "57254e2f76cd40db7f3f715238b1a2cb2bd08819d38abf4087f2944f71a3641a",
+  "bytes": 103302,
+  "signatureExit": 0,
+  "signer": [
+    "1. Developer ID Installer: Existential Audio Inc. (Q5C99V536K)"
+  ],
+  "gatekeeperInstallAssessmentExit": 0,
+  "stagedOnly": true,
+  "installed": false,
+  "administratorPromptOpened": false,
+  "systemRebooted": false,
+  "audioServiceRestarted": false,
+  "downloadMethod": "macOS system curl with normal HTTPS certificate validation; no insecure flag",
+  "initialPythonCertificateFailurePreserved": true
+}

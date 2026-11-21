@@ -1,0 +1,41 @@
+{
+  "at": "2026-11-07T12:36:55.787282+00:00",
+  "state": "ARM40_SECOND_MEDIA_PASS_CLEANUP_HASHES_AND_SETTINGS_VERIFIED_LATER_RESOURCE_HOLD_RETAINED",
+  "remoteBrowserOriginalSha256": "f0deda6fe38b4c2af51411c6cd4340c7c596c357b387d91f59e89b30317cc1f5",
+  "all32SourceFilesStillMatch": true,
+  "allFourExecutedComponentsAndTrustManifestStillMatchVerifiedArchive": true,
+  "allVersionsAndEffectiveSettingsUnchanged": true,
+  "versions": {
+    "stalemate-hangout-beta": "33862058-10a5-4a6f-9659-38841d70292f",
+    "webjam-turn-credentials": "4db649fa-a465-44b4-8487-414987b3a660"
+  },
+  "capMarkerUnchanged": true,
+  "nativeProcessExitCode": 0,
+  "independentNativeProcessListEmpty": true,
+  "ownedLinuxBrowserHarnessAlreadyExited": true,
+  "allOwnedBrowserResourcesClosed": true,
+  "duringTrialAll13ResourceChecksPassed": true,
+  "duringTrialMaxLoad": 4.89697265625,
+  "duringTrialMaxSwapPercent": 78.182421875,
+  "duringTrialMinFreeGiB": 17.8,
+  "laterPostcheckResourceInspection": {
+    "at": "2026-11-07T12:35:07.752160+00:00",
+    "load1": 3.31640625,
+    "swapPercent": 80.78359375,
+    "freeGiB": 17.66,
+    "nativeProcessNamesReadOnly": [],
+    "noProcessOrSettingsChanges": true
+  },
+  "laterNativeImportPostcheckQualified": false,
+  "laterImportStoppedAtUnchangedResourceGuard": true,
+  "noNewNativeImportOrMediaAttemptedWhileGuardClosed": true,
+  "firstPostcheckStopRetained": true,
+  "noAdditionalAnalyticsQueriesDuringPostcheck": true,
+  "originalAnalyticsRateLimitAndFullCooldownRetained": true,
+  "physicalCapture": false,
+  "recording": false,
+  "actualSharedTrackSender": false,
+  "humanHearingQualified": false,
+  "desktopGuiQualified": false,
+  "noSharedServiceOrPolicyChanged": true
+}

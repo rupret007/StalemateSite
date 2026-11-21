@@ -1,0 +1,35 @@
+{
+  "at": "2026-11-04T19:05:55.345427+00:00",
+  "source": "e101465df5d204809619aafc8b65fd7925950e8a",
+  "runId": 41886309202,
+  "actualArmPackageStartup": true,
+  "malformedNonSecretInvitationRefused": true,
+  "visibleErrorAlsoInAccessibilityTree": true,
+  "errorClearedOnEdit": true,
+  "returnKeyRetryRestoredError": true,
+  "backReturnedToMusicArtChooser": true,
+  "screenshot": "arm-fixed-join-invalid-nov04.png",
+  "screenshotSha256": "964de2761a1bdc579d67b461b0d4ea2f4dccf9797947c5b5612d5c616ede20fa",
+  "screenshotVisuallyInspected": true,
+  "hostStarted": false,
+  "captureRequestedByTest": false,
+  "normalCloseOwnedProcessesRemaining": 0,
+  "forceQuitUsed": false,
+  "settings": [
+    {
+      "name": ".webjam_config.json",
+      "existsBefore": true,
+      "existsAfter": true,
+      "contentUnchanged": true,
+      "mtimeUnchanged": true
+    },
+    {
+      "name": ".webjam_mix.json",
+      "existsBefore": true,
+      "existsAfter": true,
+      "contentUnchanged": true,
+      "mtimeUnchanged": true
+    }
+  ],
+  "musicQualified": false
+}

@@ -87,17 +87,19 @@ describe('independent lobby effect commit fence', () => {
         expect(f.persist).not.toHaveBeenCalled();
     });
 
-    it('holds report evidence and acknowledgments behind the independent session fence', async () => {
+    it.each([false, true])('holds report evidence and positive acknowledgments behind the independent session fence (receipts requested: %s)', async (reportResult) => {
         const f = fixture(); await f.connect('alice', 'Alice'); await f.connect('bravo', 'Bravo');
         await f.message('bravo', { t: 'say', ch: '#stalemate', text: 'Synthetic report selection' });
         const line = f.frames.find(frame => frame.recipient === 'alice' && frame.t === 'line'); expect(line).toBeDefined();
         f.reset(); f.controls.deny = true;
-        expect((await f.message('alice', { t: 'report', id: line.id })).ok).toBe(false);
+        expect((await f.message('alice', { t: 'report', id: line.id, ...(reportResult ? { reportResult } : {}) })).ok).toBe(false);
         expect(f.operations[0]).toMatchObject({ kind: 'message', actorId: 'alice' });
         expect(f.commits[0].effects.some(([kind]) => kind === 'moderation-queue')).toBe(true);
         expect(f.commits.every(commit => commit.options.participation === null)).toBe(true);
         expect(f.engine.adminState().reports).toEqual([]); expect(f.written).toEqual([]);
         expect(f.frames.some(frame => frame.t === 'report-status' && frame.submitted)).toBe(false);
+        expect(f.frames.filter(frame => frame.t === 'report-status')).toEqual(reportResult
+            ? [{ recipient: 'alice', t: 'report-status', id: line.id, submitted: false }] : []);
     });
 
     it('keeps joined public text actor-only and never publishes text after fence denial', async () => {
@@ -162,6 +164,36 @@ describe('independent lobby effect commit fence', () => {
         expect(engine.connect({ id: 'legacy', dev: 'dev-legacy', iph: 'ip-legacy' })).toEqual({ ok: true });
         await engine.message('legacy', JSON.stringify({ t: 'hello', nick: 'Legacy', age13: true }));
         expect(send.mock.calls.some(([, frame]) => frame.t === 'welcome')).toBe(true); expect(persist).toHaveBeenCalled();
+    });
+
+    it('requires a persistence handler when durable storage is requested', () => {
+        expect(() => createLobby({ storageRequired: true })).toThrow('A lobby persistence handler is required');
+        expect(() => createLobby({ persist: null })).toThrow('A lobby persistence handler is required');
+    });
+
+    it.each(['synchronous', 'asynchronous'])('reports a %s session write failure after pending writes settle', async failure => {
+        let finishAbuse;
+        const abuse = new Promise(resolve => { finishAbuse = resolve; });
+        const send = vi.fn(), error = new Error('session write failed');
+        const persist = vi.fn(kind => {
+            if (kind === 'abuse') return abuse;
+            if (kind !== 'sessions') return;
+            if (failure === 'synchronous') throw error;
+            return Promise.reject(error);
+        });
+        const engine = createLobby({ storageRequired: true, now: () => START, send, persist });
+        engine.connect({ id: 'legacy', dev: 'dev-legacy', iph: 'ip-legacy' });
+        send.mockClear();
+        const pending = engine.message('legacy', JSON.stringify({ t: 'hello', nick: 'Legacy', age13: true }));
+        await Promise.resolve();
+        expect(persist.mock.calls.map(([kind]) => kind)).toEqual(expect.arrayContaining(['abuse', 'sessions']));
+        expect(send).not.toHaveBeenCalled();
+        finishAbuse();
+        await pending;
+        const frames = send.mock.calls.map(([, frame]) => frame);
+        expect(frames.some(frame => frame.t === 'welcome')).toBe(false);
+        expect(frames.some(frame => frame.t === 'net' && frame.lock === 'readonly')).toBe(true);
+        expect(frames.some(frame => frame.t === 'notice' && frame.text.includes('Storage is unavailable'))).toBe(true);
     });
 });
 

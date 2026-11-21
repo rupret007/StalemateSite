@@ -2,9 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
-import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
-import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
-import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
+import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs';
 
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
@@ -31,14 +29,13 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, { shar
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing,
-        createChatAnnouncements: (log) => createChatAnnouncements(log, { frame: (fn) => window.setTimeout(fn, 16), cancel: (id) => window.clearTimeout(id) }) };
+    window.HangoutClientTestModules = createHangoutClientTestModules(window);
     window.eval(discovery);
     window.eval(activity);
     // Execute the actual browser client, replacing only module loading, which
     // jsdom cannot perform. Real Chromium journeys cover native ESM loading.
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map((match) => match[1]).join(',');
-    window.eval(`const {${imports}} = window.HangoutClientTestModules;\n${client.replace(/^import .*$/gm, '')}`);
+    window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     window.document.querySelector('[data-nick]').value = 'Viewer';
     window.document.querySelector('[data-enter]').click();
     await vi.waitFor(() => expect(sockets.length).toBe(1));
@@ -54,6 +51,29 @@ describe('private caller sharing controls in the actual browser client', () => {
     it('leaves ordinary beta UI and network behavior unchanged', async () => {
         const { window } = await visitor();
         expect(window.document.querySelector('[data-sharing-controls]').hidden).toBe(true); expect(window.fetch).not.toHaveBeenCalled();
+    });
+    it('honors a server-confirmed Stop even if this tab has no sharing controls', async () => {
+        const { window, ws, welcome, join } = await visitor();
+        welcome(); join();
+        const name = '#jam-stop';
+        const href = 'https://music.example.test/join/#synthetic';
+        join(name, { kind: 'jam', jam: { webReady: true, web: href } });
+        const browserJoin = window.document.querySelector('[data-jam-web]');
+        expect(browserJoin.disabled).toBe(false);
+        const cachedJoin = browserJoin.onclick;
+        window.open = vi.fn();
+        cachedJoin();
+        expect(window.open).toHaveBeenCalledWith(href, '_blank', 'noopener,noreferrer');
+        window.open.mockClear();
+
+        ws.receive({ t: 'sharing-stopped' });
+        expect(window.__lobby.localMediaPaused).toBe(true);
+        expect(window.__lobby.chans.get(name).jam).toBeNull();
+        expect(browserJoin.disabled).toBe(true);
+        expect(window.document.querySelector('[data-text]').disabled).toBe(true);
+        cachedJoin();
+        expect(window.open).not.toHaveBeenCalled();
+        expect(window.fetch).not.toHaveBeenCalled();
     });
     it('shows unknown/expired status without implying email grants permission or collecting private fields', async () => {
         const { window } = await visitor('stalemate', { entrySources: 1 }, { sharing: true, fetcher: async () => Response.json({ ok: true, state: 'expired', available: false, purposes: [], revision: 2, canStop: true }) });
@@ -210,7 +230,7 @@ describe('private caller sharing controls in the actual browser client', () => {
         expect(ws.sent.filter(frame => frame.t === 'cmd' && frame.name === 'block')).toEqual([{ t: 'cmd', name: 'block', args: ['Friend'], ch: '#stalemate', roomInstance: 'a'.repeat(32), personContext: 1, personPeer: 'friend-socket' }]);
         get('[data-sharing-leave]').click(); get('[data-sharing-leave]').click();
         expect(closes).toEqual([[1000, 'Left chat']]); expect(ws.onclose).toBeNull(); expect(ws.onmessage).toBeNull();
-        expect(window.__lobby.chans.size).toBe(0); expect(window.__lobby.pms.size).toBe(0); expect(get('[data-buffer]').children).toHaveLength(0);
+        expect(window.__lobby.chans.size).toBe(0); expect(window.__lobby.pms.size).toBe(0); expect(get('[data-chat-lines]').children).toHaveLength(0);
         expect(get('[data-session-reason]').textContent).toContain('You left this chat'); expect(get('[data-session-reason]').textContent).not.toContain('expired');
         release(Response.json({ error: 'Synthetic pending request ended' }, { status: 503 }));
         await vi.waitFor(() => expect(get('[data-sharing-check]').disabled).toBe(false)); flush(1000);

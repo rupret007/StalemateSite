@@ -1,6 +1,7 @@
 // Credentials never enter storage/logs. One global DO serializes reservations across rooms.
 import { originAllowed, previewKeyOk, validRoomId } from './core.mjs';
 import { hmacKeyOk, verifyDevice } from './auth.mjs';
+import { buildRuntimeTurnEntries, hangoutTurnServiceEnabled, runtimeTurnConfigured } from './turn-config.mjs';
 
 export const TURN_TTL = 600;
 const WINDOW = 10 * 60 * 1000;
@@ -8,6 +9,19 @@ const GB = 1e9;
 const RESERVE_BYTES = 0.1 * GB; // admission estimate, NOT a provider-enforced egress cap
 const MAX_PENDING = 32; // bound in-memory waiters while provider requests are outstanding
 const reply = (status, reason, extra = {}) => Response.json({ iceServers: [], reason, ...extra }, { status });
+
+function budgetRequest(env, path, room, device) {
+    const stub = env.TURN_BUDGET.get(env.TURN_BUDGET.idFromName('global'));
+    return stub.fetch(`https://turn/${path}`, { method: 'POST', body: JSON.stringify({ room, device }) });
+}
+
+export async function issueGameNightTurn(env, ref, device) {
+    if (!env.TURN_BUDGET || env.HANGOUT_ARCADE_TURN !== '1') return null;
+    // Pad the unique 32-hex room instance to the ledger's 64-hex room-key format.
+    const response = await budgetRequest(env, 'issue-game-night', ref.padEnd(64, '0'), device);
+    if (!response.ok) return null;
+    return response.json();
+}
 
 export async function admitTurn(request, env) {
     const origin = request.headers.get('Origin');
@@ -23,8 +37,10 @@ export async function admitTurn(request, env) {
     headers['Access-Control-Allow-Headers'] = 'Content-Type';
     if (request.method === 'OPTIONS') return finish(new Response(null, { status: 204 }));
     if (request.method !== 'POST') return finish(reply(405, 'POST required'));
-    if (env.HANGOUT_TURN_ENABLED !== '1') return finish(reply(503, 'TURN disabled'));
-    if (!env.TURN_BUDGET || !hmacKeyOk(env.HANGOUT_HMAC_KEY) || !previewKeyOk(env.HANGOUT_PREVIEW_KEY, env.HANGOUT_PREVIEW_KEY)) return finish(reply(503, 'not-configured'));
+    if (!hangoutTurnServiceEnabled(env)) return finish(reply(503, 'TURN disabled'));
+    const staticTurn = runtimeTurnConfigured(env);
+    if (!hmacKeyOk(env.HANGOUT_HMAC_KEY) || !previewKeyOk(env.HANGOUT_PREVIEW_KEY, env.HANGOUT_PREVIEW_KEY)) return finish(reply(503, 'not-configured'));
+    if (!staticTurn && (!env.TURN_BUDGET || env.HANGOUT_TURN_ENABLED !== '1')) return finish(reply(503, 'not-configured'));
     try {
         // Bound the body even when Content-Length is absent or dishonest.
         const reader = request.body?.getReader();
@@ -46,8 +62,13 @@ export async function admitTurn(request, env) {
         if (!validRoomId(body.room)) return finish(reply(400, 'room'));
         const device = await verifyDevice(body.device, env.HANGOUT_HMAC_KEY);
         if (!device) return finish(reply(403, 'device'));
-        const stub = env.TURN_BUDGET.get(env.TURN_BUDGET.idFromName('global'));
-        return finish(await stub.fetch('https://turn/issue', { method: 'POST', body: JSON.stringify({ room: body.room, device }) }));
+        if (staticTurn && env.HANGOUT_TURN_ENABLED !== '1') {
+            const iceServers = buildRuntimeTurnEntries(env);
+            if (!iceServers) return finish(reply(503, 'not-configured'));
+            const now = Date.now();
+            return finish(Response.json({ iceServers, ttl: TURN_TTL, expiresAt: now + TURN_TTL * 1000 }));
+        }
+        return finish(await budgetRequest(env, 'issue', body.room, device));
     } catch { return finish(reply(503, 'TURN unavailable')); }
 }
 
@@ -90,7 +111,10 @@ export class HangoutTurnBudget {
     async issue(request) {
         const env = this.env;
         const budget = Number(env.HANGOUT_TURN_MONTHLY_GB);
-        if (env.HANGOUT_TURN_ENABLED !== '1' || !env.HANGOUT_TURN_KEY_ID || !env.HANGOUT_TURN_API_TOKEN ||
+        const path = new URL(request.url).pathname;
+        const enabled = path === '/issue-game-night' ? env.HANGOUT_ARCADE_TURN === '1'
+            : path === '/issue' && env.HANGOUT_TURN_ENABLED === '1';
+        if (!enabled || request.method !== 'POST' || !env.HANGOUT_TURN_KEY_ID || !env.HANGOUT_TURN_API_TOKEN ||
             !env.HANGOUT_TURN_ANALYTICS_TOKEN || !/^[a-f0-9]{32}$/.test(env.HANGOUT_CF_ACCOUNT_ID || '') ||
             !Number.isFinite(budget) || budget <= 0 || budget > 800) return reply(503, 'not-configured');
         const { room, device } = await request.json();

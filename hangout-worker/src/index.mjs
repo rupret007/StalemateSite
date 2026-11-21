@@ -53,6 +53,24 @@ export class HangoutQuota {
     constructor(state, env) { this.state = state; this.env = env; this.limits = limitsFrom(env); }
     async fetch(request) {
         const key = `c:${dayKey(Date.now())}`;
+        if (request && new URL(request.url).pathname === '/private-music-native') {
+            if (request.method !== 'POST' || this.env.HANGOUT_BETA_MODE !== 'protected'
+                || this.env.HANGOUT_PARTICIPATION_AUTHORITY !== 'c3-v1') return new Response(null, { status: 404 });
+            const bucket = request.headers.get('X-Hangout-Native-Rate');
+            if (!bucket || !/^[A-Za-z0-9_-]{22}$/.test(bucket)) return new Response(null, { status: 403 });
+            const minute = Math.floor(Date.now() / 60_000);
+            return this.state.storage.transaction(async tx => {
+                const prior = await tx.get('private-music-native-rate');
+                const counts = new Map(prior?.minute === minute ? prior.counts : []);
+                const used = counts.get(bucket) ?? 0;
+                if (!Number.isSafeInteger(used) || used < 0) return new Response(null, { status: 503 });
+                if (used >= 120 || !counts.has(bucket) && counts.size >= 512) return new Response(null, { status: 429 });
+                counts.set(bucket, used + 1);
+                // Shared shards keep a bounded minute of hashed counters.
+                await tx.put('private-music-native-rate', { minute, counts: [...counts] });
+                return new Response(null, { status: 200 });
+            });
+        }
         if (request && new URL(request.url).pathname === INTERNAL_HEALTH_PATH) {
             if (this.env.HANGOUT_BETA_MODE !== 'protected' || request.method !== 'GET') return new Response('not found', { status: 404 });
             try {

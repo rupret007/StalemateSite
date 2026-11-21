@@ -1,0 +1,18 @@
+{
+  "runtimeSourceRevision": "ec1b4a09d6c375433aedb33f56c3deb9590350ac",
+  "state": "53_FOCUSED_UNITS_PASSED",
+  "files": 3,
+  "tests": 53,
+  "workers": 1,
+  "retries": 0,
+  "firstRun": {
+    "passed": 51,
+    "failed": 2,
+    "cause": "Exact greeting fixtures lacked the newly advertised capability. Expectations updated without removing assertions.",
+    "retainedFailureLogSha256": "771666d1a204f68cd3d59141e9e94d649b6a23ea697108ca79686c6f7f575ece"
+  },
+  "stdoutSha256": "1128a21dd8fc8b3f62bc7471ef524531ead0aa45916cd603c84839c23fa2a0b1",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "providerCalls": false,
+  "physicalCapture": false
+}

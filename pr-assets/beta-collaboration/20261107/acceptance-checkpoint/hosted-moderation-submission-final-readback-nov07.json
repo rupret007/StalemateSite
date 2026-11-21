@@ -1,0 +1,31 @@
+{
+  "at": "2026-11-07T13:52:14.888595+00:00",
+  "state": "CURRENT_REPORT_SUBMISSION_ACK_AND_INDEPENDENT_CLEANUP_VERIFIED_HUMAN_REVIEW_PENDING",
+  "remoteProofSha256": "ef21e081221016bb062bc36a6196efe1ce2156e970a14d932b51db40d58ac886",
+  "harnessSha256": "e1b645d795267b1c61937831c1aab2c75c98ce5f7883a701c86ff4b8092384aa",
+  "originalOwnedNodeCommandRemaining": false,
+  "ownedQaRoomClosed": true,
+  "allOwnedBrowserResourcesClosed": true,
+  "logout": [
+    200,
+    200
+  ],
+  "copiedCookieAfterLogout": [
+    401,
+    401
+  ],
+  "ordinaryAdminAccess": [
+    403,
+    403
+  ],
+  "physicalCaptureRequests": 0,
+  "aiModeration": "off",
+  "humanModeratorActionObserved": false,
+  "otherReportsReadOrChanged": false,
+  "privateVersionsAndAllSettingsUnchanged": true,
+  "noFurtherReportCreatedByThisReadback": true,
+  "publicExcerpt": {
+    "omission": "Unique synthetic report text/lookup marker omitted; owner-only original retained. No real participant text was collected.",
+    "humanReviewStillPending": true
+  }
+}

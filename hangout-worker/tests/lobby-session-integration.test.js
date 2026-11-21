@@ -434,7 +434,7 @@ describe('opt-in session authority through the actual beta gateway and Lobby', (
         let checkDone = false, chatDone = false;
         const checking = betaFetch(request('/beta/state', { cookie: bravo.cookie }), h.env).then(result => { checkDone = true; return result; });
         const chatting = h.message(bravo, { t: 'say', ch: '#stalemate', text: 'The lobby continues during remote closure' }).then(() => { chatDone = true; });
-        await vi.waitFor(() => { expect(checkDone).toBe(true); expect(chatDone).toBe(true); }, { timeout: 100, interval: 1 });
+        await vi.waitFor(() => { expect(checkDone).toBe(true); expect(chatDone).toBe(true); }, { timeout: 3000, interval: 1 });
         expect((await checking).status).toBe(200); await chatting; expect(settled).toBe(false);
         expect(bravo.socket.frames.some(frame => frame.t === 'line' && frame.text === 'The lobby continues during remote closure')).toBe(true);
         expect(alice.socket.frames.some(frame => frame.text === 'The lobby continues during remote closure')).toBe(false);

@@ -16,28 +16,46 @@
             swatches: $('[data-act-swatches]'),
             clear: $('[data-act-clear]'),
             video: $('[data-act-video]'),
+            preview: $('[data-act-yt]').parentElement,
             yt: $('[data-act-yt]'),
             tap: $('[data-act-tap]'),
             videoStatus: $('[data-act-video-status]'),
+            cameraSwitch: $('[data-paint-camera-switch]'),
+            episodeTitle: $('[data-paint-episode-title]'),
             load: $('[data-act-load]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
+            paintOptions: $('[data-paint-options]'),
+            paintLessons: $('[data-paint-lessons]'),
             tiles: $('[data-act-tiles]'), relayStatus: $('[data-act-relay-status]')
         };
         const state = {
             ch: null, kind: null, clock: H.createClock(), room: H.emptyState(),
-            myId: null, names: new Map(), camOn: false, ice: null,
+            myId: null, names: new Map(), camOn: false, ice: null, cameraFacing: 'user',
             pcs: new Map(), stream: null, peers: new Set()
         };
-        const player = { yt: null, kind: null, key: '', readyKey: '', failedKey: '', loading: null, applying: 0, autoplayBlocked: false, seenPlaying: false, playPending: false };
+        const player = { yt: null, kind: null, key: '', readyKey: '', failedKey: '', loading: null, applying: 0, lastIntentAt: 0, autoplayBlocked: false, buffering: false, seenPlaying: false, playPending: false };
         const youtube = window.HangoutYouTube.create({
             getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
             onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
-            onError: () => videoFailure(player.key)
+            onError: (error) => videoFailure(player.key, error)
         });
-        let videoPublishTimer;
+        let videoPublishTimer, videoSyncTimer, videoSampleTimer;
+        let localSample = null;
         let live = null;
         let pendingPts = [];
+        // Prefix cache stays inside this room generation. It is built only by
+        // stroke() calls. WebKit composites a later stroke differently after
+        // drawImage or putImageData, so a copied bitmap cannot be the underlay.
+        let paintPrefix = null, paintPrefixKey = '', paintPrefixLastId = null, paintPrefixChannel = null;
+        let paintPrefixGeneration = -1, paintPrefixWidth = 0, paintPrefixHeight = 0;
+        let paintPrefixTimer = 0, paintPrefixToken = 0;
+        // A long history keeps one copied prefix so extending the latest stroke
+        // does not repaint every earlier point. Short drawings do not use it:
+        // WebKit changes edge coverage after that copy.
+        let retainedPrefix = null, retainedKey = '', retainedLastId = null, retainedChannel = null;
+        let retainedGeneration = -1, retainedWidth = 0, retainedHeight = 0;
+        let canvasRoomInstance;
         let flushTimer = 0;
         let roomGeneration = 0, captureVersion = 0, turnClient = null, turnInit = null;
         let cameraFailureNotice = '';
@@ -105,7 +123,8 @@
         }
         function currentActivity(item) {
             if (item.generation !== roomGeneration || item.channel !== state.ch || state.ch !== app.active || !state.names.has(state.myId)) return false;
-            if (item.kind === 'clear' || item.kind === 'video') return isOp();
+            if (item.kind === 'clear') return isOp();
+            if (item.kind === 'video') return state.kind === 'bobross' || isOp();
             if (item.kind !== 'rtc') return paintActive();
             if (!item.entry?.current()) return false;
             const current = item.entry.pc.localDescription;
@@ -182,11 +201,27 @@
             return !item.failed; // Queued locally, not acknowledged by the server.
         }
 
+        function resetCanvasBase() {
+            paintPrefixToken += 1;
+            clearTimeout(paintPrefixTimer); paintPrefixTimer = 0;
+            if (paintPrefix) { paintPrefix.width = 0; paintPrefix.height = 0; }
+            paintPrefix = null; paintPrefixKey = ''; paintPrefixLastId = null; paintPrefixChannel = null;
+            paintPrefixGeneration = -1; paintPrefixWidth = 0; paintPrefixHeight = 0;
+            if (retainedPrefix) { retainedPrefix.width = 0; retainedPrefix.height = 0; }
+            retainedPrefix = null; retainedKey = ''; retainedLastId = null; retainedChannel = null;
+            retainedGeneration = -1; retainedWidth = 0; retainedHeight = 0;
+        }
+
         function teardown() {
+            if (!state.ch) return;
             roomGeneration += 1; captureVersion += 1;
+            resetCanvasBase();
+            localSample = null;
             clearTimeout(activity.timer); activity.timer = 0; activity.queue = []; activity.bytes = 0;
             cancelStroke();
             clearTimeout(videoPublishTimer);
+            clearInterval(videoSyncTimer);
+            clearInterval(videoSampleTimer);
             turnClient?.stop(); turnClient = null; turnInit = null; state.ice = null;
             ui.relayStatus.textContent = '';
             cameraFailureNotice = '';
@@ -201,42 +236,114 @@
             state.camOn = false;
             resetCameraPresentation();
             ui.stage.hidden = true;
+            paintEpisodeTitle();
             ui.paint.hidden = true;
             ui.video.hidden = true;
             youtube.cancel(); player.yt = null;
             player.key = ''; player.readyKey = ''; player.failedKey = ''; player.loading = null; player.autoplayBlocked = false;
             player.seenPlaying = false; player.playPending = false;
+            ui.cameraSwitch.hidden = true;
             ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
             ui.tap.hidden = true;
         }
 
         function onJoin(chan, act) {
+            // Reuse already-validated coordinates when the same art room accepts
+            // another authoritative snapshot. A long prefix bitmap can be carried
+            // across that snapshot; short drawings are repainted from strokes.
+            let previousStrokes, carriedPrefix;
+            const continuing = act && chan?.kind === 'art' && state.kind === 'art' && state.ch === chan.name && canvasRoomInstance === chan.keepRef;
+            if (continuing) previousStrokes = state.room.strokes;
+            if (continuing && retainedPrefix && retainedGeneration === roomGeneration
+                && retainedLastId === previousStrokes.at(-1)?.id && retainedKey === strokesPrefixFingerprint(previousStrokes)
+                && retainedWidth === ui.canvas.width && retainedHeight === ui.canvas.height) {
+                carriedPrefix = { bitmap: retainedPrefix, strokes: previousStrokes };
+                retainedPrefix = null;
+            }
             teardown();
             if (!chan || !['art', 'bobross', 'watch'].includes(chan.kind)) return;
             state.ch = chan.name;
             state.kind = chan.kind;
             ui.stage.hidden = false;
-            const paint = chan.kind === 'art' || chan.kind === 'bobross';
+            const paint = chan.kind === 'art';
             const video = chan.kind === 'bobross' || chan.kind === 'watch';
             ui.paint.hidden = !paint;
+            // Paint Along uses the lesson video and camera tiles; reserve the
+            // drawing surface for art rooms so it is absent from the UI itself.
+            ui.canvas.hidden = chan.kind !== 'art';
             ui.video.hidden = !video;
-            ui.load.hidden = chan.kind !== 'watch';
-            ui.bobPicks.hidden = chan.kind !== 'bobross';
-            if (paint) setupCanvas();
-            if (video) setupVideoUi();
-            if (act) ingestSnap(act);
+            ui.load.hidden = !video;
+            const paintAlong = chan.kind === 'bobross';
+            ui.paintOptions.hidden = !paintAlong;
+            ui.paintLessons.open = false;
+            if (paintAlong) {
+                ui.preview.after(ui.videoStatus, ui.tap);
+                ui.bobPicks.after(ui.load);
+            } else {
+                // Keep Retry immediately before the URL field. The player stays
+                // hidden until a source loads, so the empty room still opens
+                // on the chooser instead of a blank 16:9 box.
+                ui.preview.after(ui.videoStatus, ui.tap, ui.load);
+            }
+            ui.preview.hidden = !paintAlong;
+            ui.video.classList.toggle('paint-along-player', paintAlong);
+            $('[data-paint-canvas-hint]').hidden = !paintAlong;
+            ui.cameraSwitch.hidden = !paintAlong || !phone;
+            ui.episodeTitle.hidden = !paintAlong;
+            if (paint) { canvasRoomInstance = chan.keepRef; setupCanvas(); }
+            if (video) {
+                setupVideoUi();
+                videoSyncTimer = setInterval(syncVideo, 2000);
+                videoSampleTimer = setInterval(sampleVideo, 250);
+            }
+            if (act) ingestSnap(act, previousStrokes, carriedPrefix);
             syncNames(chan);
+            drawWatchStart();
             if (video && chan.kind === 'bobross' && isOp() && !state.room.video) {
-                const ep = BOB.EPISODES[2];
+                const ep = BOB.DEFAULT_LESSON;
                 hostVideo({ kind: 'yt', id: ep.id }, true, 0);
             }
         }
 
-        function ingestSnap(act) {
+        function samePaintPrefix(before, after) {
+            if (!before || !after || after.length < 2 || before.length !== after.length) return false;
+            for (let index = 0; index < after.length - 1; index += 1) {
+                const a = before[index], b = after[index];
+                if (a === b) continue;
+                if (!a || a.id !== b.id || a.color !== b.color || a.size !== b.size || a.pts.length !== b.pts.length) return false;
+                for (let point = 0; point < b.pts.length; point += 1) {
+                    if (a.pts[point][0] !== b.pts[point][0] || a.pts[point][1] !== b.pts[point][1]) return false;
+                }
+            }
+            return true;
+        }
+
+        function ingestSnap(act, previousStrokes, carriedPrefix) {
             if (!act) return;
-            H.apply(state.room, { type: 'snapshot', state: { strokes: act.strokes || [], video: act.video } });
+            H.apply(state.room, { type: 'snapshot', state: { strokes: act.strokes || [], video: act.video } },
+                { previousSnapshotStrokes: previousStrokes });
+            const strokes = state.room.strokes;
+            if (carriedPrefix && carriedPrefix.bitmap.width === ui.canvas.width && carriedPrefix.bitmap.height === ui.canvas.height
+                && samePaintPrefix(carriedPrefix.strokes, strokes)) {
+                retainedPrefix = carriedPrefix.bitmap;
+                retainedKey = strokesPrefixFingerprint(strokes);
+                retainedLastId = strokes.at(-1).id;
+                retainedGeneration = roomGeneration;
+                retainedChannel = state.ch;
+                retainedWidth = retainedPrefix.width;
+                retainedHeight = retainedPrefix.height;
+            }
+            if (act.video) applyVideoMetadata(act.video);
+            paintEpisodeTitle();
             redraw();
             if (state.room.video) syncToState(true);
+        }
+
+        function applyVideoMetadata(video) {
+            if (!state.room.video) return;
+            for (const key of ['seq', 'by', 'updatedAt', 'rate']) {
+                if (Object.hasOwn(video, key)) state.room.video[key] = video[key];
+            }
         }
 
         function syncNames(chan) {
@@ -249,6 +356,7 @@
         function onChan(chan) {
             if (!state.ch || chan.name !== state.ch) return;
             syncNames(chan);
+            drawWatchStart();
             const c = app.chans.get(state.ch);
             state.camOn = !!(c && c.myCam);
             refreshAv();
@@ -272,22 +380,30 @@
             if (!m.ch || m.ch !== app.active || m.ch !== state.ch) return;
             observeTimestamp(m.ts);
             if (m.kind === 'stroke' && m.from !== state.myId && H.apply(state.room, { type: 'stroke', stroke: m.stroke }) === 'draw') {
-                const s = state.room.strokes.find((x) => x.id === m.stroke.id);
-                drawStroke(s);
+                redraw(m.stroke.id);
             }
             if (m.kind === 'clear') {
+                cancelStroke();
                 H.apply(state.room, { type: 'clear' });
                 redraw();
             }
             if (m.kind === 'video' && m.video) {
-                H.apply(state.room, { type: 'video', source: m.video.source, playing: m.video.playing, pos: m.video.pos }, { t: m.video.t });
+                const applied = H.apply(state.room, { type: 'video', source: m.video.source, playing: m.video.playing, pos: m.video.pos }, { t: m.video.t });
+                if (applied !== 'video') return;
+                applyVideoMetadata(m.video);
+                paintEpisodeTitle();
+                if (!m.video.playing && m.by && m.by !== app.me) {
+                    ui.videoStatus.textContent = `Paused by ${m.by}`;
+                    ui.videoStatus.hidden = false;
+                    setTimeout(() => { if (ui.videoStatus.textContent === `Paused by ${m.by}`) ui.videoStatus.hidden = true; }, 3000);
+                }
                 syncToState(true);
             }
             if (m.kind === 'rtc' && m.from) onRtc(m.from, m);
         }
 
         /* ---- canvas ---- */
-        const paintActive = () => !!state.ch && state.ch === app.active && ['art', 'bobross'].includes(state.kind);
+        const paintActive = () => !!state.ch && state.ch === app.active && state.kind === 'art';
         const currentStroke = () => live && paintActive() && live.channel === state.ch && live.generation === roomGeneration;
         function cancelStroke() {
             clearTimeout(flushTimer); flushTimer = 0; live = null; pendingPts = [];
@@ -348,10 +464,12 @@
         }
 
         function addPt(x, y) {
-            const px = Math.max(0, Math.min(1, x));
-            const py = Math.max(0, Math.min(1, y));
-            live.pts.push([px, py]);
-            pendingPts.push([px, py]);
+            if (live.pts.length >= H.LIMITS.strokeTotalPoints) return;
+            const normalized = H.cleanStroke({ id: live.id, color: live.color, size: live.size, pts: [[x, y]] });
+            if (!normalized) return;
+            const point = normalized.pts[0];
+            live.pts.push(point);
+            pendingPts.push(point);
             drawStroke(live, Math.max(0, live.pts.length - 2));
             if (pendingPts.length >= 16) flushStroke();
             else if (!flushTimer) {
@@ -370,63 +488,246 @@
             }
             H.apply(state.room, { type: 'stroke', stroke: { id: live.id, color: live.color, size: live.size, pts: pendingPts } });
             pendingPts = [];
+            // Match snapshot rendering after normalization. Segment-by-segment
+            // antialiasing and repainting a growing path produce different pixels.
+            redraw(live.id);
         }
 
-        function drawStroke(stroke, from = 0) {
-            if (!stroke || !stroke.pts.length) return;
-            const ctx = ui.canvas.getContext('2d');
-            const w = ui.canvas.width;
-            const h = ui.canvas.height;
+        function paintStroke(ctx, stroke, from = 0) {
+            if (!stroke || stroke.pts.length <= from) return;
+            // A real canvas context points back at its canvas. The unit DOM's
+            // context does not, and the room canvas has the same bitmap size.
+            const surface = ctx.canvas || ui.canvas;
+            const w = surface.width;
+            const h = surface.height;
             ctx.strokeStyle = stroke.color;
             ctx.lineWidth = stroke.size * (w / 1200);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
-            const pts = stroke.pts;
-            ctx.moveTo(pts[from][0] * w, pts[from][1] * h);
-            for (let i = from + 1; i < pts.length; i += 1) ctx.lineTo(pts[i][0] * w, pts[i][1] * h);
+            ctx.moveTo(stroke.pts[from][0] * w, stroke.pts[from][1] * h);
+            for (let i = from + 1; i < stroke.pts.length; i += 1) ctx.lineTo(stroke.pts[i][0] * w, stroke.pts[i][1] * h);
             ctx.stroke();
         }
 
-        function redraw() {
+        function drawStroke(stroke, from = 0) {
+            paintStroke(ui.canvas.getContext('2d'), stroke, from);
+        }
+
+        // Within one live generation strokes only gain points. A cached prefix
+        // from another generation is discarded before any reuse.
+        function strokesPrefixFingerprint(strokes) {
+            let out = '';
+            for (let i = 0; i < strokes.length - 1; i += 1) out += strokes[i].id + ':' + strokes[i].pts.length + '|';
+            return out;
+        }
+
+        function blankCanvas() {
+            const canvas = document.createElement('canvas');
+            canvas.width = ui.canvas.width;
+            canvas.height = ui.canvas.height;
+            return canvas;
+        }
+
+        function rememberPrefix(strokes) {
+            paintPrefixToken += 1;
+            clearTimeout(paintPrefixTimer); paintPrefixTimer = 0;
+            const canvas = blankCanvas();
+            const ctx = canvas.getContext('2d');
+            for (const stroke of strokes.slice(0, -1)) paintStroke(ctx, stroke);
+            paintPrefix = canvas;
+            paintPrefixKey = strokesPrefixFingerprint(strokes);
+            paintPrefixLastId = strokes.at(-1).id;
+            paintPrefixGeneration = roomGeneration;
+            paintPrefixChannel = state.ch;
+            paintPrefixWidth = canvas.width;
+            paintPrefixHeight = canvas.height;
+        }
+
+        function schedulePrefix(strokes) {
+            const token = ++paintPrefixToken;
+            clearTimeout(paintPrefixTimer);
+            const generation = roomGeneration, channel = state.ch;
+            const width = ui.canvas.width, height = ui.canvas.height;
+            const lastId = strokes.at(-1).id, key = strokesPrefixFingerprint(strokes);
+            const prefix = strokes.slice(0, -1).map(stroke => ({
+                id: stroke.id, color: stroke.color, size: stroke.size,
+                pts: stroke.pts.map(point => [point[0], point[1]])
+            }));
+            paintPrefixTimer = window.setTimeout(() => {
+                paintPrefixTimer = 0;
+                if (token !== paintPrefixToken || generation !== roomGeneration || channel !== state.ch) return;
+                if (ui.canvas.width !== width || ui.canvas.height !== height) return;
+                const canvas = document.createElement('canvas');
+                canvas.width = width; canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                for (const stroke of prefix) paintStroke(ctx, stroke);
+                if (token !== paintPrefixToken || generation !== roomGeneration || channel !== state.ch) return;
+                paintPrefix = canvas;
+                paintPrefixKey = key;
+                paintPrefixLastId = lastId;
+                paintPrefixGeneration = generation;
+                paintPrefixChannel = channel;
+                paintPrefixWidth = width;
+                paintPrefixHeight = height;
+            }, 0);
+        }
+
+        function prefixReady(strokes, last) {
+            return !!(paintPrefix && last && paintPrefixLastId === last.id
+                && paintPrefixGeneration === roomGeneration && paintPrefixChannel === state.ch
+                && paintPrefixWidth === ui.canvas.width && paintPrefixHeight === ui.canvas.height
+                && paintPrefixKey === strokesPrefixFingerprint(strokes));
+        }
+
+        function redrawRetained(strokes, last, changedStrokeId, pendingFrom) {
+            paintPrefixToken += 1;
+            clearTimeout(paintPrefixTimer); paintPrefixTimer = 0;
+            if (paintPrefix) { paintPrefix.width = 0; paintPrefix.height = 0; }
+            paintPrefix = null; paintPrefixKey = ''; paintPrefixLastId = null; paintPrefixChannel = null;
+            paintPrefixGeneration = -1; paintPrefixWidth = 0; paintPrefixHeight = 0;
             const ctx = ui.canvas.getContext('2d');
             ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
-            state.room.strokes.forEach((s) => drawStroke(s));
+            const key = strokesPrefixFingerprint(strokes);
+            const reusable = retainedPrefix && retainedLastId === last.id
+                && retainedKey === key && retainedGeneration === roomGeneration && retainedChannel === state.ch
+                && retainedWidth === ui.canvas.width && retainedHeight === ui.canvas.height;
+            if (reusable) ctx.drawImage(retainedPrefix, 0, 0);
+            else {
+                for (const stroke of strokes.slice(0, -1)) paintStroke(ctx, stroke);
+                const copy = document.createElement('canvas');
+                copy.width = ui.canvas.width;
+                copy.height = ui.canvas.height;
+                copy.getContext('2d').drawImage(ui.canvas, 0, 0);
+                if (retainedPrefix) { retainedPrefix.width = 0; retainedPrefix.height = 0; }
+                retainedPrefix = copy;
+                retainedKey = key;
+                retainedLastId = last.id;
+                retainedGeneration = roomGeneration;
+                retainedChannel = state.ch;
+                retainedWidth = copy.width;
+                retainedHeight = copy.height;
+            }
+            paintStroke(ctx, last);
+            if (pendingFrom >= 0) paintStroke(ctx, live, pendingFrom);
+        }
+
+        function publishFrame(bitmap) {
+            const ctx = ui.canvas.getContext('2d');
+            ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
+            if (bitmap) ctx.drawImage(bitmap, 0, 0);
+        }
+
+        function redraw(changedStrokeId) {
+            const strokes = state.room.strokes, last = strokes.at(-1);
+            if (!last) { publishFrame(null); resetCanvasBase(); return; }
+            const pendingFrom = currentStroke() && pendingPts.length
+                ? Math.max(0, live.pts.length - pendingPts.length - 1) : -1;
+            let prefixPoints = 0;
+            for (let i = 0; i < strokes.length - 1; i += 1) prefixPoints += strokes[i].pts.length;
+            if (prefixPoints > 100000) {
+                redrawRetained(strokes, last, changedStrokeId, pendingFrom);
+                return;
+            }
+            if (retainedPrefix) {
+                retainedPrefix.width = 0; retainedPrefix.height = 0; retainedPrefix = null;
+                retainedKey = ''; retainedLastId = null; retainedChannel = null;
+                retainedGeneration = -1; retainedWidth = 0; retainedHeight = 0;
+            }
+            // Extend only the current stroke over a prefix that was itself
+            // stroked, never copied. Copying and then stroking changes WebKit's
+            // edge coverage, so two viewers stop sharing one bitmap.
+            if (changedStrokeId === last.id && prefixReady(strokes, last)) {
+                const frame = paintPrefix;
+                paintPrefix = null;
+                const ctx = frame.getContext('2d');
+                paintStroke(ctx, last);
+                if (pendingFrom >= 0) paintStroke(ctx, live, pendingFrom);
+                publishFrame(frame);
+                schedulePrefix(strokes);
+                return;
+            }
+            const frame = blankCanvas();
+            const ctx = frame.getContext('2d');
+            for (const stroke of strokes) paintStroke(ctx, stroke);
+            if (pendingFrom >= 0) paintStroke(ctx, live, pendingFrom);
+            publishFrame(frame);
+            rememberPrefix(strokes);
         }
 
         /* ---- synced video ---- */
+        function drawWatchStart() {
+            if (state.kind !== 'watch' || state.room.video) return;
+            const message = isOp() ? 'Add a YouTube link to start watching.' : 'Waiting for the host to choose a video.';
+            if (ui.videoStatus.textContent !== message) ui.videoStatus.textContent = message;
+            ui.videoStatus.hidden = false;
+        }
+
         function setupVideoUi() {
             if (ui.bobPicks.dataset.ready) return;
             ui.bobPicks.dataset.ready = '1';
-            BOB.EPISODES.slice(0, 6).forEach((ep) => {
+            BOB.STARTER_EPISODES.forEach((ep) => {
                 const b = document.createElement('button');
                 b.type = 'button';
-                b.className = 'btn btn--small';
+                b.className = 'btn btn--small btn--ghost';
+                b.dataset.lessonId = ep.id;
+                b.setAttribute('aria-pressed', 'false');
                 b.textContent = `${BOB.label(ep)} · ${ep.title}`;
-                b.addEventListener('click', () => hostVideo({ kind: 'yt', id: ep.id }, true, 0));
+                b.addEventListener('click', () => {
+                    hostVideo({ kind: 'yt', id: ep.id }, true, 0);
+                    ui.paintLessons.open = false;
+                    ui.paintLessons.querySelector('summary').focus();
+                });
                 ui.bobPicks.append(b);
+            });
+            ui.paintLessons.addEventListener('toggle', () => {
+                if (!ui.paintLessons.open || state.kind !== 'bobross') return;
+                const scroller = ui.paintLessons.closest('.activity');
+                const firstLesson = ui.bobPicks.firstElementChild;
+                if (!scroller?.clientHeight || !firstLesson) return;
+                // Reveal the first choice inside the activity without moving focus or the page.
+                const bottom = scroller.getBoundingClientRect().top + scroller.clientTop + scroller.clientHeight;
+                const clipped = firstLesson.getBoundingClientRect().bottom - bottom;
+                if (clipped > 0) scroller.scrollTop += clipped + 4;
             });
             ui.load.addEventListener('submit', (e) => {
                 e.preventDefault();
+                if (!isOp()) return;
                 const id = H.parseYouTubeId(ui.url.value);
-                if (!id) return;
+                if (!id) {
+                    ui.url.setCustomValidity('Enter a YouTube video link or video ID.');
+                    ui.url.reportValidity();
+                    return;
+                }
                 ui.url.value = '';
                 hostVideo({ kind: 'yt', id }, true, 0);
             });
+            ui.url.addEventListener('input', () => ui.url.setCustomValidity(''));
             ui.tap.addEventListener('click', () => syncToState(true, true));
+            ui.cameraSwitch.addEventListener('click', () => {
+                state.cameraFacing = state.cameraFacing === 'environment' ? 'user' : 'environment';
+                if (state.stream && state.camOn) {
+                    state.stream.getTracks().forEach(track => track.stop());
+                    state.stream = null;
+                    for (const id of [...state.pcs.keys()]) closePc(id);
+                    startCam();
+                }
+                ui.cameraSwitch.textContent = state.cameraFacing === 'environment' ? 'Use front camera' : 'Use rear camera';
+            });
         }
 
-        function videoFailure(key) {
+        function videoFailure(key, error) {
             if (!state.ch || player.key !== key) return;
             player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
             player.seenPlaying = false; player.playPending = false;
-            ui.videoStatus.textContent = 'YouTube couldn’t load. Retry video when you’re ready.';
+            ui.videoStatus.textContent = window.HangoutYouTube.failureMessage(error, { canChooseVideo: Boolean(isOp()) });
             ui.videoStatus.hidden = false;
             ui.tap.textContent = 'Retry video'; ui.tap.hidden = false;
         }
 
         async function ensureSource(source, retry = false) {
             if (!state.ch || source.kind !== 'yt' || !/^[A-Za-z0-9_-]{11}$/.test(source.id || '')) return false;
+            ui.preview.hidden = false;
             const key = `${source.kind}:${source.id}`;
             if (player.key === key) {
                 if (player.failedKey === key && !retry) return false;
@@ -450,8 +751,8 @@
                     player.yt = instance; player.readyKey = key;
                     ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
                     return true;
-                } catch (_) {
-                    if (generation === roomGeneration) videoFailure(key);
+                } catch (error) {
+                    if (generation === roomGeneration) videoFailure(key, error);
                     return false;
                 }
             })();
@@ -462,6 +763,11 @@
 
         function localTime() { return player.yt && player.yt.getCurrentTime ? player.yt.getCurrentTime() || 0 : 0; }
         function localPlaying() { return player.yt && player.yt.getPlayerState ? player.yt.getPlayerState() === 1 : false; }
+        function expectedVideoPosition(video, relayNow) {
+            if (!video) return 0;
+            return video.playing ? Math.max(0, video.pos + (relayNow - video.t) / 1000 * (video.rate || 1)) : video.pos;
+        }
+        function setLocalRate(rate) { if (player.yt?.setPlaybackRate) hold(() => player.yt.setPlaybackRate(rate)); }
         function hold(fn) { player.applying = Date.now() + 900; fn(); }
         function seekTo(s) { hold(() => { if (player.yt) player.yt.seekTo(s, true); }); }
         function playLocal() { hold(() => { if (player.yt) { player.playPending = true; player.yt.playVideo(); } }); }
@@ -476,18 +782,33 @@
             if (generation !== roomGeneration || v !== requested || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
             if (!v.playing) { player.autoplayBlocked = false; ui.tap.hidden = true; }
             else if (player.autoplayBlocked && !force) return;
-            const want = H.expectedPosition(v, state.clock.relayNow());
-            if (force || H.needsCorrection(localTime(), want)) seekTo(want);
+            const want = expectedVideoPosition(v, state.clock.relayNow()), drift = want - localTime();
+            const rates = player.yt?.getAvailablePlaybackRates?.() || [];
+            if (force || H.needsCorrection(localTime(), want)) { seekTo(want); if (rates.includes(v.rate || 1)) setLocalRate(v.rate || 1); }
+            else if (Math.abs(drift) >= 0.3 && v.playing) {
+                const nudge = drift > 0 ? 1.05 : 0.95;
+                if (rates.includes(nudge) && player.yt?.setPlaybackRate) setLocalRate(nudge);
+                else seekTo(want);
+            } else if (rates.includes(v.rate || 1)) setLocalRate(v.rate || 1);
             if (v.playing && !localPlaying()) playLocal();
             if (!v.playing && localPlaying()) pauseLocal();
         }
 
         function hostVideo(source, playing, pos) {
             if (!isOp()) return;
-            actSend({ kind: 'video', source, playing, pos }, () => {
+            actSend({ kind: 'video', source, playing, pos, rate: 1 }, () => {
                 H.apply(state.room, { type: 'video', source, playing, pos }, { t: state.clock.relayNow() });
+                paintEpisodeTitle();
                 syncToState(true, true);
             });
+        }
+
+        function paintEpisodeTitle() {
+            const source = state.kind === 'bobross' ? state.room.video?.source : null;
+            ui.episodeTitle.textContent = source ? BOB.findEpisode(source.id)?.title || 'YouTube lesson' : '';
+            for (const button of ui.bobPicks.children) {
+                button.setAttribute('aria-pressed', String(button.dataset.lessonId === source?.id));
+            }
         }
 
         function onYtAutoplayBlocked() {
@@ -495,40 +816,62 @@
             if (!state.ch || !player.playPending || localPlaying() || !v?.playing || v.source.kind !== 'yt' || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
             // Policy denial is local, not a request to pause everyone else.
             player.autoplayBlocked = true;
+            ui.tap.textContent = 'Tap to sync';
             ui.tap.hidden = false;
         }
         function onYtState(ev) {
             if (!state.ch || ev.target !== player.yt || ev.data !== player.yt?.getPlayerState()) return;
+            if (ev.data === 3) { player.buffering = true; localSample = { at: Date.now(), pos: localTime(), playing: false }; return; }
+            if (ev.data === 1 || ev.data === 2) { player.buffering = false; localSample = { at: Date.now(), pos: localTime(), playing: ev.data === 1 }; }
             if (ev.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
-            if (!isOp() || player.autoplayBlocked || !state.room.video || (!player.seenPlaying && state.room.video.playing)
+            if (!canDriveVideo() || player.autoplayBlocked || !state.room.video || (!player.seenPlaying && state.room.video.playing)
                 || player.readyKey !== `${state.room.video.source.kind}:${state.room.video.source.id}`) return;
             if (ev.data !== 1 && ev.data !== 2) return;
+            player.lastIntentAt = Date.now();
             clearTimeout(videoPublishTimer);
             const channel = state.ch, generation = roomGeneration, instance = player.yt, key = player.readyKey;
             videoPublishTimer = setTimeout(() => {
-                if (generation === roomGeneration && state.ch === channel && isOp() && !player.autoplayBlocked && state.room.video
+                if (generation === roomGeneration && state.ch === channel && canDriveVideo() && !player.autoplayBlocked && state.room.video
                     && player.yt === instance && player.readyKey === key && key === `${state.room.video.source.kind}:${state.room.video.source.id}`) {
                     const v = state.room.video, playing = localPlaying(), pos = localTime();
                     // Suppress the echo of our own sync, not a subsequent
                     // opposite host control within the same 900ms window.
-                    if (Date.now() < player.applying && playing === v.playing && Math.abs(pos - H.expectedPosition(v, state.clock.relayNow())) < 2) return;
-                    actSend({ kind: 'video', source: v.source, playing, pos });
+                    if (Date.now() < player.applying && playing === v.playing && Math.abs(pos - expectedVideoPosition(v, state.clock.relayNow())) < 2) return;
+                    actSend({ kind: 'video', source: v.source, playing, pos, rate: 1 });
                 }
             }, 100);
         }
-        setInterval(() => {
-            if (!isOp()) return syncToState(false);
+        function canDriveVideo() { return state.kind === 'bobross' || isOp(); }
+        function syncVideo() {
+            if (state.kind !== 'watch' || !isOp()) return syncToState(false);
             const v = state.room.video;
             if (!v || !player.yt || (!player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
-            // YouTube does not reliably emit a state change when a paused
-            // player is scrubbed. Publish the host's changed position instead
-            // of correcting the host back to the previous shared position.
             const pos = localTime(), playing = localPlaying();
-            if (playing !== v.playing || H.needsCorrection(pos, H.expectedPosition(v, state.clock.relayNow()))) {
-                actSend({ kind: 'video', source: v.source, playing, pos }, () =>
+            if (playing !== v.playing || H.needsCorrection(pos, expectedVideoPosition(v, state.clock.relayNow()))) {
+                actSend({ kind: 'video', source: v.source, playing, pos, rate: 1 }, () =>
                     H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() }));
             }
-        }, 2000);
+        }
+        function sampleVideo() {
+            const v = state.room.video;
+            if (!canDriveVideo() || !v || !player.yt || player.autoplayBlocked ||
+                player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
+            const at = Date.now(), pos = localTime(), playing = localPlaying();
+            if (player.buffering) { localSample = { at, pos, playing }; return; }
+            if (at < player.applying || at - player.lastIntentAt < 750) { localSample = { at, pos, playing }; return; }
+            if (localSample) {
+                const elapsed = (at - localSample.at) / 1000;
+                if (elapsed > 2) { localSample = { at, pos, playing }; syncToState(false); return; }
+                const natural = elapsed * (localSample.playing ? (v.rate || 1) : 0);
+                if (Math.abs((pos - localSample.pos) - natural) > 1) {
+                    player.lastIntentAt = at;
+                    actSend({ kind: 'video', source: v.source, playing, pos, rate: 1 }, () =>
+                        H.apply(state.room, { type: 'video', source: v.source, playing, pos }, { t: state.clock.relayNow() }));
+                }
+            }
+            localSample = { at, pos, playing };
+        }
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) syncToState(true); });
 
         /* ---- P2P video (cameras only) ---- */
         async function iceServers() {
@@ -569,7 +912,7 @@
                 if (state.stream || !state.camOn || generation !== roomGeneration || version !== captureVersion) return;
                 if (cameraFailureNotice && ui.relayStatus.textContent === cameraFailureNotice) activityNotice('');
                 cameraFailureNotice = '';
-                const got = await navigator.mediaDevices.getUserMedia({ video: CAM, audio: false });
+                const got = await navigator.mediaDevices.getUserMedia({ video: { ...CAM, facingMode: state.cameraFacing }, audio: false });
                 if (!state.camOn || generation !== roomGeneration || version !== captureVersion) {
                     got.getTracks().forEach((track) => track.stop()); return;
                 }

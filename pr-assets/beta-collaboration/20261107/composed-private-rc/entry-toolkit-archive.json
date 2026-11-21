@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-07T06:08:53.095512+00:00",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "entryCount": 8,
+  "archiveBytes": 8912,
+  "archiveSha256": "07bdb02a673b36dbcfcf061e57645b5e2d7159484e31d27a4cb4084616c732b1",
+  "allManifestFileHashesMatch": true,
+  "archiveReadbackPassed": true,
+  "containsApplicationOrPrivateFiles": false,
+  "publicSiteDeployed": false,
+  "licenseStatus": "Project notice preserved; no new redistribution license granted"
+}

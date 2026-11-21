@@ -1,0 +1,23 @@
+{
+  "source": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "sourceSha256": {
+    "services/reference_studio_packaged_smoke.py": "64542599e06af4c89fff41c278c07ec83018f8a859e1cf1a182d0c6256f485cf",
+    "core/reference_track.py": "455fab967ed22a4ae83c251adba4c9899883aa05846e73761d751897ef55f0cc",
+    "core/project_audio.py": "113836fb224dd82f99ab0f7ab8de3c6fe2519b98d2017bb5ec6c147e71ff9cea",
+    "tests/support/run_frozen_reference_studio_smoke.py": "ad41e4a0fcca317c8e7340f6031fa1a0b7881bb9e12946b1243d87b2bafbb085"
+  },
+  "unchangedThroughCurrentBrowserOnlyHead": true,
+  "mp3ExerciseUnconditionallyCalledByFrozenReferenceStudioSmoke": true,
+  "missingMp3CapabilityRaisesInsteadOfSkipping": true,
+  "checks": [
+    "44.1kHz two-channel MP3",
+    "gapless/no-Xing metadata handling",
+    "bounded initial decoding",
+    "48kHz output stream",
+    "restart to beginning",
+    "exact normal EOF",
+    "finite nonzero PCM and zeroed terminal tail",
+    "stream and decoder cleanup"
+  ],
+  "actualSharedTrackSenderOrHardware": false
+}

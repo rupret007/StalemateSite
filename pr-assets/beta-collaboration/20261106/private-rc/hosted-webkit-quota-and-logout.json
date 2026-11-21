@@ -1,0 +1,14 @@
+{
+  "source": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "activeVersion": "75655a50-9e13-4966-bb68-22b45a230c1d",
+  "startedAt": "2026-11-07T03:12:57.978Z",
+  "scope": "Actual WebKit room-creation guard and signed guest revocation; no provider or microphone",
+  "checks": [
+    "Existing room creation guard displays its server explanation without opening an unauthorized Jam room",
+    "The guest can return to the existing chat after room creation is refused",
+    "Logout revokes copied cookies, denies protected JavaScript and closes the active guest page"
+  ],
+  "captureRequests": 0,
+  "status": "passed",
+  "completedAt": "2026-11-07T03:13:01.512Z"
+}

@@ -185,6 +185,85 @@ describe('bounded, transient participation rollback checkpoint', () => {
         expect(state.secret).toBe('uncommitted'); expect(checkpoint.restore()).toBe(false);
     });
 
+    it('short-key memo preserves exact UTF-8 charges and restoration for repeated Unicode keys', () => {
+        const make = () => Array.from({ length: 3 }, () => ({ repeated: null, 'é': null, '🎸': null, '\ud800': null }));
+        const graph = make(), checkpoint = createParticipationCheckpoint(graph);
+        expect(checkpoint.metrics).toMatchObject({ bytes: 1220, nodes: 20, objects: 4, entries: 16 });
+        for (const row of graph) for (const key of Object.keys(row)) row[key] = 'changed';
+        checkpoint.restore(); expect(graph).toEqual(make());
+        expect(() => createParticipationCheckpoint(make(), { maxBytes: 1219 })).toThrow(/limit/);
+        expect(createParticipationCheckpoint(make(), { maxBytes: 1220 }).metrics.bytes).toBe(1220);
+    });
+    it('short-key memo is per capture and falls back for long names and overflow', () => {
+        const key = 'repeated', long = 'z'.repeat(65), rows = Array.from({ length: 4 }, () => ({ [key]: null, [long]: null }));
+        const original = String.prototype.charCodeAt;
+        let repeatedScans = 0, longScans = 0, overflowScans = 0;
+        vi.spyOn(String.prototype, 'charCodeAt').mockImplementation(function (index) {
+            if (String(this) === key) repeatedScans++;
+            if (String(this) === long) longScans++;
+            if (String(this) === 'key299') overflowScans++;
+            return original.call(this, index);
+        });
+        createParticipationCheckpoint(rows);
+        expect(repeatedScans).toBe(key.length); expect(longScans).toBe(long.length * 4);
+        createParticipationCheckpoint(rows); expect(repeatedScans).toBe(key.length * 2);
+        const unique = Object.fromEntries(Array.from({ length: 300 }, (_, i) => ['key' + i, null]));
+        expect(createParticipationCheckpoint({ first: unique, second: { ...unique } }).metrics.entries).toBe(602);
+        expect(overflowScans).toBe('key299'.length * 2);
+    });
+    it('short-key memo still checks the clock on repeated-name cache hits', () => {
+        let calls = 0, expired = false;
+        vi.spyOn(performance, 'now').mockImplementation(() => { calls++; return expired ? 51 : 0; });
+        const original = Object.getOwnPropertyDescriptor;
+        let seen = 0;
+        vi.spyOn(Object, 'getOwnPropertyDescriptor').mockImplementation((object, key) => {
+            const result = original(object, key);
+            if (key === 'repeated' && ++seen === 2) expired = true;
+            return result;
+        });
+        expect(() => createParticipationCheckpoint([{ repeated: null }, { repeated: null }])).toThrow(/limit/);
+        expect(seen).toBe(2); expect(calls).toBeGreaterThan(1);
+    });
+
+    it('flat descriptor pairs restore mixed flags, numeric keys, special names and array length last', () => {
+        const shared = { text: 'original' }, object = Object.create(null), array = [shared, 'length', 3];
+        Object.defineProperties(object, {
+            first: { value: shared, enumerable: false, writable: true, configurable: true },
+            length: { value: 'not an array length', enumerable: true, writable: true, configurable: true },
+            ['__proto__']: { value: 7, enumerable: true, writable: true, configurable: true },
+            last: { value: 4, enumerable: false, writable: false, configurable: true }
+        });
+        Object.defineProperty(array, 'extra', { value: shared, enumerable: false, configurable: true, writable: true });
+        const beforeObject = Object.getOwnPropertyDescriptors(object), beforeArray = Object.getOwnPropertyDescriptors(array);
+        const checkpoint = createParticipationCheckpoint({ object, array });
+        object.first = 'changed'; delete object.last; object.newKey = 9;
+        array.length = 1; array.extra = null; array.push('changed'); shared.text = 'changed';
+        expect(checkpoint.restore()).toBe(true);
+        expect(Object.getOwnPropertyDescriptors(object)).toEqual(beforeObject);
+        expect(Object.getOwnPropertyDescriptors(array)).toEqual(beforeArray);
+        expect(object.first).toBe(shared); expect(array.extra).toBe(shared); expect(shared.text).toBe('original');
+    });
+
+    it('flat descriptor pairs refuse a missing late property on nonextensible state without partial restoration', () => {
+        const state = Object.preventExtensions({ first: 1, middle: 2, last: 3 });
+        const checkpoint = createParticipationCheckpoint({ state });
+        state.first = 9; delete state.last;
+        expect(() => checkpoint.restore()).toThrow(/Unsupported/);
+        expect(state.first).toBe(9); expect(Object.hasOwn(state, 'last')).toBe(false);
+        expect(checkpoint.restore()).toBe(false);
+    });
+
+    it('flat descriptor pairs retain every repeated descriptor and cycle across a larger graph', () => {
+        const rows = Array.from({ length: 300 }, (_, i) => ({ a: i, b: null, c: 'length', d: false }));
+        rows[0].b = rows;
+        const checkpoint = createParticipationCheckpoint({ rows });
+        for (const row of rows) { row.a = -1; row.c = 'changed'; }
+        rows[0].b = null;
+        expect(checkpoint.restore()).toBe(true);
+        expect(rows.every((row, i) => row.a === i && row.c === 'length' && row.d === false)).toBe(true);
+        expect(rows[0].b).toBe(rows);
+    });
+
     it.each([{ maxBytes: 0 }, { maxBytes: 8 * 1024 * 1024 + 1 }, { maxNodes: 100001 }, { maxMs: 51 }, { maxMs: Infinity }, { unknown: 1 }])
         ('does not let a caller widen or disable defensive ceilings: %j', options => {
             expect(() => createParticipationCheckpoint({}, options)).toThrow(/Invalid/);

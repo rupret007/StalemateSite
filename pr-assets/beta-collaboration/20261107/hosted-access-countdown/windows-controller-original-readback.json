@@ -1,0 +1,17 @@
+{
+  "files": {
+    "windows-browser-proof.json": false,
+    "browser-check.cjs": false,
+    "controller-start.json": false
+  },
+  "ownedNodePids": [],
+  "effectiveExecutionPolicy": "Restricted",
+  "controlListeners": [
+    "127.0.0.1"
+  ],
+  "physicalCapture": false,
+  "at": "2026-11-07T18:29:07.568834+00:00",
+  "originalControllerFailure": "JSONDecodeError; remote error not retained by first wrapper",
+  "originalEncodedCommandCharacters": 9704,
+  "noTestRestarted": true
+}

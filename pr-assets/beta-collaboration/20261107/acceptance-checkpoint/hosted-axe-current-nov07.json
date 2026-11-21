@@ -1,0 +1,422 @@
+{
+  "startedAt": "2026-11-07T13:36:54.336Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "axeVersion": "4.14.0",
+  "scope": "Automated axe checks only on actual hosted ordinary guest screens. Not screen-reader, full WCAG, physical Safari, iOS zoom or installed-desktop qualification.",
+  "scans": [
+    {
+      "name": "nickname gate mobile",
+      "viewport": 390,
+      "axeVersion": "4.14.0",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "tags": [
+            "cat.color",
+            "wcag2aa",
+            "wcag143",
+            "TTv5",
+            "TT13.c",
+            "EN-301-549",
+            "EN-9.1.4.3",
+            "ACT",
+            "RGAAv4",
+            "RGAA-3.2.1"
+          ],
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "nodeCount": 7,
+          "nodes": [
+            {
+              "target": [
+                ".gate-intro > .eyebrow"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-intro > h1"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".lede"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-features > span:nth-child(1)"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-features > span:nth-child(2)"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-features > span:nth-child(3)"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".window-chrome > span[attribute]"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            }
+          ]
+        }
+      ],
+      "passes": 40,
+      "inapplicable": 51
+    },
+    {
+      "name": "nickname gate desktop",
+      "viewport": 1280,
+      "axeVersion": "4.14.0",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "tags": [
+            "cat.color",
+            "wcag2aa",
+            "wcag143",
+            "TTv5",
+            "TT13.c",
+            "EN-301-549",
+            "EN-9.1.4.3",
+            "ACT",
+            "RGAAv4",
+            "RGAA-3.2.1"
+          ],
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "nodeCount": 9,
+          "nodes": [
+            {
+              "target": [
+                ".gate-intro > .eyebrow"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-intro > h1"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-headline"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".lede"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-features > span:nth-child(1)"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-features > span:nth-child(2)"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-features > span:nth-child(3)"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".gate-command"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                ".window-chrome > span[attribute]"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            }
+          ]
+        }
+      ],
+      "passes": 40,
+      "inapplicable": 51
+    },
+    {
+      "name": "connected lobby desktop",
+      "viewport": 1280,
+      "axeVersion": "4.14.0",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "tags": [
+            "cat.color",
+            "wcag2aa",
+            "wcag143",
+            "TTv5",
+            "TT13.c",
+            "EN-301-549",
+            "EN-9.1.4.3",
+            "ACT",
+            "RGAAv4",
+            "RGAA-3.2.1"
+          ],
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "nodeCount": 2,
+          "nodes": [
+            {
+              "target": [
+                "button[attribute] > b[attribute]"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                "button[attribute] > b[attribute]"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "label-content-name-mismatch",
+          "impact": "serious",
+          "tags": [
+            "cat.semantics",
+            "wcag21a",
+            "wcag253",
+            "EN-301-549",
+            "EN-9.2.5.3",
+            "RGAAv4",
+            "RGAA-6.1.5"
+          ],
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-content-name-mismatch?application=axeAPI",
+          "nodeCount": 1,
+          "nodes": [
+            {
+              "target": [
+                ".slash"
+              ],
+              "checks": [
+                "label-content-name-mismatch"
+              ]
+            }
+          ]
+        }
+      ],
+      "passes": 46,
+      "inapplicable": 44
+    },
+    {
+      "name": "connected lobby mobile",
+      "viewport": 390,
+      "axeVersion": "4.14.0",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "tags": [
+            "cat.color",
+            "wcag2aa",
+            "wcag143",
+            "TTv5",
+            "TT13.c",
+            "EN-301-549",
+            "EN-9.1.4.3",
+            "ACT",
+            "RGAAv4",
+            "RGAA-3.2.1"
+          ],
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "nodeCount": 1,
+          "nodes": [
+            {
+              "target": [
+                ".conversation-starters > button[attribute]:nth-child(3)"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "label-content-name-mismatch",
+          "impact": "serious",
+          "tags": [
+            "cat.semantics",
+            "wcag21a",
+            "wcag253",
+            "EN-301-549",
+            "EN-9.2.5.3",
+            "RGAAv4",
+            "RGAA-6.1.5"
+          ],
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/label-content-name-mismatch?application=axeAPI",
+          "nodeCount": 1,
+          "nodes": [
+            {
+              "target": [
+                ".slash"
+              ],
+              "checks": [
+                "label-content-name-mismatch"
+              ]
+            }
+          ]
+        }
+      ],
+      "passes": 42,
+      "inapplicable": 48
+    },
+    {
+      "name": "People mobile",
+      "viewport": 390,
+      "axeVersion": "4.14.0",
+      "violations": [],
+      "incomplete": [],
+      "passes": 40,
+      "inapplicable": 51
+    },
+    {
+      "name": "Rooms mobile",
+      "viewport": 390,
+      "axeVersion": "4.14.0",
+      "violations": [],
+      "incomplete": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "tags": [
+            "cat.color",
+            "wcag2aa",
+            "wcag143",
+            "TTv5",
+            "TT13.c",
+            "EN-301-549",
+            "EN-9.1.4.3",
+            "ACT",
+            "RGAAv4",
+            "RGAA-3.2.1"
+          ],
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+          "nodeCount": 2,
+          "nodes": [
+            {
+              "target": [
+                "button[attribute] > b[attribute]"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            },
+            {
+              "target": [
+                "button[attribute] > b[attribute]"
+              ],
+              "checks": [
+                "color-contrast"
+              ]
+            }
+          ]
+        }
+      ],
+      "passes": 40,
+      "inapplicable": 51
+    },
+    {
+      "name": "new channel dialog mobile; no room created",
+      "viewport": 390,
+      "axeVersion": "4.14.0",
+      "violations": [],
+      "incomplete": [],
+      "passes": 22,
+      "inapplicable": 69
+    },
+    {
+      "name": "command palette mobile; no command submitted",
+      "viewport": 390,
+      "axeVersion": "4.14.0",
+      "violations": [],
+      "incomplete": [],
+      "passes": 18,
+      "inapplicable": 73
+    }
+  ],
+  "physicalCapture": false,
+  "recording": false,
+  "providerCredentials": false,
+  "rawDomOrPrivateTextPersisted": false,
+  "logout": [
+    200
+  ],
+  "browserVersion": "156.0.8078.4",
+  "copiedCookieAfterLogout": 401,
+  "captureRequests": 0,
+  "violationRules": [],
+  "incompleteRules": [
+    "color-contrast",
+    "label-content-name-mismatch"
+  ],
+  "state": "COMPLETED_HOSTED_AXE_CHECK_RESULTS_REQUIRE_REVIEW",
+  "allOwnedBrowserResourcesClosed": true,
+  "completedAt": "2026-11-07T13:36:57.441Z"
+}

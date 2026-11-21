@@ -1,0 +1,123 @@
+{
+  "at": "2026-11-04T04:24:46.042294+00:00",
+  "head": "551e669f45ef06ceee9e875cc4ac220ef2b75b9d",
+  "mergeCheckout": "ba1ba5ae2ed6b39f950c7bfb7deebba7bf320f5e",
+  "wholeTree": "78c2b68ac335a8ef1b68a537e106cd7724bc06c0",
+  "eachOfTwoWebsiteTestJobs": {
+    "units": 2057,
+    "unitFiles": 137,
+    "mainBrowserCases": 735,
+    "separateRootProjectPathBrowserSummaries": [
+      34,
+      34
+    ],
+    "doNotSumOverlappingSuites": true,
+    "retryMarkers": 0,
+    "failureOrFlakySummaries": 0
+  },
+  "runtimeGroups": [
+    {
+      "localMappingQualified": true,
+      "hostedLimitQualified": false,
+      "rawOversizeAccepted": true
+    },
+    {
+      "localNativeLifecycleQualified": true,
+      "miniflareDisposed": true,
+      "noLiveOwnedProcesses": true,
+      "temporaryStateRemoved": true
+    },
+    {
+      "localNativeLobbyEffectsQualified": true,
+      "miniflareDisposed": true,
+      "noLiveOwnedProcesses": true,
+      "temporaryStateRemoved": true
+    },
+    {
+      "localGatewayWebSocketSessionAuthorityQualified": true,
+      "temporaryStateRemoved": true
+    },
+    {
+      "localGatewayWebSocketSessionAuthorityQualified": true,
+      "productionParticipationCompositionQualified": true,
+      "guardianDecisionsQualified": false,
+      "productionOwnSharingCompositionQualified": true,
+      "nativeC2RetentionHandlerQualified": true,
+      "hostedAlarmSchedulerQualified": false,
+      "temporaryStateRemoved": true
+    },
+    {
+      "localGatewayWebSocketSessionAuthorityQualified": true,
+      "productionParticipationCompositionQualified": true,
+      "guardianDecisionsQualified": false,
+      "productionOwnSharingCompositionQualified": true,
+      "nativeLocalHealthyAckProbeQualified": true,
+      "hostedScaleQualified": false,
+      "temporaryStateRemoved": true
+    },
+    {
+      "localGatewayWebSocketSessionAuthorityQualified": true,
+      "productionParticipationCompositionQualified": true,
+      "guardianDecisionsQualified": false,
+      "nativeLocalNonAckPressureQualified": true,
+      "originalNinePlusThreeQualifiedByThisMode": false,
+      "hostedScaleQualified": false,
+      "temporaryStateRemoved": true
+    },
+    {
+      "localGatewayWebSocketSessionAuthorityQualified": true,
+      "productionParticipationCompositionQualified": true,
+      "guardianDecisionsQualified": false,
+      "nativeLocalFiftyGuestFanoutQualified": true,
+      "originalNinePlusThreeQualifiedByThisMode": false,
+      "hostedScaleQualified": false,
+      "temporaryStateRemoved": true
+    },
+    {
+      "localGatewayWebSocketSessionAuthorityQualified": true,
+      "productionIncidentSourceCompositionQualified": true,
+      "incidentAuthorityAndKeyQualified": false,
+      "temporaryStateRemoved": true
+    },
+    {
+      "localGatewayWebSocketSessionAuthorityQualified": true,
+      "productionParticipationCompositionQualified": true,
+      "guardianDecisionsQualified": false,
+      "productionIncidentSourceCompositionQualified": true,
+      "incidentAuthorityAndKeyQualified": false,
+      "productionOwnSharingCompositionQualified": true,
+      "combinedParticipationIncidentSourceCompositionQualified": true,
+      "temporaryStateRemoved": true
+    },
+    {
+      "localGatewayWebSocketSessionAuthorityQualified": true,
+      "productionParticipationCompositionQualified": true,
+      "guardianDecisionsQualified": false,
+      "nativeOwnerStartInvocationBoundaryQualified": true,
+      "zeroNetworkCallbackOnly": true,
+      "originalNinePlusThreeQualifiedByThisMode": false,
+      "providerActivationQualified": false,
+      "temporaryStateRemoved": true
+    }
+  ],
+  "runtimeGroupCount": 11,
+  "deploymentJobs": "skipped",
+  "logs": [
+    {
+      "file": "site198-source-test-terminal-nov04.log",
+      "bytes": 322630,
+      "sha256": "8d9ded9ef86b5c71e77435fcc732a097b1a7ab20b80c2cfa49d5da9e99e78303"
+    },
+    {
+      "file": "site198-pr-test-terminal-nov04.log",
+      "bytes": 319929,
+      "sha256": "1887a641a2db25ef37725fcd96630cae5a864f9a9522713d90a93aa476e0aff4"
+    },
+    {
+      "file": "site198-runtime-terminal-nov04.log",
+      "bytes": 1205247,
+      "sha256": "b44c455963fe92e458f59b1a7a9469fa4b8a33ae1b59e384dbb63e1ab60e646d"
+    }
+  ],
+  "noHostedCapacityOrProviderActivationProof": true
+}

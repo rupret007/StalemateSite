@@ -1,0 +1,30 @@
+{
+  "at": "2026-11-04T09:35:42.378970+00:00",
+  "source": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+  "runId": 41798291653,
+  "actualArmBundleOpened": true,
+  "expectedExecutablePathVerified": true,
+  "uiObserved": "Actual Music/Art chooser, Host and Join; no warning or permission dialog",
+  "hostOrJoinClicked": false,
+  "captureRequestedByTest": false,
+  "normalWindowCloseVerifiedByProcessListAndGlobalAppInventory": true,
+  "forcedTerminationUsed": false,
+  "observationIssue": "App-specific readback after closing reopened the app; retained initial observations, then used Close followed only by process/global inventory to prove exit",
+  "settings": [
+    {
+      "name": ".webjam_config.json",
+      "existsBefore": true,
+      "existsAfter": true,
+      "contentUnchanged": true,
+      "mtimeUnchanged": true
+    },
+    {
+      "name": ".webjam_mix.json",
+      "existsBefore": true,
+      "existsAfter": true,
+      "contentUnchanged": true,
+      "mtimeUnchanged": true
+    }
+  ],
+  "physicalMusicQualified": false
+}

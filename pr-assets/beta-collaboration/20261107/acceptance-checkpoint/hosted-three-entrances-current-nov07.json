@@ -1,0 +1,39 @@
+{
+  "startedAt": "2026-11-07T13:01:50.233Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "scope": "Three distinct loopback website fixtures open the actual shared private service. No real third-party domain verification or new registered integration.",
+  "checks": [
+    "Stalemate website link reaches normal private invitation and shared chat",
+    "Rad Dad website link reaches normal private invitation and shared chat",
+    "Neutral partner website link reaches normal private invitation and shared chat",
+    "Three website origins share one lobby; neutral messages gain no source badge",
+    "Entrance badges can be hidden for People and new messages without changing old lines",
+    "Source badges grant no staff identity or moderator page access",
+    "First-party cookie scope, no credentials at fixture websites, and normal logout revocation"
+  ],
+  "ordinaryGuests": 3,
+  "physicalCapture": false,
+  "recording": false,
+  "providerCredentials": false,
+  "registryChanged": false,
+  "signedIdentityFixtures": false,
+  "cookieValuesPersisted": false,
+  "logout": [
+    200,
+    200,
+    200
+  ],
+  "copiedCookieAfterLogout": [
+    401,
+    401,
+    401
+  ],
+  "browserVersion": "156.0.8078.4",
+  "fixtureWebsiteRequests": 3,
+  "noPrivateValueOrCookieSentToFixtureWebsites": true,
+  "physicalCaptureRequests": 0,
+  "state": "PASSED_HOSTED_THREE_DISTINCT_ENTRANCES_NEUTRAL_PARTNER_BADGE_PRIVACY_AND_ROLE_ISOLATION",
+  "allOwnedContextsBrowserAndFixtureServersClosed": true,
+  "completedAt": "2026-11-07T13:01:59.594Z"
+}

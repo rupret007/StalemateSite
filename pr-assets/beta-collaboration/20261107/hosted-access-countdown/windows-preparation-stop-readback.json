@@ -1,0 +1,29 @@
+{
+  "at": "2026-11-07T18:36:57.3511738Z",
+  "files": {
+    "windows-browser-proof.json": false,
+    "browser-check.cjs": false,
+    "controller-start.json": false
+  },
+  "ownedNodePids": [],
+  "effectiveExecutionPolicy": "Restricted",
+  "chromeCount": 4,
+  "chromePid": [
+    30140,
+    11976,
+    14492,
+    25132
+  ],
+  "signatureStatus": "",
+  "signatureSubject": null,
+  "hasExpectedProfile": false,
+  "freeGiB": 44.19,
+  "memoryFreeGiB": 8.19,
+  "sourcePresent": true,
+  "controlListeners": [
+    "127.0.0.1"
+  ],
+  "originalShortCommandFailure": "Preparation stopped before receipt; wrapper did not retain the remote diagnostic",
+  "physicalCapture": false,
+  "noTestRestarted": true
+}

@@ -1,0 +1,181 @@
+{
+  "state": "NORMAL_APPLICATION_CI_FULL_LOGS_AND_ACTUAL_CHECKOUT_TREES_REVIEWED",
+  "reviews": [
+    {
+      "sourceReceiptSha256": "2cee843152c7456723f503dc550ab53c6bb432f1d8768c4bf2119959eb7a5127",
+      "review": {
+        "state": "CURRENT_HEAD_ALL_THREE_NORMAL_CI_RUNS_AND_COMPLETE_LOGS_REVIEWED",
+        "at": "2026-11-08T00:15:59.790082+00:00",
+        "head": "ac9b82f42c8d6952193f5cbefbf11fc04816821d",
+        "tree": "7037bd7b5a4b32841af313402545256b5943053e",
+        "runs": [
+          {
+            "run": 42425628059,
+            "job": 128563168842,
+            "event": "pull_request",
+            "logFile": "pr236-ac9-head-ci-logs/128563168842.log",
+            "logBytes": 1205382,
+            "logSha256": "481d9a5781b26522b30e70ec7a36ca29378aa3163c014bf498aca8082fe6ce9d",
+            "actualCheckout": {
+              "sha": "75a44e1aecc5b69514858572767f4612833a0be6",
+              "tree": "7037bd7b5a4b32841af313402545256b5943053e",
+              "parents": [
+                "9aaef59bed0fb4b1d4e6d4b25427c71b4158ab7a",
+                "ac9b82f42c8d6952193f5cbefbf11fc04816821d"
+              ],
+              "wholeTreeEqualsReviewedHead": true
+            },
+            "failedOrRetryMarkers": []
+          },
+          {
+            "run": 42425628054,
+            "job": 128563168782,
+            "event": "pull_request",
+            "logFile": "pr236-ac9-head-ci-logs/128563168782.log",
+            "logBytes": 344360,
+            "logSha256": "42e46f2694827e9a5ea31cb5ed099b014d1324d23a5ad6ab7670c91fe1beec6e",
+            "actualCheckout": {
+              "sha": "75a44e1aecc5b69514858572767f4612833a0be6",
+              "tree": "7037bd7b5a4b32841af313402545256b5943053e",
+              "parents": [
+                "9aaef59bed0fb4b1d4e6d4b25427c71b4158ab7a",
+                "ac9b82f42c8d6952193f5cbefbf11fc04816821d"
+              ],
+              "wholeTreeEqualsReviewedHead": true
+            },
+            "failedOrRetryMarkers": []
+          },
+          {
+            "run": 42425624546,
+            "job": 128563158531,
+            "event": "push",
+            "logFile": "pr236-ac9-head-ci-logs/128563158531.log",
+            "logBytes": 333318,
+            "logSha256": "9a897949f3755f2e1c1268fb209dbcdf408587e64408a33a63351a1f17e5c98e",
+            "actualCheckout": {
+              "sha": "ac9b82f42c8d6952193f5cbefbf11fc04816821d",
+              "tree": "7037bd7b5a4b32841af313402545256b5943053e",
+              "parents": [
+                "4f4bee29fe691edbf98bdf5585153c119db6b933"
+              ],
+              "wholeTreeEqualsReviewedHead": true
+            },
+            "failedOrRetryMarkers": []
+          }
+        ],
+        "all62RequirementsUnchanged": true,
+        "workflowFilesUnchanged": true
+      }
+    },
+    {
+      "sourceReceiptSha256": "6d7657c0480b3c2654233d673af3b303ea4abac09f1c1e726b4303fe9933c740",
+      "review": {
+        "state": "ALL_AUTOMATIC_MERGED_HEAD_CI_LOGS_AND_CHECKOUT_TREES_REVIEWED",
+        "at": "2026-11-08T00:59:18.039753+00:00",
+        "head": "84e77d6d8513a4f8ecce713835b97aa3a547b66c",
+        "tree": "7037bd7b5a4b32841af313402545256b5943053e",
+        "runs": [
+          {
+            "run": 42428985264,
+            "event": "pull_request",
+            "job": 128573422641,
+            "name": "Test and Pages",
+            "logBytes": 333246,
+            "logSha256": "f4e066ad6679bdcccad069c4ace515b08cb325d292ef18e6c23ef435ff2c746e",
+            "checkout": {
+              "sha": "5f9a56aaf90b72e60a8bf254ac4c48d57b7c2a30",
+              "tree": "7037bd7b5a4b32841af313402545256b5943053e",
+              "parents": [
+                "0f236aaa104f14aeb8aa4a5445dd2ef0074af390",
+                "84e77d6d8513a4f8ecce713835b97aa3a547b66c"
+              ],
+              "wholeTreeEqualsReviewedHead": true
+            },
+            "failureOrRetryMarkers": [],
+            "unitFiles": 138,
+            "units": 2091,
+            "browser": 821,
+            "heartbeatCases": 8,
+            "smokes": [
+              34,
+              34
+            ],
+            "pages": "skipped"
+          },
+          {
+            "run": 42428985239,
+            "event": "pull_request",
+            "job": 128573422916,
+            "name": "Local Durable Object runtime",
+            "logBytes": 1205374,
+            "logSha256": "7caaa41058ff4e9286d19ba397d4c7fb057449bedaeb360a8a49f06732b99795",
+            "checkout": {
+              "sha": "5f9a56aaf90b72e60a8bf254ac4c48d57b7c2a30",
+              "tree": "7037bd7b5a4b32841af313402545256b5943053e",
+              "parents": [
+                "0f236aaa104f14aeb8aa4a5445dd2ef0074af390",
+                "84e77d6d8513a4f8ecce713835b97aa3a547b66c"
+              ],
+              "wholeTreeEqualsReviewedHead": true
+            },
+            "failureOrRetryMarkers": []
+          },
+          {
+            "run": 42428980806,
+            "event": "push",
+            "job": 128573409124,
+            "name": "Test and Pages",
+            "logBytes": 343729,
+            "logSha256": "9ce89f549b303c74e5e48f7db370a0e1cf6d73531f627953c8c145ce0008b595",
+            "checkout": {
+              "sha": "84e77d6d8513a4f8ecce713835b97aa3a547b66c",
+              "tree": "7037bd7b5a4b32841af313402545256b5943053e",
+              "parents": [
+                "9aaef59bed0fb4b1d4e6d4b25427c71b4158ab7a",
+                "ac9b82f42c8d6952193f5cbefbf11fc04816821d"
+              ],
+              "wholeTreeEqualsReviewedHead": true
+            },
+            "failureOrRetryMarkers": [],
+            "unitFiles": 138,
+            "units": 2091,
+            "browser": 821,
+            "heartbeatCases": 8,
+            "smokes": [
+              34,
+              34
+            ],
+            "pages": "skipped"
+          },
+          {
+            "run": 42428980730,
+            "event": "push",
+            "job": 128573408635,
+            "name": "Local Durable Object runtime",
+            "logBytes": 1205337,
+            "logSha256": "d4b9a04b90342085d0be2ea125b6447d3a1aba46075bcd1f52a610f7a8698e19",
+            "checkout": {
+              "sha": "84e77d6d8513a4f8ecce713835b97aa3a547b66c",
+              "tree": "7037bd7b5a4b32841af313402545256b5943053e",
+              "parents": [
+                "9aaef59bed0fb4b1d4e6d4b25427c71b4158ab7a",
+                "ac9b82f42c8d6952193f5cbefbf11fc04816821d"
+              ],
+              "wholeTreeEqualsReviewedHead": true
+            },
+            "failureOrRetryMarkers": []
+          }
+        ],
+        "ciRuns": [
+          42428985264,
+          42428985239,
+          42428980806,
+          42428980730
+        ],
+        "fullRawLogsReviewed": true,
+        "normalCiRerunsRequested": false
+      }
+    }
+  ],
+  "scope": "Existing app workflows; Pages deployment skipped. No physical music or new external native-provider mode claimed."
+}

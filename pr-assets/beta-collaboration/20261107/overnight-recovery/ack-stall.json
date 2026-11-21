@@ -1,0 +1,82 @@
+{
+  "startedAt": "2026-11-07T08:04:27.591Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "engine": "WebKit",
+  "endpoint": "Intel MacBook",
+  "ordinaryGuests": 2,
+  "scope": "Actual protected Worker; one intentionally non-acknowledging browser in a consented synthetic PM, not physical slow TCP or a capacity ceiling",
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "roomCreations": 0,
+  "checks": [
+    "Two ordinary private guests enter with normal media blocked",
+    "The existing two-minute PM admission delay is respected",
+    "Only the stalled peer reaches the unchanged 128-frame delivery window",
+    "The healthy peer stays connected and receives a fresh ordinary response"
+  ],
+  "logout": [
+    200,
+    200
+  ],
+  "resourceChecks": [
+    {
+      "at": "2026-11-07T08:04:27.594Z",
+      "load": 1.8818359375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.98
+    },
+    {
+      "at": "2026-11-07T08:05:31.321Z",
+      "load": 2.5,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.88
+    },
+    {
+      "at": "2026-11-07T08:06:41.344Z",
+      "load": 2.2216796875,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.88
+    },
+    {
+      "at": "2026-11-07T08:07:14.807Z",
+      "load": 2.19677734375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.88
+    },
+    {
+      "at": "2026-11-07T08:07:46.873Z",
+      "load": 2.64453125,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.88
+    },
+    {
+      "at": "2026-11-07T08:08:18.892Z",
+      "load": 2.130859375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.88
+    },
+    {
+      "at": "2026-11-07T08:08:50.930Z",
+      "load": 2.13720703125,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.88
+    }
+  ],
+  "browserVersion": "27.2",
+  "pmGateWaitMs": 130036,
+  "messagesAttemptedAfterStall": 129,
+  "stallDurationMs": 137778,
+  "sequencedFramesAfterStall": 128,
+  "suppressedAckCalls": 128,
+  "stalledCloseCodes": [
+    4413
+  ],
+  "stalledPeerDidNotAutoReconnect": true,
+  "healthyPeerCloseCount": 0,
+  "healthyPeerFreshResponse": true,
+  "status": "passed",
+  "captureRequests": 0,
+  "contextsClosed": true,
+  "completedAt": "2026-11-07T08:09:05.228Z"
+}

@@ -923,7 +923,7 @@ for (const width of [375, 390]) test(`camera rejection needs explicit retry and 
             camOn: window.__lobbyRoom.state.camOn, stream: !!window.__lobbyRoom.state.stream, myCam: window.__lobby.chans.get(window.__lobby.active).myCam }));
         expect(denied).toEqual({ attempts: 1, nativeCaptures: 0, off: 1, camOn: false, stream: false, myCam: false });
         const openStatus = await cameraRecoveryGeometry(owner); completeCameraRecoveryText(openStatus, true);
-        const activity = owner.locator('[data-activity]'), summary = activity.locator('summary');
+        const activity = owner.locator('[data-activity]'), summary = activity.locator(':scope > summary');
         await summary.click(); await expect(activity).toHaveJSProperty('open', false);
         const collapsedStatus = await cameraRecoveryGeometry(owner); completeCameraRecoveryText(collapsedStatus, false);
         await summary.click(); await expect(activity).toHaveJSProperty('open', true);

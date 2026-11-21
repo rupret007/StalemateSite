@@ -1,0 +1,31 @@
+{
+  "createdAt": "2026-11-08T07:02:36.419677+00:00",
+  "files": {
+    "README.md": {
+      "sha256": "3a65208aaf5dfda1e988fb075b56232ee7a1baa6d7706971f65ef9a1724105b1",
+      "bytes": 1028
+    },
+    "generated-transport.json": {
+      "sha256": "58543e20f307857276a02ffce88cb2909d7856592e59ee198771d25eea1aa555",
+      "bytes": 3036
+    },
+    "macbook-audio-prerequisites.json": {
+      "sha256": "94db0070d3b90f372ef1a0f2171f6fa014fc7d9ed2f9f36b03c13f49c99aef02",
+      "bytes": 1663
+    },
+    "service-readback.json": {
+      "sha256": "584d6df0b211c388cb80703318b0f28fc5e929292dd30c539d08e4dee5892ae8",
+      "bytes": 1792
+    },
+    "webex-readiness.json": {
+      "sha256": "2dc2f62409bc67b03c0652f47305abdd078340d12abf9abf9c0ec741976f9b8d",
+      "bytes": 2180
+    },
+    "windows-generated-countdown.png": {
+      "sha256": "e6d716af96f8f6c40f575c85101752413b9c4da9471fd2a2578ecac347787b01",
+      "bytes": 27654
+    }
+  },
+  "releaseCandidateReady": false,
+  "canonicalRequirementsUnchanged": true
+}

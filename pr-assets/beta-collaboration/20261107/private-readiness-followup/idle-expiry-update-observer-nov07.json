@@ -1,0 +1,65 @@
+{
+  "state": "PASSED_EXISTING_GUEST_ACROSS_NORMAL_PRIVATE_UPDATE",
+  "processId": 1025191,
+  "startedAt": "2026-11-07T17:14:30.913Z",
+  "oldVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "proposedSource": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "ordinaryGuests": 1,
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "recording": false,
+  "deploymentInvokedByFixture": false,
+  "originalExpiryFailurePreservedAndCleanupVerified": true,
+  "originalExpiryPassed": false,
+  "checks": [
+    "Ordinary Rad Dad guest joins before the private update and keeps an unsent draft",
+    "Existing guest can communicate after the actual update without publishing its draft",
+    "All thirteen served runtime payloads match the reviewed countdown source",
+    "Normal logout revokes copied cookies and protected code after the update"
+  ],
+  "logout": [
+    200
+  ],
+  "captureRequests": 0,
+  "browserVersion": "156.0.8078.4",
+  "beforeUpdateSocketEvents": [
+    {
+      "event": "open",
+      "at": 1794071672464
+    }
+  ],
+  "readyToDeploy": true,
+  "readyAt": "2026-11-07T17:14:32.577Z",
+  "observedAt": "2026-11-07T17:15:16.881Z",
+  "actualNewVersion": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "deliverySignalReceivedAt": "2026-11-07T17:15:15.138Z",
+  "afterUpdateConfirmedEchoMs": 326,
+  "unsentDraftStayedPrivate": true,
+  "afterUpdateSocketEvents": [
+    {
+      "event": "open",
+      "at": 1794071672464
+    }
+  ],
+  "observedSocketCloseDuringUpdate": false,
+  "explicitRestartOrHibernationForced": false,
+  "servedAssets": [
+    "join/index.html",
+    "join/policy.js",
+    "join/session.js",
+    "join/config.js",
+    "join/audio.js",
+    "join/errors.js",
+    "join/style.css",
+    "join/prejoin.js",
+    "join/crypto.js",
+    "join/mailbox.js",
+    "join/app.js",
+    "r/45662413410ed051/lobby/lobby.css",
+    "r/45662413410ed051/lobby/lobby.js"
+  ],
+  "copiedCookieAfterLogout": 401,
+  "protectedCodeAfterLogout": 401,
+  "allOwnedBrowserResourcesClosed": true,
+  "completedAt": "2026-11-07T17:15:16.881Z"
+}

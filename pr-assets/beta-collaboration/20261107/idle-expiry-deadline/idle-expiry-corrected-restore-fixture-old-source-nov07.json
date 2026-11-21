@@ -1,0 +1,23 @@
+{
+  "state": "CORRECTED_RESTORE_FIXTURE_OLD_SOURCE_RESULT_REQUIRES_REVIEW",
+  "unitExitCode": 1,
+  "productionCodeChanged": false,
+  "fixtureNowCompletesActualNicknameHelloBeforeRestore": true,
+  "initialFixtureTypeErrorPreserved": true,
+  "summary": [
+    " Test Files  1 failed (1)",
+    "      Tests  1 failed | 29 skipped (30)",
+    "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+    " FAIL  hangout-worker/tests/beta-lifecycle.test.js > private socket expiry, hibernation and cost caps > brings a late lobby alarm forward when a live binding is restored near expiry",
+    "AssertionError: expected 1792407650000 to be less than or equal to 1792407600000"
+  ],
+  "testSha256": "f398e8eaa5666a7d9662cc759201da5ca79af3821a50fa9e9e9b0e76491fb1c6",
+  "guardBefore": {
+    "load1": 0.06884765625,
+    "memoryAvailableGiB": 14.465499877929688,
+    "swapPercent": 14.952421188354492,
+    "freeGiB": 722.4013900756836
+  },
+  "logSha256": "1f2a91e73677230c1bb3ca9c052931a53fd40a6e8c0eb23fd629ad11ef9a4396",
+  "at": "2026-11-07T16:17:10.786539+00:00"
+}

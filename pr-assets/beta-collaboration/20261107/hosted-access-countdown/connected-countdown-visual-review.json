@@ -1,0 +1,11 @@
+{
+  "reviewedAt": "2026-11-07T17:34:58.714768+00:00",
+  "screenshotSha256": "db38077baa783ca544480aa692464c5e3378238afcfbf3c69b30457db74a9e11",
+  "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "visuallyInspected": true,
+  "findings": "Connected page is uncluttered, Leave is the single primary action, browser access time is visible with a host-may-end-sooner explanation, and relay status is explicit. No private invite or user conversation appears in the image.",
+  "separateAssertions": "Natural timer decreased594to593seconds; Join hidden; Leave programmatically focused; time hidden after leaving.",
+  "physicalCaptureOrHumanHearing": false,
+  "actualDesktopSharedTrackSender": false
+}

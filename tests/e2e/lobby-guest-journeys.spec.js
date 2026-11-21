@@ -10,7 +10,7 @@ const INVITE = 'Join our synthetic rehearsal on WebJam:\nPaste this whole messag
 test.use({ permissions: ['camera'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
 
 async function visitor(browser, baseURL, relay, nick, width, fixture) {
-    const context = await browser.newContext({ viewport: { width, height: 844 }, permissions: ['camera'] });
+    const context = await browser.newContext({ viewport: { width, height: width === 1440 ? 900 : 844 }, permissions: ['camera'] });
     await context.route('**/*', route => new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort());
     await context.addInitScript(() => {
         window.copiedInvites = [];
@@ -37,8 +37,12 @@ async function visitor(browser, baseURL, relay, nick, width, fixture) {
     return page;
 }
 async function say(page, text) { await page.fill('[data-text]', text); await page.press('[data-text]', 'Enter'); }
+async function openRooms(page) {
+    const mobileRooms = page.locator('.phonetabs [data-show="rooms"]');
+    if (await mobileRooms.isVisible()) await mobileRooms.click();
+}
 async function channel(page, name) {
-    await page.locator('.phonetabs [data-show="rooms"]').click(); await page.click('[data-start="chat"]');
+    await openRooms(page); await page.click('[data-start="chat"]');
     await page.fill('[data-channel-name]', name); await page.locator('[data-channel-form] button[type=submit]').click();
     await expect(page.locator('[data-chat-context]')).toHaveText('#' + name);
 }
@@ -66,6 +70,7 @@ for (const width of [375, 390]) {
             await say(outsider, '/invite JourneyGuest ' + roomName);
             await expect(outsider.locator('[data-buffer]')).toContainText('/invite: permission denied');
             await expect(guest.locator('[data-toast] button')).toHaveCount(0);
+            await expect(guest.locator('[data-game-offer]')).toBeHidden();
             await host.click('[data-roomtools]');
             await expect(host.getByRole('button', { name: 'Invite guest', exact: true })).toBeVisible();
             await host.getByRole('button', { name: 'Invite guest', exact: true }).click();
@@ -78,8 +83,8 @@ for (const width of [375, 390]) {
             await host.screenshot({ path: testInfo.outputPath(`invite-guest-${width}.png`) });
             await dialog.getByRole('button', { name: 'Send invitation', exact: true }).click();
             await expect(dialog).toBeHidden();
-            await expect(guest.locator('[data-toast]')).toContainText('JourneyHost invited you to ' + roomName);
-            await guest.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+            await expect(guest.locator('[data-game-offer]')).toContainText('JourneyHost invited you to ' + roomName);
+            await guest.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
             await expect(guest.locator('[data-chat-context]')).toHaveText(roomName);
             await expect(guest.locator('[data-roomtools]')).toBeHidden();
             await host.fill('[data-jam-link]', INVITE); await host.locator('[data-jam-form] button[type=submit]').click();
@@ -261,7 +266,7 @@ test('a host losing room controls cannot submit an invitation from an already op
         await host.click('[data-roomtools]'); await host.getByRole('button', { name: 'Invite guest', exact: true }).click();
         await host.getByLabel('Guest nickname', { exact: true }).fill('CurrentHost');
         await host.getByRole('button', { name: 'Send invitation', exact: true }).click();
-        await cohost.locator('[data-toast]').getByRole('button', { name: 'Join', exact: true }).click();
+        await cohost.locator('[data-game-offer]').getByRole('button', { name: 'Join room', exact: true }).click();
         await expect(cohost.locator('[data-jam]')).toBeVisible();
         await say(host, '/op CurrentHost'); await expect(cohost.locator('[data-roomtools]')).toBeVisible();
         await host.click('[data-roomtools]'); await host.getByRole('button', { name: 'Invite guest', exact: true }).click();
@@ -277,25 +282,29 @@ test('a host losing room controls cannot submit an invitation from an already op
         await host.locator('[data-invite-form]').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
         expect(fixture.inbound.filter(frame => frame.nick === 'FormerHost' && frame.name === 'invite')).toHaveLength(before);
         await expect(target.locator('[data-toast] button')).toHaveCount(0);
+        await expect(target.locator('[data-game-offer]')).toBeHidden();
     } finally { await Promise.all(pages.map(page => page.context().close())); }
 });
 
-for (const width of [375, 390]) {
+for (const width of [375, 390, 1440]) {
     test(`an ended guest session has visible invitation recovery and retires stale actions at ${width}px`, async ({ browser, baseURL }, testInfo) => {
         const fixture = await closingFixture(), relay = hangoutRelayWsBase(baseURL, `guest-ended-${randomUUID()}`), pages = [];
         try {
             const ended = await visitor(browser, baseURL, relay, 'EndingGuest', width, fixture); pages.push(ended);
             const peer = await visitor(browser, baseURL, relay, 'ContinuingPeer', width, fixture); pages.push(peer);
             const reader = await visitor(browser, baseURL, relay, 'ContinuingReader', width, fixture); pages.push(reader);
-            await ended.click('.phonetabs [data-show="rooms"]'); await ended.click('[data-start="jam"]');
+            await openRooms(ended); await ended.click('[data-start="jam"]');
             await ended.fill('[data-jam-link]', INVITE); await ended.locator('[data-jam-form] button[type=submit]').click();
-            await ended.click('.phonetabs [data-show="rooms"]'); await ended.click('[data-start="art"]');
+            await openRooms(ended); await ended.click('[data-start="art"]');
             await ended.click('[data-cam]'); await ended.check('[data-adult]'); await ended.click('[data-cam-yes]');
             await expect.poll(() => ended.evaluate(() => capturedTracks.some(track => track.readyState === 'live'))).toBe(true);
             await say(peer, '/msg EndingGuest A private request awaiting a decision');
             await expect(ended.locator('[data-pmreqs]')).toContainText('ContinuingPeer');
             await channel(peer, 'guest-later'); await say(peer, '/invite EndingGuest');
-            await expect(ended.locator('[data-toast]')).toContainText('invited you');
+            const invitation = ended.locator('[data-room-invite]');
+            await expect(invitation).toBeVisible();
+            await expect(invitation).toContainText('invited you');
+            await expect(invitation.getByRole('button', { name: 'Join', exact: true })).toBeEnabled();
             await ended.fill('[data-text]', 'Unsent drawing idea — never move this into lobby chat');
             await ended.click('[data-roomtools]'); await expect(ended.locator('[data-palette]')).toBeVisible();
             fixture.end('EndingGuest');
@@ -304,10 +313,14 @@ for (const width of [375, 390]) {
             await expect(ended.locator('[data-connection]')).toHaveText('Session ended');
             await expect(ended.locator('[data-reconnect]')).toBeHidden();
             await expect(ended.locator('[data-send]')).toBeDisabled();
+            await expect(ended.locator('[data-quick]')).toBeHidden();
+            await expect(ended.getByRole('button', { name: 'Commands', exact: true })).toBeDisabled();
             await expect(ended.locator('[data-text]')).toHaveValue('Unsent drawing idea — never move this into lobby chat');
             await expect(ended.locator('[data-pmreqs]')).toBeEmpty();
             await expect(ended.locator('[data-palette]')).toBeHidden();
             await expect(ended.locator('[data-toast] button')).toHaveCount(0);
+            await expect(invitation).toBeHidden();
+            await expect(invitation.getByRole('button', { name: 'Join', exact: true })).toHaveCount(0);
             await expect(ended.locator('[data-jam-link]')).toHaveValue('');
             await expect(ended.locator('[data-jam-copy-value]')).toHaveValue('');
             expect(await ended.evaluate(() => JSON.stringify([...__lobby.chans.values()]))).not.toContain(INVITE);
@@ -318,7 +331,25 @@ for (const width of [375, 390]) {
             expect(fixture.admissions.get('EndingGuest')).toBe(1);
             expect(await reader.evaluate(() => document.body.textContent)).not.toContain('Unsent drawing idea');
             await contained(ended, recovery); await contained(ended, ended.locator('[data-send]'));
+            const draftCopy = recovery.getByRole('button', { name: 'Copy draft' });
+            await contained(ended, draftCopy);
+            const copyBounds = await draftCopy.boundingBox();
+            expect(copyBounds.width).toBeGreaterThanOrEqual(48);
+            expect(copyBounds.height).toBeGreaterThanOrEqual(48);
             await ended.screenshot({ path: testInfo.outputPath(`session-ended-${width}.png`) });
+            await draftCopy.focus();
+            await ended.keyboard.press('Enter');
+            await expect(ended.locator('[data-toast]')).toContainText('Draft copied. Nothing was sent.');
+            expect(await ended.evaluate(() => window.copiedInvites.at(-1))).toBe('Unsent drawing idea — never move this into lobby chat');
+            await openRooms(ended);
+            await expect(ended.getByRole('searchbox', { name: 'Find a room' })).toBeDisabled();
+            await expect(ended.getByRole('combobox', { name: 'Room directory' })).toBeDisabled();
+            await expect(ended.locator('[data-room-count]')).toBeHidden();
+            await expect(ended.getByText('Join again to see rooms.', { exact: true })).toBeVisible();
+            if (width === 390) await ended.screenshot({ path: testInfo.outputPath('session-ended-rooms-390.png') });
+            if (width !== 1440) await ended.locator('.phonetabs [data-show="people"]').click();
+            await expect(ended.getByRole('checkbox', { name: 'Turn off PM requests' })).toBeDisabled();
+            await expect(ended.getByRole('link', { name: 'House rules', exact: true })).toBeVisible();
             const reentry = recovery.getByRole('link', { name: 'Return to invitation', exact: true });
             await expect(reentry).toHaveAttribute('href', '/beta/'); await reentry.click();
             await expect(ended).toHaveURL(baseURL + '/beta/');

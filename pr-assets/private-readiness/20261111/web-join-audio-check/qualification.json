@@ -1,0 +1,113 @@
+{
+  "activationReceiptSha256": "ded8cb4165b128b44bbe487e0fa7c2ae003096afbc01ee488827067c65bfb662",
+  "admittedAssetsMatched": 6,
+  "anonymousAdmissionPreserved": true,
+  "browser": {
+    "actualMedia": false,
+    "physicalMobile": false,
+    "receiptSha256": "4fca9483e32812400477bfc82d9fe3b60bdfc1243a74710955d68607cfdd0712",
+    "scope": "Admitted hosted Chromium with an unregistered fixture and simulated missing microphone",
+    "viewports": [
+      {
+        "actualCaptureCalls": 0,
+        "deployedAppSha256": "987b8d91f55a6bb3d34ba822b4b0de2631ea9fe48a847ab3b4f2e851bff4f8bf",
+        "headphonesFocusedAfterSkip": true,
+        "joinGuidanceExposed": true,
+        "noHorizontalOverflow": true,
+        "retryFocused": true,
+        "screenshot": "mic-retry-375.png",
+        "screenshotSha256": "6a3b3d4e54ae3634ae53d1e38a226b1ce2da6ab9d336a1f875eb593b88880d0f",
+        "syntheticCaptureRefusals": 2,
+        "width": 375
+      },
+      {
+        "actualCaptureCalls": 0,
+        "deployedAppSha256": "987b8d91f55a6bb3d34ba822b4b0de2631ea9fe48a847ab3b4f2e851bff4f8bf",
+        "headphonesFocusedAfterSkip": true,
+        "joinGuidanceExposed": true,
+        "noHorizontalOverflow": true,
+        "retryFocused": true,
+        "screenshot": "mic-retry-390.png",
+        "screenshotSha256": "bd81af19b7cf4bb6edb1d99898f0ee6991880072e023537b47636b4ffb0d7154",
+        "syntheticCaptureRefusals": 2,
+        "width": 390
+      }
+    ]
+  },
+  "browserZoom": {
+    "checks": [
+      {
+        "actualMicCalls": 0,
+        "checkedStates": [
+          "start",
+          "recovery",
+          "ready"
+        ],
+        "clientWidth": 640,
+        "headphonesNamedAndFocused": true,
+        "horizontalOverflow": false,
+        "metrics": {
+          "height": 376,
+          "ratio": 2,
+          "width": 640
+        },
+        "missingMicrophoneAssertiveAlert": true,
+        "percent": 200,
+        "retryFocused": true,
+        "threeJoinDescriptionsExposed": true
+      },
+      {
+        "actualMicCalls": 0,
+        "checkedStates": [
+          "start",
+          "recovery",
+          "ready"
+        ],
+        "clientWidth": 320,
+        "headphonesNamedAndFocused": true,
+        "horizontalOverflow": false,
+        "metrics": {
+          "height": 188,
+          "ratio": 4,
+          "width": 320
+        },
+        "missingMicrophoneAssertiveAlert": true,
+        "percent": 400,
+        "retryFocused": true,
+        "threeJoinDescriptionsExposed": true
+      }
+    ],
+    "keyboardFocusedControls": [
+      "Check microphone",
+      "Try again",
+      "Skip check",
+      "Headphones",
+      "Join with microphone"
+    ],
+    "receiptSha256": "ad0fc558bf1ef8ef5d7bb18d33b768fca136edb3985f2cdd66d46b8091aa4036",
+    "scope": "Exact staged assets on loopback using Chrome Page zoom on Intel macOS",
+    "screenReaderSpeech": false,
+    "screenshot": "zoom-400-ready.png",
+    "screenshotSha256": "8b8a22f4adcdf4fb0e5b0bf043944878f0e142f48ea84373632660b80da866de"
+  },
+  "deployment": "a73dcc6a-b9ca-43f6-a78e-8fb5629321e7",
+  "effectiveConfigurationPreserved": true,
+  "guestLogoutAndRevocationVerified": true,
+  "intelMacStartup": {
+    "archiveVerificationReceiptSha256": "e0288a8b0be9dde50d2d68165490fb284837f47eb86400c99d5a1d55bb83a26c",
+    "artifactId": 13847713990,
+    "codeSignaturesVerified": true,
+    "isolatedHomeOnly": true,
+    "physicalMusicAndWebexVerified": false,
+    "runId": 42997398282,
+    "shortcutSelectionReceiptSha256": "4e850563794b7f96d1348ce795c0671ee7a7ed76fe625fcdec5069ef850c311e",
+    "source": "23cfae6ac05c128e1caf8a6fd366751686304ba6",
+    "startupReceiptSha256": "473ac4c9796b56a8adc3a5cddfa23de75a27e70161cd7f92391cfb14b517cb53"
+  },
+  "issuerUnchanged": "fd37578f-13cd-4fce-b557-35c0d962ef9d",
+  "previousServingVersion": "43002fe9-4d04-456b-9fde-320dc151abc8",
+  "recordedAt": "2026-11-11T14:02:34.556582+00:00",
+  "servingVersion": "fca791b7-bcec-4597-a855-fb7d7eb152d5",
+  "source": "3ad1cc19b06ac2070480232676b3866279fd37c6",
+  "websitePullRequest": 277
+}

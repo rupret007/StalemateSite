@@ -1,0 +1,22 @@
+{
+  "at": "2026-11-07T03:04:49.361434+00:00",
+  "readOnly": true,
+  "candidate": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "rollbackVersion": "50c62fa6-676c-4c1a-888f-ae4ceb74a3be",
+  "deployment": "3186f5ce-3da2-4459-8413-f78ddb16de76",
+  "effectiveBindingsSha256": "435ce27693f31cb1705f8ca716d163515bad484cd04da0a6bfba8a8766711b5b",
+  "effectivePlainVarsSha256": "1e68ccc7aa9ba559685c56e47ca672b2aa0ccdeaa9ced28fc08da4bf21c9e869",
+  "durableBindingsSha256": "391edc19ad638a1675dfb3c851b0e1623a288224e0ebff0f462b0b5f2d2470fa",
+  "secretBindingNames": [
+    "HANGOUT_BETA_INVITE_KEY",
+    "HANGOUT_BETA_OPS_KEY",
+    "HANGOUT_HMAC_KEY",
+    "HANGOUT_PREVIEW_KEY",
+    "OPENAI_API_KEY"
+  ],
+  "activeVersionSettingsChecked": true,
+  "approvedOriginPreserved": true,
+  "sourceVarsWithApprovedOverlayEqualLive": true,
+  "assetsVerified": 69,
+  "readyForPrivateApplicationDeploy": true
+}

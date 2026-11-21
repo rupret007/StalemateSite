@@ -1,0 +1,113 @@
+{
+  "asOf": "2026-11-10",
+  "source": "67c7ef08e515c84eb2b0736c474ec2c4b0c21682",
+  "run": 42761983020,
+  "buildUrl": "https://github.com/rupret007/webjam/actions/runs/42761983020",
+  "buildConclusion": "success",
+  "mergedNativeRevision": "7b6e6612a99518f28aff93d36b29698be86d57ea",
+  "qualifiedSourceAndMergedTree": "1e0126b23cc309159ca2e4bb92c0d96ad7083f3a",
+  "sourceUnitPassed": 12976,
+  "existingSkipped": 60,
+  "unitModules": 566,
+  "eachPinnedJamulusVersion": {
+    "versions": [
+      "3.12.2",
+      "3.12.3"
+    ],
+    "rpcPassed": 11,
+    "generatedJackBoundaryPassed": 7
+  },
+  "publicTagOrReleasePublished": false,
+  "desktopSelectionChanged": false,
+  "actualArchives": [
+    {
+      "target": "linux-x64",
+      "artifactId": 13739606489,
+      "outerBytes": 458988271,
+      "outerSha256": "70c2f87e1d4acd09700a8643161ba63179cde2b965e6315565a141af7202edc4",
+      "innerSha256": "9c1206f90dab594ad25004fcb302df8f3859791d6ca38323dddba9d607f4222a",
+      "architecture": "ELF64-x86_64",
+      "sourceAndPrivateBetaTargetVerified": true,
+      "archivePathsAndSymlinksAndCrcVerified": true,
+      "runtimeNoticesAndAll11PinnedLicenseEntriesVerified": true,
+      "ownMitLicenseSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1",
+      "appOrInstallerExecutedLocallyForArchiveInspection": false,
+      "physicalMusicOrWebexQualified": false,
+      "publisherTrustQualified": false
+    },
+    {
+      "target": "windows-x64",
+      "artifactId": 13739502289,
+      "outerBytes": 613344399,
+      "outerSha256": "af51fd4700c7e58c811b6ceda44a172d0cc6f59551961650a50e238b7d189c04",
+      "innerSha256": "e7c93c4b640b07494fe95be73fd3d5dd8ac61075a449bb1d73dcc60008bb5d9a",
+      "architecture": "PE-x86_64",
+      "sourceAndPrivateBetaTargetVerified": true,
+      "archivePathsAndSymlinksAndCrcVerified": true,
+      "runtimeNoticesAndAll11PinnedLicenseEntriesVerified": true,
+      "ownMitLicenseSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1",
+      "appOrInstallerExecutedLocallyForArchiveInspection": false,
+      "physicalMusicOrWebexQualified": false,
+      "publisherTrustQualified": false,
+      "unsignedTestOnly": true,
+      "setupSha256": "809e1e8ebb3ef91577872cd54972507113af3daf146ea1e594d976c58c561b90",
+      "setupAndZipChecksumManifestVerified": true,
+      "hostedInstallStartUninstallSucceeded": true
+    },
+    {
+      "target": "macos-arm64",
+      "artifactId": 13739208547,
+      "outerBytes": 459648625,
+      "outerSha256": "739ba18a7d7da6a989a1cc6511c0e3dab8ef08c1275560a7cb8faf957e02abe3",
+      "innerSha256": "ad57a022c85ddd234525d82c736d793236471c5e2f9ef6040490df277c45e37a",
+      "architecture": "arm64",
+      "sourceAndPrivateBetaTargetVerified": true,
+      "archivePathsAndSymlinksAndCrcVerified": true,
+      "runtimeNoticesAndAll11PinnedLicenseEntriesVerified": true,
+      "ownMitLicenseSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1",
+      "appOrInstallerExecutedLocallyForArchiveInspection": false,
+      "physicalMusicOrWebexQualified": false,
+      "publisherTrustQualified": false,
+      "strictNestedSignatureChecks": 5,
+      "allStrictDeepAllArchitectureChecksPassed": true,
+      "adHocNotNotarized": true
+    },
+    {
+      "target": "macos-x64",
+      "artifactId": 13738949919,
+      "outerBytes": 474632996,
+      "outerSha256": "f7e04d0e6bc606815689950229a637796504ee476cd1f9db8303b237b6377b72",
+      "innerSha256": "c3b8778e815647e8a4488ee45fa25c99069d3cb57e1d793c458f45ba26bd13cc",
+      "architecture": "x86_64",
+      "sourceAndPrivateBetaTargetVerified": true,
+      "archivePathsAndSymlinksAndCrcVerified": true,
+      "runtimeNoticesAndAll11PinnedLicenseEntriesVerified": true,
+      "ownMitLicenseSha256": "a4280fb054e6e7d066c5face14d72dc65cc8f56f0a46bf2eaf147c872c97e3a1",
+      "appOrInstallerExecutedLocallyForArchiveInspection": false,
+      "physicalMusicOrWebexQualified": false,
+      "publisherTrustQualified": false,
+      "strictNestedSignatureChecks": 5,
+      "allStrictDeepAllArchitectureChecksPassed": true,
+      "adHocNotNotarized": true
+    }
+  ],
+  "actualArmIdleUi": {
+    "source": "67c7ef08e515c84eb2b0736c474ec2c4b0c21682",
+    "sameVerifiedExecutableConfirmed": true,
+    "matchingFroIconsOnBothArtChoices": true,
+    "currentBobRossCustomYouTubeCopyObserved": true,
+    "normalCommandQExitObservedTwice": true,
+    "nativeMenuQuitAccessibilityDisabledUnresolved": true,
+    "menuActivationQualified": false,
+    "noHostJoinCaptureOrRecording": true,
+    "screenshots": {
+      "arm67-art-start.png": "195c54c3f21bef802e578c349ee8ee89fe00d50d200b99acd770e7ec510be48c",
+      "arm67-music-start.png": "e11db0808c6d8ab82e23fe52d590da87307ff86f89a872ced4ee7b97acf00dbd",
+      "arm67-app-menu.txt": "c3f48568637899f070f70865985335b2cdff74750ebf338ac376051fb0b5e933"
+    }
+  },
+  "all62OriginalOutcomesStillRequired": true,
+  "physicalCurrentMusicSharedTrackWebexNewcomerJourneyQualified": false,
+  "websiteRuntimeOrProviderOrHoldsChanged": false,
+  "legalOrLicenseComplianceCertified": false
+}

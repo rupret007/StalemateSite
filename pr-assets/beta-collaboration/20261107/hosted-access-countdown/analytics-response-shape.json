@@ -1,0 +1,12 @@
+{
+  "at": "2026-11-07T17:28:51.738037+00:00",
+  "physicalCapture": false,
+  "trialStarted": false,
+  "providerCredentialsMinted": false,
+  "originalFailedPreflightPreserved": true,
+  "priorDiagnosticFailure": "Diagnostic used len(errors) but the successful GraphQL response represented errors as null. No native session started.",
+  "errorCount": 0,
+  "errors": [],
+  "accountsCount": 1,
+  "state": "READ_ONLY_USAGE_RESPONSE_SHAPE_RECORDED_NO_TRIAL"
+}

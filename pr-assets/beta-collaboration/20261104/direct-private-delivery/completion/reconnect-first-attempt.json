@@ -1,0 +1,30 @@
+{
+  "startedAt": "2026-11-04T10:03:50.216Z",
+  "source": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "scope": "Actual protected service; deliberate local socket close and manual reconnect, not a physical network interruption, expiry observer or music trial",
+  "engines": [
+    {
+      "name": "chromium",
+      "version": "156.0.8078.4",
+      "pageErrors": 0,
+      "logout": [
+        200,
+        401
+      ],
+      "newMessagesReceived": true,
+      "noPreviousOrMissedBacklog": true,
+      "draftRetainedWithoutSending": true,
+      "manualReconnect": true,
+      "reloadFreshSession": true,
+      "copiedCookieRevoked": true,
+      "status": "passed"
+    }
+  ],
+  "captureRequests": 0,
+  "status": "failed",
+  "failure": {
+    "stage": "chromium-copied-cookie-logout",
+    "type": "Error"
+  },
+  "completedAt": "2026-11-04T10:04:01.183Z"
+}

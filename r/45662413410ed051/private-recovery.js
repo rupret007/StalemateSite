@@ -45,7 +45,7 @@
             const signed = copy(raw), body = signed.body;
             if (body.kind === 'video') {
                 const time = body.t === undefined ? t : body.t;
-                if (!H.cleanSource(body.source) || typeof body.playing !== 'boolean' || !Number.isFinite(body.pos)
+                if (!(H.cleanSource(body.source) || H.isActivityOnlyVideo(body)) || typeof body.playing !== 'boolean' || !Number.isFinite(body.pos)
                     || body.pos < 0 || body.pos > 86400 || !Number.isFinite(time) || time < 0) return null;
                 return { signed, t: time };
             }
@@ -216,7 +216,7 @@
                 if (rangeStatus.exhausted) return failed('drawing-exhausted');
                 if (rangeStatus.pendingPoints) return failed('unresolved-stroke-gap');
                 const video = chosen.get('video');
-                if (video) {
+                if (video && !H.isActivityOnlyVideo(video.signed.body)) {
                     const body = video.signed.body;
                     H.apply(state, { type: 'video', source: body.source, playing: body.playing, pos: body.pos }, { t: video.t });
                 }

@@ -1,0 +1,37 @@
+{
+  "recordedAt": "2026-11-07T03:14:54.739280+00:00",
+  "applicationSource": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "documentationBase": "0ee3eddbf44a595dc92d7699a05a9a6fb42c7ae4",
+  "applicationCI": [
+    "42322831939",
+    "42322802308"
+  ],
+  "webJamCI": [
+    "42322563708",
+    "42322563666",
+    "42322563588"
+  ],
+  "privateVersion": "75655a50-9e13-4966-bb68-22b45a230c1d",
+  "delivery": "Direct application tests and private delivery; earlier StoryPool deployment handoff withdrawn at Jeff\u2019s instruction",
+  "screenshotsVisuallyInspected": true,
+  "fullReleaseCandidateAccepted": false,
+  "pending": [
+    "Current physical speech and live musical passage across Mac and Windows",
+    "Second-network trial",
+    "Actual shared-mix WAV and supported MP3 playback",
+    "Actual Webex meeting/video and music/conversation audio handoff",
+    "Remaining platform, accessibility, integration, scale and operator/legal acceptance scopes"
+  ],
+  "files": {
+    "chromium-375.png": "b6626d4863ca4393a3bdeb7479e2661d98c7ed00dfaf7cd76adb44c572b36bb7",
+    "chromium-390.png": "67ffa74766e70e8460cb8b78e249b57d38edeccce05fb12102dff01ccc5255b9",
+    "deployment.json": "a390a8820480c07806d9d6ea87c144b94f302214ad04a4d162a842ecff5437d9",
+    "earlier-attempts.json": "4d564e380a80b5164f123dfd47cea455e72700dd7b32608039e7a8d2f918c990",
+    "hosted-chromium.json": "d783d16651bf50a3f16017378b842a68b582b49b7ca9738aaf6139845aad98a9",
+    "hosted-webkit-quota-and-logout.json": "d1d9f2ccf6e06f2424434e3e5543fbe47dc72a4bd68d305e90605d084fb38b2d",
+    "hosted-webkit-stopped-at-room-limit.json": "bff1eeb68b4b353768c05da27d46eac4e900ab9725ee807d03c91012425bcece",
+    "preflight.json": "5af80c85fc74e7c0dbc25b3617659cdc85cc1aa55f5f368cc07b005faf2972a0",
+    "webkit-375.png": "e69f02c1ed588ab10ecd4051b0c9009a8946d54eea89ada81bcee08d4779d024",
+    "webkit-390.png": "0226c1e183ba4163a139f6a3c07d23ad9adb8e046d203465a162a839bc541cdc"
+  }
+}

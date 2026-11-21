@@ -2,9 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM, VirtualConsole } from 'jsdom';
 import { readFileSync } from 'node:fs';
-import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
-import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
 import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
+import { createHangoutClientTestModules, entryFunctions } from './hangout-lobby-client-stub.mjs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
 const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
@@ -40,10 +39,10 @@ async function visitor({ via = 'rad-dad', verified = false, stored = {}, returni
         receive(frame) { this.onmessage?.({ data: JSON.stringify(frame) }); }
         close(code = 1000) { this.readyState = 3; this.onclose?.({ code }); }
     };
-    window.HangoutClientTestModules = { ...entryFunctions, createEntrySharing, createChatAnnouncements };
+    window.HangoutClientTestModules = createHangoutClientTestModules(window, { createChatAnnouncements });
     window.eval(discovery);
     const imports = [...client.matchAll(/^import \{([^}]+)\} from '[^']+';/gm)].map(match => match[1]).join(',');
-    window.eval(`const {${imports}} = window.HangoutClientTestModules;\n${client.replace(/^import .*$/gm, '')}`);
+    window.eval(`const entrance = window.HangoutClientTestModules; const {${imports}} = entrance;\n${client.replace(/^import .*$/gm, '')}`);
     window.document.querySelector('[data-nick]').value = 'Viewer';
     window.document.querySelector('[data-enter]').click();
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
@@ -102,7 +101,7 @@ describe('bounded explicit Keep return', () => {
     it('conditionally rejoins but sends no registration until explicit confirmation of the matching room', async () => {
         const { window, ws, join } = await returned();
         expect(window.sessionStorage.getItem(entryFunctions.KEEP_ROOM_INTENT_KEY)).toBeNull();
-        expect(ws.sent.filter(f => f.name === 'join')).toEqual([{ t: 'cmd', name: 'join', args: [room], ch: '#stalemate', roomInstance: ref }]);
+        expect(ws.sent.filter(f => f.name === 'join')).toEqual([{ t: 'cmd', name: 'join', args: [room], ch: '#stalemate', roomInstance: ref, keepReturn: true }]);
         expect(ws.sent.some(f => f.name === 'register')).toBe(false);
         expect(window.document.querySelector('[data-keep-prompt]').hidden).toBe(true);
         join();

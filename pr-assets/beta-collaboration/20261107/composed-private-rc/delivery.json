@@ -1,0 +1,19 @@
+{
+  "at": "2026-11-07T05:58:25.321693+00:00",
+  "candidate": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "merge": "45fc36450e0542559818897cf7c200f0a346fd0e",
+  "tree": "5d12703740f48136ed905752ffc4642bd0e6b9c9",
+  "rollbackVersion": "75655a50-9e13-4966-bb68-22b45a230c1d",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "state": "SETTINGS_VERIFIED_AWAITING_HOSTED_PROOF",
+  "assets": 69,
+  "publicSitesChanged": false,
+  "physicalCapture": false,
+  "turnCredentialsMinted": false,
+  "storyPoolUsed": false,
+  "exitCode": 0,
+  "deployment": "f6cc2976-c845-4ca2-89b3-fa930347a16f",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "allEffectiveBindingsAndRuntimeSettingsPreserved": true,
+  "issuerVersionUnchanged": true
+}

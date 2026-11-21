@@ -1,0 +1,35 @@
+{
+  "source": "e101465df5d204809619aafc8b65fd7925950e8a",
+  "innerArchiveSha256": "f23562f97adf1673539caef43b6893480030c279e7878ed695714317b2399dc4",
+  "platform": "Physical Intel MacBook Pro, macOS15.7.9",
+  "firstDesktopVerification": {
+    "at": "2026-11-04T20:04:08.309557+00:00",
+    "exitCode": 1,
+    "diagnostic": "resource fork, Finder information, or similar detritus not allowed",
+    "observedBundleAttributes": [
+      "com.apple.FinderInfo",
+      "com.apple.fileprovider.fpfs#P"
+    ],
+    "failurePreserved": true
+  },
+  "sameArchivePrivateCacheVerification": {
+    "at": "2026-11-04T20:06:13.423405+00:00",
+    "exitCode": 0,
+    "bundleAttributes": [],
+    "privateTargetManifest": {
+      "build": "e101465df5d204809619aafc8b65fd7925950e8a",
+      "target": "private-beta",
+      "version": 1
+    },
+    "attributeRemovalOrResigning": false,
+    "quarantineOrPlatformTrustBypassed": false
+  },
+  "desktopShortcutVerification": {
+    "at": "2026-11-04T20:07:29.382699+00:00",
+    "exitCode": 0,
+    "name": "WebJam Private Demo.app",
+    "target": "Verified private cache bundle",
+    "failedCopyPreservedAndRenamed": true
+  },
+  "physicalNativeGuiOrMusicQualified": false
+}

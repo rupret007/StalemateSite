@@ -2,15 +2,18 @@
 // Actual application codec/authority/effect writer on disk-backed SQLite. The
 // native alarm API is represented by one key in that SAME SQL transaction;
 // these tests do not qualify hosted alarms, ingress identity proofs or release.
+import { GAME_NIGHT_IDLE, GAME_NIGHT_LENGTH } from '../../hangout-worker/src/game-night-lifetime.mjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { openDurableRecordSqlite } from '../support/durable-record-sqlite.mjs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { createTransportControlBudget } from '../../hangout-worker/src/transport-budget.mjs';
 import { HangoutLobby } from '../../hangout-worker/src/lobby-do.mjs';
+import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
+import { BETA_COOKIE, signBeta } from '../../hangout-worker/src/beta-auth.mjs';
 import { accountId } from '../../hangout-worker/src/auth.mjs';
 import { createParticipationEnforcement } from '../../hangout-worker/src/participation-enforcement.mjs';
 import { writeLobbyEffects } from '../../hangout-worker/src/lobby-effect-records.mjs';
@@ -105,6 +108,40 @@ describe('explicit collocated lobby authority initialization and migration', () 
         await expect(initializeLobbySessionAuthority({ storage: f.storage, env: f.env, state: f.state, now: NOW })).rejects.toThrow();
         expect(fingerprint(f.driver)).toBe(before);
         const reopened = await f.reopen(); expect((await reopened.authority.load()).state).toEqual(f.state);
+    });
+
+    it('reopens saved Game Night records, preserves ordinary access and processes pending guest closure', async () => {
+        const f = await fixture();
+        const ordinary = f.registration('ordinary');
+        const guest = f.registration('game-night');
+        for (const request of [ordinary, guest]) expect((await f.authority.register(request)).status).toBe(200);
+        const key = 'authority-session:' + guest.sid;
+        const indexKey = 'authority-session-index:v1';
+        const exp = NOW + 16 * 60 * 60_000;
+        const idleUntil = NOW + 4 * 60 * 60_000;
+        const forward = await f.authority.records.transaction(async tx => {
+            const saved = { ...await tx.get(key), exp, idleUntil };
+            const index = await tx.get(indexKey);
+            index.entries.find(row => row.sid === guest.sid).exp = exp;
+            await tx.put(key, saved);
+            await tx.put(indexKey, index);
+            return saved;
+        });
+        const { authority } = await f.reopen();
+        expect((await authority.load()).state).toEqual(f.state);
+        expect(await authority.check(ordinary)).toMatchObject({ reason: 'active' });
+        const request = { ...guest, exp };
+        expect(await authority.check(request)).toMatchObject({ reason: 'active' });
+        expect(await authority.records.transaction(tx => tx.get(key))).toEqual(forward);
+
+        const pending = { ...forward, revoked: true, pending: true, retryAt: NOW, closureRevision: 1 };
+        await authority.records.transaction(tx => tx.put(key, pending));
+        expect(await authority.check(request)).toBeNull();
+        expect(await authority.due()).toEqual([pending]);
+        const retried = await authority.retry(guest.sid);
+        expect(retried).toMatchObject({ sid: guest.sid, closureRevision: 2 });
+        await authority.confirmClosed(retried);
+        expect(await authority.records.transaction(tx => tx.get(key))).toMatchObject({ pending: false, idleUntil });
     });
 
     it.each(['marker', 'alarm'])('rolls back actual initializer writes after %s failure and supports explicit retry', async boundary => {
@@ -335,6 +372,34 @@ describe('production retention on the actual authority codec and SQLite', () => 
         await expect(f.authority.maintainParticipation()).rejects.toThrow(); expect(fingerprint(f.driver)).toBe(before);
         expect(await f.authority.records.transaction(tx => tx.get(partitionMaintenance.PARTICIPATION_MAINTENANCE_CURSOR_KEY))).toBeUndefined();
     });
+});
+
+it('slides Game Night idle on activity without extending or resurrecting the session', async () => {
+    const f = await fixture();
+    const request = f.registration('night-guest', { gameNight: true, exp: f.now() + GAME_NIGHT_LENGTH });
+    const holdAlarm = f.now() + 5000;
+    await f.rawPut(ALARM, holdAlarm);
+    expect((await f.authority.register(request)).status).toBe(200);
+    expect(await f.rawGet(ALARM)).toBe(holdAlarm);
+    expect((await f.authority.room({ ...request, room: 'other-room' })).status).toBe(403);
+
+    f.advance(GAME_NIGHT_IDLE - 1);
+    expect(await f.authority.gameNightActivity(request)).toBe(true);
+    f.advance(GAME_NIGHT_IDLE - 1);
+    expect(await f.authority.check(request)).toMatchObject({ reason: 'active' });
+    f.advance(1);
+    expect(await f.authority.check(request)).toBeNull();
+    expect(await f.authority.gameNightActivity(request)).toBe(false);
+
+    const later = f.registration('night-later', { gameNight: true, exp: f.now() + GAME_NIGHT_LENGTH });
+    expect((await f.authority.register(later)).status).toBe(200);
+    for (let i = 0; i < 5; i++) {
+        f.advance(3 * GAME_NIGHT_IDLE / 4);
+        expect(await f.authority.gameNightActivity(later)).toBe(true);
+    }
+    f.advance(GAME_NIGHT_IDLE / 4);
+    expect(await f.authority.check(later)).toBeNull();
+    expect(await f.authority.gameNightActivity(later)).toBe(false);
 });
 
 describe('actual SQLite session issuance, binding and lobby effect fence', () => {
@@ -791,6 +856,240 @@ describe('actual HangoutLobby constructs the required participation bridge', () 
             const subject = await app.lobby.authority.resolveParticipationConnection({ ...a.binding, id: wa.attachment.id, authorityRef: wa.attachment.id });
             expect(subject?.principalRef).toBe(`s_${a.request.sid}`);
         } finally { await app.dispose(); }
+    });
+});
+
+describe('private Music through signed beta admission, production lobby and SQLite authority', () => {
+    for (const action of ['Stop', 'Leave', 'Kick', 'Block', 'late host heartbeat', 'suspended guest']) it(`fences a browser Music host and the selected guest to their signed sessions and retires both roles on ${action}`, async () => {
+        const f = await fixture({ participation: true });
+        const host = await f.enroll('browser-music-host'), guest = await f.enroll('browser-music-guest');
+        const ledger = await participationLedger(f);
+        for (const party of [host, guest]) await ledger.grant(party.binding);
+        const origin = 'https://music-fixture.example.invalid';
+        const prepare = vi.fn(async () => ({ status: 200 }));
+        const issue = vi.fn(async (claim, confirm) => await confirm()
+            ? { status: 200, credentials: { role: claim.role } } : { status: 403 });
+        const revoke = vi.fn(async () => ({ status: 200 }));
+        const touch = vi.fn(async () => ({ status: 200 }));
+        Object.assign(f.env, {
+            WEBJAM_WEB_ORIGINS: origin, HANGOUT_TURN_ENABLED: '0', HANGOUT_AI_MODERATION: 'off',
+            HANGOUT_BETA_INVITE_KEY: 'offline-music-fixture-key-for-signed-cookies',
+            HANGOUT_PREVIEW_KEY: 'offline-music-fixture-preview',
+            ASSETS: { fetch: async () => new Response('<html><head></head></html>', { headers: { 'Content-Type': 'text/html' } }) },
+            ROOMS: {}, QUOTA: { idFromName: name => name, get: () => ({ fetch: () => new Response(null) }) },
+            WEBJAM_PRIVATE_MUSIC: { prepare, issue, revoke, touch }
+        });
+        const app = await productionDo(f);
+        const owner = p9SerializedOwner(app.lobby);
+        f.env.LOBBY = { idFromName: name => name, get: () => ({ fetch: (request, init) =>
+            app.lobby.fetch(request instanceof Request ? request : new Request(request, init)) }) };
+        const cookie = async party => BETA_COOKIE + '=' + await signBeta('access', {
+            v: 1, sid: party.request.sid, version: party.request.version, exp: party.request.exp, scope: 'guest'
+        }, f.env.HANGOUT_HMAC_KEY);
+        const call = (path, session, body) => betaFetch(new Request(origin + path, {
+            ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}),
+            headers: { ...(session ? { Cookie: session, Origin: origin } : {}),
+                ...(body ? { 'Content-Type': 'application/json' } : {}), 'CF-Connecting-IP': '127.0.0.1' }
+        }), f.env);
+        try {
+            const wa = await app.connect(host, 'PhoneHost'), wb = await app.connect(guest, 'PhoneGuest');
+            const hostCookie = await cookie(host), guestCookie = await cookie(guest);
+            const lobbyPage = await call('/r/45662413410ed051/lobby/', hostCookie);
+            expect(lobbyPage.status).toBe(200);
+            expect(lobbyPage.headers.get('Content-Security-Policy')).toContain(`frame-src ${origin}/join/host/ ${origin}/join/guest/ `);
+            expect(lobbyPage.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'none'");
+            expect(lobbyPage.headers.get('Permissions-Policy')).toBe('microphone=(self)');
+            await app.message(wa, { t: 'cmd', name: 'join', args: ['#jam-phone-music'], ch: '#stalemate' });
+            const room = wa.frames.find(frame => frame.t === 'join' && frame.ch.name === '#jam-phone-music').ch;
+            const request = randomBytes(16).toString('hex'), proof = randomBytes(32).toString('hex');
+            const webjam = '776a6d7573696301' + Math.floor(f.now() / 1000).toString(16) + randomBytes(20).toString('hex');
+            const common = { version: 1, request, ch: room.name, roomInstance: room.keepRef };
+            const generation = 1, requestHost = { id: webjam.slice(-32), webjam, generation, proof };
+            expect((await call('/join/host/', hostCookie)).status).toBe(403);
+            await app.message(wa, { t: 'music-host-bind', ...common, peer: wb.attachment.id, webjam, generation,
+                hostMode: 'browser', proofHash: createHash('sha256').update(proof).digest('hex') });
+            const bound = wa.frames.find(frame => frame.t === 'music-host-bound' && frame.request === request);
+            expect(bound).toMatchObject({ status: 'bound' });
+            expect(bound.expires).toBeGreaterThan(f.now());
+            const hostPage = await call('/join/host/', hostCookie);
+            expect(hostPage.status).toBe(200);
+            expect(hostPage.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'self'");
+            expect((await call('/join/host/', guestCookie)).status).toBe(403);
+            expect((await call('/join/guest/', guestCookie)).status).toBe(403);
+            expect((await call('/join/', hostCookie)).status).toBe(403);
+            expect((await call('/beta/music/native', null, { op: 'native-join', ...requestHost })).status).toBe(403);
+            expect((await call('/beta/music', guestCookie, { op: 'host-join', ...requestHost })).status).toBe(403);
+            expect((await call('/beta/music', hostCookie, { op: 'host-join', ...requestHost, generation: 2 })).status).toBe(403);
+            expect(prepare).not.toHaveBeenCalled();
+            const hostJoin = await call('/beta/music', hostCookie, { op: 'host-join', ...requestHost });
+            expect(hostJoin.status).toBe(200);
+            expect(await hostJoin.json()).toEqual({ role: 'host' });
+            expect((await call('/beta/music', hostCookie, { op: 'host-join', ...requestHost })).status).toBe(403);
+            const href = `${origin}/join/#k=${'B'.repeat(43)}&s=${webjam}&g=${generation}&e=${Math.floor(f.now() / 1000) + 60}`;
+            await app.message(wa, { t: 'music-offer-create', ...common, peer: wb.attachment.id, href });
+            const offer = wb.frames.find(frame => frame.t === 'music-offer');
+            expect(offer).toBeDefined();
+            await app.message(wb, { t: 'music-offer-seen', ...common, id: offer.id });
+            const joinProof = randomBytes(32).toString('hex');
+            await app.message(wb, { t: 'music-offer-accept', ...common, id: offer.id, joinProof });
+            await vi.waitFor(() => expect(wb.frames.some(frame => frame.t === 'music-offer-accepted')).toBe(true));
+            const guestPage = await call('/join/guest/', guestCookie);
+            expect(guestPage.status).toBe(200);
+            expect(guestPage.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'self'");
+            expect((await call('/join/guest/', hostCookie)).status).toBe(403);
+            const join = { op: 'join', id: offer.id, proof: joinProof };
+            expect((await call('/beta/music', hostCookie, join)).status).toBe(403);
+            const guestJoin = await call('/beta/music', guestCookie, join);
+            expect(guestJoin.status).toBe(200);
+            expect(await guestJoin.json()).toEqual({ href, credentials: { role: 'guest' } });
+            expect(issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+            const hostCheck = () => call('/beta/music', hostCookie, { op: 'host-check', ...requestHost });
+            const guestCheck = () => call('/beta/music', guestCookie, { ...join, op: 'check' });
+            if (action === 'late host heartbeat' || action === 'suspended guest') {
+                // Keep the original sockets and skip maintenance so an access
+                // request itself must observe a missed role deadline.
+                if (action === 'suspended guest') {
+                    for (let i = 0; i < 3; i += 1) {
+                        f.advance(4_000);
+                        expect((await hostCheck()).status).toBe(200);
+                    }
+                    expect(touch.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+                    f.advance(3_001);
+                } else f.advance(15_001);
+                expect((await hostCheck()).status).toBe(403);
+                expect((await guestCheck()).status).toBe(403);
+                expect(touch.mock.calls.map(([claim]) => claim.role)).toEqual(action === 'suspended guest' ? ['host'] : []);
+            } else if (action === 'Stop') {
+                expect((await call('/beta/music', hostCookie, { op: 'host-stop', ...requestHost })).status).toBe(200);
+            } else if (action === 'Leave') {
+                await app.message(wb, { t: 'cmd', name: 'part', args: [room.name], ch: room.name });
+            } else {
+                const actor = action === 'Kick' ? wa : wb, peer = actor === wa ? wb : wa;
+                await app.message(actor, { t: 'cmd', name: action.toLowerCase(), args: [actor === wa ? 'PhoneGuest' : 'PhoneHost'],
+                    ch: room.name, personContext: 1, personPeer: peer.attachment.id, roomInstance: room.keepRef });
+            }
+            if (action !== 'Stop') expect(wb.frames.some(frame => frame.t === 'music-offer-ended' && frame.id === offer.id)).toBe(true);
+            expect((await call('/join/host/', hostCookie)).status).toBe(403);
+            expect((await call('/beta/music', guestCookie, join)).status).toBe(403);
+            await vi.waitFor(() => expect(revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(['guest', 'host']));
+        } finally {
+            owner.restore();
+            await app.dispose();
+        }
+    });
+
+    it.each(['logout', 'Stop'])('rejects an admitted guest after real %s wins before issuer start', async action => {
+        const f = await fixture({ participation: true });
+        const host = await f.enroll('music-host'), guest = await f.enroll('music-guest'), outsider = await f.enroll('music-outsider');
+        const ledger = await participationLedger(f);
+        for (const party of [host, guest, outsider]) await ledger.grant(party.binding);
+        const origin = 'https://private-music.example.invalid', requests = [];
+        const nativeRate = vi.fn(async () => new Response(null, { status: 200 }));
+        let release, notify;
+        const pending = new Promise(resolve => { notify = resolve; });
+        const hold = new Promise(resolve => { release = resolve; });
+        Object.assign(f.env, {
+            WEBJAM_WEB_ORIGINS: origin, HANGOUT_TURN_ENABLED: '0', HANGOUT_AI_MODERATION: 'off',
+            HANGOUT_BETA_INVITE_KEY: 'offline-music-fixture-key-for-signed-cookies',
+            HANGOUT_PREVIEW_KEY: 'offline-music-fixture-preview',
+            ASSETS: { fetch: async request => request.headers.has('If-None-Match') || request.headers.has('If-Modified-Since')
+                ? new Response(null, { status: 304 }) : new Response('<html><head></head></html>', {
+                    headers: { 'Content-Type': 'text/html', ETag: '"fixture"' }
+                }) },
+            ROOMS: {}, QUOTA: { idFromName: name => name, get: () => ({ fetch: nativeRate }) },
+            WEBJAM_PRIVATE_MUSIC: {
+                prepare: async claim => { if (claim.role === 'guest') { notify(); await hold; } return { status: 200 }; },
+                issue: async (claim, confirm) => {
+                    if (!await confirm()) return { status: 403 };
+                    requests.push(claim.role);
+                    return { status: 200, credentials: { fixture: true } };
+                },
+                touch: vi.fn(async () => ({ status: 200 })),
+                revoke: vi.fn(async () => ({ status: 200 }))
+            }
+        });
+        const app = await productionDo(f), owner = p9SerializedOwner(app.lobby);
+        f.env.LOBBY = { idFromName: name => name, get: () => ({ fetch: (request, init) =>
+            app.lobby.fetch(request instanceof Request ? request : new Request(request, init)) }) };
+        const cookie = async party => BETA_COOKIE + '=' + await signBeta('access', {
+            v: 1, sid: party.request.sid, version: party.request.version, exp: party.request.exp, scope: 'guest'
+        }, f.env.HANGOUT_HMAC_KEY);
+        const call = (path, { cookie: session, body, native = false, extra = {} } = {}) => betaFetch(new Request(origin + path, {
+            ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}),
+            headers: { ...(session ? { Cookie: session } : {}), ...(!native ? { Origin: origin } : {}),
+                ...(body ? { 'Content-Type': 'application/json' } : {}), 'CF-Connecting-IP': '192.0.2.18', ...extra }
+        }), f.env);
+        let joining;
+        try {
+            const wa = await app.connect(host, 'NativeHost'), wb = await app.connect(guest, 'NativeGuest');
+            const guestCookie = await cookie(guest), outsideCookie = await cookie(outsider);
+            expect(wa.frames.some(frame => frame.t === 'hello' && frame.features.privateMusicProvider === 1)).toBe(true);
+            await app.message(wa, { t: 'cmd', name: 'join', args: ['#jam-protected'], ch: '#stalemate' });
+            const room = wa.frames.find(frame => frame.t === 'join' && frame.ch.name === '#jam-protected').ch;
+            const id = randomBytes(16).toString('hex'), proof = randomBytes(32).toString('hex');
+            const webjam = '776a6d7573696301' + Math.floor(f.now() / 1000).toString(16) + randomBytes(20).toString('hex');
+            const common = { version: 1, request: id, ch: room.name, roomInstance: room.keepRef };
+            const generation = 2, expires = Math.floor(f.now() / 1000) + 60;
+            const native = (op) => call('/beta/music/native', { native: true, body: { op, id: webjam.slice(-32), webjam, generation, proof } });
+            await app.message(wa, { t: 'music-host-bind', ...common, peer: wb.attachment.id, webjam,
+                generation, proofHash: createHash('sha256').update(proof).digest('hex') });
+            expect(wa.frames.some(frame => frame.t === 'music-host-bound' && frame.status === 'bound')).toBe(true);
+            expect((await call('/beta/music/native', { native: true, body: { op: 'native-join' } })).status).toBe(403);
+            expect(nativeRate).not.toHaveBeenCalled();
+            nativeRate.mockResolvedValueOnce(new Response(null, { status: 429 }));
+            expect((await native('native-join')).status).toBe(429);
+            expect(requests).toEqual([]);
+            expect((await native('native-join')).status).toBe(200);
+            const href = `${origin}/join/#k=${'B'.repeat(43)}&s=${webjam}&g=${generation}&e=${expires}`;
+            await app.message(wa, { t: 'music-offer-create', ...common, peer: wb.attachment.id, href });
+            const offer = wb.frames.find(frame => frame.t === 'music-offer');
+            expect(!!offer).toBe(true);
+            await app.message(wb, { t: 'music-offer-seen', ...common, id: offer.id });
+            const joinProof = randomBytes(32).toString('hex');
+            await app.message(wb, { t: 'music-offer-accept', ...common, id: offer.id, joinProof });
+            await vi.waitFor(() => expect(wb.frames.some(frame => frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
+            expect((await call('/join/')).status).toBe(401);
+            expect((await call('/join/', { cookie: outsideCookie })).status).toBe(403);
+            const page = await call('/join/', { cookie: guestCookie, extra: { 'If-None-Match': '"fixture"' } });
+            expect(page.status).toBe(200);
+            expect(page.headers.get('Cache-Control')).toBe('private, no-store');
+            expect(page.headers.has('ETag')).toBe(false);
+            const originalAssets = f.env.ASSETS;
+            f.env.ASSETS = { fetch: async () => new Response('<html><head data-fixture></head></html>', {
+                headers: { 'Content-Type': 'text/html' }
+            }) };
+            expect((await call('/join/', { cookie: guestCookie })).status).toBe(503);
+            f.env.ASSETS = originalAssets;
+            expect((await call('/turn', { cookie: guestCookie })).status).toBe(503);
+            const body = { op: 'join', id: offer.id, proof: joinProof };
+            const forged = { 'X-Hangout-Music-Session': JSON.stringify({
+                sid: guest.request.sid, version: guest.request.version, exp: guest.request.exp
+            }) };
+            expect((await call('/__private-music', { cookie: outsideCookie, body, extra: forged })).status).toBe(404);
+            expect((await call('/beta/music', { cookie: outsideCookie, body, extra: forged })).status).toBe(403);
+            joining = call('/beta/music', { cookie: guestCookie, body });
+            await pending;
+            if (action === 'logout') {
+                expect((await call('/beta/logout', { cookie: guestCookie, body: {} })).status).toBe(200);
+                expect((await call('/join/', { cookie: guestCookie })).status).toBe(401);
+            } else {
+                const sharing = await (await call('/beta/participation', { cookie: guestCookie })).json();
+                const stop = await call('/beta/participation/stop', { cookie: guestCookie, body: { expectedRevision: sharing.revision } });
+                expect(stop.status).toBe(200);
+                expect((await stop.json()).state).toBe('withdrawn');
+                expect((await call('/join/', { cookie: guestCookie })).status).toBe(403);
+            }
+            release();
+            expect((await joining).status).toBe(403);
+            expect(requests).toEqual(['host']);
+            await vi.waitFor(() => expect(f.env.WEBJAM_PRIVATE_MUSIC.revoke.mock.calls.map(([claim]) => claim.role).sort())
+                .toEqual(['guest', 'host']));
+        } finally {
+            release();
+            await joining?.catch(() => {});
+            owner.restore();
+            await app.dispose();
+        }
     });
 });
 
@@ -1558,4 +1857,162 @@ describe('offline validation-to-start time boundary', () => {
             expect(h.app.lobby.evidenceStorage).toBe('ready'); p9NoGateThrow(h);
         } finally { await h.dispose(); }
     });
+});
+
+describe('recovery batch read reuse remains scoped to native transactions', () => {
+    it('rechecks the live clock after a previous recovery and never reuses its affirmative bindings', async () => {
+        const f = await fixture(), person = await f.enroll('load-cache-clock');
+        const before = fingerprint(f.driver);
+        expect((await f.authority.load()).bindings.find(row => row.binding.id === person.binding.id).active).toBe(true);
+        f.advance(100001);
+        expect((await f.authority.load()).bindings.find(row => row.binding.id === person.binding.id).active).toBe(false);
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('rechecks current staff roles after a previous recovery without changing stored state', async () => {
+        const f = await fixture(), account = await accountId('reviewer@example.invalid', f.env.HANGOUT_HMAC_KEY);
+        const person = await f.enroll('load-cache-role', { kind: 'staff', account, role: 'moderator', admin: true, expiresAt: NOW + 50000 });
+        const before = fingerprint(f.driver);
+        expect((await f.authority.load()).bindings.find(row => row.binding.id === person.binding.id).active).toBe(true);
+        f.env.HANGOUT_MODERATOR_EMAILS = '';
+        expect((await f.authority.load()).bindings.find(row => row.binding.id === person.binding.id).active).toBe(false);
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('rejects newly corrupt physical binding bytes after a successful recovery without repair', async () => {
+        const f = await fixture(), person = await f.enroll('load-cache-corrupt');
+        expect((await f.authority.load()).bindings[0].active).toBe(true);
+        const hex = Buffer.from('authority-connection:' + person.binding.id).toString('hex');
+        const physical = [...f.driver.rows().keys()].find(key => key.includes(':part:' + hex + ':'));
+        expect(physical).toBeDefined(); await f.rawPut(physical, new Uint8Array([255]));
+        const before = fingerprint(f.driver);
+        await expect(f.authority.load()).rejects.toThrow();
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+});
+
+// Observe real physical reads grouped by actual SQLite transaction, without
+// replacing the codec, cached rows, authority clock or validation functions.
+async function recoverySharedSessionFixture() {
+    const f = await fixture(), first = await f.enroll('reuse-00'), bindings = [first.binding];
+    for (let n = 1; n < 17; n++) {
+        const id = `reuse-${String(n).padStart(2, '0')}`;
+        const binding = { ...first.binding, id, authorityRef: id, dev: `device_${id}` };
+        expect(await f.authority.bind(binding)).toEqual(binding); bindings.push(binding);
+    }
+    const physical = key => ':manifest:' + Buffer.from(key).toString('hex');
+    const keys = { session: physical('authority-session:' + first.request.sid), index: physical(SESSION_INDEX),
+        connections: physical(CONNECTION_INDEX), bindings: new Set(bindings.map(b => physical('authority-connection:' + b.id))) };
+    const transactions = new Map();
+    const observe = event => {
+        if (event.name !== 'get') return;
+        const tx = f.driver.stats.transactions;
+        if (!transactions.has(tx)) transactions.set(tx, []);
+        transactions.get(tx).push(event.key);
+    };
+    const batchRows = () => [...transactions.values()].filter(reads =>
+        reads.some(key => key.endsWith(keys.connections)) && reads.some(key => [...keys.bindings].some(suffix => key.endsWith(suffix))));
+    return { f, bindings, keys, transactions, observe, batchRows };
+}
+
+describe('recovery shares raw reads but never authority across the sixteen-binding boundary', () => {
+    it('reads shared session and index exactly once per native batch and again in the seventeenth binding batch', async () => {
+        const { f, keys, observe, batchRows } = await recoverySharedSessionFixture();
+        const before = fingerprint(f.driver); f.hooks.before = observe;
+        const loaded = await f.authority.load(); delete f.hooks.before;
+        expect(loaded.bindings).toHaveLength(17); expect(loaded.bindings.every(row => row.active)).toBe(true);
+        const batches = batchRows(); expect(batches).toHaveLength(2);
+        expect(batches.map(reads => reads.filter(key => [...keys.bindings].some(suffix => key.endsWith(suffix))).length)).toEqual([16, 1]);
+        for (const reads of batches) {
+            expect(reads.filter(key => key.endsWith(keys.session))).toHaveLength(1);
+            expect(reads.filter(key => key.endsWith(keys.index))).toHaveLength(1);
+            expect(reads.filter(key => key.endsWith(keys.connections))).toHaveLength(1);
+        }
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('advancing the clock within the cached batch denies subsequent bindings sharing the same session', async () => {
+        const { f, keys, observe, transactions } = await recoverySharedSessionFixture();
+        const second = ':manifest:' + Buffer.from('authority-connection:reuse-01').toString('hex');
+        let advanced = false; const before = fingerprint(f.driver);
+        f.hooks.before = event => {
+            observe(event);
+            const reads = transactions.get(f.driver.stats.transactions) || [];
+            if (!advanced && event.name === 'get' && event.key.endsWith(second) && reads.some(key => key.endsWith(keys.connections))) {
+                f.advance(100001); advanced = true;
+            }
+        };
+        const loaded = await f.authority.load(); delete f.hooks.before;
+        expect(advanced).toBe(true);
+        expect(loaded.bindings.map(row => row.active)).toEqual([true, ...Array(16).fill(false)]);
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('does not hide a shared-session native read refusal in the next batch behind the first batch cache', async () => {
+        const { f, keys, observe, transactions } = await recoverySharedSessionFixture();
+        let validatedSessionReads = 0; const before = fingerprint(f.driver);
+        f.hooks.before = event => {
+            observe(event);
+            const reads = transactions.get(f.driver.stats.transactions) || [];
+            if (event.name === 'get' && event.key.endsWith(keys.session) && reads.some(key => key.endsWith(keys.connections))) {
+                validatedSessionReads++;
+                if (validatedSessionReads === 2) throw Error('Synthetic second-batch shared-session read refusal');
+            }
+        };
+        await expect(f.authority.load()).rejects.toThrow('Synthetic second-batch shared-session read refusal');
+        delete f.hooks.before;
+        expect(validatedSessionReads).toBe(2); expect(fingerprint(f.driver)).toBe(before);
+    });
+});
+
+describe('single participation resolver read reuse retains external transaction fences', () => {
+    it('reuses the shared session within one operation but keeps fresh marker fences', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('single-reuse');
+        f.driver.resetOperations(); const before = fingerprint(f.driver);
+        expect((await f.authority.resolveParticipationConnection(person.binding)).principalRef).toBe('s_' + person.request.sid);
+        const reads = key => f.driver.stats.operations.filter(event => event.name === 'get' && event.key.endsWith(':manifest:' + Buffer.from(key).toString('hex'))).length;
+        expect(reads('authority-session:' + person.request.sid)).toBe(1);
+        // initialized and configuredMarker on raw tx remain distinct from the
+        // internal cached validation and final fresh configuredMarker fence.
+        expect(reads(LOBBY_AUTHORITY_MARKER)).toBeGreaterThanOrEqual(4);
+        expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('propagates a refusal at the final fresh marker fence after cached validation', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('single-fence');
+        const suffix = ':manifest:' + Buffer.from(LOBBY_AUTHORITY_MARKER).toString('hex');
+        let reads = 0; f.hooks.before = event => { if (event.name === 'get' && event.key.endsWith(suffix)) reads++; };
+        expect(await f.authority.resolveParticipationConnection(person.binding)).not.toBeNull();
+        const last = reads; expect(last).toBeGreaterThanOrEqual(4); reads = 0;
+        const before = fingerprint(f.driver);
+        f.hooks.before = event => {
+            if (event.name === 'get' && event.key.endsWith(suffix) && ++reads === last) throw Error('Synthetic final marker fence refusal');
+        };
+        await expect(f.authority.resolveParticipationConnection(person.binding)).rejects.toThrow('Synthetic final marker fence refusal');
+        delete f.hooks.before; expect(reads).toBe(last); expect(fingerprint(f.driver)).toBe(before);
+    });
+    it('denies expiry crossing inside a single cached operation', async () => {
+        const f = await fixture({ participation: true }), person = await f.enroll('single-clock');
+        const suffix = ':manifest:' + Buffer.from('authority-session:' + person.request.sid).toString('hex');
+        let advanced = false; const before = fingerprint(f.driver);
+        f.hooks.before = event => { if (!advanced && event.name === 'get' && event.key.endsWith(suffix)) { f.advance(100001); advanced = true; } };
+        expect(await f.authority.resolveParticipationConnection(person.binding)).toBeNull();
+        delete f.hooks.before; expect(advanced).toBe(true); expect(fingerprint(f.driver)).toBe(before);
+    });
+});
+
+it('rechecks expiry between single binding validation and identity validation on a cached session hit', async () => {
+    const f = await fixture({ participation: true }), person = await f.enroll('single-between');
+    let clockCalls = 0, expireAfter = Infinity;
+    const authority = createLobbySessionAuthority({ storage: f.storage, env: f.env,
+        now: () => ++clockCalls <= expireAfter ? NOW : NOW + 100001, writeEffects: writeLobbyEffects });
+    expect(await authority.resolveParticipationConnection(person.binding)).not.toBeNull();
+    // Calibrate the live clock calls consumed by the real binding validator.
+    // The resolver must then execute the separate identity validator against
+    // the already-cached session, but with the newly expired live clock.
+    clockCalls = 0; expect(await authority.validate(person.binding)).toBe(true);
+    expireAfter = clockCalls; expect(expireAfter).toBeGreaterThan(0); clockCalls = 0;
+    f.driver.resetOperations(); const before = fingerprint(f.driver);
+    expect(await authority.resolveParticipationConnection(person.binding)).toBeNull();
+    expect(clockCalls).toBeGreaterThan(expireAfter);
+    const reads = key => f.driver.stats.operations.filter(event => event.name === 'get'
+        && event.key.endsWith(':manifest:' + Buffer.from(key).toString('hex'))).length;
+    expect(reads('authority-session:' + person.request.sid)).toBe(1);
+    expect(reads(LOBBY_AUTHORITY_MARKER)).toBeGreaterThanOrEqual(4);
+    expect(fingerprint(f.driver)).toBe(before);
 });

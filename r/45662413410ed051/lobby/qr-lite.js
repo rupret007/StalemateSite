@@ -2296,24 +2296,47 @@ var qrcode = function() {
     return qrcode;
 }));
 
+/*
+MIT License
+Copyright (c) 2009 Kazuhiko Arase
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 window.HangoutQrLite = {
     draw(canvas, text) {
         const qr = qrcode(0, 'M');
         qr.addData(text);
         qr.make();
         const modules = qr.getModuleCount();
-        const size = canvas.width || 200;
+        const margin = 4; // DENSO WAVE requires a four-module quiet zone.
+        const scale = 4; // Integer pixels keep module boundaries sharp.
+        const size = (modules + margin * 2) * scale;
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
-        const scale = size / modules;
         ctx.fillStyle = '#f4f0e6';
         ctx.fillRect(0, 0, size, size);
         ctx.fillStyle = '#101414';
         for (let row = 0; row < modules; row += 1) {
             for (let col = 0; col < modules; col += 1) {
-                if (qr.isDark(row, col)) ctx.fillRect(col * scale, row * scale, scale, scale);
+                if (qr.isDark(row, col)) ctx.fillRect((col + margin) * scale, (row + margin) * scale, scale, scale);
             }
         }
-        canvas.dataset.inviteUrl = text;
+        // The capability is encoded only in the image, never a DOM attribute.
+        canvas.removeAttribute('data-invite-url');
     }
 };

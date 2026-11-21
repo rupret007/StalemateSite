@@ -2,7 +2,43 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { ENTRY_SITES, createEntrySiteRegistry, entrySitesFromConfig, normalizeEntrySource, entrySourceFromParams,
-    entryBadge, entryReturn, entryHandoff, readEntryHandoff } from '../../r/45662413410ed051/entry-sites.mjs';
+    entryBadge, entryReturn, entryHandoff, readEntryHandoff, gameNightEntry, gameNightFragment } from '../../r/45662413410ed051/entry-sites.mjs';
+
+it('carries an exact Game Night room locator only from the explicit entrance', () => {
+    const params = new URLSearchParams('game-night=1&via=rad-dad');
+    const target = { room: '#game-abc123x456def', ref: 'a'.repeat(32) };
+    const hash = gameNightFragment(target);
+    expect(hash).toBe('#game=game-abc123x456def&instance=' + target.ref);
+    expect(gameNightEntry(params, hash)).toEqual({ target });
+    expect(gameNightEntry(new URLSearchParams('via=rad-dad'), hash)).toBeNull();
+    expect(gameNightEntry(new URLSearchParams('game-night=1&game-night=1'), hash)).toBeNull();
+    for (const malformed of ['', hash + '&game=game-abc123x456def', hash + '&invite=private', hash.slice(0, -1), hash.replace('game-abc', 'art-abc')]) {
+        expect(gameNightEntry(params, malformed)).toEqual({ target: null });
+    }
+    expect(gameNightFragment({ ...target, ref: 'unsafe&stuff' })).toBe('');
+    const chess = new URLSearchParams('game-night=1&via=stalemate&table=chess');
+    expect(gameNightEntry(chess)).toEqual({ target: null, table: 'chess' });
+    expect(gameNightEntry(chess, hash)).toEqual({ target });
+    for (const brand of ['stalemate', 'rad-dad']) {
+        expect(gameNightEntry(new URLSearchParams({ 'game-night': '1', via: brand, table: 'four', deliver: 'share' })))
+            .toEqual({ target: null });
+    }
+    chess.append('table', 'turdanoid');
+    expect(gameNightEntry(chess)).toEqual({ target: null });
+});
+
+it('accepts a single private WebJam Chess host digest in the fragment only', () => {
+    const digest = 'a'.repeat(64);
+    const host = 'game-night=1&table=chess';
+    const fragment = '#grants=' + digest;
+    expect(gameNightEntry(new URLSearchParams(host), fragment)).toEqual({ target: null, table: 'chess', webJamGrant: digest });
+    for (const query of [host + '&deliver=share', host + '&table=chess', host.replace('chess', 'turdtris')]) {
+        expect(gameNightEntry(new URLSearchParams(query), fragment)).not.toHaveProperty('webJamGrant');
+    }
+    for (const hash of ['', fragment + '&grants=' + digest, fragment + '&room=x', fragment + 'a']) {
+        expect(gameNightEntry(new URLSearchParams(host + '&grants=' + digest), hash)).not.toHaveProperty('webJamGrant');
+    }
+});
 
 describe('reviewed entry-site display configuration', () => {
     it('uses allowlisted names and fixed return links; unknown and duplicate sources stay neutral', () => {

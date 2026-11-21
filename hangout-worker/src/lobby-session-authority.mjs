@@ -1,8 +1,10 @@
 // Opt-in private-beta authority. One native transaction contains issued session
 // metadata, connection bindings and the actual Lobby effects. This is not C2
 // policy/guardian qualification. Deployment/drain remains the release owner's job.
+import { createHash } from 'node:crypto';
 import { accountId, roleForEmail } from './auth.mjs';
 import { validRoomId } from './core.mjs';
+import { GAME_NIGHT_IDLE, GAME_NIGHT_LENGTH, nextGameNightIdle, nightIdleExpired, validNightSession } from './game-night-lifetime.mjs';
 import { BETA_TTL, betaVersion } from './beta-session-client.mjs';
 import { validBetaRecord } from './beta-session-state.mjs';
 import { createDurableRecordStorage } from './durable-record-storage.mjs';
@@ -11,6 +13,7 @@ import { initializeLobbyEffects, readLobbyState, writeLobbyEffects, pruneLobbyEf
 import { lobbyIncidentSourceMode } from './lobby-incident-sources.mjs';
 import { validPrivateReportState } from './private-reports.mjs';
 import { createLobby } from './lobby-core.mjs';
+import { storedReceipts } from './message-receipts.mjs';
 import { accessPartitionedParticipationSelf, maintainPartitionedParticipation, PARTICIPATION_PARTITION_BOUNDS, PARTICIPATION_POLICY_KEY } from './participation-partitions.mjs';
 
 export const LOBBY_AUTHORITY_MODE = 'lobby-v1';
@@ -22,6 +25,7 @@ const SESSION = 'authority-session:', CONNECTION = 'authority-connection:', RATE
 const SID = /^[a-z0-9-]{16,64}$/, REF = /^[A-Za-z0-9_-]{1,128}$/, ACCOUNT = /^a_[A-Za-z0-9_-]{43}$/;
 const LIMIT = 1000, CONNECTION_LIMIT = 200, ROOM_LIMIT = 16, BATCH = 16, INTERVAL = 60000;
 const clone = value => structuredClone(value);
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const fail = () => { throw Error('lobby-authority-unavailable'); };
 const ensure = value => { if (!value) fail(); };
 const exact = (value, keys) => value && Object.getPrototypeOf(value) === Object.prototype
@@ -34,9 +38,10 @@ export const lobbyAuthorityMode = env => env?.HANGOUT_SESSION_AUTHORITY === LOBB
 const profileValid = value => value === null || exact(value, ['kind', 'account', 'role', 'admin', 'expiresAt'])
     && ['owner', 'staff'].includes(value.kind) && ACCOUNT.test(value.account) && integer(value.expiresAt)
     && (value.kind === 'owner' ? value.role === 'fan' && value.admin === false : ['owner', 'band', 'moderator'].includes(value.role) && value.admin === true);
-const recordValid = value => exact(value, ['v', 'sid', 'version', 'generation', 'createdAt', 'exp', 'revoked', 'pending', 'attempt', 'retryAt', 'rooms', 'profile', 'closureRevision'])
+const recordValid = value => exact(value, ['v', 'sid', 'version', 'generation', 'createdAt', 'exp', 'revoked', 'pending', 'attempt', 'retryAt', 'rooms', 'profile', 'closureRevision',
+    ...(value?.idleUntil === undefined ? [] : ['idleUntil'])])
     && value.v === 2 && SID.test(value.sid) && version(value.version) && integer(value.createdAt) && integer(value.exp)
-    && value.exp > value.createdAt && value.exp <= value.createdAt + BETA_TTL && typeof value.revoked === 'boolean' && typeof value.pending === 'boolean'
+    && value.exp > value.createdAt && (value.idleUntil === undefined ? value.exp <= value.createdAt + BETA_TTL : validNightSession(value)) && typeof value.revoked === 'boolean' && typeof value.pending === 'boolean'
     && (!value.pending || value.revoked) && integer(value.attempt) && value.attempt <= 20 && integer(value.retryAt) && value.retryAt <= value.exp
     && Array.isArray(value.rooms) && value.rooms.length <= ROOM_LIMIT && value.rooms.every(validRoomId) && new Set(value.rooms).size === value.rooms.length
     && Number.isSafeInteger(value.generation) && value.generation > 0 && integer(value.closureRevision) && profileValid(value.profile)
@@ -63,7 +68,7 @@ export function createLobbyAuthorityStorage(storage) {
             return result;
         };
         const raw = Object.fromEntries(['get', 'put', 'delete', 'list', 'getAlarm', 'setAlarm', 'deleteAlarm'].map(name => [name, (...args) => counted(name, ...args)]));
-        const records = createDurableRecordStorage({ storage: { transaction: work => work(raw) }, namespace: 'lobby-authority-v1', maxRecordBytes: 8 * 1024 * 1024 });
+        const records = createDurableRecordStorage({ storage: { transaction: work => work(raw) }, namespace: 'lobby-authority-v1', maxRecordBytes: 8 * 1024 * 1024, sha256 });
         return records.transaction(tx => operation(tx, raw));
     }) });
 }
@@ -99,7 +104,10 @@ async function rates(tx) {
         && Object.entries(value).every(([key, rate]) => /^[A-Za-z0-9_-]{22}$/.test(key) && exact(rate, ['until', 'count'])
             && integer(rate.until) && Number.isSafeInteger(rate.count) && rate.count >= 1 && rate.count <= 20)); return value;
 }
-async function initialized(tx) { await marker(tx); await index(tx); await connections(tx); await rates(tx); }
+async function initialized(tx) {
+    await marker(tx);
+    return { sessions: await index(tx), connectionIndex: await connections(tx), budgets: await rates(tx) };
+}
 
 // Explicitly invoked only for a known-new, owner-drained application domain.
 // Missing state in ordinary startup NEVER invokes either initializer.
@@ -139,7 +147,12 @@ export async function migrateLobbySessionAuthority({ storage, env, registrySnaps
         // as empty. Preserve that legacy contract ONLY during owner migration;
         // a present malformed row and any missing new-format row still refuse.
         const optional = async (key, fallback) => { const value = await raw.get(key); return value === undefined ? fallback : value; };
-        const abuse = await optional('abuse', fresh.abuseSnapshot()), sessions = await optional('sessions', fresh.sessionSnapshot());
+        const abuse = await optional('abuse', fresh.abuseSnapshot());
+        let sessions = await optional('sessions', fresh.sessionSnapshot());
+        if (sessions && Object.hasOwn(sessions, 'receiptArchive')) {
+            const { receiptArchive, ...metadata } = sessions;
+            sessions = { ...metadata, receipts: storedReceipts(sessions) };
+        }
         const moderationQueue = await optional('moderation-queue', { reports: [], held: [] }), aiReviews = await optional('ai-reviews', []);
         const roomIndex = await raw.get('room-index'), legacyRooms = await raw.get('rooms'); let rooms;
         if (roomIndex !== undefined) {
@@ -181,7 +194,7 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         }
         return roleMap;
     }
-    const active = record => !!record && record.exp > now() && record.version === betaVersion(env) && !record.revoked;
+    const active = (record, at = now()) => !!record && record.exp > at && record.version === betaVersion(env) && !record.revoked && !nightIdleExpired(record, at);
     async function configuredMarker(tx) {
         const current = await marker(tx), mode = env.HANGOUT_PARTICIPATION_AUTHORITY;
         ensure(mode === undefined || mode === 'c3-v1');
@@ -191,13 +204,13 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         if (mode === undefined) ensure(await tx.get(PARTICIPATION_POLICY_KEY) === undefined);
         return current;
     }
-    async function validateBinding(tx, candidate) {
+    async function validateBinding(tx, candidate, known = {}) {
         if (!bindingValid(candidate) || candidate.expiresAt <= now()) return false;
         const modeMarker = await configuredMarker(tx);
-        const ids = await connections(tx), saved = await tx.get(CONNECTION + candidate.id); ensure(saved === undefined || bindingValid(saved));
+        const ids = known.connectionIndex || await connections(tx), saved = await tx.get(CONNECTION + candidate.id); ensure(saved === undefined || bindingValid(saved));
         ensure(ids.ids.includes(candidate.id) ? saved !== undefined : saved === undefined);
         if (!saved || bindingKeys.some(key => saved[key] !== candidate[key])) return false;
-        const record = await session(tx, saved.betaSid);
+        const record = await session(tx, saved.betaSid, known.sessions);
         if (!active(record) || record.generation !== modeMarker.generation || saved.betaInviteVersion !== record.version || saved.expiresAt > record.exp) return false;
         if (!saved.account) return saved.role === 'fan' && saved.admin === false;
         const profile = record.profile;
@@ -217,32 +230,49 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         return { principalRef: profile?.account || `s_${sid}`, communityRef: LOBBY_AUTHORITY_COMMUNITY,
             expiresAt: Math.min(expiresAt, profile?.expiresAt ?? expiresAt) };
     }
-    async function prune(tx, at) {
-        const rows = await index(tx); let removed = 0;
-        for (const item of [...rows.entries]) if (item.exp <= at && removed < BATCH) {
-            const old = await session(tx, item.sid, rows); ensure(old && old.exp === item.exp);
-            await tx.delete(SESSION + item.sid); rows.entries = rows.entries.filter(row => row.sid !== item.sid); removed++;
+    async function prune(tx, at, { sessions, budgets }) {
+        let removed = 0;
+        for (const item of sessions.entries) if (item.exp <= at && removed < BATCH) {
+            const old = await session(tx, item.sid, sessions); ensure(old && old.exp === item.exp);
+            await tx.delete(SESSION + item.sid); sessions.entries = sessions.entries.filter(row => row.sid !== item.sid); removed++;
         }
-        if (removed) await tx.put(SESSION_INDEX, rows);
-        const oldRates = await rates(tx), kept = Object.fromEntries(Object.entries(oldRates).filter(([, rate]) => rate.until > at));
-        if (Object.keys(kept).length !== Object.keys(oldRates).length) await tx.put(RATES, kept);
-        return rows;
+        if (removed) await tx.put(SESSION_INDEX, sessions);
+        let ratesChanged = false;
+        for (const key of Object.keys(budgets)) if (budgets[key].until <= at) {
+            delete budgets[key];
+            ratesChanged = true;
+        }
+        if (ratesChanged) await tx.put(RATES, budgets);
     }
-    async function schedule(tx, raw, at) {
-        const rows = await index(tx), budgets = await rates(tx);
+    async function schedule(raw, at, { sessions, budgets }, afterAlarm = false) {
         // Lobby tick/log/private-report maintenance always requires a future
         // alarm, even when the SID registry and mint rates are empty.
-        await raw.setAlarm(Math.min(at + INTERVAL, ...rows.entries.map(row => Math.max(at + 1, row.exp)), ...Object.values(budgets).map(row => Math.max(at + 1, row.until))));
+        const currentAlarm = await raw.getAlarm();
+        const existing = Number.isFinite(currentAlarm) && (!afterAlarm || currentAlarm > at) ? currentAlarm : Infinity;
+        await raw.setAlarm(Math.min(existing, at + INTERVAL, ...sessions.entries.map(row => Math.max(at + 1, row.exp)), ...Object.values(budgets).map(row => Math.max(at + 1, row.until))));
     }
     const transact = operation => records.transaction(async (tx, raw) => {
-        await initialized(tx); ensure((await configuredMarker(tx)).inviteVersion === betaVersion(env));
-        const result = await operation(tx, raw); await configuredMarker(tx); return result;
+        // Reuse validated registry rows within this native transaction only.
+        const registry = await initialized(tx);
+        ensure((await configuredMarker(tx)).inviteVersion === betaVersion(env));
+        const result = await operation(tx, raw, registry);
+        await configuredMarker(tx);
+        return result;
     });
     return Object.freeze({
         records,
         resolveParticipationConnection: value => transact(async tx => {
+            // Read-only operation-local reuse only. transact still performs its
+            // initialization and both fresh configuredMarker fences on raw tx.
+            // These validators only read transaction-local rows. Each call
+            // still checks its own descriptor and the live clock and roles.
+            const rows = new Map();
+            const current = Object.freeze({ get: async key => {
+                if (!rows.has(key)) rows.set(key, await tx.get(key));
+                return rows.get(key);
+            } });
             const binding = bindingFrom(value);
-            return await validateBinding(tx, binding) ? participationIdentity(tx, binding.betaSid, binding.expiresAt) : null;
+            return await validateBinding(current, binding) ? participationIdentity(current, binding.betaSid, binding.expiresAt) : null;
         }),
         async resolveParticipationConnections(values) {
             ensure(Array.isArray(values) && values.length <= CONNECTION_LIMIT);
@@ -250,12 +280,12 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             return records.transaction(async tx => {
                 // Preparation only: native reads are shared inside this one
                 // read-only transaction, never across actions or commit fences.
-                // Each validator still sees an independent row and checks its
-                // own descriptor, current role and live clock on every call.
+                // Each validator checks its own descriptor, current role and
+                // live clock against the transaction-local rows.
                 const rows = new Map();
                 const current = Object.freeze({ get: async key => {
                     if (!rows.has(key)) rows.set(key, await tx.get(key));
-                    return clone(rows.get(key));
+                    return rows.get(key);
                 } });
                 await initialized(current); ensure((await configuredMarker(current)).inviteVersion === betaVersion(env));
                 const identities = [];
@@ -359,9 +389,19 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             const ids = [...savedBindings.keys()];
             for (let offset = 0; offset < ids.length; offset += BATCH) {
                 const batch = await records.transaction(async tx => {
+                    // Like participation cohort preparation, share decoded reads
+                    // only inside this native read-only transaction. Each binding
+                    // still gets its own live validation against those rows.
+                    // Never reuse these rows across batches or capture fences.
+                    const rows = new Map();
+                    const current = Object.freeze({ get: async key => {
+                        if (!rows.has(key)) rows.set(key, await tx.get(key));
+                        return rows.get(key);
+                    } });
+                    const known = { sessions: await index(current), connectionIndex: await connections(current) };
                     const result = [];
                     for (const id of ids.slice(offset, offset + BATCH)) {
-                        const binding = savedBindings.get(id); result.push({ binding, active: await validateBinding(tx, binding) });
+                        const binding = savedBindings.get(id); result.push({ binding, active: await validateBinding(current, binding, known) });
                     }
                     return result;
                 });
@@ -374,36 +414,50 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         check: value => transact(async tx => {
             const record = await session(tx, value.sid);
             return record && record.exp > now() && record.generation === (await marker(tx)).generation && record.version === value.version && value.version === betaVersion(env) && value.exp <= record.exp
-                && (!record.revoked || value.allowRevoked === true) ? { reason: record.revoked ? 'revoked' : 'active', profile: clone(record.profile) } : null;
+                && ((!record.revoked && !nightIdleExpired(record, now())) || value.allowRevoked === true) ? { reason: record.revoked ? 'revoked' : 'active', profile: clone(record.profile) } : null;
         }),
         async register(body) {
-            return transact(async (tx, raw) => {
+            return transact(async (tx, raw, registry) => {
                 const at = now(); ensure(SID.test(body.sid || '') && version(body.version) && integer(body.exp));
-                if (body.version !== betaVersion(env) || body.exp <= at || body.exp > at + BETA_TTL) return { status: 403, reason: 'expired or revoked' };
-                if (await session(tx, body.sid)) return { status: 409, reason: 'session already exists' };
+                if (body.version !== betaVersion(env) || body.exp <= at || body.exp > at + (body.gameNight === true ? GAME_NIGHT_LENGTH : BETA_TTL)) return { status: 403, reason: 'expired or revoked' };
+                if (await session(tx, body.sid, registry.sessions)) return { status: 409, reason: 'session already exists' };
                 ensure(/^[A-Za-z0-9_-]{22}$/.test(body.iph || '') && profileValid(body.profile ?? null));
                 const profile = body.profile ?? null;
+                if (body.gameNight === true && profile) return { status: 403, reason: 'identity denied' };
                 if (profile && (profile.expiresAt > body.exp || profile.expiresAt <= at || profile.admin && (await currentRoles()).get(profile.account) !== profile.role)) return { status: 403, reason: 'identity denied' };
-                const rows = await prune(tx, at), budgets = await rates(tx), rate = budgets[body.iph] || { until: at + 3600000, count: 0 };
-                if (rows.entries.length >= LIMIT || rate.count >= 20 || !budgets[body.iph] && Object.keys(budgets).length >= LIMIT) return { status: 429, reason: 'beta session allowance reached' };
+                await prune(tx, at, registry);
+                const { sessions, budgets } = registry, rate = budgets[body.iph] || { until: at + 3600000, count: 0 };
+                if (sessions.entries.length >= LIMIT || rate.count >= 20 || !budgets[body.iph] && Object.keys(budgets).length >= LIMIT) return { status: 429, reason: 'beta session allowance reached' };
                 budgets[body.iph] = { ...rate, count: rate.count + 1 }; await tx.put(RATES, budgets);
-                const record = { v: 2, sid: body.sid, version: body.version, generation: (await marker(tx)).generation, createdAt: at, exp: body.exp, revoked: false, pending: false, attempt: 0, retryAt: 0, rooms: [], profile: clone(profile), closureRevision: 0 };
-                await tx.put(SESSION + body.sid, record); rows.entries.push({ sid: body.sid, exp: body.exp }); await tx.put(SESSION_INDEX, rows); await schedule(tx, raw, at);
+                const record = { v: 2, sid: body.sid, version: body.version, generation: (await marker(tx)).generation, createdAt: at, exp: body.exp, revoked: false, pending: false, attempt: 0, retryAt: 0, rooms: [], profile: clone(profile), closureRevision: 0,
+                    ...(body.gameNight === true ? { idleUntil: Math.min(body.exp, at + GAME_NIGHT_IDLE) } : {}) };
+                await tx.put(SESSION + body.sid, record);
+                sessions.entries.push({ sid: body.sid, exp: body.exp });
+                await tx.put(SESSION_INDEX, sessions);
+                await schedule(raw, at, registry);
                 return { status: 200, reason: 'registered' };
             });
         },
-        bind: value => transact(async tx => {
-            const binding = bindingFrom(value); ensure(bindingValid(binding)); const ids = await connections(tx);
+        gameNightActivity: value => transact(async tx => {
+            const at = now(), record = await session(tx, value.sid);
+            if (!active(record, at) || record.generation !== (await marker(tx)).generation
+                || value.version !== record.version || record.idleUntil === undefined) return false;
+            const idleUntil = nextGameNightIdle(record, at);
+            if (idleUntil !== null) await tx.put(SESSION + value.sid, { ...record, idleUntil });
+            return true;
+        }),
+        bind: value => transact(async (tx, raw, { sessions, connectionIndex: ids }) => {
+            const binding = bindingFrom(value); ensure(bindingValid(binding));
             ensure(!ids.ids.includes(binding.id) && ids.ids.length < CONNECTION_LIMIT && await tx.get(CONNECTION + binding.id) === undefined);
             await tx.put(CONNECTION + binding.id, binding); ids.ids.push(binding.id); await tx.put(CONNECTION_INDEX, ids);
-            ensure(await validateBinding(tx, binding)); return binding;
+            ensure(await validateBinding(tx, binding, { sessions })); return binding;
         }),
         unbind: id => transact(async tx => {
             const ids = await connections(tx); if (!ids.ids.includes(id)) return;
             await tx.delete(CONNECTION + id); ids.ids = ids.ids.filter(value => value !== id); await tx.put(CONNECTION_INDEX, ids);
         }),
         room: body => transact(async tx => {
-            const record = await session(tx, body.sid); if (!active(record) || record.version !== body.version || body.exp > record.exp) return { status: 403, reason: 'revoked' };
+            const record = await session(tx, body.sid); if (!active(record) || record.idleUntil !== undefined || record.version !== body.version || body.exp > record.exp) return { status: 403, reason: 'revoked' };
             if (!validRoomId(body.room)) return { status: 400, reason: 'room' };
             if (!record.rooms.includes(body.room)) {
                 if (record.rooms.length >= ROOM_LIMIT) return { status: 429, reason: 'private room allowance reached' };
@@ -423,9 +477,10 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             const record = await session(tx, attempt.sid);
             if (record?.revoked && record.closureRevision === attempt.closureRevision) await tx.put(SESSION + record.sid, { ...record, pending: false });
         }),
-        schedule: () => transact((tx, raw) => schedule(tx, raw, now())),
-        due: () => transact(async tx => {
-            const rows = await prune(tx, now()), due = [];
+        schedule: ({ afterAlarm = false } = {}) => transact((tx, raw, registry) => schedule(raw, now(), registry, afterAlarm)),
+        due: () => transact(async (tx, raw, registry) => {
+            await prune(tx, now(), registry);
+            const { sessions: rows } = registry, due = [];
             for (const item of rows.entries) {
                 const record = await session(tx, item.sid, rows); ensure(record && record.exp === item.exp);
                 if (record.pending && record.retryAt <= now()) due.push(record);
@@ -456,7 +511,8 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             if (batch.length) { rows.entries = rows.entries.slice(batch.length); await tx.put(SESSION_INDEX, rows); }
             if (rows.entries.length || (await connections(tx)).ids.length) return finish({ status: 409, reason: 'old session metadata cleanup remains' });
             await tx.put(LOBBY_AUTHORITY_MARKER, { ...current, inviteVersion: nextVersion, generation: current.generation + 1, usedVersions: [...current.usedVersions, nextVersion] });
-            await schedule(tx, raw, now()); return finish({ status: 200, reason: 'rotated' });
+            await schedule(raw, now(), { sessions: await index(tx), budgets: await rates(tx) });
+            return finish({ status: 200, reason: 'rotated' });
         }),
         maintenance: () => transact(async tx => { await pruneLobbyEffectLogs({ tx, now: now() }); }),
         async maintainParticipation() {

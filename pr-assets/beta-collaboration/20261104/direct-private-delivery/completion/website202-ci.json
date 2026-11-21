@@ -1,0 +1,54 @@
+{
+  "qualifiedAt": "2026-11-04T10:04:11.548895+00:00",
+  "reviewedHead": "3d7edb1ffe5c0cda11f463cf9b451c504518e634",
+  "wholeTree": "ec04816c18bf3f68de0be29e41d2ec5397b108da",
+  "prCheckout": "dc3707c29bfd662608e02f49633155c15c7efd25",
+  "prTreeVerifiedViaGitHub": "ec04816c18bf3f68de0be29e41d2ec5397b108da",
+  "scope": "Documentation head only; application de2b017 remains deployed separately; no music or native install proof",
+  "jobs": [
+    {
+      "jobId": 126488430428,
+      "runId": 41804612853,
+      "checkout": "3d7edb1ffe5c0cda11f463cf9b451c504518e634",
+      "conclusion": "success",
+      "unitFiles": 137,
+      "unitPasses": 2061,
+      "mainBrowserPasses": 763,
+      "rootProjectBrowserPasses": [
+        34,
+        34
+      ],
+      "overlappingCountsNotSummed": true,
+      "retryOrFlakySummary": false,
+      "logBytes": 322651,
+      "logSha256": "a8be0a929db50ee3bbedba246b7330b9a9d0cabd3724fb613c4889b018fd8724"
+    },
+    {
+      "jobId": 126488451097,
+      "runId": 41804618877,
+      "checkout": "dc3707c29bfd662608e02f49633155c15c7efd25",
+      "conclusion": "success",
+      "unitFiles": 137,
+      "unitPasses": 2061,
+      "mainBrowserPasses": 763,
+      "rootProjectBrowserPasses": [
+        34,
+        34
+      ],
+      "overlappingCountsNotSummed": true,
+      "retryOrFlakySummary": false,
+      "logBytes": 327705,
+      "logSha256": "aae1063d18fa49974816093dcab4de14113e304064d98fc081763622dd6d2b38"
+    }
+  ],
+  "pagesJobs": [
+    {
+      "jobId": 126503007060,
+      "conclusion": "skipped"
+    },
+    {
+      "jobId": 126505368531,
+      "conclusion": "skipped"
+    }
+  ]
+}

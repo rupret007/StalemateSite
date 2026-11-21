@@ -1,0 +1,54 @@
+{
+  "at": "2026-11-07T04:16:16.977Z",
+  "readOnly": true,
+  "httpStatus": 200,
+  "service": {
+    "state": "ready",
+    "reasons": []
+  },
+  "admission": {
+    "state": "open",
+    "lock": "off",
+    "shield": false,
+    "lockAuto": false
+  },
+  "storage": {
+    "lobby": "ok",
+    "quota": "ok",
+    "registry": "ok"
+  },
+  "usage": [
+    {
+      "name": "connections",
+      "used": 23,
+      "limit": 200,
+      "unit": "connections",
+      "scope": "application",
+      "period": "day"
+    },
+    {
+      "name": "lobbyRequests",
+      "used": 48.39999999999998,
+      "limit": 40000,
+      "unit": "requests",
+      "scope": "application",
+      "period": "day"
+    },
+    {
+      "name": "aiReviews",
+      "used": 0,
+      "limit": 100,
+      "unit": "reviews",
+      "scope": "application",
+      "period": "day"
+    },
+    {
+      "name": "betaSessions",
+      "used": 19,
+      "limit": 1000,
+      "unit": "sessions",
+      "scope": "application",
+      "period": "active"
+    }
+  ]
+}

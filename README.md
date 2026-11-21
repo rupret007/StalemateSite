@@ -123,3 +123,13 @@ Do not invent a domain name here. Check availability before buying.
 ## What this repo does not include
 
 Rad Dad server deploy scripts, `worker/`, `private/` areas and historical zips. Fresh static files plus the shared test patterns only.
+
+## Private WebJam / Hang Out development
+
+Start with the [current private readiness handoff](hangout-internal/HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+for exact staged/deployed revisions, tested browser and music roles, evidence,
+remaining checks and the Stalemate/Rad Dad integration instructions. The
+[acceptance requirements](hangout-internal/HANGOUT_ACCEPTANCE_REQUIREMENTS.md)
+preserve all 62 outcomes. This is one shared community with two entrance labels.
+The private release candidate remains pending; these development documents do
+not publish a community link in either website's navigation.

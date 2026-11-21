@@ -1,0 +1,127 @@
+{
+  "head": "4f4bee29fe691edbf98bdf5585153c119db6b933",
+  "state": "RUNTIME_CI_PASSED_MAIN_CI_CLIENT_MODULE_WIRING_FAILURE_PRESERVED",
+  "runs": [
+    {
+      "id": 42424520809,
+      "event": "pull_request",
+      "workflow": "Local Durable Object runtime",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 128559827524,
+          "name": "Local workerd mapping and crash recovery",
+          "conclusion": "success",
+          "logSha256": "e5839438600bd64d8843a36cec439b0f4a3c572ee1fb229f08401a581a2619cb",
+          "actualCheckout": {
+            "sha": "0fb7f3324245a33aa7d503f1bd2b7632c906d29b",
+            "tree": "cca17da9ae6ac5853b0230539e97936c6c7ef20a",
+            "parents": [
+              "9aaef59bed0fb4b1d4e6d4b25427c71b4158ab7a",
+              "4f4bee29fe691edbf98bdf5585153c119db6b933"
+            ],
+            "wholeTreeEqualsReviewedHead": true
+          }
+        }
+      ]
+    },
+    {
+      "id": 42424520800,
+      "event": "pull_request",
+      "workflow": "Test and Pages",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 128559827472,
+          "name": "test",
+          "conclusion": "failure",
+          "logSha256": "bf8c13760c9241849b97df92fafda0b3526fa6b9730247ac7a164294e4fb91d5",
+          "actualCheckout": {
+            "sha": "0fb7f3324245a33aa7d503f1bd2b7632c906d29b",
+            "tree": "cca17da9ae6ac5853b0230539e97936c6c7ef20a",
+            "parents": [
+              "9aaef59bed0fb4b1d4e6d4b25427c71b4158ab7a",
+              "4f4bee29fe691edbf98bdf5585153c119db6b933"
+            ],
+            "wholeTreeEqualsReviewedHead": true
+          }
+        },
+        {
+          "id": 128560421175,
+          "name": "Deploy GitHub Pages",
+          "conclusion": "skipped",
+          "logSha256": null,
+          "actualCheckout": null
+        }
+      ]
+    },
+    {
+      "id": 42424516752,
+      "event": "push",
+      "workflow": "Local Durable Object runtime",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 128559814645,
+          "name": "Local workerd mapping and crash recovery",
+          "conclusion": "success",
+          "logSha256": "2fc0b8c78ccdd1d29d9a5683cce07a9d65994def30150f948815771c0acb7167",
+          "actualCheckout": {
+            "sha": "4f4bee29fe691edbf98bdf5585153c119db6b933",
+            "tree": "cca17da9ae6ac5853b0230539e97936c6c7ef20a",
+            "parents": [
+              "8f88e0bd2bcc0c256d9aae3e736aef9eb1799184"
+            ],
+            "wholeTreeEqualsReviewedHead": true
+          }
+        }
+      ]
+    },
+    {
+      "id": 42424516742,
+      "event": "push",
+      "workflow": "Test and Pages",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 128559814588,
+          "name": "test",
+          "conclusion": "failure",
+          "logSha256": "84467841766b775e58e6dae4e8c5cc41305b08594867f485a4533010d4bd7a87",
+          "actualCheckout": {
+            "sha": "4f4bee29fe691edbf98bdf5585153c119db6b933",
+            "tree": "cca17da9ae6ac5853b0230539e97936c6c7ef20a",
+            "parents": [
+              "8f88e0bd2bcc0c256d9aae3e736aef9eb1799184"
+            ],
+            "wholeTreeEqualsReviewedHead": true
+          }
+        },
+        {
+          "id": 128560849351,
+          "name": "Deploy GitHub Pages",
+          "conclusion": "skipped",
+          "logSha256": null,
+          "actualCheckout": null
+        }
+      ]
+    }
+  ],
+  "mainFailure": {
+    "filesFailed": 5,
+    "filesPassed": 133,
+    "testsFailed": 60,
+    "testsPassed": 2031,
+    "cause": "The five jsdom fixtures evaluated the page but omitted its newly imported real createIdleHeartbeat export.",
+    "correction": "Import and supply the real module in those five fixture environments. No assertion or production source changed."
+  },
+  "correctedFixtureFiles": [
+    "tests/unit/hangout-lobby-client-context.test.js",
+    "tests/unit/hangout-beta-entry-context.test.js",
+    "tests/unit/hangout-keep-signin.test.js",
+    "tests/unit/hangout-message-recovery-client.test.js",
+    "tests/unit/hangout-sharing-controls-client.test.js"
+  ],
+  "workflowChanged": false,
+  "newExactHeadCiRequired": true
+}

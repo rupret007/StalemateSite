@@ -22,6 +22,8 @@ window.YT = {
         let base = 0;
         let started = null;
         let playerState = 2;
+        let volume = 100;
+        let muted = false;
         // Opt-in policy fixture only. Real playVideo() returns void, including
         // when browser policy blocks playback; the API reports that separately.
         // Existing suites keep their original immediate-play behavior.
@@ -42,6 +44,11 @@ window.YT = {
         };
         this.getCurrentTime = () => time();
         this.getPlayerState = () => playerState;
+        this.setVolume = value => { volume = value; };
+        this.getVolume = () => volume;
+        this.mute = () => { muted = true; };
+        this.unMute = () => { muted = false; };
+        this.isMuted = () => muted;
         const startPlaying = () => {
             if (started === null) started = now();
             emit(1);

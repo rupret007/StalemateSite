@@ -3,6 +3,7 @@ const { test, expect } = require('@playwright/test');
 // Every link on every public page: internal targets load, external targets are ours.
 const PAGES = ['/', '/qr/', '/tap/', '/play/', '/404.html'];
 const OURS = [
+    /^https:\/\/github\.com\/rupret007\/webjam\/releases\/latest$/,
     // The verified show venue is an approved destination for the new directions action.
     /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=Los\+Amigo%27s\+Sports\+Bar\+%2B\+Bites%2C\+8604\+Preston\+Rd\+Suite\+100%2C\+Plano\+TX\+75024$/,
     /^mailto:stalemate\.punk@gmail\.com$/,

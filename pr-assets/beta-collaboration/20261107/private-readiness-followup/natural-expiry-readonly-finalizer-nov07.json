@@ -1,0 +1,78 @@
+{
+  "state": "STOPPED_INSPECT_ORIGINAL_NO_AUTOMATIC_RETRY",
+  "startedAt": "2026-11-07T11:05:24.370531+00:00",
+  "pid": 42150,
+  "originalObserverPid": 52043,
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "expectedVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "expiresAt": "2026-11-07T15:55:23.162Z",
+  "physicalCapture": false,
+  "recording": false,
+  "newGuest": false,
+  "newBrowser": false,
+  "providerCredentials": false,
+  "deploymentAttempted": false,
+  "originalObserverModified": false,
+  "releaseCandidateReady": false,
+  "stage": "validate actual terminal expiry, HTTP denials and browser cleanup",
+  "originalState": "FAILED_INSPECT_ORIGINAL",
+  "lastOriginalObservation": "2026-11-07T15:56:10.782Z",
+  "recordedSocketCloseEvents": [
+    {
+      "at": 1794040328194,
+      "generation": 1,
+      "code": 1006
+    },
+    {
+      "at": 1794041464575,
+      "generation": 2,
+      "code": 1006
+    },
+    {
+      "at": 1794049046004,
+      "generation": 3,
+      "code": 1006
+    },
+    {
+      "at": 1794055478829,
+      "generation": 4,
+      "code": 1006
+    },
+    {
+      "at": 1794064839953,
+      "generation": 5,
+      "code": 1006
+    }
+  ],
+  "recordedSocketOpenEvents": [
+    {
+      "at": 1794038123735,
+      "generation": 1
+    },
+    {
+      "at": 1794040329271,
+      "generation": 2
+    },
+    {
+      "at": 1794041465735,
+      "generation": 3
+    },
+    {
+      "at": 1794049046980,
+      "generation": 4
+    },
+    {
+      "at": 1794055480126,
+      "generation": 5
+    },
+    {
+      "at": 1794064840986,
+      "generation": 6
+    }
+  ],
+  "uninterruptedUptimeQualified": false,
+  "spontaneousDisconnectCauseEstablished": false,
+  "observedAt": "2026-11-07T15:56:27.953917+00:00",
+  "failureType": "AssertionError",
+  "completedAt": "2026-11-07T15:56:27.953911+00:00"
+}

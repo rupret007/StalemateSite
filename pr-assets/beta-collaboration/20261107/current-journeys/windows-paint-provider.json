@@ -1,0 +1,108 @@
+{
+  "at": "2026-11-07T06:36:42.163Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "scope": "Two ordinary guests in actual Windows Chrome; real YouTube IFrame API and hosted drawing/video state. Browser output is muted with --mute-audio; no hearing or native music qualification.",
+  "physicalCapture": false,
+  "browserOutputMuted": true,
+  "captureCalls": 0,
+  "thirdPartyRequests": 159,
+  "privateValueMatches": 0,
+  "logout": [
+    200,
+    200
+  ],
+  "roomsCreated": 1,
+  "windowsBrowser": "156.0.8078.80",
+  "grandeurFirstAndFourChoices": true,
+  "optionalMaterialsGuide": true,
+  "sharedStrokeAndHostControls": true,
+  "realProvider": {
+    "attempted": true,
+    "physicalHearingQualified": false,
+    "recording": false,
+    "host": {
+      "initial": {
+        "id": "mT0RNrTDHkI",
+        "position": 0.8302470343322754,
+        "muted": false,
+        "state": 1
+      }
+    },
+    "guest": {
+      "initial": {
+        "id": "mT0RNrTDHkI",
+        "position": 0.8520559942779541,
+        "muted": false,
+        "state": 1
+      }
+    },
+    "samples": [
+      {
+        "ms": 1015,
+        "host": {
+          "position": 2.0138320743865967,
+          "state": 1,
+          "muted": false,
+          "roomPlaying": true,
+          "roomPosition": 0.19277091607666014,
+          "video": "mT0RNrTDHkI"
+        },
+        "guest": {
+          "position": 1.8670549809265136,
+          "state": 1,
+          "muted": false,
+          "roomPlaying": true,
+          "roomPosition": 0.19277091607666014,
+          "video": "mT0RNrTDHkI"
+        }
+      },
+      {
+        "ms": 2027,
+        "host": {
+          "position": 3.027356133514404,
+          "state": 1,
+          "muted": false,
+          "roomPlaying": true,
+          "roomPosition": 0.19277091607666014,
+          "video": "mT0RNrTDHkI"
+        },
+        "guest": {
+          "position": 2.878136017166138,
+          "state": 1,
+          "muted": false,
+          "roomPlaying": true,
+          "roomPosition": 0.19277091607666014,
+          "video": "mT0RNrTDHkI"
+        }
+      },
+      {
+        "ms": 3045,
+        "host": {
+          "position": 4.045376900817871,
+          "state": 1,
+          "muted": false,
+          "roomPlaying": true,
+          "roomPosition": 0.19277091607666014,
+          "video": "mT0RNrTDHkI"
+        },
+        "guest": {
+          "position": 3.8952580247955324,
+          "state": 1,
+          "muted": false,
+          "roomPlaying": true,
+          "roomPosition": 0.19277091607666014,
+          "video": "mT0RNrTDHkI"
+        }
+      }
+    ],
+    "sustainedProgress": true,
+    "status": "advancing-unmuted-provider-timelines"
+  },
+  "realProviderPauseResumeShared": true,
+  "customLessonPlayingOnBoth": true,
+  "status": "passed",
+  "ownRoomClosed": true,
+  "originalWindowsPagesPreserved": true,
+  "completedAt": "2026-11-07T06:36:55.183Z"
+}

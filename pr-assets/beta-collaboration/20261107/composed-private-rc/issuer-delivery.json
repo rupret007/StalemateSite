@@ -1,0 +1,41 @@
+{
+  "at": "2026-11-07T04:44:00.743816+00:00",
+  "candidate": "e735a048de82e26c424e31964a30f1dfbd548df9",
+  "rollbackVersion": "60e3f182-2d11-4740-b89a-74377778766d",
+  "state": "VERIFIED",
+  "privateApplicationDelivery": true,
+  "providerRequestsOrCredentialsMinted": false,
+  "limitsChanged": false,
+  "publicSitesChanged": false,
+  "reconciledAt": "2026-11-07T04:44:39.006296+00:00",
+  "deployment": "618e7517-42e1-422a-8449-5d04a2ecada0",
+  "version": "4db649fa-a465-44b4-8487-414987b3a660",
+  "exitCode": 0,
+  "allEffectiveBindingsAndRuntimeSettingsPreserved": true,
+  "bindingValuesNamespaceIDsAndSecretNamesPreserved": true,
+  "sourceVerified": true,
+  "sourceFiles": [
+    {
+      "file": "mailbox.js",
+      "matchesReviewedSource": true
+    },
+    {
+      "file": "cors.js",
+      "matchesReviewedSource": true
+    },
+    {
+      "file": "policy.js",
+      "matchesReviewedSource": true
+    },
+    {
+      "file": "quota.js",
+      "matchesReviewedSource": true
+    },
+    {
+      "file": "worker.js",
+      "matchesReviewedSource": true
+    }
+  ],
+  "initialPostcheckFailureRetained": true,
+  "redeployAttempted": false
+}

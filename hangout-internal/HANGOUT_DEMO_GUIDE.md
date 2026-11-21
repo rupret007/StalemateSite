@@ -1,15 +1,53 @@
 # Hang Out: a short shared-community demonstration
 
-This guide demonstrates the shared IRC lobby and collaboration flow. The
-application source is not a claim that the current hosted beta contains it.
-The receiving website/release session must identify the matching approved
-Worker, assets and canonical address before inviting Che to that version.
+For the exact private build, demonstrated checks and remaining work, start with
+the [current readiness handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md).
+The private lobby has passed current Mac and Windows browser checks. The full
+release candidate, including physical music and operator acceptance, remains
+pending. Do not send this as a promise that every feature is already qualified.
 
 The finished Che demo includes **live WebJam music with verified two-way
-audio**, as well as the browser community. The five-minute visitor journey
-below is one part of acceptance. Follow the [music acceptance plan](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md)
-for the ARM Mac mini, Intel/x86 MacBook Pro and Windows PC; keep the original
-Linux requirements too. Audio remains opt-in for each participant.
+audio**, as well as the shared browser community. Follow the
+[music acceptance plan](HANGOUT_MUSIC_DEMO_ACCEPTANCE.md) for the ARM Mac mini,
+Intel/x86 MacBook Pro and Windows PC; keep the original Linux requirements too.
+Audio remains opt-in for each participant.
+
+## What the participant needs
+
+For the first private test, **Jeff hosts with the approved WebJam app on his
+MacBook; Che joins in Chrome on his Windows PC.** Che does not need the native
+client or BlackHole for that browser role. Keep the private community invitation
+and the fresh music link separate: the first admits you to Hang Out; the second
+connects your browser to this one Music session.
+
+1. Have headphones and a working microphone ready. Wired audio and Ethernet are
+   preferred for music. A Bluetooth headset can be used for an initial speech
+   check, but it does not establish instrument quality or low musical latency.
+2. Open the private community link supplied by Jeff. Enter the community code
+   supplied separately, choose your nickname and say hello. A band account is
+   not required for the guest role. Do not use an old music link as the community
+   code or post either invitation publicly.
+3. Accept Jeff's Jam-room invitation. When he shares the fresh Music destination,
+   choose **Join in browser**. Jeff keeps the native Music session running.
+4. Choose **Check microphone**, allow the intended input when the browser asks,
+   and speak until the level responds. If the wrong input appears, choose the
+   correct microphone. Confirm headphones, then **Join with microphone**. A flat
+   meter is a setup issue to resolve before joining, not a reason to click Join
+   repeatedly.
+5. First hear speech both ways; then try the short musical passage. Browser
+   joining has higher delay than the native musician connection. Treat the
+   displayed estimate as partial diagnostics, not a promise of tight timing.
+   Choose **Leave session** when finished; Jeff then uses **End Session**.
+
+If the host ended the session, the invitation expired or a join may have used it,
+ask Jeff for a new music invitation. Do not keep retrying an expired link.
+**Session ended** for community access instead means return to the community
+invitation. A relay-limit notice needs operator review; changing routers, opening
+ports or resetting a quota is not a participant fix.
+
+The song/backing-track check needs extra setup on the **Mac host**, not the
+Windows browser guest. Use the [Shared Track guide](HANGOUT_SHARED_TRACK_NEXT_CHECK_20261107.md).
+Webex video is optional and separate; keep it closed for the first audio check.
 
 ## Choose the environment
 
@@ -59,6 +97,20 @@ it is not verified band membership or a staff role.
 5. Check the phone layout at 375/390px with a long line and an error notice:
    text/controls wrap, the page stays within its width, and input plus Send remain
    usable. A physical iPhone keyboard/background test is separate from emulation.
+
+## Paint Along
+
+In **Rooms**, choose **Paint along**. The room host can select a featured Bob
+Ross lesson, starting with **The Grandeur of Summer**, or paste another YouTube
+lesson and choose **Load**. Other participants follow the shared lesson; if a
+browser requires a gesture, use **Tap to play**. The shared canvas is available,
+and people can also sketch or paint on paper or in their own art app.
+
+**Getting started · kit and materials** contains the optional official materials
+links. You do not need to buy a kit to watch or sketch. YouTube provides the
+lesson video and audio. Keep headphones on when another audio app is involved. The prior Windows provider
+check verified lesson loading and synchronized controls with browser output
+muted; it did not establish physical lesson audibility or full native Art parity.
 
 ## Moderator and ownership check
 
@@ -113,19 +165,20 @@ application role behavior, not real email verification or hosted revocation.
 
 ## WebJam music and results
 
-Start a Jam room, then use **Host tools → Invite guest** and enter the other
-visitor's current nickname. They accept with **Join** in their invitation.
-Jam rooms remain invite-only; the invitation gives membership, not host powers.
-Share the complete invitation from WebJam in the room's host box. The other
-visitor chooses **Copy full WebJam invitation**, opens WebJam, selects Join and
-pastes it. This website handoff does not establish a successful native audio
-session.
+The native Mac host starts Music, then uses the visible **Copy browser invite**
+control and waits for **Link copied**. This prepares/copies the link in one step;
+no legacy Web Join menu sequence is required. Keep Music running. In Hang Out,
+create a Jam room, invite the other visitor through **Host tools → Invite guest**,
+and paste the fresh browser invitation into the host's invitation box, then
+**Share**. The guest accepts the room invite and explicitly selects **Join in
+browser**. Room membership is not host authority. Sharing never requests capture
+or opens a guest page automatically. See
+[browser invitation sharing](HANGOUT_BROWSER_INVITATION_HANDOFF.md).
 
-When the release owner has qualified Web Join, the host can instead paste
-**Copy web invite** into the same box; the visitor explicitly chooses **Join in
-browser**. Follow [browser invitation sharing](HANGOUT_BROWSER_INVITATION_HANDOFF.md).
-An enabled link does not establish supported participation permissions, issuer
-readiness or audio. Keep an unsupported audio route disabled.
+A separately supported native guest uses the full desktop invitation with the
+native Join action; do not substitute that message for the browser music link.
+The Windows native role remains trust-blocked in the current private candidate;
+the first Windows test uses Chrome. Do not bypass native signing policy.
 
 If a guest or verified owner's session expires or is revoked, **Session ended**
 replaces automatic retries. The beta offers **Return to invitation** through its

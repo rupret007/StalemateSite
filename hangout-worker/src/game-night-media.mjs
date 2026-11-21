@@ -1,0 +1,223 @@
+import { cleanRtc } from './lobby-act.mjs';
+import { createGameNightSockets } from './game-night-sockets.mjs';
+
+const TAG = 'game-night-media';
+const PROTOCOL = 'game-night-media.v1';
+const MAX_PARTICIPANTS = 4;
+const FRAME_BYTES = 16384;
+const RELAY_RETRY_MS = 30_000;
+const RELAY_RENEW_BEFORE_MS = 60_000;
+const REPORT_PEER_LIMIT = 8;
+const REPORT_PEER_TTL = 300_000;
+const REPORT_REASON_LIMIT = 380;
+const inactive = Object.freeze({ audio: false, video: false });
+const encoder = new TextEncoder();
+const sameRoom = (a, b) => a?.ref === b?.ref && a?.room === b?.room;
+
+export const mediaPath = path => path === '/beta/game-night-media' || path === '/beta/game-night-media-ticket';
+export const mediaEnabled = (env = {}) => env.HANGOUT_BETA_MODE === 'protected' && env.HANGOUT_ARCADE_MEDIA === '1' && env.HANGOUT_OPEN !== '0';
+export const isMediaSocket = socket => socket.deserializeAttachment?.()?.kind === TAG;
+
+// SDP can negotiate receive-only tracks before either guest enables capture.
+// Check each active media section's effective direction, with a default of
+// sendrecv when neither the section nor the session declares a direction.
+export function allowedMediaDescription(description, tracks) {
+    let media = '', enabled = false, sessionDirection = '', direction = '';
+    const allowed = () => !enabled || ['inactive', 'recvonly'].includes(direction || sessionDirection) || tracks[media] === true;
+    for (const line of description.split(/\r?\n/)) {
+        if (line.startsWith('m=')) {
+            if (!allowed()) return false;
+            const [kind, port] = line.slice(2).split(/\s+/);
+            if (!['audio', 'video'].includes(kind) || !/^\d+$/.test(port || '')) return false;
+            media = kind; enabled = Number(port) !== 0; direction = '';
+        } else if (line === 'a=bundle-only' && media && !enabled) {
+            return false;
+        } else if (/^a=(sendrecv|sendonly|recvonly|inactive)$/.test(line)) {
+            if (media) {
+                if (direction) return false;
+                direction = line.slice(2);
+            } else {
+                if (sessionDirection) return false;
+                sessionDirection = line.slice(2);
+            }
+        }
+    }
+    return !!media && allowed();
+}
+
+export function createGameNightMedia({ state, current, active, approve, charge, allowed, mintRelay, serialize, submitReport,
+    now = () => Date.now() }) {
+    const { issue, upgrade, member, sockets, send, close } = createGameNightSockets({
+        state, current, active, charge, allowed, tag: TAG, protocol: PROTOCOL, readyType: 'media-ready'
+    });
+    const relayPending = new WeakSet();
+    function participants(scope) {
+        return sockets().map(ws => ({ ws, scope: ws.deserializeAttachment() }))
+            .filter(peer => peer.scope.joined && sameRoom(scope, peer.scope))
+            .map(peer => ({ ...peer, member: member(peer.scope) }))
+            .filter(peer => peer.member);
+    }
+    function cameraPolicy(peers) { return peers.some(peer => peer.scope.videoAllowed && peer.member.canOpen && peer.member.canPlay); }
+    function save(socket, changes) { socket.serializeAttachment({ ...socket.deserializeAttachment(), ...changes }); }
+    function tracksFor(peer, cameraAllowed) {
+        return { audio: !!(peer.member.canPlay && peer.scope.tracks?.audio),
+            video: !!(cameraAllowed && peer.member.canPlay && peer.scope.tracks?.video) };
+    }
+    function reportPeers(previous = [], visible) {
+        const at = now(), currentIds = new Set(visible.map(peer => peer.id));
+        const present = visible.map(({ id, nick }) => ({
+            id, nick: previous.find(peer => peer.id === id)?.nick ?? nick, until: null
+        }));
+        const recent = previous.filter(peer => !currentIds.has(peer.id) && (peer.until === null || peer.until > at))
+            .map(peer => ({ ...peer, until: peer.until ?? at + REPORT_PEER_TTL })).sort((a, b) => b.until - a.until);
+        return [...present, ...recent].slice(0, REPORT_PEER_LIMIT);
+    }
+    function publish(scope) {
+        const peers = participants(scope), cameraAllowed = cameraPolicy(peers);
+        for (const peer of peers) {
+            const tracks = tracksFor(peer, cameraAllowed);
+            if (peer.scope.tracks?.audio !== tracks.audio || peer.scope.tracks?.video !== tracks.video) save(peer.ws, { tracks });
+            const visible = peers.filter(other => other.ws !== peer.ws && peer.member.canCall(other.scope.actor));
+            const observed = submitReport ? reportPeers(peer.scope.reportPeers, visible
+                .filter(other => other.scope.betaSid !== peer.scope.betaSid)
+                .map(other => ({ id: other.scope.actor, nick: other.member.nick }))) : [];
+            const view = {
+                cameraAllowed,
+                canManageCamera: peer.member.canOpen && peer.member.canPlay,
+                ...(mintRelay ? { relay: true } : {}),
+                ...(submitReport ? { reports: true, recentReportPeers: observed
+                    .filter(entry => entry.until !== null).map(({ id, nick }) => ({ id, nick })) } : {}),
+                tracks,
+                peers: visible.map(other => ({
+                    id: other.scope.actor, nick: other.member.nick, ...tracksFor(other, cameraAllowed)
+                }))
+            };
+            const serialized = JSON.stringify(view);
+            if (serialized === peer.scope.lastRoster) continue;
+            save(peer.ws, { lastRoster: serialized, ...(submitReport ? { reportPeers: observed } : {}) });
+            send(peer.ws, { t: 'media-room', version: 1, ...view });
+        }
+    }
+    function error(socket, reason) { send(socket, { t: 'media-error', reason }); }
+    async function report(socket, scope, binding, peers, frame) {
+        if (typeof frame.request !== 'string' || !/^[A-Za-z0-9_-]{24}$/.test(frame.request)) return error(socket, 'invalid-report');
+        const ack = status => send(socket, { t: 'media-report', version: 1, request: frame.request, status });
+        if (!submitReport) return ack('unavailable');
+        if (Object.keys(frame).length !== 6 || frame.consent !== true || typeof frame.target !== 'string' ||
+            typeof frame.reason !== 'string' || !frame.reason.trim() || frame.reason.length > REPORT_REASON_LIMIT) return ack('invalid');
+        const witness = scope.reportPeers?.find(peer => peer.id === frame.target && (peer.until === null || peer.until > now()));
+        if (!witness || witness.id === scope.actor) return ack('peer-unavailable');
+        const peer = peers.find(other => other.scope.actor === witness.id);
+        const target = peer && peer.member.betaSid !== binding.betaSid && await active(peer.member) ? peer.member : null;
+        if (peer?.member.betaSid === binding.betaSid) return ack('peer-unavailable');
+        let result;
+        try { result = await submitReport({ binding, scope, witness, target, request: frame.request, reason: frame.reason.trim() }); }
+        catch { return ack('unavailable'); }
+        return ack(result?.ok ? 'queued' : result?.status === 429 ? 'limited'
+            : result?.status === 400 ? 'invalid' : result?.status === 409 ? 'conflict' : 'unavailable');
+    }
+    async function relayMember(socket) {
+        if (socket.readyState !== 1) return null;
+        const scope = socket.deserializeAttachment(), binding = member(scope);
+        if (!scope?.joined || !binding || !participants(scope).some(peer => binding.canCall(peer.scope.actor)) ||
+            !await active(binding) || !await approve(scope, inactive)) return null;
+        return { scope, binding };
+    }
+    async function beginRelay(socket) {
+        if (relayPending.has(socket)) return;
+        const admitted = mintRelay && await relayMember(socket);
+        if (!admitted || admitted.scope.relayAfter > now()) return error(socket, 'relay-unavailable');
+        relayPending.add(socket);
+        save(socket, { relayAfter: now() + RELAY_RETRY_MS });
+        // Release the lobby event gate while waiting for the provider.
+        return async () => {
+            try {
+                let relay;
+                try { relay = await mintRelay(admitted.scope.ref, admitted.binding.dev); } catch { /* unavailable */ }
+                await serialize(async () => {
+                    if (!await relayMember(socket)) return;
+                    const remaining = relay?.expiresAt - now();
+                    if (!Array.isArray(relay?.iceServers) || !relay.iceServers.length || !(remaining > RELAY_RENEW_BEFORE_MS)) {
+                        return error(socket, 'relay-unavailable');
+                    }
+                    const refreshInMs = remaining - RELAY_RENEW_BEFORE_MS;
+                    save(socket, { relayAfter: now() + refreshInMs });
+                    send(socket, { t: 'media-relay', version: 1, iceServers: relay.iceServers, refreshInMs });
+                });
+            } finally { relayPending.delete(socket); }
+        };
+    }
+    async function receive(socket, raw) {
+        if (socket.readyState !== 1) return;
+        const scope = socket.deserializeAttachment(), binding = member(scope);
+        if (!binding || !await active(binding)) { close(socket, 4403, 'room membership ended'); publish(scope); return; }
+        if (!await charge(socket, scope.actor)) { close(socket, 4429, 'media allowance exhausted'); publish(scope); return; }
+        if (typeof raw !== 'string' || raw.length > FRAME_BYTES || encoder.encode(raw).byteLength > FRAME_BYTES) {
+            close(socket, 4400, 'bad media frame'); publish(scope); return;
+        }
+        let frame;
+        try { frame = JSON.parse(raw); } catch { /* protocol refusal below */ }
+        if (frame?.version !== 1 || typeof frame.action !== 'string') {
+            close(socket, 4400, 'bad media frame'); publish(scope); return;
+        }
+        const peers = participants(scope);
+        if (frame.action === 'join') {
+            if (scope.joined) return;
+            if (peers.length >= MAX_PARTICIPANTS || !await approve(scope, inactive)) return error(socket, 'call-unavailable');
+            save(socket, { joined: true, tracks: inactive, videoAllowed: false });
+            publish(scope);
+            return;
+        }
+        if (!scope.joined) return error(socket, 'call-required');
+        if (frame.action === 'leave') {
+            close(socket, 1000, 'left call');
+            publish(scope);
+        } else if (frame.action === 'camera-policy') {
+            if (!binding.canOpen || !binding.canPlay || typeof frame.on !== 'boolean') return error(socket, 'camera-policy-unavailable');
+            for (const peer of peers) {
+                const videoAllowed = frame.on && peer.ws === socket;
+                if (peer.scope.videoAllowed !== videoAllowed) save(peer.ws, { videoAllowed });
+            }
+            publish(scope);
+        } else if (frame.action === 'tracks') {
+            if (typeof frame.audio !== 'boolean' || typeof frame.video !== 'boolean' ||
+                frame.video && (!cameraPolicy(peers) || frame.adult18 !== true)) return error(socket, 'tracks-unavailable');
+            const tracks = { audio: frame.audio, video: frame.video };
+            const raises = tracks.audio && !scope.tracks.audio || tracks.video && !scope.tracks.video;
+            if (raises && !await approve(scope, tracks)) return error(socket, 'tracks-unavailable');
+            save(socket, { tracks });
+            publish(scope);
+        } else if (frame.action === 'signal') {
+            const rtc = cleanRtc(frame), target = rtc && peers.find(peer => peer.scope.actor === rtc.to);
+            if (!target || !binding.canCall(target.scope.actor) || !await active(target.member)) return error(socket, 'peer-unavailable');
+            const cameraAllowed = cameraPolicy(peers);
+            const tracks = tracksFor({ member: binding, scope }, cameraAllowed);
+            if (rtc.sdp && !allowedMediaDescription(rtc.sdp.sdp, tracks)) return error(socket, 'tracks-unavailable');
+            if (!await approve(scope, tracks, target.scope, tracksFor(target, cameraAllowed))) return error(socket, 'peer-unavailable');
+            send(target.ws, { t: 'media-signal', version: 1, from: scope.actor, ...(rtc.sdp ? { sdp: rtc.sdp } : { ice: rtc.ice }) });
+        } else if (frame.action === 'relay') {
+            return beginRelay(socket);
+        } else if (frame.action === 'report') {
+            await report(socket, scope, binding, peers, frame);
+        } else error(socket, 'unknown-action');
+    }
+    function reconcile() {
+        const rooms = new Map();
+        for (const ws of sockets()) {
+            const scope = ws.deserializeAttachment();
+            rooms.set(scope.ref, scope);
+            if (!member(scope)) close(ws, 4403, 'room membership ended');
+        }
+        for (const scope of rooms.values()) publish(scope);
+    }
+    async function maintain() {
+        for (const ws of sockets()) {
+            const scope = ws.deserializeAttachment(), binding = member(scope);
+            if (!binding || !await active(binding) || scope.joined && !await approve(scope, scope.tracks)) {
+                close(ws, 4403, 'call permission ended');
+            }
+        }
+        reconcile();
+    }
+    return { issue, upgrade, receive, reconcile, maintain };
+}

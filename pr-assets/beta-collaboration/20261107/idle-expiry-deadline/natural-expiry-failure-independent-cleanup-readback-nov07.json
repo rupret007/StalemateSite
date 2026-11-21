@@ -1,0 +1,64 @@
+{
+  "state": "ORIGINAL_FAILURE_PRESERVED_CLEANUP_AND_UNCHANGED_RUNTIME_INDEPENDENTLY_VERIFIED_NOT_EXPIRY_PASS",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "originalExpiryState": "FAILED_INSPECT_ORIGINAL",
+  "expiryPass": false,
+  "physicalCapture": false,
+  "newBrowserOrGuestStarted": false,
+  "deploymentAttempted": false,
+  "originalProofSha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+  "originalFinalizerPreserved": true,
+  "stage": "existing post-merge CI run readback",
+  "sameRemoteOriginalReceiptAndHarnessVerified": true,
+  "originalReceiptSha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+  "ownedProcesses": {
+    "52043": {
+      "pidPresent": false,
+      "originalOwnedCommandStillPresent": false
+    },
+    "52067": {
+      "pidPresent": false,
+      "originalOwnedCommandStillPresent": false
+    }
+  },
+  "ownedObserverAndAssertionGone": true,
+  "finalDeployedVersions": {
+    "stalemate-hangout-beta": {
+      "deployment": "f6cc2976-c845-4ca2-89b3-fa930347a16f",
+      "version": "33862058-10a5-4a6f-9659-38841d70292f",
+      "at100Percent": true
+    },
+    "webjam-turn-credentials": {
+      "deployment": "618e7517-42e1-422a-8449-5d04a2ecada0",
+      "version": "4db649fa-a465-44b4-8487-414987b3a660",
+      "at100Percent": true
+    }
+  },
+  "allPrivateSettingsStillMatchPreflight": true,
+  "credentialsPrintedOrPersisted": false,
+  "existingPostMergeCiRuns": [
+    {
+      "id": 42364214614,
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "sha": "9bbb8dbb3bf00c10790f9bf1bc986421d7964931"
+    },
+    {
+      "id": 42364214619,
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "sha": "9bbb8dbb3bf00c10790f9bf1bc986421d7964931"
+    },
+    {
+      "id": 42364209875,
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "sha": "9bbb8dbb3bf00c10790f9bf1bc986421d7964931"
+    }
+  ],
+  "allExistingPostMergeRunsSucceeded": true,
+  "completedAt": "2026-11-07T16:00:33.361938+00:00"
+}

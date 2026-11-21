@@ -1,0 +1,224 @@
+// @vitest-environment node
+import { expect, it, vi } from 'vitest';
+import { gameNightPassRecord } from '../../hangout-worker/src/game-night-pass.mjs';
+import { gameGuestScope, gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
+import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
+
+import { gameNightReturnHint, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+
+const { gameGuestNick, availableGameGuestNick } = createLobby();
+
+it('keeps a saved game only in a Game Night room', () => {
+    const fields = { ref: 'a'.repeat(32), until: 2000 };
+    const validRoom = room => gameNightRoomName(room) || room === '#general';
+    const gameRoom = { ...fields, room: '#game-1acbefx23acbe', game: 'chess' };
+    const lobbyRoom = { ...fields, room: '#general' };
+
+    expect(gameNightReturnHint(gameRoom, validRoom, 1000)).toEqual(gameRoom);
+    expect(gameNightReturnHint({ ...lobbyRoom, game: 'chess' }, validRoom, 1000)).toEqual(lobbyRoom);
+});
+
+it('closes legacy invitations for retired games, including previously accepted links', async () => {
+    const code = 'a'.repeat(32);
+    const attempt = 'b'.repeat(32);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(attempt));
+    const redeemer = Buffer.from(digest).toString('hex');
+    const scope = {
+        game: 'four', match: '11111111-1111-4111-8111-111111111111',
+        room: '#game-1acbefx23acbe', ref: 'c'.repeat(32), host: 'host-session-aaaa', nameSeed: 1
+    };
+    const invitation = { scope, until: Date.now() + 60000, version: '1' };
+    const env = { HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1' };
+
+    expect(gameGuestScope(scope)).toBeNull();
+    expect(gameGuestScope({ ...scope, game: 'chess' })).toMatchObject({ game: 'chess' });
+    for (const record of [invitation, { ...invitation, redeemer }]) {
+        const lobby = { env, state: { storage: { get: async () => record } } };
+        for (const [operation, body] of [['details', { code }], ['accept', { code, age13: true, attempt }]]) {
+            const result = await gameInvitationRequest(lobby, operation, body);
+            expect(result.status).toBe(410);
+            expect((await result.json()).error).toBe('This invite is no longer available. Ask your host for a new one.');
+        }
+    }
+});
+
+
+it('caps demo Chess links and admitted guests at the demo host session deadline', async () => {
+    vi.useFakeTimers();
+    try {
+        const now = Date.now();
+        const host = 'host-session-aaaa';
+        const rows = new Map();
+        let accepted;
+        const lobby = {
+            env: { HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1' },
+            state: { storage: {
+                get: async key => rows.get(key),
+                list: async () => rows,
+                put: async (key, record) => rows.set(key, record)
+            } },
+            controlBudget: { take: async () => true },
+            arcadeAvailable: game => game === 'chess',
+            arcadeBinding: () => ({ betaSid: host, betaInviteVersion: '1', canOpen: true, canPlay: true }),
+            sessionActive: async () => true,
+            engine: { invitedGameHost: () => 'c' + 'a'.repeat(32), gameGuestNick },
+            arcade: { get: () => ({
+                hasGuestSeat: async () => true,
+                guestTableId: async (_scope, match) => match,
+                guestNightEndsAt: async () => now + 16 * 60 * 60_000,
+                reserveGuestSeat: async (_scope, _sid, _until, key, record) => {
+                    rows.set(key, record);
+                    accepted = record;
+                    return true;
+                }
+            }) }
+        };
+        const payload = {
+            actor: 'c' + 'a'.repeat(32), room: '#game-1acbefx23acbe', ref: 'c'.repeat(32),
+            game: 'chess', match: '11111111-1111-4111-8111-111111111111'
+        };
+        const issue = async (demo, exp) => (await gameInvitationRequest(lobby, 'issue', payload, { betaSid: host, demo, exp })).json();
+        const hostDeadline = now + 6 * 60 * 60_000;
+        const ordinary = await issue(false), demo = await issue(true, hostDeadline);
+        expect(ordinary.until - now).toBe(72 * 60 * 60_000);
+        expect(demo.until).toBe(hostDeadline);
+        const shortHostDeadline = now + 5000;
+        const short = await issue(true, shortHostDeadline);
+        expect(short.until).toBe(shortHostDeadline);
+        const attempt = 'e'.repeat(32);
+        const accept = code => gameInvitationRequest(lobby, 'accept', { code, age13: true, attempt });
+        expect((await accept(demo.code)).status).toBe(200);
+        expect(accepted.exp).toBe(hostDeadline);
+        for (let count = 0; count < 6; count += 1) await issue(false);
+        const limited = await gameInvitationRequest(lobby, 'issue', payload, { betaSid: host });
+        expect(limited.status).toBe(429);
+        expect((await limited.json()).error).toBe('Too many invitations are still on record. Share a current link for this game or try again later.');
+        expect((await accept(ordinary.code)).status).toBe(200);
+        const guestDeadline = accepted.exp;
+        expect(guestDeadline - now).toBe(16 * 60 * 60_000);
+        expect(guestDeadline).toBeLessThan(ordinary.until);
+        vi.setSystemTime(shortHostDeadline - 1000);
+        expect((await accept(short.code)).status).toBe(200);
+        expect(accepted.exp).toBe(shortHostDeadline);
+        vi.setSystemTime(shortHostDeadline);
+        expect((await accept(short.code)).status).toBe(410);
+        expect((await gameInvitationRequest(lobby, 'details', { code: short.code })).status).toBe(410);
+        vi.setSystemTime(guestDeadline - 1);
+        expect((await accept(ordinary.code)).status).toBe(200);
+        vi.setSystemTime(guestDeadline);
+        expect((await accept(ordinary.code)).status).toBe(410);
+    } finally {
+        vi.useRealTimers();
+    }
+});
+
+it.each([
+    ['Game Night', '#game-1acbefx23acbe', false],
+    ['WebJam', '#jam-pass-test', true]
+])('resumes the %s hashed pass only for its current table and invite version', async (_label, room, webJam) => {
+    const pass = 'b'.repeat(64);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass));
+    const hash = Buffer.from(digest).toString('hex');
+    const tableId = '11111111-1111-4111-8111-111111111111';
+    const access = {
+        scope: { game: 'chess', match: tableId, tableId, room, ref: 'c'.repeat(32),
+            host: 'host-session-aaaa', nameSeed: 4 },
+        sid: 'guest-session-bbbb', exp: Date.now() + 60000
+    };
+    const rows = gameNightPassRecord(access, hash, '1');
+    const guestNightEndsAt = vi.fn(async () => access.exp);
+    const lobby = {
+        env: { HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1' },
+        state: { storage: { get: async key => rows[key] } },
+        arcadeAvailable: game => game === 'chess',
+        arcade: new Map([['chess', { guestNightEndsAt }]])
+    };
+    const resume = (table = tableId, candidate = pass) => gameInvitationRequest(lobby, 'resume', { tableId: table, pass: candidate });
+    if (webJam) {
+        expect((await resume()).status).toBe(410);
+        lobby.env.HANGOUT_GAME_NIGHT_ROOM_GRANTS = '1';
+    }
+    expect(await (await resume()).json()).toEqual(access);
+    expect(guestNightEndsAt).toHaveBeenCalledExactlyOnceWith(access.scope);
+    guestNightEndsAt.mockResolvedValueOnce(0);
+    expect((await resume()).status).toBe(410);
+    expect((await resume('22222222-2222-4222-8222-222222222222')).status).toBe(410);
+    expect((await resume(tableId, 'a'.repeat(64))).status).toBe(410);
+    lobby.env.HANGOUT_BETA_INVITE_VERSION = '2';
+    expect((await resume()).status).toBe(410);
+});
+
+it('keeps a Spades watch link read-only and bound to the same table through redemption and resume', async () => {
+    vi.useFakeTimers();
+    try {
+        const now = Date.now();
+        const host = 'host-session-aaaa';
+        const tableId = '11111111-1111-4111-8111-111111111111';
+        const replacementId = '22222222-2222-4222-8222-222222222222';
+        let currentTable = tableId;
+        const nightEndsAt = now + 60 * 60_000;
+        const rows = new Map();
+        const table = {
+            watchTableId: async scope => !scope.tableId || scope.tableId === currentTable ? currentTable : null,
+            guestNightEndsAt: async scope => scope.tableId === currentTable ? nightEndsAt : 0,
+            reserveGuestSeat: vi.fn()
+        };
+        const lobby = {
+            env: { HANGOUT_BETA_MODE: 'protected', HANGOUT_GAME_NIGHT_GUESTS: '1' },
+            state: { storage: {
+                get: async key => rows.get(key),
+                list: async ({ prefix }) => new Map([...rows].filter(([key]) => key.startsWith(prefix))),
+                put: async (key, record) => {
+                    if (typeof key === 'string') rows.set(key, record);
+                    else for (const [entry, value] of Object.entries(key)) rows.set(entry, value);
+                }
+            } },
+            controlBudget: { take: async () => true },
+            arcadeAvailable: game => game === 'turdspades',
+            arcadeBinding: () => ({ betaSid: host, nick: 'Host', betaInviteVersion: '1', canOpen: true, canPlay: true }),
+            sessionActive: async () => true,
+            engine: { invitedGameHost: () => 'c' + 'a'.repeat(32), gameGuestNick, availableGameGuestNick },
+            arcade: new Map([['turdspades', table]])
+        };
+        const payload = { actor: 'c' + 'a'.repeat(32), room: '#game-1acbefx23acbe', ref: 'c'.repeat(32),
+            game: 'turdspades', match: tableId, watch: true };
+        const issue = async (session = { betaSid: host }) => (await gameInvitationRequest(lobby, 'issue', payload, session)).json();
+        const pass = 'd'.repeat(64);
+        const passHash = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pass))).toString('hex');
+        const attempt = 'e'.repeat(32);
+        const accept = (code, data) => gameInvitationRequest(lobby, 'accept', { code, age13: true, attempt, passHash, ...data });
+        const details = code => gameInvitationRequest(lobby, 'details', { code });
+        const resume = id => gameInvitationRequest(lobby, 'resume', { tableId: id, pass });
+
+        const original = await issue();
+        const pending = await issue();
+        const short = await issue({ betaSid: host, demo: true, exp: now + 1000 });
+        expect(original.until).toBeGreaterThan(nightEndsAt);
+        expect(short.until).toBe(now + 1000);
+        expect(await (await details(original.code)).json()).toMatchObject({ host: 'Host', watch: true, inviteExpiresAt: original.until });
+        expect(await (await details(short.code)).json()).toMatchObject({ inviteExpiresAt: short.until });
+        expect((await accept(original.code, { age13: false })).status).toBe(400);
+        expect(await (await details(original.code)).json()).toMatchObject({ guestName: expect.stringMatching(/^Guest-\d{6}$/) });
+        expect((await accept(original.code, { nick: 'admin' })).status).toBe(422);
+        const admitted = await (await accept(original.code, { watch: false, nick: 'ArcadeFriend' })).json();
+        expect(admitted.scope).toMatchObject({ tableId, watch: true, nick: 'ArcadeFriend' });
+        expect(admitted.exp).toBe(nightEndsAt);
+        expect(await (await accept(original.code)).json()).toEqual(admitted);
+        expect((await accept(original.code, { attempt: 'f'.repeat(32) })).status).toBe(410);
+        expect(await (await resume(tableId)).json()).toEqual(admitted);
+        expect((await resume(replacementId)).status).toBe(410);
+
+        vi.setSystemTime(short.until);
+        expect((await details(short.code)).status).toBe(410);
+        expect((await accept(short.code)).status).toBe(410);
+        currentTable = replacementId;
+        expect((await details(pending.code)).status).toBe(410);
+        expect((await accept(pending.code)).status).toBe(410);
+        expect((await accept(original.code)).status).toBe(410);
+        expect((await resume(tableId)).status).toBe(410);
+        expect(table.reserveGuestSeat).not.toHaveBeenCalled();
+        expect(gameGuestScope({ ...admitted.scope, game: 'chess' })).toBeNull();
+    } finally {
+        vi.useRealTimers();
+    }
+});

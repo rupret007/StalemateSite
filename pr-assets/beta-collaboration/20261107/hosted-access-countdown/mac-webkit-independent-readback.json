@@ -1,0 +1,14 @@
+{
+  "proofSha256": "26627ca3a77ff99ae1161a41bbe867c302cd71e19258db3216d02c70599f9e69",
+  "harnessSha256": "b88b0c9be428c937a270cd04f2a2367a878bcc00805c10deeab3c40d3d9daede",
+  "ownedNodePids": [],
+  "at": "2026-11-07T18:38:08.732807+00:00",
+  "state": "SAME_MAC_WEBKIT_PROOF_HARNESS_AND_OWNED_NODE_EXIT_VERIFIED",
+  "screenshots": {
+    "hosted-webkit-375-c227104-nov07.png": "3722580138ebaa0c49aae4869dafc7d8f4a6f4e1a7dfae4bdd356b94edaa26cf",
+    "hosted-webkit-390-c227104-nov07.png": "dcedbeae8acc0cf5b2d1f98252495e3d4d112f1e6d6f5de9353f0266d4ebe137"
+  },
+  "physicalCapture": false,
+  "browserCloseScope": "Harness awaited its own browser.close before the matching terminal receipt; no separate historical browser PID recorded",
+  "releaseCandidateComplete": false
+}

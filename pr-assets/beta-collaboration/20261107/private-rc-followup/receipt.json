@@ -1,0 +1,24 @@
+{
+  "recordedAt": "2026-11-07T04:22:23.522102+00:00",
+  "source": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "version": "75655a50-9e13-4966-bb68-22b45a230c1d",
+  "previousEvidenceMerge": "981b88dce3b579b8d0fedae4daf4095177817a26",
+  "candidateChanged": false,
+  "publicSitesChanged": false,
+  "limitsChanged": false,
+  "microphoneOrRelayTrialStarted": false,
+  "fullGoalAccepted": false,
+  "resetHintPR": "https://github.com/rupret007/webjam/pull/449",
+  "macOSWebKitAudioDiagnostic": "https://github.com/rupret007/webjam/issues/448",
+  "files": {
+    "hosted-webkit-completed.json": "4cf911eadcf46629ade84b604212d5b032cb4c0b8912c424bd3005f8237c0c6c",
+    "read-only-health.json": "3742cc0c45e2094997856e6a595588e9c795da2f04ca66a6eb9dedded8b06dd9",
+    "realtime-usage-headroom.json": "d9001bb562d7e83e3f119e7d586d09ffec22e80897250dd946397c006379ea44",
+    "room-workload-browser-entry.json": "7951f7e313ada248be401c0609bbc726f70593c6e8e3464d6b7654a65f5a4a29",
+    "room-workload-first-attempt.json": "fe54dd47e7668bf002c47a84233810a41859cd4785ad6774660ecd4832663093",
+    "single-admission-check.json": "64c04e215c4fe07a6af64985004acbb457f1358396447f46067e214699f626ec"
+  },
+  "resetHintMerge": "e735a048de82e26c424e31964a30f1dfbd548df9",
+  "resetHintReviewedHead": "ec4bfdfa705b7ba32707fe26174265c77dae2e7a",
+  "resetHintDeployed": false
+}

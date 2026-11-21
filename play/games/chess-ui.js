@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { Chess, createGame, playMove, claimDraw, claimReason, intendedClaims, undoTurn, resign,
   loadGame, saveGame, recordResult, readResults, exportPgn, LEVELS, colorName, pieceName } from './chess-core.js?v=99a08f6ff639de1d';
-import { ChessEngine } from './chess-engine.js?v=278c2488721a0324';
+import { ChessEngine } from './chess-engine.js?v=abf1f1c7c038c50b';
 import { pieceSvg, PIECE_GUIDE, loadPieceArtwork } from './chess-pieces.js';
 import { ChessBoard, MOVE_ANIMATION_MS } from './chess-board.js?v=9a72af72421e8d82';
 
@@ -150,7 +150,7 @@ function renderBoard() {
   const files = [...'abcdefgh'];
   const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
   if (game.flipped) { files.reverse(); ranks.reverse(); }
-  const frag = document.createDocumentFragment();
+  const ordered = [];
   for (const rank of ranks) {
     for (const file of files) {
       const square = `${file}${rank}`;
@@ -164,21 +164,29 @@ function renderBoard() {
       const target = legal.find(move => move.to === square);
       const checked = piece?.type === 'k' && piece.color === chess.turn() && chess.isCheck();
       const lastSquare = last && [last.from, last.to].includes(square);
-      button.className = ['square', (file.charCodeAt(0) + rank) % 2 ? '' : 'dark',
+      const classes = ['square', (file.charCodeAt(0) + rank) % 2 ? '' : 'dark',
         square === selected ? 'selected' : '', target ? 'legal' : '', target?.captured ? 'capture' : '',
         lastSquare ? 'last' : '', checked ? 'checked' : '', hintMove && [hintMove.slice(0, 2), hintMove.slice(2, 4)].includes(square) ? 'hinted' : ''].filter(Boolean).join(' ');
-      button.innerHTML = `${file === files[0] ? `<span class="coord rank" aria-hidden="true">${rank}</span>` : ''}${rank === ranks[7] ? `<span class="coord file" aria-hidden="true">${file}</span>` : ''}${checked ? '<span class="check-label" aria-hidden="true">CHECK</span>' : ''}`;
-      button.setAttribute('aria-label', `${square}, ${piece ? `${colorName(piece.color)} ${pieceName(piece.type)}` : 'empty'}${checked ? ', in check' : ''}${target ? target.captured ? ', legal capture' : ', legal move' : ''}${lastSquare ? ', last move' : ''}${hintMove && [hintMove.slice(0, 2), hintMove.slice(2, 4)].includes(square) ? ', hint' : ''}`);
-      button.setAttribute('aria-pressed', String(selected === square));
-      button.tabIndex = square === focused ? 0 : -1;
-      frag.append(button);
+      const marks = `${file === files[0] ? `<span class="coord rank" aria-hidden="true">${rank}</span>` : ''}${rank === ranks[7] ? `<span class="coord file" aria-hidden="true">${file}</span>` : ''}${checked ? '<span class="check-label" aria-hidden="true">CHECK</span>' : ''}`;
+      const label = `${square}, ${piece ? `${colorName(piece.color)} ${pieceName(piece.type)}` : 'empty'}${checked ? ', in check' : ''}${target ? target.captured ? ', legal capture' : ', legal move' : ''}${lastSquare ? ', last move' : ''}${hintMove && [hintMove.slice(0, 2), hintMove.slice(2, 4)].includes(square) ? ', hint' : ''}`;
+      const pressed = String(selected === square);
+      const tabIndex = square === focused ? 0 : -1;
+      if (button.className !== classes) button.className = classes;
+      if (button.innerHTML !== marks) button.innerHTML = marks;
+      if (button.getAttribute('aria-label') !== label) button.setAttribute('aria-label', label);
+      if (button.getAttribute('aria-pressed') !== pressed) button.setAttribute('aria-pressed', pressed);
+      if (button.getAttribute('tabindex') !== String(tabIndex)) button.tabIndex = tabIndex;
+      ordered.push(button);
     }
   }
-  // Moving existing buttons retains listeners, but reinsertion can lose focus.
   boardView.update({ chess, id: game.id, view: reviewing ?? 'live', flipped: game.flipped,
     selected, hint: hintMove, last, allowed: canMove(), local: game.mode === 'local' });
-  boardView.grid.replaceChildren(frag);
-  if (active) { focusBoard(active); }
+  const grid = boardView.grid;
+  const orderChanged = grid.children.length !== ordered.length
+    || ordered.some((button, index) => grid.children[index] !== button);
+  // Selection and ordinary moves keep the existing keyboard grid and focus.
+  if (orderChanged) grid.replaceChildren(...ordered);
+  if (active && (orderChanged || focused !== active)) focusBoard(active);
   const topColor = game.flipped ? 'w' : 'b';
   const label = color => game.mode === 'local' ? `${colorName(color)} pieces` : color === game.side ? `You · ${colorName(color)}` : `Computer<span class="player-level"> · ${LEVELS[game.level].label}</span> · ${colorName(color)}`;
   $('top-player').innerHTML = label(topColor);

@@ -28,6 +28,26 @@ async function fixture({ logs = [], initialize = true } = {}) {
 }
 const log = (n, at = NOW) => ({ at, by: 'TestOwner', action: 'room-register', target: `#test-${n}`, reason: '', ch: '#stalemate' });
 describe('known lobby effects in one physical-record transaction', () => {
+    it('persists Game Night as an ordinary invite-only chat record without the call URL', async () => {
+        const f = await fixture(), frames = [];
+        const app = createLobby({ gameNight: true, now: () => NOW, send: (_, frame) => frames.push(frame) });
+        const room = '#game-123456x789012';
+        app.connect({ id: 'host', dev: 'test-host-device', iph: 'test-host-ip', role: 'fan' });
+        app.message('host', JSON.stringify({ t: 'hello', nick: 'GameHost', age13: true }));
+        app.message('host', JSON.stringify({ t: 'cmd', ch: '#stalemate', name: 'join', args: [room] }));
+        const view = frames.findLast(m => m.t === 'join').ch;
+        expect(view).toMatchObject({ name: room, kind: 'game' });
+        app.message('host', JSON.stringify({ t: 'cmd', ch: room, roomInstance: view.keepRef, name: 'discord',
+            args: ['https://discord.gg/GameNightFixture'] }));
+        expect(frames.findLast(m => m.t === 'chan').ch.gameCall).toBe('https://discord.gg/GameNightFixture');
+
+        await f.write([['rooms', app.roomSnapshot()]]);
+        const { rooms } = await f.read();
+        expect(rooms.rooms).toHaveLength(1);
+        expect(rooms.rooms[0]).toMatchObject({ name: room, kind: 'chat', modes: { i: true, C: false } });
+        expect(JSON.stringify(rooms)).not.toContain('GameNightFixture');
+    });
+
     it('requires explicit known-new initialization and refuses missing or overwritten initialized state', async () => {
         const f = await fixture({ initialize: false });
         await expect(f.read()).rejects.toThrow('lobby-effects-unavailable');
@@ -94,6 +114,39 @@ describe('known lobby effects in one physical-record transaction', () => {
         await expect(f.write([['net', getter]])).rejects.toThrow();
         await expect(f.write([['net', { ...f.initial.net, toJSON() { invoked++; return f.initial.net; } }]])).rejects.toThrow();
         expect(invoked).toBe(0);
+    });
+    it.each([false, true])('writes compatible controlled delivery receipts with a second device present: %s', async withWitness => {
+        const f = await fixture(), frames = [];
+        const engine = createLobby({ now: () => NOW, send: (recipient, frame) => frames.push({ recipient, frame }),
+            effectCommit: {
+                prepare: operation => operation,
+                async commit(_context, effects) {
+                    await f.write(effects.filter(([kind]) => kind === 'sessions'));
+                    return { ok: true };
+                }
+            }
+        });
+        const sender = { id: 'socket_sender', dev: 'device_sender', iph: 'ip_sender', role: 'fan' };
+        const witness = { id: 'socket_witness', dev: 'device_witness', iph: 'ip_witness', role: 'fan' };
+        const participants = withWitness ? [sender, witness] : [sender];
+        const message = (who, frame) => engine.message(who.id, JSON.stringify(frame));
+        for (const [who, nick] of [[sender, 'SoloSender'], ...(withWitness ? [[witness, 'OtherVisitor']] : [])]) {
+            expect(await engine.connect(who)).toMatchObject({ ok: true });
+            await message(who, { t: 'hello', nick, age13: true });
+        }
+        const text = 'A line already delivered to this conversation';
+        const send = await message(sender, { t: 'say', ch: '#stalemate', text });
+        expect(send?.ok, 'protected say must survive the effect reader').not.toBe(false);
+        const delivered = frames.filter(({ frame }) => frame.t === 'line' && frame.text === text);
+        expect(delivered.map(({ recipient }) => recipient).sort()).toEqual(participants.map(({ id }) => id).sort());
+        const lineId = delivered[0].frame.id;
+        const { sessions } = await f.read();
+        const receipt = sessions.receipts.find(row => row.id === lineId);
+        expect(receipt).toMatchObject({ t: 'line', id: lineId, ch: '#stalemate', from: 'SoloSender',
+            authorDev: sender.dev, digest: expect.stringMatching(/^[a-f0-9]{64}$/) });
+        expect(receipt.recipients.slice().sort()).toEqual(participants.map(({ id }) => id).sort());
+        expect(receipt).not.toHaveProperty('controlOnly');
+        expect(JSON.stringify(sessions)).not.toContain(text);
     });
     it('rejects PM bodies in otherwise valid session pending and receipt metadata', async () => {
         const f = await fixture(), engine = createLobby({ now: () => NOW });

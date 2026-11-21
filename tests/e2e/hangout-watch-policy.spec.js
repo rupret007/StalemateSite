@@ -199,7 +199,11 @@ for (const surface of ['private', 'channel']) {
         await room.load(); await expectBlocked(room.guest.page, room.tap);
         await expect.poll(() => room.host.page.evaluate(() => window.__ytLog?.length || 0)).toBe(1);
         expect(await room.host.page.evaluate(() => window.__ytAutoplayControl.readyEvents || 0)).toBe(0);
-        if (surface === 'private') { await room.host.page.click('[data-bob-toggle]'); await room.host.page.click('[data-bob-hold]'); }
+        if (surface === 'private') {
+            await room.host.page.click('[data-bob-toggle]');
+            if (await room.host.page.locator('[data-ask-no]').isVisible()) await room.host.page.click('[data-ask-no]');
+            await room.host.page.click('[data-bob-hold]');
+        }
         else await room.host.page.evaluate(video => window.__lobby.ws.send(JSON.stringify({ t: 'act', kind: 'video', ch: '#watch-autoplay', source: video.source, playing: false, pos: 0 })), await room.shared(room.host.page));
         await expect.poll(async () => (await room.shared(room.guest.page))?.playing).toBe(false);
         await room.host.page.evaluate(() => window.__ytAutoplayControl.players[0].finishReady());

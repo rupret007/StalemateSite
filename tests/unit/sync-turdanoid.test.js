@@ -19,7 +19,7 @@ function fixture() {
     const upstream = join(base, 'upstream');
     mkdirSync(join(root, 'scripts/lib'), { recursive: true });
     mkdirSync(join(root, 'scripts/stalemate-overlay'), { recursive: true });
-    for (const file of ['scripts/sync-turdanoid.sh', 'scripts/lib/sync-turdanoid.cjs', 'scripts/lib/arcade-asset-versions.cjs', 'scripts/play-track.js', 'scripts/play-music-pref.js', 'scripts/play-music-pref.css', 'scripts/stalemate-strip.css', 'scripts/chess-stockfish-loader.js']) {
+    for (const file of ['scripts/sync-turdanoid.sh', 'scripts/lib/sync-turdanoid.cjs', 'scripts/lib/arcade-asset-versions.cjs', 'scripts/play-track.js', 'scripts/play-music-pref.js', 'scripts/play-music-pref.css', 'scripts/stalemate-strip.css', 'scripts/stalemate-arcade-music.patch', 'scripts/chess-stockfish-loader.js']) {
         cpSync(join(sourceRoot, file), join(root, file));
     }
     for (const song of songs) writeFileSync(join(root, 'scripts/stalemate-overlay', song), song);
@@ -28,10 +28,10 @@ function fixture() {
     mkdirSync(join(upstream, 'games'), { recursive: true });
     const html = '<!doctype html><html><head><meta name="robots" content="index"><meta http-equiv="Content-Security-Policy" content="default-src *"></head><body><h1>First revision</h1></body></html>';
     for (const page of ['index', 'TurdAnoid', 'turdtris', 'turdjack', 'crapeights', 'turdrummy', 'turdspades', 'turdomania', 'chess', 'turdrush', 'neon-arkanoid', 'hub']) writeFileSync(join(upstream, `${page}.html`), html);
-    writeFileSync(join(upstream, 'index.html'), html.replace('</body>', '<details class="changelog"><summary>Latest Changelog</summary>Private dev notes</details></body>'));
+    writeFileSync(join(upstream, 'index.html'), html.replace('</body>', '<details class="changelog"><summary>Latest Changelog</summary>Private dev notes</details><p class="footer-note">Arcade fixture</p></body>'));
     writeFileSync(join(upstream, 'game.js'), '/* upstream game */');
     writeFileSync(join(upstream, 'favicon.svg'), '<svg/>');
-    writeFileSync(join(upstream, 'assets/suite-music.js'), 'export const music = true;');
+    for (const file of ['suite-music.js', 'turdsuite.js']) cpSync(join(sourceRoot, 'play/assets', file), join(upstream, 'assets', file));
     writeFileSync(join(upstream, 'games/core.js'), 'export const core = true;');
     writeFileSync(join(upstream, 'games/core.test.js'), 'do not ship');
     mkdirSync(join(upstream, 'assets/chess'), { recursive: true });
@@ -39,6 +39,7 @@ function fixture() {
     writeFileSync(join(upstream, 'games/chess-engine.js'), "new globalThis.URL('../assets/chess/stockfish-19-lite-single.js', import.meta.url)");
     const git = (...args) => execFileSync('git', args, { cwd: upstream, encoding: 'utf8' }).trim();
     git('init', '--quiet', '-b', 'main');
+    git('apply', '-R', join(root, 'scripts/stalemate-arcade-music.patch'));
     git('add', '.');
     git('-c', 'user.name=Arcade test', '-c', 'user.email=arcade-test@example.invalid', 'commit', '--quiet', '-m', 'Fixture');
     const first = git('rev-parse', 'HEAD');
@@ -94,6 +95,10 @@ describe('committed Turdanoid synchronization', () => {
         expect(hub.match(/http-equiv="Content-Security-Policy"/g)).toHaveLength(1);
         expect(hub).toContain("default-src 'self'");
         expect(hub).toContain('Stalemate Arcade');
+        expect(hub).toContain('<a href="../#contact">Contact</a>');
+        for (const file of ['suite-music.js', 'turdsuite.js']) {
+            expect(readFileSync(join(play, 'assets', file), 'utf8')).toBe(readFileSync(join(sourceRoot, 'play/assets', file), 'utf8'));
+        }
         expect(hub).toContain('https://stalemate.band/play/stalemate/og-play.png');
         const overlayVersion = createHash('sha256').update(readFileSync(join(play, 'stalemate/stalemate-overlay.js'))).digest('hex').slice(0, 16);
         expect(readFileSync(join(play, 'TurdAnoid.html'), 'utf8').match(/src="stalemate\/stalemate-overlay\.js(?:\?[^"]*)?"/g)).toEqual([`src="stalemate/stalemate-overlay.js?v=${overlayVersion}"`]);

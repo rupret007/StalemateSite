@@ -1,0 +1,25 @@
+{
+  "at": "2026-11-07T13:02:44.173176+00:00",
+  "state": "INDEPENDENT_THREE_ENTRANCE_PROOF_HASH_HARNESS_AND_OWNED_NODE_EXIT_VERIFIED",
+  "remoteProofSha256": "ecfb097d9ca20ce0501595a4ab762de42fd6b423ca4c58347d2e1efaf4f7915e",
+  "harnessSha256": "187444ad6bc52a5991ea0eedcb41440f36282c85d02d56cff5ce4bdc50f3f3c6",
+  "originalOwnedNodeCommandRemaining": false,
+  "allSevenStagesPassed": true,
+  "ordinaryGuests": 3,
+  "threeDistinctLoopbackWebsiteOrigins": true,
+  "actualHostedPrivateService": true,
+  "realPartnerDomainVerificationClaimed": false,
+  "noRegisteredIntegrationOrSettingsChanged": true,
+  "physicalCaptureRequests": 0,
+  "logout": [
+    200,
+    200,
+    200
+  ],
+  "copiedCookieAfterLogout": [
+    401,
+    401,
+    401
+  ],
+  "normalExpiryObserverUnchanged": true
+}

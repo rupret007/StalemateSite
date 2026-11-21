@@ -1,0 +1,157 @@
+{
+  "schema": "webjam.private-source-qualification.v1",
+  "observedAt": "2026-11-10T08:51:15.138950+00:00",
+  "website": {
+    "pr": 253,
+    "merge": "11c9d1f8e73233eeaf601a1fef304b57568ae639",
+    "head": "d53ff7f87070dad7acf0183b0e1f63181b242c6c",
+    "base": "53ae7bdbd4d4a991476e967ad5e603ad5c43d936",
+    "tree": "09d02dc9df44dc62ceeb56658dc0fbc8354be051",
+    "mergedTreeEqualsBothQualifiedSourceTrees": true,
+    "bothCiSuccess": [
+      42774481695,
+      42774439018
+    ],
+    "unitEach": 2110,
+    "browserEach": 904,
+    "rootProjectEach": [
+      34,
+      34
+    ],
+    "fullLogsReviewed": true,
+    "pagesSkipped": true
+  },
+  "upstream": {
+    "pr": 466,
+    "reviewedHead": "098c57250b5ed2b97c233d7e843f5c5d1297a9e8",
+    "merge": "01804299f3940f243b06f88749d488e03f08cf5c",
+    "tree": "1efc6a0f2db8d583d4db31fa8e81ae236695f60c",
+    "ciRuns": [
+      42772461223,
+      42772461272,
+      42772461250
+    ],
+    "applicationPassed": 12976,
+    "existingSkipped": 60,
+    "uniqueModules": 566,
+    "webJoinUnit": 44,
+    "browser": 69,
+    "worker": 87,
+    "nativeRuntimeSourceChanged": false,
+    "existingNativePackagesRemainSource": "67c7ef08e515c84eb2b0736c474ec2c4b0c21682"
+  },
+  "preparedPackage": {
+    "preparedAssetsSourceRemains": "d53ff7f87070dad7acf0183b0e1f63181b242c6c",
+    "assetCount": 70,
+    "assetBytes": 25791406,
+    "allOutputBytesEqualActualMergedSource": true,
+    "workerSourceUnchangedFromRecordedC83": true,
+    "originalPreparationManifestSha256": "040f19e1079f1a0a7aa55bfb42645ab1d3f36cd41301a9c4653e864ce8112c3f",
+    "providerCalled": false,
+    "uploaded": false,
+    "trafficChanged": false,
+    "admitted": false,
+    "existingHoldRecoveryApprovalStillPending": true
+  },
+  "applicationProviderStartCi": {
+    "ciRun": 42780185842,
+    "ciJob": 129708072371,
+    "actualTestedSynthetic": "55a57c9dccc7f04569abd98750aee8b119de74cc",
+    "actualTestedTree": "09d02dc9df44dc62ceeb56658dc0fbc8354be051",
+    "actualTestedTreeEqualsCurrentPrivateSource": true,
+    "actualCommand": "npm run --silent test:lobby-session-runtime -- --participation --provider-start",
+    "providerStartExitCode": 0,
+    "allRecordedModeExitFilesZero": 15,
+    "artifact": 13745871900,
+    "artifactBytes": 106944,
+    "artifactSha256": "78cb5282efe35a26a516b5376ec76cbf2e6b3311bfc94c1521a774bc64aaf850",
+    "workflowExplicitInputHashesMatched": 50,
+    "providerStartTrackedInputHashesMatched": 49,
+    "trackedBundleInputsMatched": 38,
+    "recordedLockedDependencyBundleInputs": 30,
+    "nativeOwnerStartInvocationBoundaryQualified": true,
+    "productionParticipationCompositionQualified": true,
+    "localGatewayWebSocketSessionAuthorityQualified": true,
+    "guardianDecisionsQualified": false,
+    "providerActivationQualified": false,
+    "zeroNetworkCallbackOnly": true,
+    "originalNinePlusThreeQualifiedByThisMode": false,
+    "providerStartCaseCount": 5,
+    "activeNativeCallbacksAtEnd": 0,
+    "pendingResponsesAtEnd": 0,
+    "temporaryStateRemoved": true,
+    "coldRuntimeExitAndOwnedCleanupConfirmed": true,
+    "checks": [
+      "actual-original-owner-and-readonly-native-TX-before-once-start",
+      "same-request-identity-cannot-start-twice",
+      "held-response-releases-owner-for-realStop-and-healthy-publication",
+      "committedStop-and-revoke-prevent-captured-start",
+      "native-callback-close-sync-fence-prevents-start-and-close-promise-is-awaited-after-dispatch",
+      "complete-private-state-scan-and-one-live-owned-loss-checkpoint"
+    ],
+    "scope": "Actual current-source application/workerd mode in hosted CI. Not StoryPool core, native desktop/media, real guardian decisions, hosted capacity, provider activation or private deployment proof.",
+    "noManualRerunOrDispatch": true
+  },
+  "entryToolkit": {
+    "source": "d53ff7f87070dad7acf0183b0e1f63181b242c6c",
+    "ciRun": 42774439018,
+    "artifact": 13745151157,
+    "archiveBytes": 8619,
+    "archiveSha256": "c7364d4749eede098e58af54e32c67925cc422f7278c141f40cac956be3f57fd",
+    "files": 8,
+    "payloadsVerified": 7,
+    "sourceInputsVerified": 4,
+    "crcSafeRelativePathsNoSymlinks": true,
+    "allPayloadBytesMatchPreviouslyQualifiedToolkit": true,
+    "onlyManifestSourceRevisionChanged": true,
+    "currentExporterAndInputHashesMatchSource": true,
+    "sourceManifestIsNotDeploymentProof": true,
+    "noPublicEntryInstalled": true,
+    "redistributionLicenseQualified": false,
+    "licenseNoticePreserved": true
+  },
+  "priorGuideArchive": {
+    "path": "hangout-internal/HANGOUT_PRIVATE_READINESS_HISTORY_20261110_BEFORE_AUDIO_STATS.md",
+    "sha256": "91aa331d6f53f08ebf91728e5eb73f6fa722641b488f18631d39855a25508bd0",
+    "exactPriorBytes": true
+  },
+  "canonicalRequirements": {
+    "count": 62,
+    "fileSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+    "orderedRawIdOutcomeCellsSha256": "94001557e0ea50e92e0e7ab6b63592092d6540c2debdf616e6a5d85318370988"
+  },
+  "notQualified": [
+    "private delivery of current candidate",
+    "current physical Music and acoustic latency",
+    "actual WAV/MP3 plus live input mix",
+    "Webex join/video/exclusive audio handoff",
+    "all desktop hardware roles",
+    "hosted capacity",
+    "full assistive technology and mobile qualification",
+    "public/all-ages/operator/legal launch",
+    "uncoached newcomer completion"
+  ],
+  "publicEntranceChanged": false,
+  "configurationOrProviderHoldChanged": false,
+  "extraSpend": 0,
+  "postmergeWebsiteCi": {
+    "observedAt": "2026-11-10T08:51:46.758034+00:00",
+    "run": 42780178022,
+    "job": 129708052037,
+    "source": "11c9d1f8e73233eeaf601a1fef304b57568ae639",
+    "conclusion": "success",
+    "unitFiles": 139,
+    "unitPassed": 2110,
+    "browserPassed": 904,
+    "localRootProjectChecks": [
+      34,
+      34
+    ],
+    "firstFailureOrFlakySummary": false,
+    "pagesJob": 129722666687,
+    "pagesConclusion": "skipped",
+    "logBytes": 352279,
+    "logSha256": "127c1046cec7b2722287c1020eb70f6c44abedc04359ec065f51cc04c7cea0f0",
+    "scope": "Automatic postmerge source CI; root/project checks use local servers, not hosted private deployment or physical media."
+  }
+}

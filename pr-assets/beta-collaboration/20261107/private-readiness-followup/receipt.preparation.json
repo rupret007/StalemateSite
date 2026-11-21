@@ -1,0 +1,106 @@
+{
+  "preparedAt": "2026-11-07T16:54:44.146751+00:00",
+  "scope": "Prepared source/shortcut/CI, actual failed natural expiry with independent cleanup, and controlled local native before/after alarm proof. No repaired deployment or repaired hosted eight-hour PASS.",
+  "payloads": {
+    "relay-same-network-source-review-nov07.json": {
+      "sha256": "a7a801aa69c60c8862cb7f3110940182eb0320b50ea6aa87d951a4225dec2a7b",
+      "originalSha256": "a7a801aa69c60c8862cb7f3110940182eb0320b50ea6aa87d951a4225dec2a7b",
+      "transform": "exact bytes"
+    },
+    "relay-source-review-first-assertion-stop-nov07.json": {
+      "sha256": "3ad34afcbbea721c892ec4ce4dfd4dcb5a157616160975ad312f51e68756897a",
+      "originalSha256": "3ad34afcbbea721c892ec4ce4dfd4dcb5a157616160975ad312f51e68756897a",
+      "transform": "exact bytes"
+    },
+    "macbook-friendly-launch-location-readback-nov07.json": {
+      "sha256": "77d54964797e5a603712a539ab3736aa67777cfa323bab5143e75ab456d833f3",
+      "originalSha256": "c5193750b047e7db62310b33a72c1427daa8da77bfb7924eaf7f2730064f8075",
+      "transform": "JSON reserialized; absolute user-home prefix replaced by ~/"
+    },
+    "macbook-desktop-shortcut-current-nov07.json": {
+      "sha256": "ff8a2c9dec6b981cb1ddd81b08eda8f5b8dc602ffc830bd78603f5206bcd2ee4",
+      "originalSha256": "69b76dcfd96593b9c63736e74d48cc55f0e1b088036766ef0f9a7e8eabe6a2b7",
+      "transform": "JSON reserialized; absolute user-home prefix replaced by ~/"
+    },
+    "macbook-current-package-layout-review-nov07.json": {
+      "sha256": "37a88ee2c021111bbbe92ecc13a4d3cbe3db533823d0a48762d9eb797d87e548",
+      "originalSha256": "37a88ee2c021111bbbe92ecc13a4d3cbe3db533823d0a48762d9eb797d87e548",
+      "transform": "exact bytes"
+    },
+    "macbook-desktop-shortcut-current-canonical-layout-nov07.json": {
+      "sha256": "aa50a6f583ea555c9d3b2d2d4686c5f4904e33598af6224410b9a2ff6cf78f4e",
+      "originalSha256": "05619a0ee94d559e6ad6a112e31dc81831e23981d05234f0060fe7010e355812",
+      "transform": "JSON reserialized; absolute user-home prefix replaced by ~/"
+    },
+    "cold-lobby-reviewed-ci-logs-nov07.json": {
+      "sha256": "5216d4ff71f5882025853ae9c0bbf6e3ee61ec8e1641d3254f85a466631df1b9",
+      "originalSha256": "5216d4ff71f5882025853ae9c0bbf6e3ee61ec8e1641d3254f85a466631df1b9",
+      "transform": "exact bytes"
+    },
+    "macbook-desktop-shortcut-independent-readback-nov07.json": {
+      "sha256": "f48fae54f72ff74f5cde81046e5edaacc55bdf7a8388f25b0963f7eb28a670e6",
+      "originalSha256": "f48fae54f72ff74f5cde81046e5edaacc55bdf7a8388f25b0963f7eb28a670e6",
+      "transform": "exact bytes"
+    },
+    "hosted-natural-expiry-current-nov07.json": {
+      "sha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+      "originalSha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+      "transform": "exact bytes"
+    },
+    "natural-expiry-readonly-finalizer-nov07.json": {
+      "sha256": "1491b3b07505d5c7626fb884dff435822e4c0cc8bce521ce07ce22cc0f7c2164",
+      "originalSha256": "1491b3b07505d5c7626fb884dff435822e4c0cc8bce521ce07ce22cc0f7c2164",
+      "transform": "exact bytes"
+    },
+    "natural-expiry-terminal-failure-triage-nov07.json": {
+      "sha256": "066b21361fe068df199e40e9a87302c6e2f4a5f2a8680865cf4ff696f8d03604",
+      "originalSha256": "066b21361fe068df199e40e9a87302c6e2f4a5f2a8680865cf4ff696f8d03604",
+      "transform": "exact bytes"
+    },
+    "natural-expiry-failure-independent-cleanup-readback-nov07.json": {
+      "sha256": "c6313a3e8c92ee3d6a342dd8079f89e49a92400f1088303f0f1bef6c9d723bdd",
+      "originalSha256": "c6313a3e8c92ee3d6a342dd8079f89e49a92400f1088303f0f1bef6c9d723bdd",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-native-preparation-nov07.json": {
+      "sha256": "e008480ea97cafc058b75e94bfc1f1958e1d91626fd6392430bffe6143db0ded",
+      "originalSha256": "e008480ea97cafc058b75e94bfc1f1958e1d91626fd6392430bffe6143db0ded",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-native-preparation-root-directory-correction-nov07.json": {
+      "sha256": "f4dd6809538e2237c162525b34e5fc92d1ec1059b472192756f5cbd1f7922c36",
+      "originalSha256": "f4dd6809538e2237c162525b34e5fc92d1ec1059b472192756f5cbd1f7922c36",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-native-runtime-controller-nov07.json": {
+      "sha256": "24dc72f27c72e6c5a82322cc5ae6c63fdb152f20df36155834c4bb23992f1871",
+      "originalSha256": "24dc72f27c72e6c5a82322cc5ae6c63fdb152f20df36155834c4bb23992f1871",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-native-runtime-crypto-import-controller-nov07.json": {
+      "sha256": "efe4c81a57d09172700d4fe723cbc89ca4a77e1a73bbb3007dab9d96a499c509",
+      "originalSha256": "efe4c81a57d09172700d4fe723cbc89ca4a77e1a73bbb3007dab9d96a499c509",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-native-fixture-nov07.mjs": {
+      "sha256": "e2f1cc96991b0e47b71d4e140316b57685b444d9c3babd3fd32300ca09d5e5d3",
+      "originalSha256": "e2f1cc96991b0e47b71d4e140316b57685b444d9c3babd3fd32300ca09d5e5d3",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-native-runner-nov07.mjs": {
+      "sha256": "5133b0142452896b7e85e0f580aa7f322895123b65b7f107b8e84140865f374b",
+      "originalSha256": "5133b0142452896b7e85e0f580aa7f322895123b65b7f107b8e84140865f374b",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-native-runner-crypto-import-nov07.mjs": {
+      "sha256": "ae6c6f7a5fd2e3fbeeb7a31306c3f39dfc4131503eef29abdd3d3f251993ba9d",
+      "originalSha256": "ae6c6f7a5fd2e3fbeeb7a31306c3f39dfc4131503eef29abdd3d3f251993ba9d",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-private-candidate-preparation-nov07.json": {
+      "sha256": "5f099ddb1403666be740356ee1c06ba7f8348d47e75f08dc2e1028b617bfb263",
+      "originalSha256": "5f099ddb1403666be740356ee1c06ba7f8348d47e75f08dc2e1028b617bfb263",
+      "transform": "exact bytes"
+    }
+  }
+}

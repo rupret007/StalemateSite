@@ -143,6 +143,140 @@ describe('HangoutLobby AI review integration', () => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe('protected lobby invitations', () => {
+    const origin = 'https://music.example.test';
+    const protectedEnv = {
+        HANGOUT_BETA_MODE: 'protected',
+        HANGOUT_BETA_INVITE_VERSION: '1',
+        BETA_SESSIONS: { idFromName: name => name, get: () => ({ fetch: async () => new Response('active') }) },
+    };
+    const admitted = label => ({
+        ...identity,
+        dev: `device-${label}`,
+        betaSid: `fixture-beta-${label}-123456`,
+        betaInviteVersion: '1',
+        expiresAt: Date.now() + 120000,
+    });
+
+    it.each([
+        ['protected beta with an approved origin', { ...protectedEnv, WEBJAM_WEB_ORIGINS: origin }, true],
+        ['protected beta without an approved origin', protectedEnv, false],
+        ['legacy lobby with an approved origin', { WEBJAM_WEB_ORIGINS: origin }, false],
+    ])('advertises targeted Music invitations only in the intended mode: %s', async (_label, env, available) => {
+        const pairs = installUpgradeRuntime();
+        const lobby = new HangoutLobby(stateWith(), env);
+        if (env.HANGOUT_BETA_MODE === 'protected') expect((await lobby.fetch(request())).status).toBe(403);
+        const response = await lobby.fetch(request(admitted('hello')));
+        expect(response.status).toBe(101);
+        const hello = pairs[0][1].frames.find(frame => frame.t === 'hello');
+        expect(hello.features.directMusicInvites).toBe(available ? 1 : undefined);
+        expect(hello.features.musicInviteOutcomes).toBe(available ? 1 : undefined);
+    });
+
+    it('hands the approved URL only to the selected guest after that guest joins', async () => {
+        const pairs = installUpgradeRuntime();
+        const lobby = new HangoutLobby(stateWith(), { ...protectedEnv, WEBJAM_WEB_ORIGINS: origin });
+        const send = (socket, frame) => lobby.webSocketMessage(socket, JSON.stringify(frame));
+
+        expect((await lobby.fetch(request(admitted('host')))).status).toBe(101);
+        const host = pairs[0][1];
+        await send(host, { t: 'hello', nick: 'MusicHost', age13: true });
+        expect((await lobby.fetch(request(admitted('guest')))).status).toBe(101);
+        const guest = pairs[1][1];
+        await send(guest, { t: 'hello', nick: 'Bandmate', age13: true });
+        expect((await lobby.fetch(request(admitted('observer')))).status).toBe(101);
+        const observer = pairs[2][1];
+        await send(observer, { t: 'hello', nick: 'Observer', age13: true });
+
+        const room = '#jam-practice', requestId = 'd'.repeat(32);
+        await send(host, { t: 'cmd', name: 'join', args: [room], ch: '#stalemate' });
+        const instance = host.frames.find(frame => frame.t === 'join' && frame.ch.name === room).ch.keepRef;
+        const guestId = guest.frames.find(frame => frame.t === 'welcome').id;
+        const expiry = Math.floor(Date.now() / 1000) + 60;
+        const href = `${origin}/join/#k=${'A'.repeat(43)}&s=${'1'.repeat(64)}&g=1&e=${expiry}`;
+
+        await send(host, { t: 'music-invite-offer', request: requestId, ch: room, roomInstance: instance, peer: guestId, href });
+        expect(host.frames).toContainEqual({ t: 'music-invite-result', request: requestId, status: 'sent' });
+        const offer = guest.frames.find(frame => frame.t === 'music-invite');
+        expect(offer).toMatchObject({ ch: room, roomInstance: instance });
+        expect(JSON.stringify(guest.frames)).not.toContain(href);
+
+        await send(guest, { t: 'music-invite-accept', ch: room, roomInstance: instance, id: offer.id });
+        const joinIndex = guest.frames.findIndex(frame => frame.t === 'join' && frame.ch.name === room);
+        const linkIndex = guest.frames.findIndex(frame => frame.t === 'music-invite-accepted' && frame.href === href);
+        expect(joinIndex).toBeGreaterThanOrEqual(0);
+        expect(linkIndex).toBeGreaterThan(joinIndex);
+        expect(JSON.stringify(host.frames)).not.toContain(href);
+        expect(observer.frames.some(frame => frame.t.startsWith('music-invite'))).toBe(false);
+        expect(JSON.stringify(observer.frames)).not.toContain(href);
+    });
+
+    it('keeps an admitted invite recipient in the lobby when the host closes the room', async () => {
+        const pairs = installUpgradeRuntime();
+        const lobby = new HangoutLobby(stateWith(), protectedEnv);
+        const lobbyRoom = '#stalemate', room = '#closed-invite-studio';
+        const send = (socket, frame) => lobby.webSocketMessage(socket, JSON.stringify(frame));
+        const connect = async (nick) => {
+            expect((await lobby.fetch(request(admitted(nick.toLowerCase())))).status).toBe(101);
+            const socket = pairs.at(-1)[1];
+            await send(socket, { t: 'hello', nick, age13: true });
+            return socket;
+        };
+        const host = await connect('ClosingHost');
+        const guest = await connect('InvitedGuest');
+        const observer = await connect('LobbyObserver');
+        await send(host, { t: 'cmd', name: 'join', args: [room], ch: lobbyRoom });
+        const original = host.frames.find(frame => frame.t === 'join' && frame.ch.name === room).ch;
+        await send(host, { t: 'cmd', name: 'mode', args: ['+i'], ch: room });
+        await send(host, { t: 'cmd', name: 'invite', args: ['InvitedGuest'], ch: room, personNamed: true });
+        const invite = guest.frames.find(frame => frame.t === 'invite');
+        expect(invite).toMatchObject({ ch: room, roomInstance: original.keepRef });
+        expect(observer.frames.some(frame => frame.t === 'invite')).toBe(false);
+
+        await send(host, { t: 'cmd', name: 'close', args: [], ch: room });
+        await send(guest, { t: 'cmd', name: 'join', args: [room], ch: lobbyRoom, roomInstance: invite.roomInstance });
+        expect(guest.frames).toContainEqual(expect.objectContaining({
+            t: 'notice', kind: 'error', text: 'That room changed or closed. Ask the host for a new invitation or choose another room.',
+        }));
+        expect(guest.frames.some(frame => frame.t === 'join' && frame.ch.name === room)).toBe(false);
+        expect(lobby.engine.roomSnapshot().rooms.some(candidate => candidate.name === room)).toBe(false);
+        await send(guest, { t: 'say', ch: lobbyRoom, text: 'I can still chat in the lobby.' });
+        expect(observer.frames).toContainEqual(expect.objectContaining({ t: 'line', ch: lobbyRoom, text: 'I can still chat in the lobby.' }));
+    });
+});
+
+describe('metered lobby heartbeat controls', () => {
+    it('advertises support, prepays the normal budget and does not run a chat/room action', async () => {
+        const pairs = installUpgradeRuntime(), state = stateWith(), lobby = new HangoutLobby(state, {});
+        await lobby.fetch(request()); const ws = pairs[0][1];
+        expect(ws.frames.find(f => f.t === 'hello').features.transportPing).toBe(1);
+        await lobby.webSocketMessage(ws, JSON.stringify({ t: 'hello', nick: 'QuietGuest', age13: true, transport: 1 }));
+        const before = structuredClone(lobby.engine.snapshot()), message = vi.spyOn(lobby.engine, 'message');
+        await lobby.webSocketMessage(ws, '{"t":"transport-ping"}');
+        expect(ws.frames.at(-1)).toMatchObject({ t: 'transport-pong', transportSeq: expect.any(Number) });
+        expect(lobby.controlBudget.snapshot().consumedControls).toBe(1); expect(message).not.toHaveBeenCalled();
+        const after = lobby.engine.snapshot(); expect({ ...after, budget: before.budget }).toEqual(before);
+    });
+    it('cannot bypass the existing shared control budget', async () => {
+        const pairs = installUpgradeRuntime(), state = stateWith(), lobby = new HangoutLobby(state, {});
+        await lobby.fetch(request()); const ws = pairs[0][1];
+        await lobby.webSocketMessage(ws, JSON.stringify({ t: 'hello', nick: 'CappedGuest', age13: true, transport: 1 }));
+        vi.spyOn(lobby.controlBudget, 'take').mockResolvedValue(false);
+        await lobby.webSocketMessage(ws, '{"t":"transport-ping"}');
+        expect(ws.closed.code).toBe(4413); expect(ws.frames.some(f => f.t === 'transport-pong')).toBe(false);
+    });
+    it('does not keep an expired identity alive or spend credit after expiry', async () => {
+        const pairs = installUpgradeRuntime(), state = stateWith(), lobby = new HangoutLobby(state, {});
+        await lobby.fetch(request({ ...identity, expiresAt: Date.now() + 60000 })); const ws = pairs[0][1];
+        await lobby.webSocketMessage(ws, JSON.stringify({ t: 'hello', nick: 'ExpiringGuest', age13: true, transport: 1 }));
+        ws.serializeAttachment({ ...ws.deserializeAttachment(), expiresAt: Date.now() - 1 });
+        const take = vi.spyOn(lobby.controlBudget, 'take');
+        await lobby.webSocketMessage(ws, '{"t":"transport-ping"}');
+        expect(ws.closed.code).toBe(4401); expect(take).not.toHaveBeenCalled();
+        expect(ws.frames.some(f => f.t === 'transport-pong')).toBe(false);
+    });
+});
+
 describe('HangoutLobby peer close acknowledgement', () => {
     it('acknowledges a half-closed socket before readiness and retires only its admitted member', async () => {
         const pairs = installUpgradeRuntime(), state = stateWith(), lobby = new HangoutLobby(state, {});
@@ -212,7 +346,7 @@ describe('HangoutLobby WebSocket admission', () => {
         const server = pairs[0][1];
         expect(state.getWebSockets()).toEqual([server]);
         expect(server.frames.filter((frame) => frame.t === 'hello')).toEqual([
-            { t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true, verified: false, capabilities: { moderate: false, configure: false, register: false }, features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1 } }
+            { t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true, verified: false, capabilities: { moderate: false, configure: false, register: false }, features: { entrySources: 1, privateMessageContext: 1, privateMessagePeers: 1, personTargets: 1, roomKeep: 1, messageResults: 1, jamShareResults: 1, transportPing: 1 } }
         ]);
         expect(server.frames.map((frame) => frame.t)).toEqual(devToken ? ['device', 'hello'] : ['hello']);
         expect(lobby.pendingAdmission.size).toBe(0);

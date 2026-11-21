@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createLatestPersistenceSnapshots } from './helpers/latest-persistence-snapshots.mjs';
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby, REPORT_ALREADY_QUEUED_NOTICE, REPORT_QUEUED_LABEL, REPORT_QUEUED_NOTICE } from '../../hangout-worker/src/lobby-core.mjs';
@@ -7,7 +8,10 @@ let now, engine, frames, writes, identities, sequence;
 function boot(persist) {
     frames = []; writes = [];
     engine = createLobby({ now: () => now, send: (recipient, frame) => frames.push({ recipient, ...frame }),
-        persist: persist || ((kind, value) => writes.push([kind, structuredClone(value)])), limits: { defaultSlow: 0 } });
+        // Default preserves every cloned write; bounded retention is supplemental only.
+        persist: persist || (process.env.DOT_SUPPLEMENTAL_PERSISTENCE === '1'
+            ? createLatestPersistenceSnapshots(writes)
+            : ((kind, value) => writes.push([kind, structuredClone(value)]))), limits: { defaultSlow: 0 } });
 }
 function guest(nick, role = 'fan', dev = `dev-${nick}`) {
     const identity = { id: `socket${++sequence}`, dev, iph: `ip-${sequence}`, role, admin: role === 'owner', account: '' };
@@ -44,6 +48,23 @@ describe('durable delivery receipts without a saved chat backlog', () => {
         expect(engine.adminState().reports).toEqual([expect.objectContaining({ id: line.id, from: 'Sender', text: line.text, count: 1 })]);
         expect(writes.filter(([kind]) => kind === 'moderation-queue').at(-1)[1].reports[0].text).toBe(line.text);
         expect(frames.filter((f) => f.t === 'line')).toEqual([]);
+    });
+
+    it('keeps more than 32 durable receipts readable by the previous flat-array reader', () => {
+        const sender = guest('Sender');
+        const first = say(sender, 'Solo delivery still needs a moderation receipt');
+        const witness = guest('Witness');
+        const lines = Array.from({ length: 35 }, (_, index) => say(sender, `Retained delivery ${index}`));
+        const sessions = writes.findLast(([kind]) => kind === 'sessions')[1];
+        expect(sessions).not.toHaveProperty('receiptArchive');
+        expect(sessions.receipts.map(row => row.id)).toEqual([first, ...lines].map(line => line.id));
+        expect(sessions.receipts[0]).toMatchObject({ t: 'line', id: first.id, ch: '#stalemate',
+            authorDev: 'dev-Sender', from: 'Sender', recipients: [sender], digest: expect.stringMatching(/^[a-f0-9]{64}$/) });
+        expect(JSON.stringify(sessions)).not.toContain(first.text);
+        wake({ ...snapshot(), sessions });
+        report(witness, lines[0]);
+        expect(engine.adminState().reports).toEqual([expect.objectContaining({ id: lines[0].id, text: lines[0].text })]);
+        expect(frames.filter(frame => frame.t === 'line')).toEqual([]);
     });
 
     it('rejects fabricated text, another message ID and forged author/channel fields', () => {

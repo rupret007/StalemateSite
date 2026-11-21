@@ -16,7 +16,17 @@ function stableNode(explicit) {
     const candidates = explicit ? [explicit] : ['/opt/homebrew/bin/node', '/usr/local/bin/node', '/usr/bin/node'];
     for (const candidate of candidates) {
         if (!path.isAbsolute(candidate) || /[\x00-\x1f]/.test(candidate)) continue;
-        try { fs.accessSync(candidate, fs.constants.X_OK); if (fs.statSync(candidate).isFile()) return candidate; } catch { /* next stable installation path */ }
+        try {
+            // process.execPath resolves Homebrew's symlink into a versioned
+            // Cellar directory, which disappears after an ordinary upgrade.
+            // Keep the formula's stable alias only when it names this binary.
+            const cellar = candidate.match(/^(.*)\/Cellar\/([^/]+)\/[^/]+\/bin\/node$/);
+            const stable = cellar ? path.join(cellar[1], 'opt', cellar[2], 'bin', 'node') : candidate;
+            fs.accessSync(stable, fs.constants.X_OK);
+            if (!fs.statSync(stable).isFile()) continue;
+            if (cellar && fs.realpathSync(stable) !== fs.realpathSync(candidate)) continue;
+            return stable;
+        } catch { /* next stable installation path */ }
     }
     throw new monitor.MonitorConfigError('stable-node-path-required');
 }

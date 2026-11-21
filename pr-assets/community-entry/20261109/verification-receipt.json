@@ -1,0 +1,21 @@
+{
+  "verifiedAt": "2026-11-09T07:23:16.268489+00:00",
+  "artifactId": 13656695967,
+  "run": 42574199274,
+  "artifactSha256": "aa9ab817da737474a025a8f8fcb2997197fdc1be1b84f27a899a44f00557d162",
+  "artifactBytes": 8620,
+  "sourceCommit": "40f88d8ad02c4bc9d999c809546c365654e2bbf9",
+  "mergedRevision": "1045f440937234ccd4679d95bcaa78785a59a274",
+  "testedAndMergedTree": "f91aca63cf79264b27e7e497d8fe8c27fd225b1b",
+  "manifestPayloadsVerified": 7,
+  "committedSourceInputsAndExporterMatchMergedRevision": true,
+  "exactEightFileAllowlist": true,
+  "noPrivateInvitationInCommunityAddress": true,
+  "installedOnPublicSites": false,
+  "serverConfigurationChanged": false,
+  "publicCodeRedistributionLicenseQualified": false,
+  "licenseNoticeRetained": true,
+  "tests": "Reused completed source-bound CI; no new runtime or public site operation performed.",
+  "testedAndMergedTreeMatches": true,
+  "sourceBoundArtifactOnly": true
+}

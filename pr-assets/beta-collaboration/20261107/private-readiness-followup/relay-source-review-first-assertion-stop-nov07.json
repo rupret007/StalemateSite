@@ -1,0 +1,8 @@
+{
+  "at": "2026-11-07T15:09:19.884864+00:00",
+  "state": "SOURCE_REVIEW_ASSUMPTION_STOP_BEFORE_RECEIPT_OR_TEST",
+  "incorrectAssumption": "All four inspected files were expected byte-identical from native76 to browser1b. mailbox.js differs by the previously reviewed 429-cap error handling; candidate.go, endpoint.go and policy.js are unchanged.",
+  "productTestsRun": false,
+  "productSourceChanged": false,
+  "deploymentOrProviderRequest": false
+}

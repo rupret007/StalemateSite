@@ -8,11 +8,24 @@ const { versionArcadeAssets } = require('./arcade-asset-versions.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
-const PIN = 'f9604242ac9fd2cbd28e94a524570ddbc228bd5c';
+const PIN = 'd80e169b57704d4d25d16e0cce4e51bdb206ad82';
 const FILES = [
     'index.html', 'TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
     'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html', 'neon-arkanoid.html',
     'hub.html', 'game.js', 'favicon.svg', 'assets', 'games'
+];
+const MATCH_WORKER_FILES = [
+    'games/chess-match.js', 'games/chess-core.js', 'assets/chess/chess.js', 'assets/chess/chess.js.map',
+    'assets/chess/chessjs-LICENSE.txt', 'assets/chess/GPL-3.0.txt',
+    'games/arcade-deck.js', 'games/crapeights-match.js', 'games/crapeights-rules.js',
+    'games/turdrummy-match.js', 'games/turdrummy-rules.js',
+    'games/turdspades-match.js', 'games/turdspades-engine.js',
+    'games/turdjack-match.js', 'games/turdjack-engine.js', 'games/cards.js',
+    'games/turdtris-match.js', 'games/turdtris-sprint.js', 'games/turdtris_logic.js',
+    'games/turdtris-presentation.js', 'games/turdtris-modes.js',
+    'games/turdomania-duel.js', 'games/turdomania-core.js',
+    'games/turdrush-race.js', 'games/turdrush-core.js', 'games/arcade-action-clock.js',
+    'games/turdanoid-race.js', 'games/turdanoid-physics-core.js', 'games/turdanoid-levels.js', 'games/turdanoid-levels-core.js'
 ];
 const SONGS = ['manic.m4a', 'andrea.m4a', 'only-been-18.m4a', 'wham-bam.m4a', 'planet-of-the-flakes.m4a'];
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://stalemate.goatcounter.com; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' https://stalemate.goatcounter.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'";
@@ -20,18 +33,48 @@ const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 's
 function options(args) {
     let source = UPSTREAM;
     let ref;
+    let matchWorker = false;
+    let gameNight;
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--source') {
             if (!args[i + 1] || args[i + 1].startsWith('-')) throw new Error('--source requires a local repository path');
             source = fs.realpathSync(path.resolve(args[++i]));
             if (!fs.statSync(source).isDirectory()) throw new Error('--source must be a local repository directory');
+        } else if (args[i] === '--match-worker' && !matchWorker) {
+            matchWorker = true;
+        } else if (args[i] === '--game-night' && !gameNight) {
+            gameNight = new URL(args[++i]);
+            const loopback = gameNight.protocol === 'http:' && gameNight.hostname === '127.0.0.1';
+            if (!(gameNight.protocol === 'https:' || loopback) || !/^[a-z0-9.-]+$/i.test(gameNight.hostname) || gameNight.username || gameNight.password ||
+                gameNight.pathname !== '/beta/' || gameNight.search || gameNight.hash) throw Error('Use the protected Game Night /beta/ URL.');
+            gameNight.searchParams.set('via', 'stalemate');
         } else if (args[i].startsWith('-') || ref) {
-            throw new Error('Usage: scripts/sync-turdanoid.sh [--source /path/to/Turdanoid] [branch|tag|SHA]');
+            throw new Error('Usage: scripts/sync-turdanoid.sh [--source /path/to/Turdanoid] [--match-worker] [--game-night URL] [branch|tag|SHA]');
         } else {
             ref = args[i];
         }
     }
-    return { source, ref: ref || PIN };
+    return { source, ref: ref || PIN, matchWorker, gameNight };
+}
+
+function replaceStagedDirectories(pairs) {
+    const installed = [];
+    try {
+        for (const [staged, destination] of pairs) {
+            const backup = fs.existsSync(destination) ? `${staged}-previous` : null;
+            if (backup) fs.renameSync(destination, backup);
+            installed.push({ destination, backup, moved: false });
+            fs.renameSync(staged, destination);
+            installed.at(-1).moved = true;
+        }
+    } catch (error) {
+        for (const { destination, backup, moved } of installed.reverse()) {
+            if (moved) fs.rmSync(destination, { recursive: true });
+            if (backup) fs.renameSync(backup, destination);
+        }
+        throw error;
+    }
+    for (const { backup } of installed) if (backup) fs.rmSync(backup, { recursive: true });
 }
 
 function git(args, cwd) {
@@ -56,7 +99,7 @@ function stripTests(dir) {
     }
 }
 
-function transform(stage) {
+function transform(stage, gameNight) {
     const overlaySource = path.join(ROOT, 'scripts/stalemate-overlay');
     fs.cpSync(overlaySource, path.join(stage, 'stalemate'), { recursive: true });
     fs.copyFileSync(path.join(ROOT, 'scripts/play-track.js'), path.join(stage, 'stalemate/play-track.js'));
@@ -109,6 +152,16 @@ function transform(stage) {
                 .replace(/\s*\/\* -+ Changelog -+ \*\/[\s\S]*?\.changelog li \{[^}]*\}/i, '')
                 .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '');
             if (/changelog/i.test(html)) throw new Error('Hub changelog strip failed');
+            if (gameNight) html = insert(html, '<section class="games"', `<p class="arcade-mode-shortcut"><a href="${gameNight.href}">Play online with friends →</a></p>`, filename);
+            const footerNote = /<p class="footer-note">[^\n]*<\/p>/;
+            if (!footerNote.test(html)) throw Error('Arcade footer note missing');
+            html = html.replace(footerNote, note => note + `
+    <footer class="site-footer site-footer--play">
+      <nav aria-label="Footer navigation">
+        <a href="../">Band homepage</a>
+        <a href="../#contact">Contact</a>
+      </nav>
+    </footer>`);
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate-strip.css">', filename);
             html = html.replace(/<body\b[^>]*>/i, '$&\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="../#contact" class="sm-contact">Contact</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><button type="button" class="sm-listen" data-site-play="manic" data-site-play-label="Listen to Manic" aria-label="Play Manic here">Listen to Manic</button></nav>');
         }
@@ -136,11 +189,10 @@ function transform(stage) {
 }
 
 function main() {
-    const { source, ref } = options(process.argv.slice(2));
+    const { source, ref, matchWorker, gameNight } = options(process.argv.slice(2));
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stalemate-upstream-'));
     const stage = fs.mkdtempSync(path.join(ROOT, '.play-sync-'));
-    const dest = path.join(ROOT, 'play');
-    const backup = `${stage}-previous`;
+    const workerStage = matchWorker ? fs.mkdtempSync(path.join(ROOT, '.match-worker-sync-')) : null;
     try {
         git(['init', '--quiet', tmp], ROOT);
         git(['remote', 'add', 'origin', source], tmp);
@@ -148,24 +200,29 @@ function main() {
         git(['fetch', '--quiet', '--depth=1', 'origin', ref], tmp);
         const sha = git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], tmp);
         git(['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', sha], tmp);
+        // The disposable checkout is the patch root. A source change that
+        // needs the site music overlay refreshed fails before publishing play.
+        git(['apply', path.join(ROOT, 'scripts/stalemate-arcade-music.patch')], tmp);
         for (const name of FILES) fs.cpSync(path.join(tmp, name), path.join(stage, name), { recursive: true });
-        transform(stage);
+        if (workerStage) {
+            for (const name of MATCH_WORKER_FILES) {
+                const output = path.join(workerStage, name);
+                fs.mkdirSync(path.dirname(output), { recursive: true });
+                fs.writeFileSync(output, execFileSync('git', ['cat-file', 'blob', `${sha}:${name}`], { cwd: tmp }));
+            }
+            fs.writeFileSync(path.join(workerStage, 'VENDORED.txt'), `Turdanoid@${sha}\n`);
+        }
+        transform(stage, gameNight);
         versionArcadeAssets(stage);
         fs.writeFileSync(path.join(stage, 'VENDORED.txt'), `Vendored from github.com/rupret007/Turdanoid@${sha}.\nOriginal arcade material: same owner as StalemateSite. New chess modules/page and Chessground 10.5.0: GPL-3.0-or-later. Spatial piece artwork by Maurizio Monge: MIT. chess.js 1.4.0: BSD-2-Clause. Stockfish.js 19.0.1: GPL-3.0. See assets/chess/credits.html, included licenses and corresponding-source archives.\nDo not edit by hand: run scripts/sync-turdanoid.sh ${sha}\n`);
-        // Both renames stay on the destination filesystem. A failed transform leaves play intact.
-        const hadDest = fs.existsSync(dest);
-        if (hadDest) fs.renameSync(dest, backup);
-        try {
-            fs.renameSync(stage, dest);
-        } catch (error) {
-            if (hadDest) fs.renameSync(backup, dest);
-            throw error;
-        }
-        fs.rmSync(backup, { recursive: true, force: true });
+        const outputs = [[stage, path.join(ROOT, 'play')]];
+        if (workerStage) outputs.push([workerStage, path.join(ROOT, 'hangout-worker/arcade')]);
+        replaceStagedDirectories(outputs);
         process.stdout.write(`Synced Turdanoid ${sha} into play/\n`);
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
         fs.rmSync(stage, { recursive: true, force: true });
+        if (workerStage) fs.rmSync(workerStage, { recursive: true, force: true });
     }
 }
 

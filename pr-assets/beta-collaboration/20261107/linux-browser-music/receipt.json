@@ -1,0 +1,126 @@
+{
+  "at": "2026-11-07T12:46:01.694445+00:00",
+  "websiteSource": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "websiteVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "scope": "Actual hosted Linux headless browser journeys plus generated Intel-native-components/Linux-browser and ARM-native-components/Linux-browser audio. No physical audio, desktop GUI, actual SharedTrack sender, Webex, second-network or public launch qualification.",
+  "initial20SecondTrialStillFailed": true,
+  "full40SecondCorrectedTrialPassed": true,
+  "allOriginalThresholdsAndNative155SecondDeadlineRetained": true,
+  "noApplicationCodecPolicyQuotaOrCredentialConfigurationChange": true,
+  "allOriginalPrivateEvidenceRetained": true,
+  "payloads": {
+    "current-hosted-linux-nov07.json": {
+      "sha256": "83c91fce17b69d1718ed8d97308d4fef013363dc5600a44ba81ee8f4368348ea",
+      "sourceFile": "current-hosted-linux-nov07.json",
+      "transform": "exact bytes"
+    },
+    "current-generated-linux-media.json": {
+      "sha256": "4401006ee64041397e3a9c766d71f7b004ee48f714f8d546a2bb4f31d9385a84",
+      "sourceFile": "current-generated-linux-media.json",
+      "transform": "exact bytes"
+    },
+    "current-generated-linux-media-full-wav.json": {
+      "sha256": "e228164cf980d4b5f6ed3ab2d98bc27f401755746c71eef66a4a107f75602bdf",
+      "sourceFile": "current-generated-linux-media-full-wav.json",
+      "transform": "exact bytes"
+    },
+    "fixture-duration-review.json": {
+      "sha256": "bf341eef3179a3e1cb8188d0f3eb73cf6270ce0158520135c7a39f4c56780e71",
+      "sourceFile": "fixture-duration-review.json",
+      "transform": "exact bytes"
+    },
+    "browser-full-wav-original.json": {
+      "sha256": "f8d71e0828e4666be273b69db2e3c71e5881b4d149eead4e0caff2cb79b4aec3",
+      "sourceFile": "browser-full-wav-original.json",
+      "transform": "exact bytes"
+    },
+    "final-readback.json": {
+      "sha256": "6df3a0422578bb13eef521f1c9143b8ad5d4d2d032f6b9d72fa2c3622b3c5387",
+      "sourceFile": "final-readback.json",
+      "transform": "exact bytes"
+    },
+    "linux-private-library-preparation-nov07.json": {
+      "sha256": "486476cb66fed49d61a3fe76558727eb593a9ddd4f836df4be1e8930ff3539d3",
+      "sourceFile": "linux-private-library-preparation-nov07.json",
+      "transform": "exact bytes"
+    },
+    "capture-receipt.json": {
+      "sha256": "f398aeb61e1ee865c86b408d58bd5661e1ae2cb4fffc583c464a9f9a9a500ad8",
+      "sourceFile": "receipt.json",
+      "transform": "exact bytes"
+    },
+    "hosted-chromium-375-b35e5fc-nov07.png": {
+      "sha256": "3534b354f88ce50c2494700446573c2eb409a81f62a08f35b4e99c4c7d890259",
+      "transform": "exact original screenshot; visually inspected"
+    },
+    "hosted-chromium-390-b35e5fc-nov07.png": {
+      "sha256": "d399990ed86a728dbef1bc4759f5c74fbbe00c10a684784b0a7388a93b5eb885",
+      "transform": "exact original screenshot; visually inspected"
+    },
+    "live-postcheck-full-wav.json": {
+      "sha256": "d9b33b20638b52011f6b903fd7e5c9359a55adbb5cdc11655a06c571d6e423cf",
+      "sourceFile": "live-postcheck-full-wav.json",
+      "originalSourceSha256": "92667916bac218a88cbc0052817b44c2b9e865a6d0d90653ddb83d6fd77cbf93",
+      "transform": "billingObservation replaced with purpose-limited guard outcome; private full original retained"
+    },
+    "environment-setup-summary.json": {
+      "sha256": "c7b564be3ad1abcb52a96101a5e8003e4c93a993b8abd166031883474aedadc1",
+      "transform": "purpose-limited summary of preserved original environment failures and corrected setup"
+    },
+    "current-generated-arm-linux-media.json": {
+      "sha256": "2b7e3ca921a080ee5eb063f7d465dc9788a950e7710fcebe888e14bfb90fdac5",
+      "sourceFile": "current-generated-arm-linux-media.json",
+      "sourceDirectory": "arm-generated-media-readiness-nov07",
+      "transform": "exact bytes"
+    },
+    "browser-arm-original.json": {
+      "sha256": "f0deda6fe38b4c2af51411c6cd4340c7c596c357b387d91f59e89b30317cc1f5",
+      "sourceFile": "browser-arm-original.json",
+      "sourceDirectory": "arm-generated-media-readiness-nov07",
+      "transform": "exact bytes"
+    },
+    "idle-codec-readiness.json": {
+      "sha256": "9f224d1aefcf81972a39b20bd0ceeb55d5c4b9a21ae5ac7f268135078bcda0e9",
+      "sourceFile": "idle-codec-readiness.json",
+      "sourceDirectory": "arm-generated-media-readiness-nov07",
+      "transform": "exact bytes"
+    },
+    "postcheck-first-stop.json": {
+      "sha256": "3ed46bdcc8bb8b81b99c321e66a94d870ec859044f3a8607cd9a0e6efe3447b7",
+      "sourceFile": "postcheck-first-stop.json",
+      "sourceDirectory": "arm-generated-media-readiness-nov07",
+      "transform": "exact bytes"
+    },
+    "postcheck-first-stop-inspection.json": {
+      "sha256": "85d8b1e29c69d2847a394feca53136e2436ef7b38cb46ef7e500d9fc81528ebd",
+      "sourceFile": "postcheck-first-stop-inspection.json",
+      "sourceDirectory": "arm-generated-media-readiness-nov07",
+      "transform": "exact bytes"
+    },
+    "final-readback-with-resource-hold.json": {
+      "sha256": "65e1cff610f10a197a71d09480b761de2a5669e281adce4ccb3679034161e2e1",
+      "sourceFile": "final-readback-with-resource-hold.json",
+      "sourceDirectory": "arm-generated-media-readiness-nov07",
+      "transform": "exact bytes"
+    },
+    "analytics-cooldown.json": {
+      "sha256": "260c337fa0df9b99a5c06b8cf7e76efc4c255bc2659683d3642e33c6e652d38f",
+      "sourceFile": "analytics-cooldown.json",
+      "sourceDirectory": "arm-generated-media-readiness-nov07",
+      "transform": "exact bytes"
+    },
+    "arm-package-preparation.json": {
+      "sha256": "9699c0792d263075afdcc964d8d7c660ddf2bf7df331ec11cae49c6e7a17fa2a",
+      "sourceFile": "preparation.json",
+      "originalSourceSha256": "2f700b9d2a74cda45b97cb9c34e1613051e2bd8246287f08d9aede17f56ccc4f",
+      "transform": "local executable bundle path omitted; all package hashes and guards retained"
+    }
+  },
+  "secretsAndCredentialPatternsCheckedWithoutPrintingValues": true,
+  "arm40SecondTrialPassed": true,
+  "laterArmNativeImportPostcheckQualified": false,
+  "laterArmPostcheckResourceHoldRetained": true,
+  "noFurtherNativeTestWhileGuardClosed": true
+}

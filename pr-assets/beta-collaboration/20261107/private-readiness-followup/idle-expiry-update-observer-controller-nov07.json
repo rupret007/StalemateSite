@@ -1,0 +1,28 @@
+{
+  "state": "PASSED_EXISTING_GUEST_NORMAL_PRIVATE_UPDATE_INDEPENDENT_PROCESS_READBACK_PENDING",
+  "startedAt": "2026-11-07T17:14:25.252259+00:00",
+  "runtimeBefore": {
+    "deployment": "f6cc2976-c845-4ca2-89b3-fa930347a16f",
+    "version": "33862058-10a5-4a6f-9659-38841d70292f"
+  },
+  "harnessSha256": "21f7b066485c2df34a99d21e974a1a05f896266a3c961dc053a0924db70b9c80",
+  "originalExpiryProofSha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+  "deploymentInvokedByObserver": false,
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "proof": "idle-expiry-update-observer-nov07.json",
+  "remoteProofSha256": "8be9c4a3c83d4d38930e644ffed45e2d9af188f1fccb6ab6fcb573461ba46e23",
+  "browserHarnessPid": 1025191,
+  "guardBefore": {
+    "load1": 0.71923828125,
+    "memoryAvailableGiB": 14.17,
+    "swapPercent": 14.55678939819336,
+    "freeGiB": 721.87
+  },
+  "exitCode": 0,
+  "runtimeAfter": {
+    "deployment": "1a83f7e5-7ed1-4aa7-8af5-bd68fb6a8fcf",
+    "version": "c2271048-aaa3-4649-8e9e-48dd46212da5"
+  },
+  "completedAt": "2026-11-07T17:15:13.427517+00:00"
+}

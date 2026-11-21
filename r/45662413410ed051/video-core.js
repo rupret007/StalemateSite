@@ -34,7 +34,16 @@
      * lighter sharp layer, and if the sum still tops the budget every layer is scaled down.
      * viewers: [{ id, wantHi, hiSince, tier, relayed }]. Returns { [id]: encoding }. */
     const BUDGET = Object.freeze({ desktop: 2000000, phone: 1200000 });
-    const PHONE_HQ_BPS = 280000;
+    const PHONE_HQ_BPS = 600000;
+    const PHONE_MESH_HI_BPS = 600000;
+    const PHONE_MESH_LO_BPS = 350000;
+    /* Per-sender video cap on phones scales with mesh uplink count (1 peer → hi, 3+ → lo). */
+    function phoneMeshBitrate(uplinks) {
+        const n = Math.max(1, Number(uplinks) || 1);
+        if (n <= 1) return PHONE_MESH_HI_BPS;
+        if (n >= 3) return PHONE_MESH_LO_BPS;
+        return PHONE_MESH_LO_BPS + Math.round((PHONE_MESH_HI_BPS - PHONE_MESH_LO_BPS) * (3 - n) / 2);
+    }
     const MAX_HQ = 2;
     function planUplink(o) {
         const opts = o || {};
@@ -52,6 +61,11 @@
             if (phone && hq.has(v.id) && enc.maxBitrate > PHONE_HQ_BPS) { enc.maxBitrate = PHONE_HQ_BPS; enc.maxFramerate = Math.min(enc.maxFramerate, 20); }
             plan[v.id] = enc;
             if (enc.active) total += enc.maxBitrate;
+        }
+        if (phone && viewers.length) {
+            const meshCap = phoneMeshBitrate(viewers.length);
+            for (const enc of Object.values(plan)) if (enc.active) enc.maxBitrate = Math.min(enc.maxBitrate, meshCap);
+            total = Object.values(plan).reduce((a, e) => a + (e.active ? e.maxBitrate : 0), 0);
         }
         if (total > budget) {
             const k = budget / total;
@@ -203,6 +217,25 @@
         return { good: 'Great connection', ok: 'Good connection', weak: 'Shaky connection', bad: 'Very weak: video paused, audio kept' }[tier] || 'Checking…';
     }
 
+    /* A lock or app switch can end or mute a live capture. Missing, ended, or
+     * muted means it has to be opened again. A healthy live track does not. */
+    function trackNeedsResume(track) {
+        if (!track) return true;
+        if (track.readyState === 'ended' || track.muted) return true;
+        return track.readyState !== 'live';
+    }
+
+    /* Which devices to reopen after the page is visible again or a local track
+     * ends. Camera-off and voice-only stay that way. Screen share is separate. */
+    function resumeCapture(state) {
+        const s = state || {};
+        if (!s.visible || s.ended || s.kicked) return { audio: false, video: false };
+        return {
+            audio: Boolean(s.micOn) && trackNeedsResume(s.audio),
+            video: Boolean(s.camOn) && !s.screen && trackNeedsResume(s.video)
+        };
+    }
+
     /* Bounded send queue: when full, shed ICE candidates first (oldest first); offers,
      * answers and everything else only go once no candidates are left to drop. */
     function enqueue(queue, item, max) {
@@ -222,7 +255,7 @@
         return q;
     }
 
-    const api = { enqueue, isPhoneDevice, BUDGET, PHONE_HQ_BPS, MAX_HQ, planUplink, uplinkTotal, MAX_CAMS, REACTIONS, TIERS, HOST_KINDS, encodingFor, gradeLink, nextTier, pickSpeaker, mainTile, gridColumns, cleanReaction, rateLimit, handQueue, cleanHostAction, backgroundSupport, backgroundVerdict, micConstraints, musicSdp, qualityLabel };
+    const api = { enqueue, isPhoneDevice, BUDGET, PHONE_HQ_BPS, PHONE_MESH_HI_BPS, PHONE_MESH_LO_BPS, phoneMeshBitrate, MAX_HQ, planUplink, uplinkTotal, MAX_CAMS, REACTIONS, TIERS, HOST_KINDS, encodingFor, gradeLink, nextTier, pickSpeaker, mainTile, gridColumns, cleanReaction, rateLimit, handQueue, cleanHostAction, backgroundSupport, backgroundVerdict, micConstraints, musicSdp, qualityLabel, resumeCapture };
     if (typeof module === 'object' && module.exports) module.exports = api;
     global.HangoutVideo = api;
 }(typeof window !== 'undefined' ? window : globalThis));

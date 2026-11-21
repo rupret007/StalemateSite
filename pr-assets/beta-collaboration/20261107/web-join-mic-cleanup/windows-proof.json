@@ -1,0 +1,372 @@
+{
+  "source": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+  "platform": "Windows11 installed signed Chrome156.0.8078.80, Node24.14.0, Playwright1.64.1",
+  "stats": {
+    "startTime": "2026-11-07T21:15:38.538Z",
+    "duration": 16446.564,
+    "expected": 24,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "units": [
+    "\u2139 tests 40",
+    "\u2139 pass 40",
+    "\u2139 fail 0",
+    "\u2139 cancelled 0",
+    "\u2139 skipped 0",
+    "\u2139 todo 0"
+  ],
+  "sourceHashes": {
+    ".gitignore": {
+      "upstream": "9a2867f8f8984ba6446808bb19a144f6e222cb11ada3d6a5f7bc052372dc6d3e",
+      "tested": "9a2867f8f8984ba6446808bb19a144f6e222cb11ada3d6a5f7bc052372dc6d3e",
+      "onlyImportAdapter": false
+    },
+    "README.md": {
+      "upstream": "4a14945c3a9f989c9c46c0c1c8c6ab00ff328413d3fd51b2ed4976eb3dc63d2b",
+      "tested": "4a14945c3a9f989c9c46c0c1c8c6ab00ff328413d3fd51b2ed4976eb3dc63d2b",
+      "onlyImportAdapter": false
+    },
+    "_headers": {
+      "upstream": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43",
+      "tested": "4877e052aaf7cec4f51f758614100e3291942fda0c8741209231b5386fd45b43",
+      "onlyImportAdapter": false
+    },
+    "app.js": {
+      "upstream": "990d454aebd785661388f0b1e0e829a32bd00185a7fdb482dc625dd05b62f25f",
+      "tested": "990d454aebd785661388f0b1e0e829a32bd00185a7fdb482dc625dd05b62f25f",
+      "onlyImportAdapter": false
+    },
+    "audio.js": {
+      "upstream": "b08d16ad514606206754dd926a231ee35f7aca3e6450ad0f40ee516a9bf5d04b",
+      "tested": "b08d16ad514606206754dd926a231ee35f7aca3e6450ad0f40ee516a9bf5d04b",
+      "onlyImportAdapter": false
+    },
+    "config.js": {
+      "upstream": "f0e6dabeff031994670126b6c2008d645aeda58cd3a1fb87513a2f0418b0ccfd",
+      "tested": "f0e6dabeff031994670126b6c2008d645aeda58cd3a1fb87513a2f0418b0ccfd",
+      "onlyImportAdapter": false
+    },
+    "crypto.js": {
+      "upstream": "9f4cdfb4a34606df5cf7181523a16d8317071c5c1d283d20b2fdf95c432c4fc8",
+      "tested": "9f4cdfb4a34606df5cf7181523a16d8317071c5c1d283d20b2fdf95c432c4fc8",
+      "onlyImportAdapter": false
+    },
+    "errors.js": {
+      "upstream": "e20c4eb68da2f22991cc25ed3d8fb94756a71aaf9222e9a6834916e362a8f3f6",
+      "tested": "e20c4eb68da2f22991cc25ed3d8fb94756a71aaf9222e9a6834916e362a8f3f6",
+      "onlyImportAdapter": false
+    },
+    "index.html": {
+      "upstream": "7c43dd28e955dbe54c221924c11137ad65669cf2ff6975bb9f46077ddb960a3e",
+      "tested": "7c43dd28e955dbe54c221924c11137ad65669cf2ff6975bb9f46077ddb960a3e",
+      "onlyImportAdapter": false
+    },
+    "mailbox.js": {
+      "upstream": "b419f8d69c2f57a6668a9c05b638780a0d3c4e68fff03f3fbc3f48709c387cb2",
+      "tested": "b419f8d69c2f57a6668a9c05b638780a0d3c4e68fff03f3fbc3f48709c387cb2",
+      "onlyImportAdapter": false
+    },
+    "package-lock.json": {
+      "upstream": "86b1ee78fbedd88f3ec262deca993fcadcc95bff1c12be327158a2bbe748afd0",
+      "tested": "86b1ee78fbedd88f3ec262deca993fcadcc95bff1c12be327158a2bbe748afd0",
+      "onlyImportAdapter": false
+    },
+    "package.json": {
+      "upstream": "c1e8fa441e9bb22bc01dca2b1d6b4d18de110be140ea0977eea130b417891b2f",
+      "tested": "c1e8fa441e9bb22bc01dca2b1d6b4d18de110be140ea0977eea130b417891b2f",
+      "onlyImportAdapter": false
+    },
+    "playwright.config.js": {
+      "upstream": "72f5e17fdcbd6351b71382793b9656309c896fb7fb7d807cac8be992c2c44b1b",
+      "tested": "72f5e17fdcbd6351b71382793b9656309c896fb7fb7d807cac8be992c2c44b1b",
+      "onlyImportAdapter": false
+    },
+    "policy.js": {
+      "upstream": "3e89bf3cee36d7dccf5c8bb4716093661a3f35f8ddace58dbcef14a12c196658",
+      "tested": "3e89bf3cee36d7dccf5c8bb4716093661a3f35f8ddace58dbcef14a12c196658",
+      "onlyImportAdapter": false
+    },
+    "prejoin.js": {
+      "upstream": "9852946eeb450f76a0679da214b4e6b73d193055bc79a5b74b7a97b09198212d",
+      "tested": "9852946eeb450f76a0679da214b4e6b73d193055bc79a5b74b7a97b09198212d",
+      "onlyImportAdapter": false
+    },
+    "session.js": {
+      "upstream": "1855ed9acb576cad13230f1a422578c848af35173887a9c797209689d2d3d044",
+      "tested": "1855ed9acb576cad13230f1a422578c848af35173887a9c797209689d2d3d044",
+      "onlyImportAdapter": false
+    },
+    "style.css": {
+      "upstream": "af2689b995cefcc4cb67377d5dbddcd7824aff764c1fd32e4117dc6ae4217369",
+      "tested": "af2689b995cefcc4cb67377d5dbddcd7824aff764c1fd32e4117dc6ae4217369",
+      "onlyImportAdapter": false
+    },
+    "test/audio-close.test.js": {
+      "upstream": "ee7d458eb25123d910da0a11e704a45055d8c237bad808c554e3e1889ceb4261",
+      "tested": "ee7d458eb25123d910da0a11e704a45055d8c237bad808c554e3e1889ceb4261",
+      "onlyImportAdapter": false
+    },
+    "test/core.test.js": {
+      "upstream": "ad27c3210afda9dfd2331f73dfbde20bd5521545d7b6fe3cce18026586f5e39c",
+      "tested": "ad27c3210afda9dfd2331f73dfbde20bd5521545d7b6fe3cce18026586f5e39c",
+      "onlyImportAdapter": false
+    },
+    "test/e2e/access-window.spec.js": {
+      "upstream": "e72e1ad768fb64ae722fbb020c475fd771c31aebc9831fa48fa1ce9e892c396f",
+      "tested": "125d94097ca1bbfd76e086d85c92005c2bca650af2d796997b3c821a7935c015",
+      "onlyImportAdapter": true
+    },
+    "test/e2e/failure-recovery.spec.js": {
+      "upstream": "004861218921b44ffc481b0162586a49865a5e75a2d871e196e72f71a72ba797",
+      "tested": "8fe578cb2b18b5b6ce506a91c2d741a204382c7cef0eb9d9342f108e9c6bcc82",
+      "onlyImportAdapter": true
+    },
+    "test/e2e/join.spec.js": {
+      "upstream": "5812bc0e23b43d0ac7d6d2e917f95cc42efa97ae3d111119e356a5d0d6df5d80",
+      "tested": "5812bc0e23b43d0ac7d6d2e917f95cc42efa97ae3d111119e356a5d0d6df5d80",
+      "onlyImportAdapter": false
+    },
+    "test/e2e/mic-error-cleanup.spec.js": {
+      "upstream": "65c130529cd6e2aa2a101fa0784590f5f8ae5d56c60253452219755afd8729e9",
+      "tested": "70eb1dea36209127da4d4b1f8fbb1f0397170e8286ad6c43ec1383162ffd05da",
+      "onlyImportAdapter": true
+    },
+    "test/e2e/prejoin.spec.js": {
+      "upstream": "dc1f8640565982b0871f9cd638bcee4fb612a842e543a12b690336346b05e233",
+      "tested": "dc1f8640565982b0871f9cd638bcee4fb612a842e543a12b690336346b05e233",
+      "onlyImportAdapter": false
+    },
+    "test/e2e/server.js": {
+      "upstream": "2697cd6f3c20deb7d3c6e8149b98389aa21b9315445c6329eda4b5b472ffa723",
+      "tested": "2697cd6f3c20deb7d3c6e8149b98389aa21b9315445c6329eda4b5b472ffa723",
+      "onlyImportAdapter": false
+    },
+    "test/errors.test.js": {
+      "upstream": "4a602adde3f2dab945350700815e9e6111fb32d5b0cf517b9cf4a5c36da7cde5",
+      "tested": "4a602adde3f2dab945350700815e9e6111fb32d5b0cf517b9cf4a5c36da7cde5",
+      "onlyImportAdapter": false
+    },
+    "test/evidence/mic-error-cleanup-20261107.json": {
+      "upstream": "00a9c8e24c7e1a4d128c4b9c30fe164cf564bcaed14a3f62d2048b297dec88ce",
+      "tested": "00a9c8e24c7e1a4d128c4b9c30fe164cf564bcaed14a3f62d2048b297dec88ce",
+      "onlyImportAdapter": false
+    },
+    "test/evidence/webkit-close-order-20261107.json": {
+      "upstream": "b735e7f2ced3c66526fd361ea891f9673f886bb4db4565449a1e4be313db8eb9",
+      "tested": "b735e7f2ced3c66526fd361ea891f9673f886bb4db4565449a1e4be313db8eb9",
+      "onlyImportAdapter": false
+    },
+    "test/evidence/webkit-close-order-20261107.md": {
+      "upstream": "a6f807ed53f4f2fa5ab16fc67765898f2689dd6af4cb92610d789d22eb3e8c17",
+      "tested": "a6f807ed53f4f2fa5ab16fc67765898f2689dd6af4cb92610d789d22eb3e8c17",
+      "onlyImportAdapter": false
+    },
+    "test/prejoin.test.js": {
+      "upstream": "bb34b8890de933ba3a4893a25bfb740d444d14a80a2817dc31826ed2e80877a1",
+      "tested": "bb34b8890de933ba3a4893a25bfb740d444d14a80a2817dc31826ed2e80877a1",
+      "onlyImportAdapter": false
+    },
+    "test/session-ownership.test.js": {
+      "upstream": "c13bcf5e46511d560c48ef46e3c7cbbf53cb0cd0ca8a983303cd7488c9ea269b",
+      "tested": "c13bcf5e46511d560c48ef46e3c7cbbf53cb0cd0ca8a983303cd7488c9ea269b",
+      "onlyImportAdapter": false
+    },
+    "test/vectors.json": {
+      "upstream": "1e187fc90a43a117ba0190c4a21e80625d2fa3790453076bbfd91b43b622b0cc",
+      "tested": "1e187fc90a43a117ba0190c4a21e80625d2fa3790453076bbfd91b43b622b0cc",
+      "onlyImportAdapter": false
+    }
+  },
+  "reportSha256": "371239211068eab2f6b998c75fba04104d956df079876b8c9af9f605cd08a303",
+  "logSha256": "240b328bb8b78cc3a891222d9ecda6af38e33ac63b13f27e2b9d6b5b990bcf81",
+  "outcomeSha256": "acd851025493e25920ab600b20f079be558fd8328ee241191bf95563afd92884",
+  "fixtureSha256": "864c819b07a1999187021c49ac93beaa9f293fdaf1f6f8c6347dcaa0ec2cdf01",
+  "runnerSourceSha256": "e416014e047b0b656ce090a9474994aa2030c6ad2813f9baebe2ec2a5f87bdfd",
+  "cases": [
+    {
+      "title": "access time is visible, warns once near expiry, and stops updating on Leave",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a fresh attempt has its own access window and a host-end error clears it",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "losing the checked microphone clears Join readiness until a deliberate recheck",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "losing an enrolled microphone closes the audio session after passing the mic check",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "losing an enrolled microphone closes the audio session after skipping the mic check",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a closed enrolled session releases audio and asks for a new invitation",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a relay timeout releases audio and permits an explicit retry at 375px",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a relay timeout releases audio and permits an explicit retry at 390px",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a confirmed relay cap closes guest audio and asks for a fresh invite (daily reset hint: false)",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a confirmed relay cap closes guest audio and asks for a fresh invite (daily reset hint: true)",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "Leave during a stalled fetch stays a deliberate exit, then allows another Join",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late playback rejection preserves a deliberate Leave",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late playback rejection preserves the next Join",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late playback rejection preserves cleanup for the active Join",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late audio-resume rejection preserves a deliberate Leave",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late audio-resume rejection preserves the next Join",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a late audio-resume rejection preserves cleanup for the active Join",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "retired enrollment callbacks preserve the rejoining attempt",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "retired enrollment callbacks preserve the failed attempt",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a retired initial resume cannot enable Join while the next resume is pending",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "capture arriving after Leave releases only its own tracks during the next Join",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a NotAllowedError microphone check closes audio before an explicit retry",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "a NotFoundError microphone check closes audio before an explicit retry",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    },
+    {
+      "title": "input-meter startup failure stops acquired capture and closes application audio",
+      "status": "expected",
+      "attempts": [
+        "passed"
+      ]
+    }
+  ],
+  "cleanup": {
+    "observedAt": "2026-11-07T21:16:57.8927659Z",
+    "recordedProcessesStillLive": [],
+    "ownedChromeCount": 0,
+    "ownedNodeCount": 0,
+    "qaListeners": 0,
+    "temporaryTaskPresent": false,
+    "effectiveExecutionPolicy": "Restricted"
+  },
+  "adapter": "Only spec import adapted for installed normal interactive Chrome via isolated loopback CDP; assertions and production modules unchanged; unused Go bridge omitted",
+  "outputMuted": true,
+  "physicalCapture": false,
+  "providerMediaTrial": false,
+  "recordings": false,
+  "normalCiSeparate": true
+}

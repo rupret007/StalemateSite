@@ -27,6 +27,21 @@ const candidate = (j, snap = snapshot(), state = current()) => {
 };
 
 describe('atomic private activity recovery journal', () => {
+    it('keeps a host activity announcement before any video is selected', () => {
+        const paint = video(1, undefined, { activity: 'paint', source: null, playing: false, pos: 0 });
+        const exit = video(2, undefined, { activity: 'room', source: null, playing: false, pos: 0 });
+        const j = journal();
+        expect(j.recordHost(exit.signed, exit.t)).toBe(true);
+        const recovered = candidate(j, snapshot({ seq: 1, video: paint }));
+        expect(recovered.lastVideoSigned).toEqual(exit);
+        expect(recovered.state.video).toBeNull();
+        expect(recovered.lastHostSeq).toBe(2);
+
+        const invalid = video(3, undefined, { activity: 'room', source: null, playing: true, pos: 0 });
+        expect(journal().merge(snapshot({ seq: 3, video: invalid }), current()))
+            .toEqual({ ok: false, error: 'invalid-snapshot' });
+    });
+
     it('replays a post-capture tail once, including exact duplicates and agreeing overlaps', () => {
         const j = journal();
         const first = delta('line', 2, points(2, 3));

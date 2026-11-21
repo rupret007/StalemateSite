@@ -1,22 +1,23 @@
 // @vitest-environment node
 // The hangout room must stay hidden: nothing public links to it, it asks not to be indexed,
 // robots disallows its prefix, and no preview key is committed.
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
 const SLUG = '45662413410ed051';
 const ROOM = join(repoRoot, 'r', SLUG);
-const SKIP = new Set(['node_modules', '.git', 'tests', 'r', 'dist', 'playwright-report', 'test-results', 'hangout-worker', 'pr-assets', '.pilot-assets', '.beta-assets', '.local', '.wrangler']);
+const SKIP = new Set(['node_modules', '.git', 'tests', 'r', 'dist', 'playwright-report', 'test-results', 'live-results', 'hangout-worker', 'pr-assets', '.pilot-assets', '.beta-assets', '.local', '.wrangler']);
 
-function walk(dir, out = []) {
+function walk(root, dir = root, out = []) {
     for (const name of readdirSync(dir)) {
-        if (SKIP.has(name) && dir === repoRoot) continue;
+        if (SKIP.has(name) && dir === root) continue;
         if (name === 'node_modules') continue;
         const full = join(dir, name);
-        if (statSync(full).isDirectory()) walk(full, out);
+        if (statSync(full).isDirectory()) walk(root, full, out);
         else if (/\.(html|js|cjs|mjs|css|json|xml|txt|webmanifest|svg|md)$/.test(name)) out.push(full);
     }
     return out;
@@ -35,6 +36,22 @@ describe('hidden hangout room', () => {
             expect(text, rel).not.toContain(SLUG);
             expect(text, rel).not.toMatch(/href=["'][^"']*\/?r\/[0-9a-f]{8,}/i);
             expect(text, rel).not.toMatch(/hang ?out room|data-hangout/i);
+        }
+    });
+
+    it('ignores generated root live results while still scanning public files', () => {
+        const root = mkdtempSync(join(tmpdir(), 'hangout-hidden-'));
+        try {
+            const reports = join(root, 'live-results');
+            mkdirSync(reports);
+            writeFileSync(join(reports, 'route-report.json'), JSON.stringify({ route: '/r/' + SLUG }));
+            const page = join(root, 'index.html');
+            writeFileSync(page, '<h1>Stalemate</h1>');
+            expect(walk(root)).toEqual([page]);
+            const ignore = readFileSync(join(repoRoot, '.gitignore'), 'utf8');
+            expect(ignore).toMatch(/^\/?live-results\/$/m);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
         }
     });
 

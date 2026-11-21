@@ -58,6 +58,10 @@ describe('GitHub Pages package', () => {
         expect(readFileSync(join(repoRoot, 'dist/qr/index.html'), 'utf8')).toContain('play/stalemate/manic.m4a');
         expect(readFileSync(join(repoRoot, 'dist/tap/index.html'), 'utf8')).toContain('../qr/');
         expect(existsSync(join(repoRoot, 'dist/embed-placeholder.html'))).toBe(false);
+        for (const file of ['index.html', 'session.js']) {
+            expect(readFileSync(join(repoRoot, 'dist/join', file))).toEqual(readFileSync(join(repoRoot, 'join', file)));
+        }
+        expect(existsSync(join(repoRoot, 'dist/join/game-offer.js'))).toBe(false);
         rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
         expect(mkdtempSync(join(tmpdir(), 'stalemate-'))).toBeTruthy();
     });

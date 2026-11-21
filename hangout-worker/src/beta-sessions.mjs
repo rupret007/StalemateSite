@@ -1,6 +1,7 @@
 // Metadata-only beta revocation registry. No messages, PMs, ICE, media or plaintext room names.
 import { validRoomId } from './core.mjs';
-import { BETA_TTL, betaVersion } from './beta-session-client.mjs';
+import { GAME_NIGHT_LENGTH, nextGameNightIdle, nightIdleExpired } from './game-night-lifetime.mjs';
+import { betaVersion } from './beta-session-client.mjs';
 import { INTERNAL_HEALTH_PATH, healthJson } from './beta-ops.mjs';
 import { BETA_SESSION_LIMIT, BETA_SESSION_ROOM_LIMIT, BETA_RETRY_BATCH, validBetaRecord as validRecord,
     readBetaRecords, readBetaMintRates, pruneBetaSessions, scheduleBetaSessions, registerBetaSession } from './beta-session-state.mjs';
@@ -81,7 +82,7 @@ export class BetaSessions {
                 // Handled failures must not escape this callback and reset the object.
                 try {
                     const now = Date.now();
-                    if (body.exp <= now || body.exp > now + BETA_TTL || operation !== '/revoke' && body.version !== betaVersion(this.env)) return reply(403, 'expired or revoked');
+                    if (body.exp <= now || body.exp > now + GAME_NIGHT_LENGTH || operation !== '/revoke' && body.version !== betaVersion(this.env)) return reply(403, 'expired or revoked');
                     if (operation === '/register') {
                         const registered = await this.state.storage.transaction(tx => registerBetaSession(tx, body));
                         return reply(registered.status, registered.reason);
@@ -90,9 +91,18 @@ export class BetaSessions {
                     let record = await this.state.storage.get(key);
                     if (record && !validRecord(record, body.sid)) throw new Error('record');
                     if (!record || record.exp <= now || record.version !== body.version || body.exp > record.exp) return reply(403, 'expired or revoked');
-                    if (operation === '/check') return reply(!record.revoked || body.allowRevoked === true ? 200 : 403, record.revoked ? 'revoked' : 'active');
+                    if (operation === '/check') {
+                        const denied = (record.revoked || nightIdleExpired(record, now)) && body.allowRevoked !== true;
+                        return reply(denied ? 403 : 200, record.revoked ? 'revoked' : denied ? 'expired' : 'active');
+                    }
+                    if (operation === '/game-night-activity') {
+                        if (record.revoked || nightIdleExpired(record, now) || record.idleUntil === undefined) return reply(403, 'expired or revoked');
+                        const next = nextGameNightIdle(record, now);
+                        if (next !== null) await this.state.storage.put(key, { ...record, idleUntil: next });
+                        return reply(200, 'active');
+                    }
                     if (operation === '/room') {
-                        if (record.revoked) return reply(403, 'revoked');
+                        if (record.revoked || record.idleUntil !== undefined) return reply(403, 'revoked');
                         if (!validRoomId(body.room)) return reply(400, 'room');
                         if (!record.rooms.includes(body.room)) {
                             if (record.rooms.length >= BETA_SESSION_ROOM_LIMIT) return reply(429, 'private room allowance reached');

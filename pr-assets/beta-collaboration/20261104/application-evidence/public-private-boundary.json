@@ -1,0 +1,67 @@
+{
+  "at": "2026-11-04T05:51:56.538802+00:00",
+  "scope": "Read-only unauthenticated HTTP responses and homepage HTML anchor scans; not rendered-browser or source-version/deployment identity qualification",
+  "checks": [
+    {
+      "check": "stalemateHome",
+      "status": 200,
+      "responseBytes": 24953,
+      "bodySha256": "26fc9fadfa837f99d5c48f765af30b2ccdd5bfa285c39eded2dbba4713a410f7",
+      "finalOrigin": "stalemate.band",
+      "homepageAnchorCount": 48,
+      "communityAnchorCount": 0,
+      "hasWebJamClientMarker": false
+    },
+    {
+      "check": "radDadHome",
+      "status": 200,
+      "responseBytes": 33817,
+      "bodySha256": "bef280fd57c6fa4033c248aa8c2fec54c9cf251cab9143a8301746689752b541",
+      "finalOrigin": "raddadband.com",
+      "homepageAnchorCount": 46,
+      "communityAnchorCount": 0,
+      "hasWebJamClientMarker": false
+    },
+    {
+      "check": "stalemateLobbyPath",
+      "status": 200,
+      "responseBytes": 27880,
+      "bodySha256": "3f871627a57826bee649f66ac18cea13e242309608bd62c6b71a99222991e233",
+      "finalOrigin": "stalemate.band",
+      "hasWebJamChatAppMarker": true
+    },
+    {
+      "check": "radDadLobbyPath",
+      "status": 404,
+      "responseBytes": 1677,
+      "bodySha256": "22e5e60b268f20150353828307f1789a7a23c8b2ea4a7e0cc94a8244c50a4a74",
+      "finalOrigin": "raddadband.com",
+      "hasWebJamChatAppMarker": false
+    },
+    {
+      "check": "betaAnonymousState",
+      "status": 401,
+      "responseBytes": 55,
+      "bodySha256": "e7739436eb869fa0387461747f710d57e3001170d3bea6bd229357228ddb2dab",
+      "finalOrigin": "stalemate-hangout-beta.jeffstory007.workers.dev",
+      "hasWebJamChatAppMarker": false
+    },
+    {
+      "check": "betaAnonymousJoin",
+      "status": 401,
+      "responseBytes": 55,
+      "bodySha256": "e7739436eb869fa0387461747f710d57e3001170d3bea6bd229357228ddb2dab",
+      "finalOrigin": "stalemate-hangout-beta.jeffstory007.workers.dev",
+      "hasWebJamChatAppMarker": false
+    }
+  ],
+  "noAuthenticationOrStateMutation": true,
+  "stalemateLegacyShell": {
+    "matchesKnown990And201HTML": true,
+    "relayConfigured": false,
+    "turnConfigured": false,
+    "entryDisabledInHTML": true,
+    "previewMetaPresent": false,
+    "interpretation": "Existing unlinked static shell is reachable; no configured chat admission is established. Do not claim every legacy asset is private."
+  }
+}

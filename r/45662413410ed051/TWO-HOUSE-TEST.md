@@ -15,7 +15,7 @@ Hidden preview. Don't share the link outside the test group.
 6. **Manic:** Jeff taps **Manic (Stalemate)**. ☐ It plays from the site on both.
 7. **Any link:** Jeff pastes any YouTube link and taps **Play for everyone**. ☐ It works.
 8. **Late joiner:** a third device joins midway. ☐ It sees the current drawing and video at the right spot, with no earlier chat. ☐ New messages arrive once. ☐ Disconnect/reconnect starts a fresh chat buffer while an unsent draft remains.
-9. **Faces:** each person taps **Turn on my camera**, then **Turn on my mic**. ☐ A plain explainer comes first, then the browser asks. ☐ Saying "Not now" keeps it off. ☐ Faces show as small bubbles. ☐ Voices are clear with headphones. ☐ Note any echo without headphones.
+9. **Faces:** each person taps **Start video**, then **Unmute mic** (in Paint Along: one **Turn on camera** card asks for both, shows a preview, then **Join with camera**). ☐ A plain explainer comes first, then the browser asks. ☐ Saying "Not now" keeps it off. ☐ Faces show as small bubbles. ☐ Voices are clear with headphones. ☐ Note any echo without headphones.
 10. **Phone:** do steps 2–9 on the iPhone too. ☐ It's usable one-handed. ☐ Video starts with one tap if iOS blocks autoplay ("Tap to sync in").
 11. **Cellular:** repeat faces with the cellular phone. ☐ Did faces connect? If not, write down "no direct connection". That tells us whether we need the relay.
 12. **Leaving:** close a tab. ☐ The others' count drops and that person's face bubble disappears.

@@ -1,0 +1,89 @@
+{
+  "state": "CURRENT_WINDOWS_GENERATED_TRANSPORT_AND_OWNED_CLEANUP_PASSED",
+  "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "websiteSource": "ac9b82f42c8d6952193f5cbefbf11fc04816821d",
+  "privateVersion": "449fe7d2-0ac3-41b8-b622-fda2453b38db",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "startedAt": "2026-11-08T06:50:29.948210+00:00",
+  "completedAt": "2026-11-08T06:51:53.254740+00:00",
+  "controllerSha256": "b14d5b132403987d597200841a825bdb349310d04c865b46fe762c9e0d0dbcbb",
+  "browserRawProofSha256": "fb02e4dc48945e62770bb461c2a320032f163e57439b2a4826f3c60696d1eedb",
+  "localFormattedBrowserProofSha256": "fb02e4dc48945e62770bb461c2a320032f163e57439b2a4826f3c60696d1eedb",
+  "independentReadbackSha256": "ba88c3eb315b5f26178cc91e1c86e639d1f9c8b5a30e12eabb44b4c3c84938fc",
+  "harnessSha256": "3e2443876a77bfe46ff6059fb3fc1d6736ff259ec487eeb970e4105a2a2d721a",
+  "platform": "Windows11 installed signed Chrome156, isolated owned normal profile",
+  "browserVersion": "156.0.8078.80",
+  "runtimeAssetHashesMatched": 14,
+  "generatedAudioOnly": true,
+  "physicalCapture": false,
+  "recording": false,
+  "actualSharedTrackSender": false,
+  "humanHearingQualified": false,
+  "browserOutputMuted": true,
+  "browser": {
+    "elapsedMs": 40386,
+    "toneWindows": 160,
+    "disconnectedWindows": 0,
+    "musicalWindows": {
+      "E": 54,
+      "G": 53,
+      "A": 53
+    },
+    "seconds": 40,
+    "state": "connected",
+    "delayMs": 50,
+    "packetsSent": 2128,
+    "packetsReceived": 2083,
+    "lost": 0,
+    "path": [
+      "relay",
+      "srflx"
+    ]
+  },
+  "generatedMicDetectionMs": 1190,
+  "connectFromJoinClickMs": 14125,
+  "connectedAccessCountdown": {
+    "firstSeconds": 589,
+    "secondSeconds": 588,
+    "elapsedMs": 1209,
+    "joinHidden": true,
+    "leaveFocused": true,
+    "clockOrTtlChanged": false
+  },
+  "fixtureCounts": {
+    "generatedCaptureRequests": 1,
+    "displayCaptureRequests": 0
+  },
+  "native": {
+    "wavFramesSent": 2020800,
+    "secondMixerParticipantReady": true,
+    "guestToneAtNativeParticipant": true,
+    "hostBeforeStop": "closed",
+    "hostAfterStop": "closed",
+    "inviteCleared": true,
+    "fabricStopped": true,
+    "fixtureClosed": true,
+    "mixerStopped": true,
+    "secondMixerBridgeStopped": true,
+    "toneThreadStopped": true,
+    "bridgeReason": "endpoint closed"
+  },
+  "logoutStatus": 200,
+  "originalAfterLogout": 401,
+  "copiedCookieAfterLogout": 401,
+  "ownedBrowserResourcesClosed": true,
+  "ownedWindowsCommandsAbsent": true,
+  "listenerFree": true,
+  "temporaryTaskAbsent": true,
+  "executionPolicy": "Restricted",
+  "nativeSourceAndIdleReadback": {
+    "all32SourceFilesMatch": true,
+    "wavHashMatches": true,
+    "bootstrapExitCode": 0,
+    "idleReadbackOnly": true
+  },
+  "capMarkerUnchanged": true,
+  "allNativeHardwareOrGuiClaimsPending": true,
+  "estimatedDelayBoundary": "Displayed network/playback estimate only; excludes capture and native bridge. Not measured acoustic latency.",
+  "prior20SecondFailedFixtureRetained": true
+}

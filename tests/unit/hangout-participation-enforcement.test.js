@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
+import { createHash, randomBytes } from 'node:crypto';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { createParticipationConsents, PARTICIPATION_LEDGER_KEY } from '../../hangout-worker/src/participation-consents.mjs';
 import { PARTICIPATION_PURPOSES } from '../../hangout-worker/src/participation-policy.mjs';
@@ -27,7 +28,7 @@ function store() {
 function gate() {
     let enter, release; return { entered: new Promise(resolve => { enter = resolve; }), wait: () => { enter(); return new Promise(resolve => { release = resolve; }); }, release: () => release() };
 }
-async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICIPATION_PURPOSES, provider = false, maxFrames = 4000 } = {}) {
+async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICIPATION_PURPOSES, otherPeerPurposes = PARTICIPATION_PURPOSES, provider = false, maxFrames = 4000, musicOrigin = null, musicProvider = null } = {}) {
     let at = START, serial = 0;
     const reference = () => `synthetic_reference_${String(++serial).padStart(6, '0')}`, storage = store(), participants = new Map(), decisions = new Map(), guardians = new Map(), identities = new Map();
     const config = { policy: { version: 1, policyVersion: 'synthetic-policy-v1', revision: 1, communityRef: 'synthetic_shared_community',
@@ -53,15 +54,27 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
         expect((await ledger.complete(decision)).state).toBe('authorized');
         identities.set(name, { principalRef, communityRef: config.policy.communityRef, expiresAt: at + 500000 }); return { proof, principalRef };
     };
-    const alice = await enroll('alice', purposes), bravo = await enroll('bravo', peerPurposes), sessionBindings = new Map(), controls = { commitGate: null, writeGate: null, failWrites: false, providerReady: provider, afterValidate: null, skipValidate: false };
+    const alice = await enroll('alice', purposes), bravo = await enroll('bravo', peerPurposes), peer = await enroll('peer', otherPeerPurposes),
+        sessionBindings = new Map(), controls = { commitGate: null, writeGate: null, failWrites: false, providerReady: provider, providerStartFailure: false, afterValidate: null, skipValidate: false };
     const validateConnection = async ({ connection, identity, at: time }) => {
         const current = identities.get(connection.id), session = sessionBindings.get(connection.id);
         return !!current && !!session && current.expiresAt > time && current.principalRef === identity.principalRef && current.communityRef === identity.communityRef
             && ['dev', 'account', 'role', 'admin'].every(key => session[key] === connection[key]);
     };
     const enforcement = createParticipationEnforcement({ storage, now: () => at, resolveConnection: async connection => clone(identities.get(connection.id)), validateConnection,
-        providerQualified: () => controls.providerReady, dispatchStart: request => controls.skipValidate ? request.start() : storage.dispatchStart({
-            validate: async tx => { await request.validate(tx); controls.afterValidate?.(); }, start: request.start }),
+        providerQualified: () => controls.providerReady, dispatchStart: request => {
+            const dispatch = () => controls.providerStartFailure
+                ? Promise.reject(Error('synthetic provider start failure'))
+                : controls.skipValidate ? request.start() : storage.dispatchStart({
+                    validate: async tx => { await request.validate(tx); controls.afterValidate?.(); }, start: request.start });
+            const held = controls.providerDispatchGate;
+            if (!held) return dispatch();
+            controls.providerDispatchGate = null;
+            return held.wait().then(dispatch).then(result => {
+                held.onResult?.(result);
+                return result;
+            });
+        },
         beforeCommit: async ({ costsOnly }) => { if (!costsOnly && controls.commitGate) { const held = controls.commitGate; controls.commitGate = null; await held.wait(); } },
         writeEffects: async ({ tx, effects, costsOnly }) => {
             if (!costsOnly && controls.writeGate) { const held = controls.writeGate; controls.writeGate = null; await held.wait(); }
@@ -73,15 +86,30 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
     const providerControls = { quotaGate: null };
     const moderator = createAiModerator({ enabled: provider, apiKey: 'synthetic_only', now: () => at, fetchImpl: providerFetch,
         saveUsage: async () => { if (providerControls.quotaGate) { const held = providerControls.quotaGate; providerControls.quotaGate = null; await held.wait(); } } });
+    const effectCommit = {
+        prepare: async () => Object.freeze({}),
+        commit: async (_context, effects, { participation: fence, costsOnly } = {}) => {
+            if (!costsOnly && controls.rejectCommitGate) {
+                const held = controls.rejectCommitGate;
+                controls.rejectCommitGate = null;
+                await held.wait();
+                return { ok: false, reason: 'participation-denied' };
+            }
+            return fence ? fence.adapter.commit(fence.context, effects)
+                : { ok: false, reason: 'synthetic-effect-fence-unavailable' };
+        }
+    };
     let engine;
-    const make = () => createLobby({ now: () => at, participation: enforcement, persist: legacyPersist,
+    const make = () => createLobby({ now: () => at, participation: enforcement, effectCommit, persist: legacyPersist, directMusicInvites: !!musicOrigin, musicProvider,
         send: (id, frame) => frames.push({ recipient: id, ...clone(frame) }), close: (...args) => closed.push(args),
-        limits: { defaultSlow: 0, pmMinLobbyMs: 0, framesPerConnection: maxFrames },
+        limits: { defaultSlow: 0, pmMinLobbyMs: 0, framesPerConnection: maxFrames, webJoinOrigins: musicOrigin ? [musicOrigin] : [] },
         reviewPublicText: provider ? request => { const task = moderator.review(request).then(result => engine.applyAiReview(request.id, result)); providerTasks.push(task); return task; } : null });
     engine = make();
     const connect = async (id, nick = id === 'alice' ? 'Alice' : 'Bravo', extra = {}) => {
-        sessionBindings.set(id, { dev: `dev-${id}`, account: id === 'alice' ? 'a'.repeat(64) : 'b'.repeat(64), role: 'fan', admin: false, ...extra });
-        const admission = await engine.connect({ id, dev: `dev-${id}`, iph: `ip-${id}`, account: id === 'alice' ? 'a'.repeat(64) : 'b'.repeat(64), ...extra });
+        const binding = { betaSid: `synthetic_beta_session_${id}`,
+            ...(musicProvider ? { betaInviteVersion: '1', expiresAt: at + 600000 } : {}), ...extra };
+        sessionBindings.set(id, { dev: `dev-${id}`, account: id === 'alice' ? 'a'.repeat(64) : 'b'.repeat(64), role: 'fan', admin: false, ...binding });
+        const admission = await engine.connect({ id, dev: `dev-${id}`, iph: `ip-${id}`, account: id === 'alice' ? 'a'.repeat(64) : 'b'.repeat(64), ...binding });
         if (!admission?.ok) return admission;
         return engine.message(id, JSON.stringify({ t: 'hello', nick, age13: true, subjectRef: 'forged_subject_ref', consent: true }));
     };
@@ -93,12 +121,539 @@ async function setup({ purposes = PARTICIPATION_PURPOSES, peerPurposes = PARTICI
         guardians.set(proof, { operationRef: reference(), subjectRef: subject.subjectRef, principalRef: guardian.principalRef, guardianRef: guardian.guardianRef, guardianRevision: guardian.revision, expiresAt: at + 10000 });
         return ledger.change(proof, { expectedRevision: subject.revision, purposes: [...allowed] });
     };
-    return { storage, ledger, engine, enforcement, controls, frames, closed, identities, sessionBindings, validateConnection, config, alice, bravo, connect, message, cmd, withdraw, legacyPersist,
-        providerFetch, providerControls, providerTasks, moderator, make, advance: ms => { at += ms; }, now: () => at,
+    return { storage, ledger, engine, enforcement, controls, frames, closed, identities, sessionBindings, validateConnection, config, alice, bravo, peer, connect, message, cmd, withdraw, legacyPersist,
+        providerFetch, providerControls, providerTasks, musicOrigin, moderator, make, advance: ms => { at += ms; }, now: () => at,
         policyChange: async () => { config.policy = { ...config.policy, revision: 2, policyVersion: 'synthetic-policy-v2', noticeDigest: 'b'.repeat(64), decisionRef: 'synthetic_operator_change' }; return ledger.installPolicy('synthetic_operator'); } };
 }
 
+describe('scoped Music issuance through the lobby and consent ledger', () => {
+    const origin = 'https://music.example.test';
+    async function setupMusic() {
+        const credentials = { client: 'web', fixture: true };
+        const provider = {
+            origin, keepAlive: task => void task,
+            prepare: vi.fn(async () => ({ status: 200 })),
+            issue: vi.fn(async (_claim, confirm) => await confirm() ? { status: 200, credentials } : { status: 403 }),
+            touch: vi.fn(async () => ({ status: 200 })),
+            revoke: vi.fn(async () => ({ status: 200 }))
+        };
+        const f = await setup({ musicOrigin: origin, musicProvider: provider, provider: true });
+        await f.connect('alice'); await f.connect('bravo'); await f.connect('peer', 'Charlie');
+        const room = '#jam-scoped', peer = 'bravo';
+        await f.cmd('alice', 'join', [room]);
+        const roomInstance = f.engine._debug.channels.get(room).keepRef;
+        const request = randomBytes(16).toString('hex'), proof = randomBytes(32).toString('hex');
+        const webjam = '776a6d7573696301' + Math.floor(f.now() / 1000).toString(16) + randomBytes(20).toString('hex');
+        const generation = 7, expires = Math.floor(f.now() / 1000) + 120;
+        const href = `${origin}/join/#k=${'B'.repeat(43)}&s=${webjam}&g=${generation}&e=${expires}`;
+        const target = { version: 1, request, ch: room, roomInstance };
+        await f.message('alice', { t: 'music-host-bind', ...target, peer, webjam, generation, proofHash: createHash('sha256').update(proof).digest('hex') });
+        expect(f.frames.some(frame => frame.t === 'music-host-bound' && frame.status === 'bound')).toBe(true);
+        const native = op => f.engine.musicAccess({ op, id: webjam.slice(-32), webjam, generation, proof }, null, '[inert]');
+        expect((await native('native-join')).status).toBe(200);
+        await f.message('alice', { t: 'music-offer-create', ...target, peer, href });
+        const offer = f.frames.find(frame => frame.t === 'music-offer' && frame.recipient === peer);
+        expect(!!offer).toBe(true);
+        const accept = { ...target, id: offer.id }, joinProof = randomBytes(32).toString('hex');
+        await f.message(peer, { t: 'music-offer-seen', ...accept });
+        const access = (op, actor = peer, id = offer.id, override = {}, proof = joinProof, extra = {}) => {
+            const binding = f.sessionBindings.get(actor);
+            return f.engine.musicAccess({ op, id, proof, ...extra }, { sid: binding.betaSid, version: binding.betaInviteVersion, exp: binding.expiresAt, ...override }, '[inert]');
+        };
+        const acceptMusic = () => f.message(peer, { t: 'music-offer-accept', ...accept, joinProof });
+        const handed = () => f.frames.filter(frame => frame.t === 'music-offer-accepted');
+        const waitHandoff = () => vi.waitFor(() => expect(handed().length).toBe(1), { timeout: 2000 });
+        return { ...f, provider, credentials, room, roomInstance, request, webjam, generation, expires, href, access, native, acceptMusic, handed, waitHandoff };
+    }
+
+    it('keeps Music alive through a busy chat commit and publishes the handoff only after its own commit', async () => {
+        const f = await setupMusic();
+        const busyChat = gate();
+        f.controls.commitGate = busyChat;
+        const chat = f.message('alice', { t: 'say', ch: '#stalemate', text: 'Still here' });
+        await busyChat.entered;
+        const check = f.native('native-check');
+        busyChat.release();
+        await chat;
+        expect((await check).status).toBe(200);
+        expect(f.provider.revoke).not.toHaveBeenCalled();
+
+        const handoffCommit = gate();
+        f.controls.afterValidate = () => {
+            f.controls.afterValidate = null;
+            f.controls.commitGate = handoffCommit;
+        };
+        await f.acceptMusic();
+        await handoffCommit.entered;
+        try { expect(f.handed()).toEqual([]); }
+        finally { handoffCommit.release(); }
+        await f.waitHandoff();
+        expect((await f.access('join')).status).toBe(200);
+    });
+
+    it('retries a signed Music join blocked before issuer work and issues exactly once', async () => {
+        const f = await setupMusic();
+        await f.acceptMusic();
+        await f.waitHandoff();
+        const pending = gate(), chatCommit = gate();
+        f.controls.providerDispatchGate = pending;
+        const joining = f.access('join');
+        await pending.entered;
+        f.controls.commitGate = chatCommit;
+        const chat = f.message('alice', { t: 'say', ch: '#stalemate', text: 'While the guest joins.' });
+        await chatCommit.entered;
+        pending.release();
+        try {
+            const busy = await joining;
+            expect(busy.status).toBe(503);
+            expect(await busy.json()).toEqual({ error: 'busy' });
+            expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+            expect(f.provider.revoke).not.toHaveBeenCalled();
+        } finally { chatCommit.release(); }
+        await chat;
+        expect((await f.access('join')).status).toBe(200);
+        expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+        expect((await f.access('join')).status).toBe(403);
+        expect(f.provider.revoke).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])('closes an unconfirmed guest attempt while preserving an unaffected host (issuer started: %s)', async started => {
+        const f = await setupMusic();
+        await f.acceptMusic();
+        await f.waitHandoff();
+        const preparing = gate();
+        if (started) f.provider.prepare.mockImplementationOnce(async () => { await preparing.wait(); return { status: 200 }; });
+        const joining = started ? f.access('join') : null;
+        if (started) await preparing.entered;
+        try {
+            const closed = await f.access('stop', undefined, undefined, undefined, undefined, { ifStarted: true });
+            expect(closed.status).toBe(200);
+            expect(await closed.json()).toEqual({ closed: true });
+        } finally { if (started) preparing.release(); }
+        if (joining) expect((await joining).status).toBe(403);
+        expect((await f.access('join')).status).toBe(403);
+        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+        expect((await f.native('native-check')).status).toBe(started ? 403 : 200);
+        expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(started ? ['guest', 'host'] : []);
+    });
+
+    it.each([
+        [false, 'settles a busy Music authority fence after preparation without preparing or issuing twice'],
+        [true, 'closes a prepared Music join if settlement outlasts its authorization budget'],
+    ])('%s: %s', async (expired, _title) => {
+        const f = await setupMusic();
+        await f.acceptMusic();
+        await f.waitHandoff();
+        const preparing = gate(), dispatch = gate(), chatCommit = gate();
+        const firstFence = new Promise(resolve => { dispatch.onResult = resolve; });
+        const actualNow = performance.now.bind(performance);
+        let elapsed = 0;
+        const monotonic = expired ? vi.spyOn(performance, 'now').mockImplementation(() => actualNow() + elapsed) : null;
+        f.provider.prepare.mockImplementationOnce(async () => { await preparing.wait(); return { status: 200 }; });
+        const joining = f.access('join');
+        await preparing.entered;
+        f.controls.providerDispatchGate = dispatch;
+        preparing.release();
+        await dispatch.entered;
+        f.controls.commitGate = chatCommit;
+        const chat = f.message('alice', { t: 'say', ch: '#stalemate', text: 'While Music is preparing.' });
+        await chatCommit.entered;
+        dispatch.release();
+        try {
+            expect(typeof await firstFence).toBe('symbol');
+            expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+            expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+            if (expired) {
+                await new Promise(resolve => setImmediate(resolve));
+                elapsed = 12_001;
+            }
+        } finally { chatCommit.release(); }
+        await chat;
+        try { expect((await joining).status).toBe(expired ? 403 : 200); }
+        finally { monotonic?.mockRestore(); }
+        expect(f.provider.prepare.mock.calls.map(([claim]) => claim.role)).toEqual(['host', 'guest']);
+        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(expired ? ['host'] : ['host', 'guest']);
+        if (expired) expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(['guest', 'host']);
+        else expect(f.provider.revoke).not.toHaveBeenCalled();
+    });
+
+    it('never exposes a Music page or issues guest credentials if the handoff commit fails', async () => {
+        const f = await setupMusic();
+        const handoffCommit = gate();
+        f.controls.afterValidate = () => {
+            f.controls.afterValidate = null;
+            f.controls.writeGate = handoffCommit;
+        };
+        await f.acceptMusic();
+        await handoffCommit.entered;
+        f.controls.failWrites = true;
+        handoffCommit.release();
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.t === 'net' && frame.lock === 'readonly')).toBe(true));
+        expect(f.handed()).toEqual([]);
+        expect((await f.access('page')).status).toBe(403);
+        expect((await f.access('join')).status).toBe(403);
+        expect(f.provider.issue.mock.calls.map(([claim]) => claim.role)).toEqual(['host']);
+    });
+
+    it.each([['host', 'Block'], ['guest', 'Block'], ['host', 'Leave'], ['guest', 'Leave']])(
+        'honors signed %s Stop while a staged %s rolls back', async (role, action) => {
+            const f = await setupMusic(true);
+            await f.acceptMusic(); await f.waitHandoff();
+            expect((await f.access('join')).status).toBe(200);
+            f.advance(8_000);
+            const blocked = gate();
+            f.controls.rejectCommitGate = blocked;
+            const command = action === 'Block'
+                ? f.message('bravo', { t: 'cmd', name: 'block', args: ['Alice'], ch: f.room,
+                    personContext: 1, personPeer: 'alice', roomInstance: f.roomInstance })
+                : f.cmd('bravo', 'part', [f.room], f.room);
+            await blocked.entered;
+            const stop = () => role === 'host' ? f.native('native-stop') : f.access('stop');
+            let pending;
+            try {
+                expect(f.engine._debug.channels.get(f.room).members.has('bravo')).toBe(false);
+                if (action === 'Block') expect(f.engine._debug.conns.get('bravo').blocks.has('dev-alice')).toBe(true);
+                pending = stop();
+            } finally { blocked.release(); }
+            const [response, result] = await Promise.all([pending, command]);
+            expect(result).toEqual({ ok: false, reason: 'participation-denied' });
+            expect(await response.json()).toEqual({ closed: true });
+            expect(response.status).toBe(200);
+            expect((await stop()).status).toBe(200);
+            expect((await f.access('stop', 'peer')).status).toBe(403);
+            expect((await f.native('native-check')).status).toBe(403);
+            expect((await f.access('check')).status).toBe(403);
+            expect(f.provider.touch).not.toHaveBeenCalled();
+            expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(['guest', 'host']);
+        });
+
+    it('keeps a single handoff and refuses copied, stale and cross-session grants with no early room or provider access', async () => {
+        const f = await setupMusic();
+        expect((await f.access('join')).status).toBe(403);
+        await Promise.all([f.acceptMusic(), f.acceptMusic()]);
+        await f.waitHandoff();
+        expect(f.handed()[0].href.includes('#m=')).toBe(true);
+        expect(JSON.stringify(f.frames).includes('#k=')).toBe(false);
+        expect(f.engine._debug.channels.get(f.room).members.has('bravo')).toBe(false);
+        expect((await f.access('check', 'peer')).status).toBe(403);
+        expect((await f.access('join', 'alice')).status).toBe(403);
+        expect((await f.access('join', 'bravo', undefined, {}, '0'.repeat(64))).status).toBe(403);
+        expect((await f.access('join', 'bravo', '0'.repeat(32))).status).toBe(403);
+        expect((await f.access('join', 'bravo', undefined, { exp: f.now() + 599999 })).status).toBe(403);
+        expect(f.provider.issue.mock.calls.length).toBe(1);
+
+        const responses = await Promise.all([f.access('join'), f.access('join')]);
+        expect(responses.map(response => response.status).sort()).toEqual([200, 403]);
+        const success = await responses.find(response => response.ok).json();
+        expect(success.href === f.href).toBe(true);
+        expect(success.credentials).toEqual(f.credentials);
+        const scope = f.provider.issue.mock.calls[1][0];
+        expect(scope.role === 'guest' && scope.webjam === f.webjam && scope.generation === f.generation
+            && scope.roomInstance === f.roomInstance && scope.expires === f.expires * 1000).toBe(true);
+        expect(f.engine._debug.channels.get(f.room).members.has('bravo')).toBe(true);
+        expect((await f.native('native-stop')).status).toBe(200);
+        expect((await f.access('join')).status).toBe(403);
+        await vi.waitFor(() => expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(['guest', 'host']));
+    });
+
+    it('keeps prior room access when quota refuses an explicitly accepted guest', async () => {
+        const f = await setupMusic();
+        const room = f.engine._debug.channels.get(f.room);
+        await f.message('alice', { t: 'cmd', name: 'invite', args: ['Bravo', f.room], ch: f.room, personNamed: true });
+        await f.cmd('bravo', 'join', [f.room]);
+        expect(room.members.has('bravo')).toBe(true);
+        f.provider.prepare.mockResolvedValueOnce({ status: 429 });
+        await f.acceptMusic(); await f.waitHandoff();
+        expect((await f.access('join')).status).toBe(429);
+        expect(f.provider.issue.mock.calls.length).toBe(1);
+        expect(room.members.has('bravo')).toBe(true);
+        expect((await f.access('check')).status).toBe(403);
+    });
+
+    it.each(['withdrawal', 'kick', 'Stop', 'site session revoke'])('denies issuance after %s wins while quota is pending', async action => {
+        const f = await setupMusic();
+        if (action === 'kick') {
+            await f.message('alice', { t: 'cmd', name: 'invite', args: ['Bravo', f.room], ch: f.room, personNamed: true });
+            await f.cmd('bravo', 'join', [f.room]);
+        }
+        await f.acceptMusic(); await f.waitHandoff();
+        const held = gate();
+        f.provider.prepare.mockImplementationOnce(async () => { await held.wait(); return { status: 200 }; });
+        const joining = f.access('join');
+        await held.entered;
+        if (action === 'withdrawal') await f.withdraw('alice');
+        if (action === 'kick') await f.message('alice', { t: 'cmd', name: 'kick', args: ['Bravo'], ch: f.room, personNamed: true });
+        if (action === 'Stop') expect((await f.native('native-stop')).status).toBe(200);
+        if (action === 'site session revoke') f.sessionBindings.delete('bravo');
+        held.release();
+        expect((await joining).status).toBe(403);
+        expect(f.provider.issue.mock.calls.length).toBe(1);
+        expect(JSON.stringify(f.frames).includes('#k=')).toBe(false);
+    });
+
+    it('refuses a handoff after the bound native host goes silent', async () => {
+        const f = await setupMusic();
+        await f.acceptMusic(); await f.waitHandoff();
+        f.advance(15_000);
+        expect((await f.access('check')).status).toBe(403);
+        expect((await f.access('join')).status).toBe(403);
+        expect(f.provider.issue.mock.calls.length).toBe(1);
+        expect((await f.native('native-stop')).status).toBe(403);
+        await vi.waitFor(() => expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role)).toEqual(['host']));
+    });
+
+    it('retries an issuer revoke when the first request fails', async () => {
+        const f = await setupMusic();
+        f.provider.revoke.mockResolvedValueOnce({ status: 503 });
+        expect((await f.native('native-stop')).status).toBe(200);
+        await vi.waitFor(() => expect(f.provider.revoke).toHaveBeenCalledTimes(2), { timeout: 2000 });
+        expect(f.provider.revoke.mock.calls.every(([claim]) => claim.role === 'host')).toBe(true);
+    });
+
+    it('retires issued provider results that return after native Stop', async () => {
+        const f = await setupMusic();
+        await f.acceptMusic(); await f.waitHandoff();
+        const held = gate();
+        f.provider.issue.mockImplementationOnce(async (_claim, confirm) => {
+            expect(await confirm()).toBe(true);
+            await held.wait();
+            return { status: 200, credentials: f.credentials };
+        });
+        const joining = f.access('join');
+        await held.entered;
+        expect((await f.native('native-stop')).status).toBe(200);
+        held.release();
+        expect((await joining).status).toBe(403);
+        expect(f.engine._debug.channels.get(f.room).members.has('bravo')).toBe(false);
+        await vi.waitFor(() => expect(f.provider.revoke.mock.calls.map(([claim]) => claim.role).sort()).toEqual(['guest', 'host']));
+    });
+});
+
 describe('controlled C3 engine integration', () => {
+    const candidate = (origin, expires) => `${origin}/join/#k=${randomBytes(32).toString('base64url')}&s=${randomBytes(32).toString('hex')}&g=1&e=${Math.floor(expires / 1000)}`;
+    const joinMusicRoom = async (f, name = '#jam-practice') => {
+        await f.cmd('alice', 'join', [name]);
+        return f.frames.find(frame => frame.recipient === 'alice' && frame.t === 'join' && frame.ch.name === name).ch.keepRef;
+    };
+    const createMusicOffer = async (f, { request = randomBytes(16).toString('hex'), room = '#jam-practice', roomInstance,
+        guest = 'bravo', href = candidate(f.musicOrigin, f.now() + 10 * 60_000) }) => {
+        await f.message('alice', { t: 'music-offer-create', version: 1, request, ch: room, roomInstance, peer: guest, href });
+        return { request, href };
+    };
+
+    it('keeps direct Music invitations unavailable under the participation authority', async () => {
+        const musicOrigin = 'https://music.example.test';
+        const f = await setup({ musicOrigin });
+        await f.connect('alice');
+        await f.connect('bravo');
+        for (const recipient of ['alice', 'bravo']) {
+            const hello = f.frames.find(frame => frame.t === 'hello' && frame.recipient === recipient);
+            expect(hello.features).not.toHaveProperty('directMusicInvites');
+            expect(hello.features).not.toHaveProperty('musicInviteOutcomes');
+        }
+
+        const room = '#jam-practice', request = 'd'.repeat(32);
+        await f.cmd('alice', 'join', [room]);
+        const roomInstance = f.frames.find(frame => frame.t === 'join' && frame.recipient === 'alice' && frame.ch.name === room).ch.keepRef;
+        const expiry = Math.floor(f.now() / 1000) + 60;
+        const href = `${musicOrigin}/join/#k=${'A'.repeat(43)}&s=${'1'.repeat(64)}&g=1&e=${expiry}`;
+        await f.message('alice', { t: 'music-invite-offer', request, ch: room, roomInstance, peer: 'bravo', href });
+
+        expect(f.frames).toContainEqual({ recipient: 'alice', t: 'music-invite-result', request, status: 'unavailable' });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-invite')).toBe(false);
+        expect(JSON.stringify(f.frames)).not.toContain(href);
+    });
+
+    it('offers a versioned Music invitation only to the consented peer and reveals it after that peer accepts', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        for (const recipient of ['alice', 'bravo']) {
+            const hello = f.frames.find(frame => frame.t === 'hello' && frame.recipient === recipient);
+            expect(hello.features).toHaveProperty('participationSafeMusicOffers', 1);
+            expect(hello.features).not.toHaveProperty('directMusicInvites');
+        }
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        expect(invite).toMatchObject({ version: 1, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.status === 'queued')).toBe(true);
+        expect(JSON.stringify(f.frames).includes('/join/#')).toBe(false);
+        expect(JSON.stringify(f.engine.sessionSnapshot()).includes('/join/#')).toBe(false);
+        expect(JSON.stringify([...f.storage.snapshot()]).includes('/join/#')).toBe(false);
+
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.status === 'sent')).toBe(true);
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
+
+        const accepted = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted');
+        expect(accepted.version).toBe(1);
+        expect(accepted.href).toBe(href);
+        expect(f.frames.filter(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toHaveLength(1);
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-outcome' && frame.status === 'accepted')).toBe(true);
+        expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(true);
+    });
+
+    it('queues the one-tap Music handshake while the room is busy instead of dropping it', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        expect(invite).toBeTruthy();
+        // Hold the room inside a controlled commit so the guest's handshake
+        // frames arrive while the engine is busy. Dropping them would leave
+        // the offer stuck and the guest's accept silently unanswered.
+        const held = gate(); f.controls.commitGate = held;
+        const busy = f.cmd('alice', 'join', ['#art-busy-while-offering']);
+        await held.entered;
+        const seen = f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        const accept = f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        held.release();
+        await busy; await seen; await accept;
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
+        expect(f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted').href).toBe(href);
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.status === 'sent')).toBe(true);
+        expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(true);
+    });
+
+    it('answers an accept for an offer the guest never acknowledged instead of leaving it unanswered', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        // The acknowledgement never arrived, so this offer can never be
+        // accepted. The guest must be told rather than left waiting.
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(f.frames).toContainEqual({ recipient: 'bravo', t: 'music-offer-ended', version: 1,
+            id: invite.id, request, status: 'unavailable' });
+        expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(false);
+    });
+
+    it('keeps a completed Music admission in the reconnect snapshot without retaining its Web Join fragment', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
+
+        const fragment = href;
+        const saved = structuredClone({ net: f.engine.snapshot(), rooms: f.engine.roomSnapshot(), sessions: f.engine.sessionSnapshot() });
+        expect(saved.sessions.connections.find(connection => connection.id === 'bravo').channels).toContain(room);
+        expect(JSON.stringify(saved)).not.toContain('/join/#');
+        const resumed = f.make();
+        resumed.restore(saved.net);
+        await resumed.restoreRooms(saved.rooms);
+        const live = saved.sessions.connections.map(connection => ({ ...connection, betaSid: `synthetic_beta_session_${connection.id}` }));
+        expect(resumed.restoreSessions(saved.sessions, live).resumed).toContain('bravo');
+        expect(resumed.sessionSnapshot().connections.find(connection => connection.id === 'bravo').channels).toContain(room);
+        expect(JSON.stringify({ sessions: resumed.sessionSnapshot(), rooms: resumed.roomSnapshot(), stored: [...f.storage.snapshot()] })).not.toContain(fragment);
+    });
+
+    it('deduplicates an identical host request and rejects reuse for another peer', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo'); await f.connect('peer', 'GuestTwo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room), request = randomBytes(16).toString('hex');
+        const { href } = await createMusicOffer(f, { request, room, roomInstance, guest: 'bravo' });
+        await createMusicOffer(f, { request, room, roomInstance, guest: 'bravo', href });
+        expect(f.frames.filter(frame => frame.recipient === 'bravo' && frame.t === 'music-offer')).toHaveLength(1);
+        expect(f.frames.filter(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.request === request))
+            .toEqual(expect.arrayContaining([expect.objectContaining({ status: 'queued' }), expect.objectContaining({ status: 'queued' })]));
+        await createMusicOffer(f, { request, room, roomInstance, guest: 'peer', href });
+        expect(f.frames.filter(frame => frame.recipient === 'peer' && frame.t === 'music-offer')).toHaveLength(0);
+        expect(f.frames.at(-1)).toMatchObject({ recipient: 'alice', t: 'music-offer-result', request, status: 'unavailable' });
+    });
+
+    it('rejects off-origin, expired and overlong Web Join returns before notifying the guest', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const invalid = [
+            candidate('https://unapproved.example.test', f.now() + 5 * 60_000),
+            candidate(musicOrigin, f.now() - 1),
+            candidate(musicOrigin, f.now() + 11 * 60_000),
+        ];
+        for (const href of invalid) {
+            const request = randomBytes(16).toString('hex');
+            await createMusicOffer(f, { request, room, roomInstance, href });
+            expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer' && frame.request === request)).toBe(false);
+            expect(f.frames).toContainEqual({ recipient: 'alice', t: 'music-offer-result', version: 1,
+                request, status: 'unavailable' });
+        }
+    });
+
+    it('compensates room admission and withholds the candidate after provider dispatch failure', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        f.controls.providerStartFailure = true;
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await vi.waitFor(() => expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(false), { timeout: 2000 });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-outcome' && frame.status === 'unavailable')).toBe(true);
+        expect(JSON.stringify(f.frames)).not.toContain(href);
+        expect(JSON.stringify({ net: f.engine.snapshot(), rooms: f.engine.roomSnapshot(), sessions: f.engine.sessionSnapshot(),
+            stored: [...f.storage.snapshot()] })).not.toContain(href);
+    });
+
+    it('declines without admitting the guest to the Jam room or disclosing the candidate', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await f.message('bravo', { t: 'music-offer-decline', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-outcome' && frame.status === 'declined')).toBe(true);
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(JSON.stringify(f.frames).includes('/join/#')).toBe(false);
+        expect(f.engine._debug.channels.get(room).members.has('bravo')).toBe(false);
+    });
+
+    it('rejects a nonparticipant and an unauthorized peer without exposing the candidate', async () => {
+        const musicOrigin = 'https://music.example.test';
+        const f = await setup({ musicOrigin, provider: true, peerPurposes: ['direct-contact'] });
+        await f.connect('alice'); await f.connect('bravo'); await f.connect('peer', 'GuestTwo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request } = await createMusicOffer(f, { room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer')).toBe(false);
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.request === request && frame.status === 'unavailable')).toBe(true);
+        const { request: allowedRequest } = await createMusicOffer(f, { request: randomBytes(16).toString('hex'), room, roomInstance, guest: 'peer' });
+        const invite = f.frames.find(frame => frame.recipient === 'peer' && frame.t === 'music-offer');
+        expect(invite?.request).toBe(allowedRequest);
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request: allowedRequest, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(f.frames.some(frame => frame.recipient === 'peer' && frame.t === 'music-offer-accepted')).toBe(false);
+        expect(JSON.stringify(f.frames).includes('/join/#')).toBe(false);
+    });
+
+    it('rejects forged, stale and replayed accepts without issuing a second capability', async () => {
+        const musicOrigin = 'https://music.example.test', f = await setup({ musicOrigin, provider: true });
+        await f.connect('alice'); await f.connect('bravo'); await f.connect('peer', 'GuestTwo');
+        const room = '#jam-practice', roomInstance = await joinMusicRoom(f, room);
+        const { request, href } = await createMusicOffer(f, { room, roomInstance });
+        const invite = f.frames.find(frame => frame.recipient === 'bravo' && frame.t === 'music-offer');
+        await f.message('peer', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.some(frame => frame.recipient === 'peer' && frame.t === 'music-offer-accepted')).toBe(false);
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance: randomBytes(16).toString('hex') });
+        expect(f.frames.some(frame => frame.recipient === 'alice' && frame.t === 'music-offer-result' && frame.status === 'sent')).toBe(false);
+        await f.message('bravo', { t: 'music-offer-seen', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        await vi.waitFor(() => expect(f.frames.some(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toBe(true), { timeout: 2000 });
+        await f.message('bravo', { t: 'music-offer-accept', version: 1, id: invite.id, request, ch: room, roomInstance });
+        expect(f.frames.filter(frame => frame.recipient === 'bravo' && frame.t === 'music-offer-accepted')).toHaveLength(1);
+        expect(JSON.stringify(f.frames)).toContain(href);
+    });
+
     it('uses verified C2 subjects in actual chat/room/artifact/registration actions without ordinary persist fallback', async () => {
         const f = await setup(); await f.connect('alice'); await f.connect('bravo');
         await f.message('alice', { t: 'say', ch: '#stalemate', text: 'Benign synthetic shared chat' });

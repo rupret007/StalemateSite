@@ -1,0 +1,118 @@
+{
+  "at": "2026-11-04T05:45:32.399048+00:00",
+  "parentWebsiteHead": "0f236aaa104f14aeb8aa4a5445dd2ef0074af390",
+  "branch": "codex/owner-tools-late-metadata-20261104",
+  "sourceSha256": {
+    "r/45662413410ed051/lobby/lobby.js": "235978288e197c1a9aa6723e9aaa509c646467f7ced76b461b3c3b88ddd3667e",
+    "playwright.config.js": "b80ff6c64785ef2c5e23618e390b0939b6d505bc32c5bc34b445cb3da2ea751f",
+    "tests/e2e/community-moderation.spec.js": "d7ae8026ad9cab52ca572e049ce94a02b27249c13c06a7e280b5eeaa25493b05",
+    "tests/unit/hangout-lobby-client-context.test.js": "5fac49749c29712b2fccc687cf514ef1bb8a38b99f227167261c4746615acde8"
+  },
+  "local": {
+    "units": 2061,
+    "unitFiles": 137,
+    "moderationJourneys": 8,
+    "separatePhoneCaptureJourneys": 2,
+    "retries": 0,
+    "notAnOverlappingSum": true
+  },
+  "originalWebsite200CI": {
+    "job126392352414": "759 main browser cases clean",
+    "job126392334561": "758 passed; one flaky co-host revocation passed only after automatic retry",
+    "statusNotRetryFree": true
+  },
+  "logs": [
+    {
+      "label": "owner-palette-metadata-red-nov04",
+      "at": "2026-11-04T05:33:38.968488+00:00",
+      "admitted": true,
+      "exitCode": 1,
+      "logSha256": "eb04c1000db7a3a976779533c81d4b14099b8045f3ff201bc5104a3303662427"
+    },
+    {
+      "label": "owner-palette-unit-red-nov04",
+      "at": "2026-11-04T05:39:50.514229+00:00",
+      "admitted": true,
+      "exitCode": 1,
+      "logSha256": "5d45a066b9d08dfaf30a09d0aafa700fcb389ac46dab9772c3d0cc11fe9294b4"
+    },
+    {
+      "label": "owner-palette-unit-green-nov04",
+      "at": "2026-11-04T05:40:35.469793+00:00",
+      "admitted": true,
+      "exitCode": 0,
+      "logSha256": "aed0a8607cf18a49d61660701ab5468e400aa71aaf8e9f10f3a88d61f6ad00c4"
+    },
+    {
+      "label": "owner-palette-full-units-nov04",
+      "at": "2026-11-04T05:41:28.525540+00:00",
+      "admitted": true,
+      "exitCode": 0,
+      "logSha256": "a08799f125cba20205a2fbad5b6de95d34734b7e290da5df0fa78148547c9b62"
+    },
+    {
+      "label": "owner-palette-browser-green-nov04",
+      "at": "2026-11-04T05:40:53.812647+00:00",
+      "admitted": true,
+      "exitCode": 0,
+      "logSha256": "b85cfda402479823d1642ab48f701ca46efc4e3cb9f268de42d123aad80292fa"
+    },
+    {
+      "label": "owner-palette-phone-captures-nov04",
+      "at": "2026-11-04T05:44:00.696626+00:00",
+      "admitted": true,
+      "exitCode": 0,
+      "logSha256": "04816621c6b1989c918d01856862a4bd2858318069e41d7e8613945ce74a17f1"
+    },
+    {
+      "label": "owner-palette-beta-package-nov04",
+      "at": "2026-11-04T05:45:01.933824+00:00",
+      "admitted": true,
+      "exitCode": 0,
+      "logSha256": "74c7ccda24ec86832cad743a82442448ea0725f1a38496c299b2ca826040e729"
+    }
+  ],
+  "images": [
+    {
+      "file": "chromium-375.png",
+      "engine": "chromium",
+      "width": 375,
+      "height": 844,
+      "sha256": "52b3a7f3b6d9f86ee5c47ecaed7adc773e106b07e66e689618f34c9e5e60e217",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "chromium-390.png",
+      "engine": "chromium",
+      "width": 390,
+      "height": 844,
+      "sha256": "f207a757b407fd9cd302e2fdaa9e1870ffd91e78c676e5fc68b59db40474b10e",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "webkit-community-375.png",
+      "engine": "webkit-community",
+      "width": 375,
+      "height": 844,
+      "sha256": "2968e47847f76d8e0a528ade208cc0d7eb8fa08d5a8e51d4ec4a80a129c00758",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "webkit-community-390.png",
+      "engine": "webkit-community",
+      "width": 390,
+      "height": 844,
+      "sha256": "b95e27f479a3a44fa5257e5c5f2cc72be7c04efeb81a9091d10e1a3439a6031e",
+      "visuallyReviewed": true
+    }
+  ],
+  "privatePackage": {
+    "lobbyBytesMatch": true,
+    "joinFileCountIncludingProvenance": 14,
+    "joinBytesUnchangedAndMatch": true
+  },
+  "scope": "Loopback real relay and test-only verified account adapter; no hosted email, deployment, native artifact, physical iPhone or music qualification",
+  "all62RequirementFileSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+  "publicNavigationProviderReleaseHoldsChanged": false,
+  "currentHeadCIStillRequired": true
+}

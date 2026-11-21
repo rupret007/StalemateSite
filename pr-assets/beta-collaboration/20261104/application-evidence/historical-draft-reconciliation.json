@@ -1,0 +1,211 @@
+{
+  "at": "2026-11-04T06:11:01.244668+00:00",
+  "scope": "Per-file reconciliation, with reviewed semantic reasons in the two PR descriptions; not an import/merge, package/deployment or music claim",
+  "sourceBranchesPreserved": true,
+  "oldPRsOpenDraftHistorical": true,
+  "comparisons": [
+    {
+      "label": "website193",
+      "oldHead": "b39c51d285e6e3de862ef34aeea19808a2b5214e",
+      "candidate": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+      "changedFileCount": 11,
+      "files": [
+        {
+          "path": "hangout-internal/HANGOUT_DEMO_WALKTHROUGH_20261103.md",
+          "oldSha256": "8a19b9498c4d68fc46c6a5c70dedc2ab36dc2aeeae4f2e6a79f78966a9ff2051",
+          "candidatePresent": false,
+          "candidateSha256": null,
+          "exactBytesEqual": false
+        },
+        {
+          "path": "hangout-internal/JEFF_INVITE_AND_JOIN_STEPS_20261103.md",
+          "oldSha256": "ef2b9a9e4d343945d87ca203fce5852f2308996be5a8aadf5eba7378ec726270",
+          "candidatePresent": false,
+          "candidateSha256": null,
+          "exactBytesEqual": false
+        },
+        {
+          "path": "join/PROVENANCE.json",
+          "oldSha256": "b76ace7076d0b5590056b417aff59b50ab9d2788b90905a43f4a8171338469a6",
+          "candidatePresent": true,
+          "candidateSha256": "ea6372c870aef0b50e509e5990e456211bc8cbe82225a5a2c2bd4a45e3952b32",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "join/audio.js",
+          "oldSha256": "815253ee9d58fca3c9856186440a3c1f521dc275b49463b46ff7c98a220ea682",
+          "candidatePresent": true,
+          "candidateSha256": "8bf3fd3b169492c02e21e12d0c09d818c383b1a67991d64cf35f8948ebf63284",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "join/index.html",
+          "oldSha256": "e24fd21fe6e43c9c0c437e4664f2c6ff55a0fd59df05613a60243ffca68ecfb1",
+          "candidatePresent": true,
+          "candidateSha256": "6acbbbb12d791955e8997d4e389476b074cd36f6372614c5251fdfef5f0dbb10",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "join/style.css",
+          "oldSha256": "13d6c7adda8881aab458188ed4649d037dd86b8cedf0b9d7af614b7feef6e35c",
+          "candidatePresent": true,
+          "candidateSha256": "589e6e72f5fcd9970b7ba32a64f4b7336ce5fc880f276c709d62093a5e966f93",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "scripts/lib/natural-expiry-diagnostics.cjs",
+          "oldSha256": "9ca78b75cc141c8d86edc64f8f3cacdc735effaa36a7aa9cc302c762ef2b8ff6",
+          "candidatePresent": true,
+          "candidateSha256": "9ca78b75cc141c8d86edc64f8f3cacdc735effaa36a7aa9cc302c762ef2b8ff6",
+          "exactBytesEqual": true
+        },
+        {
+          "path": "tests/unit/hangout-lobby-client-context.test.js",
+          "oldSha256": "8748487482adf06390cbc66f182220d342283138ec3146c5e625c86d7babed48",
+          "candidatePresent": true,
+          "candidateSha256": "5fac49749c29712b2fccc687cf514ef1bb8a38b99f227167261c4746615acde8",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "tests/unit/join-audio-permission.test.js",
+          "oldSha256": "0db667a0460d6dcd9e777464b091b3bed0fb1b5a61ebfa168587062ccc0408e2",
+          "candidatePresent": false,
+          "candidateSha256": null,
+          "exactBytesEqual": false
+        },
+        {
+          "path": "tests/unit/natural-expiry-diagnostics.test.js",
+          "oldSha256": "b865905e435933341a6a9bba20e3b347a86f115308ca63d9c2c03ad155cee6da",
+          "candidatePresent": true,
+          "candidateSha256": "b865905e435933341a6a9bba20e3b347a86f115308ca63d9c2c03ad155cee6da",
+          "exactBytesEqual": true
+        },
+        {
+          "path": "tests/unit/natural-expiry-terminal-criteria.test.js",
+          "oldSha256": "a9f174de3be6c3720f55661948b0cee9ba9bfd8c7a6b681792dce89a124e986d",
+          "candidatePresent": true,
+          "candidateSha256": "a9f174de3be6c3720f55661948b0cee9ba9bfd8c7a6b681792dce89a124e986d",
+          "exactBytesEqual": true
+        }
+      ]
+    },
+    {
+      "label": "native417",
+      "oldHead": "b485fd20d065b027deea8f9f53c97b2d50cf6456",
+      "candidate": "0d995cd79d2a7bf95dbbafcbafbb0618e0762a71",
+      "changedFileCount": 15,
+      "files": [
+        {
+          "path": "changelog.d/adaptive-latency.md",
+          "oldSha256": "8783656ed82d67bcee85b37572b94601942f58f28ee53e3139796f80a361bffe",
+          "candidatePresent": true,
+          "candidateSha256": "8783656ed82d67bcee85b37572b94601942f58f28ee53e3139796f80a361bffe",
+          "exactBytesEqual": true
+        },
+        {
+          "path": "core/jamulus_adaptive_latency.py",
+          "oldSha256": "777347fbb8cab2e3a026d49c05a275a9c08dbf8b8a7f0e345f167e5e679955e1",
+          "candidatePresent": true,
+          "candidateSha256": "bdf31da999fde365fde3df6b201d9948b8b0c6b9d9e6e41c158a9e2423c37cd5",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "core/jamulus_rpc_client.py",
+          "oldSha256": "3c1206e58b3b339d7fa2fb14006388cf6d3884aa6bf10f64ddc0471a29e6f0d0",
+          "candidatePresent": true,
+          "candidateSha256": "d2556d42f7e56ad08db7aa5e9ed13a08d6c3e0226cdc89b087857bd7e63ac3b5",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "core/settings.py",
+          "oldSha256": "794770d0db73712e62d0b4573c52e2a19e18a09e68f94c4b6a122669194a8ba9",
+          "candidatePresent": true,
+          "candidateSha256": "794770d0db73712e62d0b4573c52e2a19e18a09e68f94c4b6a122669194a8ba9",
+          "exactBytesEqual": true
+        },
+        {
+          "path": "docs/adaptive-latency.md",
+          "oldSha256": "e251e1240a20edab51c02b393806590791bebed243201e9dd2022c661a238272",
+          "candidatePresent": true,
+          "candidateSha256": "1ccca822c7221d067aafe0dc283657cd4858ba0d372c332ba2a6246dd9205bdd",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "services/adaptive_latency_controller.py",
+          "oldSha256": "76ea3e09a24cfae1e141377c81087b82c140eddf6418d19e99d009d8e6204cef",
+          "candidatePresent": true,
+          "candidateSha256": "7e5020f33be24841275823dd73c11ef43eca3f77ada1d9fafc4414f6139f4324",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "services/bridge_service.py",
+          "oldSha256": "c35b7cf3ddeaeca6078668588dd59f929ed3cd43b310cbcaa28d6c105c5b6f8f",
+          "candidatePresent": true,
+          "candidateSha256": "a3aafce9f77dfba8532086d92958eaa466f8a28a8cf763e5878d56561389f343",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "tests/test_jamulus_adaptive_latency.py",
+          "oldSha256": "9afb82e1a77786f13443e35de814a17b73a94b98ed4602b3caab352920efe6a4",
+          "candidatePresent": true,
+          "candidateSha256": "9afb82e1a77786f13443e35de814a17b73a94b98ed4602b3caab352920efe6a4",
+          "exactBytesEqual": true
+        },
+        {
+          "path": "web/join/audio.js",
+          "oldSha256": "8bf3fd3b169492c02e21e12d0c09d818c383b1a67991d64cf35f8948ebf63284",
+          "candidatePresent": true,
+          "candidateSha256": "8bf3fd3b169492c02e21e12d0c09d818c383b1a67991d64cf35f8948ebf63284",
+          "exactBytesEqual": true
+        },
+        {
+          "path": "web/join/session.js",
+          "oldSha256": "30b8f82e9d82715c12d7ef691137f06a48158ed695ed808206967a647d27173c",
+          "candidatePresent": true,
+          "candidateSha256": "eb2a60f3de58485deb195bb6d9c79a6d58e11a476482fe2ea30ce5686df88900",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "web/join/test/core.test.js",
+          "oldSha256": "4ae0070e119e2e031539fda799474b3435641c200cfa23b865ef31cbc61be70f",
+          "candidatePresent": true,
+          "candidateSha256": "4ae0070e119e2e031539fda799474b3435641c200cfa23b865ef31cbc61be70f",
+          "exactBytesEqual": true
+        },
+        {
+          "path": "webjam_qt/controllers/application_controller.py",
+          "oldSha256": "23afaefcad94ce6922378192dab079126e355551e8c60a722e01f6f5823d1374",
+          "candidatePresent": true,
+          "candidateSha256": "23afaefcad94ce6922378192dab079126e355551e8c60a722e01f6f5823d1374",
+          "exactBytesEqual": true
+        },
+        {
+          "path": "webjam_qt/theme/conductor.qss",
+          "oldSha256": "3efe5b1bd3b70e2e7868876d7fafbb83c735ea0fbb63e7941cbc37e9d84987c3",
+          "candidatePresent": true,
+          "candidateSha256": "29906d462c12ad869a55264f435cc475056b46d773560738c56793c7b585862a",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "webjam_qt/widgets/participant_card.py",
+          "oldSha256": "bf917ef650d2dd4d54004dd6677202edcae19441462cacc2ea9b717beb2d1b22",
+          "candidatePresent": true,
+          "candidateSha256": "99838cfe8ce50d127ac174b6a1b27e97af83e93096b36118fd4945c8775f2851",
+          "exactBytesEqual": false
+        },
+        {
+          "path": "webjam_qt/widgets/participant_grid.py",
+          "oldSha256": "bdcb23fc728603a8129171a4ed9b7ef973b6f2c5fa6507e4c4fde177fe8d5e87",
+          "candidatePresent": true,
+          "candidateSha256": "982a4f8113b75aa095e859282d2b53c0abd3ed5d1071b9e26946f1403a420f30",
+          "exactBytesEqual": false
+        }
+      ]
+    }
+  ],
+  "website193UniqueHistoricalDocsNotImported": [
+    "hangout-internal/HANGOUT_DEMO_WALKTHROUGH_20261103.md",
+    "hangout-internal/JEFF_INVITE_AND_JOIN_STEPS_20261103.md"
+  ],
+  "website193OldMicUnitFileNotCopied": "Functional denial/checklist coverage retained by current packaged browser tests and actual browser source, without importing stale four-file Join/provenance subset."
+}

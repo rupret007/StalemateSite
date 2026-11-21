@@ -1,5 +1,17 @@
 # Shared-community acceptance audit
 
+**Current evidence:** the [November 8 private handoff](HANGOUT_CURRENT_PRIVATE_READINESS_20261108.md)
+records newer exact source/runtime, completed repaired expiry and current Mac and
+Windows browser checks. The requirement rows below retain their dated scopes;
+the newer handoff does not claim that all 62 outcomes or physical music passed.
+
+**Later evidence:** the [November4 direct-delivery checklist](HANGOUT_DIRECT_PRIVATE_DELIVERY_20261104.md)
+records the newer private website, all four actual package checks, reconnect and
+report acknowledgement. The rows below retain their October31 evidence scopes
+and unresolved requirements; historical revisions, guards and pending actions
+must not replace the newer checklist. All62 requirements remain unchanged and
+physical music/public-launch readiness remain unproven.
+
 Recorded October 31, 2026. The full goal remains incomplete. This audit accounts
 for every ID in the unchanged [62 original requirements](HANGOUT_ACCEPTANCE_REQUIREMENTS.md).
 Each row identifies the evidence scope and remaining proof or boundary. It does

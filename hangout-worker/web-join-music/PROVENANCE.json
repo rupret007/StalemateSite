@@ -1,0 +1,34 @@
+{
+  "repository": "https://github.com/rupret007/webjam",
+  "license": "MIT",
+  "baseCommit": "0a502b752c72d907fa65c420e82234053d5759ca",
+  "websiteSource": "9dcda1d55c60420d196b9717ce31b4801212baeb",
+  "files": {
+    "app.js": {
+      "source": "web/join/app.js",
+      "baseSha256": "ff699ff308d0e7e4d301ea30486f90bd20bc497555d206b1a08de3472c512662",
+      "sha256": "880e34f4f2b2902c881e0f9c60410bef243b46d6a36b792fd3be6b09923cd431",
+      "adaptation": "Private beta receive-only joining, retry and playback recovery, focus preservation, and fresh-link recovery that survives page restoration. Explicit microphone recheck after Skip check (107481896f05f8c6c8c21edd3aacda7c78a29bcb) and recovery focus when a checked microphone is lost while Join is focused (867cb2ec4ee647b2e5f26d3d757b3a8cc6ca80f7). The participation page redeems its session-bound Music grant on explicit audio join. Existing Music liveness checks tolerate a bounded busy response and support Safari versions without AbortSignal.any."
+    },
+    "host/index.html": {
+      "source": "StalemateSite",
+      "sha256": "26e50ae5e5b2b16123ce436ad4e081f9456be53c748d354e7738f81ac19d2a02",
+      "adaptation": "Local private Music host controls."
+    },
+    "host/host-app.js": {
+      "source": "StalemateSite",
+      "sha256": "cc8fa0269a1545eb4f2500b7e7c31241a1d262e6d39c9ef74c399474740985bd",
+      "adaptation": "Local same-origin host handoff, explicit microphone consent and cleanup."
+    },
+    "host/host-session.js": {
+      "source": "StalemateSite",
+      "sha256": "74caff45d3fb1ea7093da01079cceced895f647344318940228dbdd03fb071c1",
+      "adaptation": "Browser offerer using the pinned WebJam audio, mailbox and enrollment interfaces."
+    },
+    "request-signal.js": {
+      "source": "StalemateSite",
+      "sha256": "104120eeee7fd1b3e4732a0226c7118edca2325edfb6441cb015b34e937c64e3",
+      "adaptation": "Local fallback for combining audio request cancellation signals on Safari."
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "startedAt": "2026-11-07T14:34:18.109888+00:00",
+  "guardBefore": {
+    "load1": 0.02197265625,
+    "memoryAvailableGiB": 14.427913665771484,
+    "swapPercent": 13.424444198608398,
+    "freeGiB": 722.5832595825195
+  },
+  "originalSourceFilesStillExact": true,
+  "onlyMissingSharedFilesAdded": [
+    "r/45662413410ed051/sync-core.js"
+  ],
+  "firstImportFailureRetained": true,
+  "productCodeOrAssertionsChangedForCorrection": false,
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "unitExitCode": 0,
+  "summary": [
+    " Test Files  1 passed (1)",
+    "      Tests  30 passed (30)",
+    "   Duration  750ms (transform 333ms, setup 0ms, import 442ms, tests 201ms, environment 0ms)"
+  ],
+  "state": "COLD_LOBBY_TARGETED_UNIT_SUITE_PASSED",
+  "guardAfter": {
+    "load1": 0.02197265625,
+    "memoryAvailableGiB": 14.409950256347656,
+    "swapPercent": 13.424444198608398,
+    "freeGiB": 722.5832557678223
+  },
+  "completedAt": "2026-11-07T14:34:19.212962+00:00"
+}

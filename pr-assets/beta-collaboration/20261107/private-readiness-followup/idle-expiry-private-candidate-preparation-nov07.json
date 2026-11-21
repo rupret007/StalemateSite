@@ -1,0 +1,55 @@
+{
+  "state": "EXACT_SOURCE_COMPILE_AND64_UNCHANGED_PLUS2_REVIEWED_MODULES_VERIFIED",
+  "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "startedAt": "2026-11-07T16:53:27.358038+00:00",
+  "fullCiAndMergePending": true,
+  "deploymentAttempted": false,
+  "credentialsSupplied": false,
+  "physicalCapture": false,
+  "originalObserverChanged": false,
+  "packetFiles": 111,
+  "assets": 69,
+  "sshPid": 34730,
+  "exitCode": 0,
+  "proof": {
+    "state": "EXACT_SOURCE_COMPILE_AND64_UNCHANGED_PLUS2_REVIEWED_MODULES_VERIFIED",
+    "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+    "guardBefore": {
+      "load": 1.82177734375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.443496704101562
+    },
+    "productionDependenciesByteExactToExistingLockedInstall": true,
+    "dependencyFiles": 63,
+    "assets": 69,
+    "packetFiles": 111,
+    "fullCiAndMergePending": true,
+    "credentialsSupplied": false,
+    "physicalCapture": false,
+    "deploymentAttempted": false,
+    "compileExitCode": 0,
+    "moduleCount": 66,
+    "unchangedSourceContents": 64,
+    "changedSources": [
+      "hangout-worker/src/beta-entry.mjs",
+      "hangout-worker/src/lobby-do.mjs"
+    ],
+    "previousChangedModuleSha256": "c0310cb354c219c3577064ba8b18d047a33c8d982f5a8f892f8548913631d881",
+    "changedModuleSha256": "ad6d0623e88c1ae0390bed2ce9a19db13b92a97544083d62f5bfa6559b719000",
+    "previousLobbyModuleSha256": "ebad8d6cbb1136f0c3ac9185cadcaa635f656e4fa390f197e953869f1f6282ca",
+    "lobbyModuleSha256": "7eddf4c4b2ce4166fbe45eeb1d9c98dc731ef6bf7b5cc82ebbcc29fdb76d0732",
+    "all111SourceAndAssetHashesMatched": true,
+    "guardAfter": {
+      "load": 1.755859375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.41631317138672
+    },
+    "bundleFiles": {
+      "README.md": "66a24eb003ad2dee557446f121220a02ea642aa563f18ef10878f3db08b84972",
+      "beta-entry.js.map": "017280fea884f9308dfb1f44e7734e700a49b778fd12d43c3cb72059635c09ca",
+      "beta-entry.js": "44e94c7b6c276a4af59b72835a5a303c94839e85ec4c3c3adfe05db84d7c5cb1"
+    },
+    "completedAt": "2026-11-07T16:53:31.520083+00:00"
+  },
+  "completedAt": "2026-11-07T16:53:31.558870+00:00"
+}

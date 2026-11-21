@@ -1,0 +1,42 @@
+{
+  "state": "SAME_COMPLETED_OBSERVER_METADATA_AND_PRESERVED_CONTROLS_VERIFIED",
+  "startedAt": "2026-11-08T03:25:02.014347+00:00",
+  "source": "ac9b82f42c8d6952193f5cbefbf11fc04816821d",
+  "version": "449fe7d2-0ac3-41b8-b622-fda2453b38db",
+  "readOnly": true,
+  "newGuestOrBrowser": false,
+  "providerMediaTrial": false,
+  "physicalCapture": false,
+  "originalControllerChanged": false,
+  "testRestarted": false,
+  "originalPostcheckFailure": "HTTPError; status and response not retained by original controller, cause unassigned",
+  "watcherSecondaryFailure": "KeyError after postcheck fields were absent; no readback attempted by watcher",
+  "originalControllerSha256": "026e3ba684a1f83bd716390cb7956ec26bdbbf1e1c33974d62c9a01b8db72ad2",
+  "originalWatcherSha256": "4408c1a75f37ebb93c067c6192d9bfc3a9038cafeb34d821f76ac6425f718eed",
+  "independentCleanupVerified": true,
+  "metadataResponses": [
+    {
+      "worker": "stalemate-hangout-beta",
+      "resource": "/deployments",
+      "httpStatus": 200
+    },
+    {
+      "worker": "webjam-turn-credentials",
+      "resource": "/deployments",
+      "httpStatus": 200
+    },
+    {
+      "worker": "stalemate-hangout-beta",
+      "resource": "/settings",
+      "httpStatus": 200
+    }
+  ],
+  "releaseCandidateReady": false,
+  "currentDeployment": "9c793eb0-60a9-4c45-91b1-76cf3918ed61",
+  "currentVersion": "449fe7d2-0ac3-41b8-b622-fda2453b38db",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "allEffectiveSettingsUnchanged": true,
+  "originalRelayCapMarkerUnchanged": true,
+  "credentialsPrintedOrPersisted": false,
+  "completedAt": "2026-11-08T03:25:04.647324+00:00"
+}

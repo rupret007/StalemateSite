@@ -1,0 +1,90 @@
+{
+  "at": "2026-11-07T16:27:57.827537+00:00",
+  "parent": "32d3cdb5571e5c3d1e06eb99dde214ff6b282c89",
+  "scope": "Actual failed hosted8h idle-expiry observation, independent cleanup and unchanged runtime, controlled local Node regression and source-bound checks. No new deployment, physical capture, provider, TTL change or real8h PASS.",
+  "payloads": {
+    "hosted-natural-expiry-current-nov07.json": {
+      "sha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+      "originalSha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+      "transform": "exact bytes"
+    },
+    "natural-expiry-readonly-finalizer-nov07.json": {
+      "sha256": "1491b3b07505d5c7626fb884dff435822e4c0cc8bce521ce07ce22cc0f7c2164",
+      "originalSha256": "1491b3b07505d5c7626fb884dff435822e4c0cc8bce521ce07ce22cc0f7c2164",
+      "transform": "exact bytes"
+    },
+    "natural-expiry-terminal-failure-triage-nov07.json": {
+      "sha256": "066b21361fe068df199e40e9a87302c6e2f4a5f2a8680865cf4ff696f8d03604",
+      "originalSha256": "066b21361fe068df199e40e9a87302c6e2f4a5f2a8680865cf4ff696f8d03604",
+      "transform": "exact bytes"
+    },
+    "natural-expiry-failure-independent-cleanup-readback-nov07.json": {
+      "sha256": "c6313a3e8c92ee3d6a342dd8079f89e49a92400f1088303f0f1bef6c9d723bdd",
+      "originalSha256": "c6313a3e8c92ee3d6a342dd8079f89e49a92400f1088303f0f1bef6c9d723bdd",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-old-source-regression-nov07.json": {
+      "sha256": "af8aca39a2c15923bd8164896e1fa46b8c4ad7570ad04c9257f07fb743e7880a",
+      "originalSha256": "af8aca39a2c15923bd8164896e1fa46b8c4ad7570ad04c9257f07fb743e7880a",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-input-first-source-echo-nov07.json": {
+      "sha256": "f3588588550b6b90aa5f3e507164fda22a82d4f1f2e9e8828be6a738c4f1ccf1",
+      "originalSha256": "f3588588550b6b90aa5f3e507164fda22a82d4f1f2e9e8828be6a738c4f1ccf1",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-reproduction-timeout-readback-nov07.json": {
+      "sha256": "64e2b2f33ee0b16b46e8e874748f0e7c48a6fb6054832767ac1e2c888246dd3a",
+      "originalSha256": "64e2b2f33ee0b16b46e8e874748f0e7c48a6fb6054832767ac1e2c888246dd3a",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-old-source-regression-staged-nov07.json": {
+      "sha256": "7f51af3b7ff236747343c84bd744b4d9667cdb1a7d53771b5f9bdf12598c2fae",
+      "originalSha256": "7f51af3b7ff236747343c84bd744b4d9667cdb1a7d53771b5f9bdf12598c2fae",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-corrected-restore-fixture-old-source-nov07.json": {
+      "sha256": "5fe0e7b6a46bba81a999c5d85df7b6ebe67e9f8a29b6b8c93b71b659597dc724",
+      "originalSha256": "5fe0e7b6a46bba81a999c5d85df7b6ebe67e9f8a29b6b8c93b71b659597dc724",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-fixed-checks-nov07.json": {
+      "sha256": "60080d360e24ceaebc3782749fbbc4e494514c39dd344eb48d9d56eb72728a2f",
+      "originalSha256": "e058ebc41fa12c67997da613b8c89fa0c1dcd8fa167c2ac56f7dff42fd2f3172",
+      "transform": "absolute owned QA-cache prefix replaced; declared excerpt"
+    },
+    "idle-expiry-fixed-missing-config-case-nov07.json": {
+      "sha256": "8f73ad38dae9400641183a0de8e8f17c686ca78efcce9894de58cbceae825806",
+      "originalSha256": "8f73ad38dae9400641183a0de8e8f17c686ca78efcce9894de58cbceae825806",
+      "transform": "exact bytes"
+    },
+    "idle-expiry-source-sftp-independent-readback-nov07.json": {
+      "sha256": "d1bbebc0d3d77e9e338513d5822d10fea79857c1c04d945cfdef699e403096dc",
+      "originalSha256": "d1bbebc0d3d77e9e338513d5822d10fea79857c1c04d945cfdef699e403096dc",
+      "transform": "exact bytes"
+    }
+  },
+  "changedFileSha256": {
+    "hangout-worker/src/lobby-do.mjs": "7eddf4c4b2ce4166fbe45eeb1d9c98dc731ef6bf7b5cc82ebbcc29fdb76d0732",
+    "hangout-worker/tests/beta-lifecycle.test.js": "fb7b4df51ac4d04f7de1d3fae8a4a6b0fedced86efa44b0e330b6435537c1b7a"
+  },
+  "originalFailuresPreserved": true,
+  "threeOldSourceDeadlineAssertionsDemonstrated": true,
+  "initialRestoreFixtureRequiredNicknameHello": true,
+  "firstFixedMatrix": {
+    "passed": 97,
+    "failedMissingConfigFile": 1,
+    "testFiles": 3
+  },
+  "correctedMissingConfigCase": {
+    "passed": 1,
+    "unchangedAssertionsAndProduct": true,
+    "otherCasesNotRepeated": true
+  },
+  "newLifecycleCasesPassed": 5,
+  "deploymentAttempted": false,
+  "natural8HourResult": "FAILED_RETAINED_NOT_REPLACED_BY_LOCAL_FIXTURES",
+  "publicLaunchApproved": false,
+  "hostedB35LobbyModuleByteExactToRegressionBase32": true,
+  "all62RequirementsByteExact": true
+}

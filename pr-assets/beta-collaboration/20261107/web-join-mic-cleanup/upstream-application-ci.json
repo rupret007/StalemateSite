@@ -1,0 +1,251 @@
+{
+  "at": "2026-11-07T21:31:54.985226+00:00",
+  "head": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+  "runs": [
+    {
+      "id": 42414675274,
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "sha": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+      "event": "pull_request"
+    },
+    {
+      "id": 42414675246,
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "sha": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+      "event": "pull_request"
+    },
+    {
+      "id": 42414675260,
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "sha": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+      "event": "pull_request"
+    }
+  ],
+  "allThreeNormalRunsSuccess": true,
+  "allJobConclusions": {
+    "42414675274": [
+      {
+        "id": 128530060215,
+        "name": "Cloudflare Worker unit tests",
+        "conclusion": "success"
+      }
+    ],
+    "42414675246": [
+      {
+        "id": 128530059083,
+        "name": "Web Join and Worker unit tests",
+        "conclusion": "success"
+      },
+      {
+        "id": 128530059363,
+        "name": "Web Join Playwright e2e",
+        "conclusion": "success"
+      }
+    ],
+    "42414675260": [
+      {
+        "id": 128530059715,
+        "name": "Transport (Go security and cross-build)",
+        "conclusion": "success"
+      },
+      {
+        "id": 128530059807,
+        "name": "iOS change gate",
+        "conclusion": "success"
+      },
+      {
+        "id": 128530059834,
+        "name": "Changelog fragment",
+        "conclusion": "success"
+      },
+      {
+        "id": 128530059859,
+        "name": "Windows native diagnostic control",
+        "conclusion": "success"
+      },
+      {
+        "id": 128530059885,
+        "name": "test",
+        "conclusion": "success"
+      },
+      {
+        "id": 128530059895,
+        "name": "Reference service (protocol and container)",
+        "conclusion": "success"
+      },
+      {
+        "id": 128530059925,
+        "name": "Test integrity guards",
+        "conclusion": "success"
+      },
+      {
+        "id": 128530061061,
+        "name": "Certify Jamulus/JACK (one hour, manual)",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 128530061160,
+        "name": "Jamulus 3.12.3 HEADLESS evidence (${{ matrix.target }})",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 128530088028,
+        "name": "Pocket Stage (iOS app)",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 128530088466,
+        "name": "Art companion (iPhone and iPad)",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 128533950485,
+        "name": "Jamulus 3.12.3 update input (macos-universal)",
+        "conclusion": "success"
+      },
+      {
+        "id": 128533950538,
+        "name": "Integration (real Jamulus 3.12.3)",
+        "conclusion": "success"
+      },
+      {
+        "id": 128533950570,
+        "name": "Jamulus 3.12.3 update input (windows-x64)",
+        "conclusion": "success"
+      },
+      {
+        "id": 128533950605,
+        "name": "Integration (real Jamulus 3.12.2)",
+        "conclusion": "success"
+      },
+      {
+        "id": 128534462728,
+        "name": "Build Desktop (${{ matrix.target }})",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 128534462835,
+        "name": "macOS Release Trust (${{ matrix.target }})",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 128534462980,
+        "name": "Publish GitHub Release",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 128534463696,
+        "name": "Windows Release Trust (windows-x64)",
+        "conclusion": "skipped"
+      }
+    ]
+  },
+  "logs": [
+    {
+      "job": 128530059885,
+      "sha256": "e6f1382f4624e2f8b14ab71a38e6e6be500b13ffb334bac8609e8151fa29583f",
+      "bytes": 2527837,
+      "pytestSummaryTotals": {
+        "scope": "Sum of separate pytest invocation summaries in this job, including any smoke checks; not a distinct end-to-end test count",
+        "invocations": 563,
+        "counts": {
+          "passed": 12941,
+          "failed": 0,
+          "skipped": 60,
+          "xfailed": 0,
+          "xpassed": 0,
+          "errors": 0
+        }
+      },
+      "failureOrRetrySummaries": [],
+      "checkout": [
+        "2026-11-07T21:11:40.6993125Z HEAD is now at 0c4bf73 Merge 5dde45d2e841fd19ff9c1fd055f88520fbf778e4 into f5c53f37c2099dc2ea8213815e67e37ea73c83bb",
+        "2026-11-07T21:11:40.7083137Z 0c4bf73c4312d807c336c2c91ac677950a3cb481"
+      ]
+    },
+    {
+      "job": 128533950538,
+      "sha256": "9ec5f656f59f3b975c816d2d7477cf9e56a156d38d4b184a361e8b2034727e30",
+      "bytes": 64091,
+      "pytestSummaryTotals": {
+        "scope": "Sum of separate pytest invocation summaries in this job, including any smoke checks; not a distinct end-to-end test count",
+        "invocations": 2,
+        "counts": {
+          "passed": 18,
+          "failed": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "errors": 0
+        }
+      },
+      "failureOrRetrySummaries": [],
+      "checkout": [
+        "2026-11-07T21:27:37.1692798Z HEAD is now at 0c4bf73 Merge 5dde45d2e841fd19ff9c1fd055f88520fbf778e4 into f5c53f37c2099dc2ea8213815e67e37ea73c83bb",
+        "2026-11-07T21:27:37.1721054Z 0c4bf73c4312d807c336c2c91ac677950a3cb481"
+      ]
+    },
+    {
+      "job": 128533950605,
+      "sha256": "924b414e58f2546d355185c703a4f0dd899594ae0019aab70c59da3361f4f7ff",
+      "bytes": 64095,
+      "pytestSummaryTotals": {
+        "scope": "Sum of separate pytest invocation summaries in this job, including any smoke checks; not a distinct end-to-end test count",
+        "invocations": 2,
+        "counts": {
+          "passed": 18,
+          "failed": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "errors": 0
+        }
+      },
+      "failureOrRetrySummaries": [],
+      "checkout": [
+        "2026-11-07T21:27:38.7521645Z HEAD is now at 0c4bf73 Merge 5dde45d2e841fd19ff9c1fd055f88520fbf778e4 into f5c53f37c2099dc2ea8213815e67e37ea73c83bb",
+        "2026-11-07T21:27:38.7595013Z 0c4bf73c4312d807c336c2c91ac677950a3cb481"
+      ]
+    }
+  ],
+  "ordinaryCiNotPhysicalOrEighthProviderStartProof": true,
+  "privateDeploymentUntouched": true,
+  "upstreamMerge": {
+    "pr": 452,
+    "head": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+    "merge": "25806b6bcabee1f73c0c0d614f8450cdb61bd12e",
+    "tree": "13a8bbffb9193c5cc57cfe95dba625d4979ce924",
+    "parents": [
+      "bcc1554ea60cb939564206493f50456996381661",
+      "5dde45d2e841fd19ff9c1fd055f88520fbf778e4"
+    ],
+    "reviewedAndMergedWholeTreesEqual": true,
+    "allThreeNormalExactHeadCiRunsPassed": [
+      42414675274,
+      42414675246,
+      42414675260
+    ]
+  },
+  "parentMerge": {
+    "pr": 451,
+    "head": "f5c53f37c2099dc2ea8213815e67e37ea73c83bb",
+    "merge": "bcc1554ea60cb939564206493f50456996381661",
+    "mergeTree": "584e186fa5b1385bdba0b251e42f1319ffbb36bf",
+    "parents": [
+      "3ae314eee41d05ae953d8c34a2c537eac46d823e",
+      "f5c53f37c2099dc2ea8213815e67e37ea73c83bb"
+    ],
+    "reviewedAndMergedWholeTreesEqual": true,
+    "allThreeExactHeadNormalRunsPassed": [
+      42412758457,
+      42412758536,
+      42412758508
+    ]
+  }
+}

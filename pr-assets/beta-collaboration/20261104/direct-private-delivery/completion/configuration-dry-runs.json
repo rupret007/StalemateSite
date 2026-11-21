@@ -1,0 +1,19 @@
+{
+  "scope": "Unapplied configuration bundling only; not provider activation or a new deployment",
+  "checks": [
+    {
+      "name": "direct-private-issuer-config-dry-run-nov04",
+      "at": "2026-11-04T09:38:00.044135+00:00",
+      "exitCode": 0,
+      "logSha256": "c36ec19c552034b79e52d959f4526a97d389bc84fa4988d935b84a6b204a050b"
+    },
+    {
+      "name": "direct-private-beta-music-config-dry-run-nov04",
+      "at": "2026-11-04T09:46:56.548874+00:00",
+      "exitCode": 0,
+      "logSha256": "92982217b6d40b45acb996c6c70e340072f8bde972a48e4c12d12e768984bdfa"
+    }
+  ],
+  "webCredentialsCreated": false,
+  "musicConfigurationApplied": false
+}

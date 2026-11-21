@@ -1,0 +1,40 @@
+{
+  "startedAt": "2026-11-07T16:48:50.032647+00:00",
+  "state": "PINNED_NATIVE_QA_TOOLS_READY_NOT_EXECUTED",
+  "result": {
+    "state": "PINNED_NATIVE_QA_TOOLS_READY_NOT_EXECUTED",
+    "startedAt": "2026-11-07T16:48:55.072325+00:00",
+    "guardBefore": {
+      "load1": 0.51416015625,
+      "memoryAvailableGiB": 14.3848876953125,
+      "swapPercent": 14.786243438720703,
+      "freeGiB": 722.3207473754883
+    },
+    "originalPreparationPreserved": true,
+    "nativeTestStarted": false,
+    "physicalCapture": false,
+    "reason": "Official archive contains a normal top-level directory without a trailing slash; all child paths and extraction safety checks remain required.",
+    "nodeVersion": "v24.22.2",
+    "nodeBinarySha256": "904a6d3484241d466989f9df9ba3aab822b1496191bdb28230eb491a55c32a52",
+    "guardBeforeInstall": {
+      "load1": 0.51416015625,
+      "memoryAvailableGiB": 14.350379943847656,
+      "swapPercent": 14.786243438720703,
+      "freeGiB": 722.1178436279297
+    },
+    "npmCiExitCode": 0,
+    "versions": {
+      "miniflare": "5.20261019.2-beta",
+      "workerd": "1.20261019.1",
+      "undici": "7.30.1"
+    },
+    "guardAfter": {
+      "load1": 0.55322265625,
+      "memoryAvailableGiB": 14.349418640136719,
+      "swapPercent": 14.780139923095703,
+      "freeGiB": 721.8951759338379
+    },
+    "completedAt": "2026-11-07T16:48:59.835077+00:00"
+  },
+  "completedAt": "2026-11-07T16:48:55.494635+00:00"
+}

@@ -1,0 +1,105 @@
+{
+  "state": "HOSTED_JOURNEYS_WITH_INDEPENDENT_CLEANUP_AND_VISUAL_REVIEW_VERIFIED",
+  "source": "ac9b82f42c8d6952193f5cbefbf11fc04816821d",
+  "version": "449fe7d2-0ac3-41b8-b622-fda2453b38db",
+  "physicalCapture": false,
+  "providerMediaTrial": false,
+  "originalStructuredProofSha256": "ccf04f3011b2f40718c4ff31b021b06d3e70d547fc41db7d8ed8ed3222562d3d",
+  "independentReadbackSha256": "3d87e75ab30323e34c5323735ec2706194e50eff7efe55345fa56b37530b6ac3",
+  "visualReviewSha256": "03c78e8b9bff97699ec2097fba2bc1f6eb20bccda454b2b59cfeaf3383bfc465",
+  "proof": {
+    "status": "passed",
+    "startedAt": "2026-11-08T01:19:33.902Z",
+    "completedAt": "2026-11-08T01:19:44.663Z",
+    "engine": "webkit",
+    "browserVersion": "27.2",
+    "checks": [
+      "Uninvited guests cannot read private state or Web Join JavaScript",
+      "Stalemate invitation, nickname and connected chat",
+      "Rad Dad invitation, nickname and connected chat",
+      "Both entrances share one lobby and display the arrival-site badge",
+      "Private runtime JavaScript and styles match the candidate exactly",
+      "Mobile chat contains page width and keeps input and Send visible at 375 and 390px",
+      "Manual reconnect retains an unsent draft and starts fresh scrollback",
+      "Two guests create and join an Art room with a received canvas stroke",
+      "The server allows the room host and refuses an ordinary guest topic change",
+      "A Jam host can invite a guest and share a browser destination on the preserved origin",
+      "Both own QA rooms close through the normal host command",
+      "Logout revokes copied cookies and protected code and closes the active page"
+    ],
+    "logout": [
+      200,
+      200
+    ],
+    "mobile": [
+      {
+        "viewport": 375,
+        "pageWidth": 375,
+        "inputLeft": 46,
+        "inputRight": 294,
+        "sendRight": 357,
+        "sendLeft": 299,
+        "fontSize": "16px"
+      },
+      {
+        "viewport": 390,
+        "pageWidth": 390,
+        "inputLeft": 46,
+        "inputRight": 309,
+        "sendRight": 372,
+        "sendLeft": 314,
+        "fontSize": "16px"
+      }
+    ],
+    "assets": [
+      "join/app.js",
+      "join/audio.js",
+      "join/config.js",
+      "join/crypto.js",
+      "join/errors.js",
+      "join/index.html",
+      "join/mailbox.js",
+      "join/policy.js",
+      "join/prejoin.js",
+      "join/session.js",
+      "join/style.css",
+      "r/45662413410ed051/lobby/idle-heartbeat.mjs",
+      "r/45662413410ed051/lobby/lobby.css",
+      "r/45662413410ed051/lobby/lobby.js"
+    ],
+    "setupMs": [
+      {
+        "source": "stalemate",
+        "ms": 955
+      },
+      {
+        "source": "rad-dad",
+        "ms": 916
+      }
+    ],
+    "reconnectMs": 325,
+    "allOwnedBrowserResourcesClosed": true
+  },
+  "readback": {
+    "state": "SAME_PROOF_HARNESS_AND_OWNED_PROCESS_CLEANUP_INDEPENDENTLY_VERIFIED",
+    "ownedProcesses": [
+      {
+        "pid": 59740,
+        "pidPresent": false,
+        "originalOwnedCommandStillPresent": false
+      },
+      {
+        "pid": 59741,
+        "pidPresent": false,
+        "originalOwnedCommandStillPresent": false
+      }
+    ],
+    "remoteProofSha256": "ccf04f3011b2f40718c4ff31b021b06d3e70d547fc41db7d8ed8ed3222562d3d",
+    "harnessSha256": "9192525225beeded6dad1bfb7cc42f993fc401bd27bbde4e01f0ae19905424b4",
+    "sameStructuredProof": true,
+    "completedAt": "2026-11-08T01:21:54.166824+00:00"
+  },
+  "limits": "No physical capture or listening; SDK/viewport checks are not physical Safari/iPhone or full assistive-technology qualification.",
+  "setupTimingBoundary": "From invitation submission through automated nickname entry to connected",
+  "crossPlatformSpeedComparisonQualified": false
+}

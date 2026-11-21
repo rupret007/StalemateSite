@@ -1,0 +1,122 @@
+{
+  "observedAt": "2026-11-05T01:05:58.373805+00:00",
+  "source": "4c4dec3d8b53e4951116ed28de8060d0c92a3ed1",
+  "runId": 41938592196,
+  "runConclusion": "success",
+  "packages": [
+    {
+      "target": "macos-arm64",
+      "artifactId": 13376459472,
+      "actionsSha256": "bfd1a9bac5845a5230fd7d03425fa3b849dd12e86ca1ff7b9467c520d2923988",
+      "innerSha256": "baeb67e9d2fe7beed930030b728be78d11f60049b29ede96d7fa9e3b490849d4",
+      "innerZip": "WebJam-macos-arm64-ADHOC-TEST-ONLY.zip",
+      "architecture": "Mach-O arm64",
+      "privateTarget": "private-beta",
+      "codecSha256": "29362a8d7ecdffb802e5ae138aa048a898fa21a6e34834d455e77d6e8a861da0",
+      "inspectionReceiptSha256": "9575c78954c190a13f5d492b3fdf2df8e287be55142aaf48c62bccefa754a677"
+    },
+    {
+      "target": "macos-x64",
+      "artifactId": 13377976583,
+      "actionsSha256": "484b56d5a49338f1e4714acf35a295954125a690836d9e9b99f5fdc42bdd1541",
+      "innerSha256": "0b9367f73a3271245c30d6c29d5b93a94052d11106ba59c85385f51694717f5e",
+      "innerZip": "WebJam-macos-x64-ADHOC-TEST-ONLY.zip",
+      "architecture": "Mach-O x86-64",
+      "privateTarget": "private-beta",
+      "codecSha256": "056771693584a37e3ccceee582e80fa43a5d3ddc71c3af78b741d00f231999aa",
+      "inspectionReceiptSha256": "e4489a10e96a16028743fbd2eedb66bc48081014f8ffa3face20e13b28a30948"
+    },
+    {
+      "target": "windows-x64",
+      "artifactId": 13375904542,
+      "actionsSha256": "1cbaecd57a7acb0b60f97c786bdf95b20dd9e11fc2834997992231ba98f7ad5e",
+      "innerSha256": "89d487e3211ab8a6e7e034c8e8e33b3587d0ab6bf5c125e5a0f156ad43d18637",
+      "innerZip": "WebJam-windows-x64-UNSIGNED-TEST-ONLY.zip",
+      "architecture": "PE x86-64",
+      "privateTarget": "private-beta",
+      "codecSha256": null,
+      "inspectionReceiptSha256": "3cf712f9ed33ab586a97d0b2975a008673f79ea053938db1d4c177cb0aa7a769"
+    },
+    {
+      "target": "linux-x64",
+      "artifactId": 13376503940,
+      "actionsSha256": "d168e1c10e0d3e3938ea200b86c2eeee3aee96e677fb18e90a7dd9780334c2ae",
+      "innerSha256": "c889cae541cafaaf6df6a1a95e4d21cfe952d683007701633a6b3baebdaadbe0",
+      "innerZip": "WebJam-linux-x64.zip",
+      "architecture": "ELF64 x86-64",
+      "privateTarget": "private-beta",
+      "codecSha256": null,
+      "inspectionReceiptSha256": "c983f2606344319941f02cc82560bd959ec59d383d59d5e53ae9cdeefec440bd"
+    }
+  ],
+  "codecCI": [
+    {
+      "target": "macos-arm64",
+      "jobId": 126962025261,
+      "logSha256": "25633ae6314b70e52cdab5d59415c672fbadb66fe5ffe34c41d2ad6b8d27f85a",
+      "actualArchiveSha256": "baeb67e9d2fe7beed930030b728be78d11f60049b29ede96d7fa9e3b490849d4",
+      "codecExecution": {
+        "target": "macos-arm64",
+        "codecSha256": "29362a8d7ecdffb802e5ae138aa048a898fa21a6e34834d455e77d6e8a861da0",
+        "opusSourceSha256": "65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1",
+        "jamulusFrames": 128,
+        "browserFrames": 960,
+        "sampleRate": 48000,
+        "hardwareCaptureOpened": false,
+        "networkOpened": false
+      },
+      "executionMatchesActualArchive": true
+    },
+    {
+      "target": "macos-x64",
+      "jobId": 126962025289,
+      "logSha256": "41aaf2c0d17ce59afb012dfb2a05d99d23639d7f71d95585424132310f4dc5f3",
+      "actualArchiveSha256": "0b9367f73a3271245c30d6c29d5b93a94052d11106ba59c85385f51694717f5e",
+      "codecExecution": {
+        "target": "macos-x64",
+        "codecSha256": "056771693584a37e3ccceee582e80fa43a5d3ddc71c3af78b741d00f231999aa",
+        "opusSourceSha256": "65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1",
+        "jamulusFrames": 128,
+        "browserFrames": 960,
+        "sampleRate": 48000,
+        "hardwareCaptureOpened": false,
+        "networkOpened": false
+      },
+      "executionMatchesActualArchive": true
+    }
+  ],
+  "armMac": {
+    "signatureVerified": true,
+    "archiveAndActualLocalCodecMatch": true,
+    "normalOpenSucceeded": true,
+    "actualChooserObserved": true,
+    "paintAlongCopyAndAfroMarkObserved": true,
+    "hostOrJoinClicked": false,
+    "normalWindowCloseAndNoCandidateChildrenVerified": true,
+    "gatekeeperAssessmentAccepted": false,
+    "signatureMode": "ad-hoc, unnotarized; no platform security change"
+  },
+  "intelMacBook": {
+    "transferredArchiveHashVerified": true,
+    "actualDeepStrictSignatureVerified": true,
+    "embeddedSourceArchitecturePrivateDestinationAndCodecHashVerified": true,
+    "existingUserArtSessionLeftUntouched": true,
+    "newAppLaunched": false
+  },
+  "windows": {
+    "nativePackageUnsigned": true,
+    "nativeInstallationOrTrustClaimed": false,
+    "actualBrowserMusicPending": true
+  },
+  "linux": {
+    "actualArchiveRetained": true,
+    "installationOrMusicClaimed": false
+  },
+  "scope": "Actual archives and scoped package/runtime checks; no reciprocal physical music or public-launch claim",
+  "storage": "Verified current-cohort archives moved to the Hoser external drive; per-file SHA/size checks before redundant internal copies removed. Existing worktree archive path remains usable while the drive is mounted.",
+  "originalResourceFailure": "Windows inner extraction initially refused the15GiB disk reserve. Source artifacts retained; rerun only after verified external move changed available storage. No redownload, duplicate build or test assertion change.",
+  "providerReadiness": "Fresh01:02UTC account-wide30d TURN/SFU responses are HTTP200 with no errors and no groups. Do not turn empty analytics or dashboard No data into an exact zero. Realtime subscription/renewal and current billing period observed; reconcile allowance/headroom again before capture. No media or provider changes in this turn.",
+  "physicalMusicComplete": false,
+  "publicLaunch": false,
+  "all62RequirementsPreserved": true
+}

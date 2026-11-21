@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-07T13:36:46.811441+00:00",
+  "state": "FIRST_AXE_HARNESS_FORMATTING_GUARD_STOP_RETAINED_BEFORE_AUTH_OR_BROWSER",
+  "originalControllerSha256": "389e50a65af9fe839829c60f6f332b053a37f381043bf91389b93b2be6e5410a",
+  "failureLine": 16,
+  "cause": "Exact string guard expected a space after colon; fixture explicitly sets chromiumSandbox:true without that space",
+  "sandboxStillRequired": true,
+  "noBrowserGuestAuthenticationOrProviderAccessStarted": true,
+  "controllerReceiptAbsentBeforeCorrectedStart": true,
+  "productSourceChanged": false
+}

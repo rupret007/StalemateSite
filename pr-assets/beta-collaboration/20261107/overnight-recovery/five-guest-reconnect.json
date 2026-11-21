@@ -1,0 +1,62 @@
+{
+  "startedAt": "2026-11-07T07:51:00.693Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "endpoint": "Intel MacBook",
+  "engine": "WebKit",
+  "ordinaryGuests": 5,
+  "scope": "Actual protected Worker; three simultaneous client-initiated WebSocket closes, not unannounced TCP loss or WAN capacity",
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "checks": [
+    "Five ordinary guests enter through both brands without media",
+    "An ordinary founder creates a keyed invite-only room and invites four peers",
+    "All guests receive one private line; founder keeps a private unsent draft",
+    "Three actual sockets close together and automatic reconnect assigns fresh identities",
+    "Explicit room rejoin keeps founder power, preserves its draft and starts fresh transcript"
+  ],
+  "logout": [
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "copiedCookieChecks": [
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    },
+    {
+      "before": 200,
+      "after": 401
+    }
+  ],
+  "initialAttemptRetained": true,
+  "harnessCorrection": "Use both normal browser Origin and JSON content type/body required by beta-entry.mjs:226; retain both earlier incorrect harness requests",
+  "browserVersion": "27.2",
+  "threeClientReconnectMs": 1408,
+  "freshSessionIds": 3,
+  "finalUniqueMembers": 5,
+  "newLineCopiesPerClient": 1,
+  "privateDraftAutoSent": false,
+  "oldTranscriptReplayed": false,
+  "founderPowerRetained": true,
+  "status": "passed",
+  "ownRoomClosed": true,
+  "captureRequests": 0,
+  "contextsClosed": true,
+  "completedAt": "2026-11-07T07:51:16.957Z"
+}

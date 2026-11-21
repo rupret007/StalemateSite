@@ -1,0 +1,104 @@
+{
+  "state": "ORIGINAL_WAV_TIMELINE_INSPECTED_READ_ONLY",
+  "fixtureSha256": "f5298cbb71fea2a9d394de3c517bea795de97bc445b7020f50f00c8b40e7db45",
+  "seconds": 40,
+  "sampledSeconds": [
+    {
+      "second": 0,
+      "dominant": "E",
+      "amplitudes": {
+        "E": 2092,
+        "G": 26,
+        "A": 72
+      }
+    },
+    {
+      "second": 12,
+      "dominant": "E",
+      "amplitudes": {
+        "E": 2208,
+        "G": 98,
+        "A": 141
+      }
+    },
+    {
+      "second": 13,
+      "dominant": "E",
+      "amplitudes": {
+        "E": 2202,
+        "G": 78,
+        "A": 109
+      }
+    },
+    {
+      "second": 14,
+      "dominant": "G",
+      "amplitudes": {
+        "E": 79,
+        "G": 2190,
+        "A": 262
+      }
+    },
+    {
+      "second": 19,
+      "dominant": "G",
+      "amplitudes": {
+        "E": 79,
+        "G": 2190,
+        "A": 262
+      }
+    },
+    {
+      "second": 20,
+      "dominant": "G",
+      "amplitudes": {
+        "E": 79,
+        "G": 2190,
+        "A": 262
+      }
+    },
+    {
+      "second": 25,
+      "dominant": "G",
+      "amplitudes": {
+        "E": 79,
+        "G": 2190,
+        "A": 262
+      }
+    },
+    {
+      "second": 26,
+      "dominant": "G",
+      "amplitudes": {
+        "E": 79,
+        "G": 2190,
+        "A": 262
+      }
+    },
+    {
+      "second": 27,
+      "dominant": "A",
+      "amplitudes": {
+        "E": 152,
+        "G": 301,
+        "A": 2199
+      }
+    },
+    {
+      "second": 39,
+      "dominant": "A",
+      "amplitudes": {
+        "E": 152,
+        "G": 301,
+        "A": 2199
+      }
+    }
+  ],
+  "physicalCapture": false,
+  "audioPlayback": false,
+  "fixtureChanged": false,
+  "appChanged": false,
+  "at": "2026-11-07T11:46:43.941247+00:00",
+  "original20SecondTrialStillFailed": true,
+  "correction": "Use full40-second fixture duration, retaining all three chord thresholds and original native155-second deadline. No product or codec patch is indicated by this failure."
+}

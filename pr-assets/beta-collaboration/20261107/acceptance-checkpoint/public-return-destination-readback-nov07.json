@@ -1,0 +1,36 @@
+{
+  "at": "2026-11-07T13:45:27.992109+00:00",
+  "state": "BOTH_DEFAULT_RETURN_DESTINATIONS_REACHABLE_OVER_NORMAL_HTTPS",
+  "records": [
+    {
+      "url": "https://stalemate.band/",
+      "httpsGetSucceeded": true,
+      "title": "Stalemate | Original punk rock, played loud",
+      "canonical": [
+        "https://stalemate.band/"
+      ],
+      "bodySha256": "26fc9fadfa837f99d5c48f765af30b2ccdd5bfa285c39eded2dbba4713a410f7",
+      "bytes": 24953,
+      "privateInviteValuesInPublicResponse": false,
+      "privateBetaDestinationLinkCount": 0,
+      "domainOwnershipProvedByThis": false
+    },
+    {
+      "url": "https://raddadband.com/",
+      "httpsGetSucceeded": true,
+      "title": "Rad Dad | DFW Pop-Punk Cover Band",
+      "canonical": [
+        "https://raddadband.com/"
+      ],
+      "bodySha256": "5565cb17036adb1847723522555d4787224503bd27e4702ee8143f2bcd8865d0",
+      "bytes": 33450,
+      "privateInviteValuesInPublicResponse": false,
+      "privateBetaDestinationLinkCount": 0,
+      "domainOwnershipProvedByThis": false
+    }
+  ],
+  "webToolFailureOnStalemateWasNotASiteFailure": "Normal system curl HEAD and GET both succeeded without TLS overrides. No guessed domain replacement.",
+  "scope": "Read-only public return-link health; not permission to modify either website or proof of third-party domain ownership.",
+  "sitesOrAppOrDnsChanged": false,
+  "privateInvitesOrCookiesSent": false
+}

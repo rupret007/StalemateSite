@@ -1,0 +1,23 @@
+{
+  "repository": "https://github.com/rupret007/webjam",
+  "commit": "5ae09b196ee7bc8a854e54d15065227d289d43cf",
+  "sourcePR": "https://github.com/rupret007/webjam/pull/501",
+  "license": "MIT",
+  "files": {
+    "game-offer.js": {
+      "source": "web/join/game-offer.js",
+      "sha256": "03ff4afaef2b28a3f7908861d517518c9013ef5deda530563e1ffec2d4715ea7",
+      "adaptation": null
+    },
+    "index.html": {
+      "source": "web/join/index.html",
+      "sha256": "86e4f19f244fdf115e253d91cc9670754aefd9cf754888ef440ccc60b21a6e02",
+      "adaptation": "Chess and private Music preview controls layered over the pinned Web Join page. Keeps the listen-only and Resume audio controls in the protected beta. Keeps microphone retry in the tab order with Safari\u2019s restricted keyboard navigation setting. Preloads the protected receiver’s static imports so the join screen can initialize in parallel."
+    },
+    "session.js": {
+      "source": "web/join/session.js",
+      "sha256": "7b1f148b0148d9b2961b21e6bd75c6f0074dbf101afc14debdc1ac9006acff22",
+      "adaptation": "Chess-only delta applied to the reviewed website Web Join client; retain private listen-only joining from website 9dcda1d Private Music may supply credentials already issued by the protected page."
+    }
+  }
+}

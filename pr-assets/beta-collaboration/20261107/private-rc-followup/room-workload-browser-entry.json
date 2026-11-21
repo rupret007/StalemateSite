@@ -1,0 +1,157 @@
+{
+  "startedAt": "2026-11-07T04:19:10.901Z",
+  "source": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "version": "75655a50-9e13-4966-bb68-22b45a230c1d",
+  "scope": "Nine independent Chromium guest contexts on one Mac and one normal Internet connection. Eight-seat previously identified QA Art room, four rounds of chat, no physical media or load beyond this tier.",
+  "rounds": 4,
+  "guestsInRoom": 8,
+  "captureRequests": 0,
+  "logout": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "stateAfterLogout": [
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401
+  ],
+  "guards": [
+    {
+      "load": 4.005859375,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.11166763305664
+    },
+    {
+      "load": 3.92529296875,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.111515045166016
+    },
+    {
+      "load": 3.92529296875,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.11151123046875
+    },
+    {
+      "load": 3.92529296875,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.109539031982422
+    },
+    {
+      "load": 3.85107421875,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.109546661376953
+    },
+    {
+      "load": 3.85107421875,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.108631134033203
+    },
+    {
+      "load": 3.85107421875,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.108631134033203
+    },
+    {
+      "load": 3.85107421875,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.107715606689453
+    },
+    {
+      "load": 3.78271484375,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.107711791992188
+    },
+    {
+      "load": 3.78271484375,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.106800079345703
+    },
+    {
+      "load": 3.78271484375,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.10498046875
+    },
+    {
+      "load": 4.3603515625,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.104984283447266
+    },
+    {
+      "load": 4.2509765625,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.104888916015625
+    },
+    {
+      "load": 4.2509765625,
+      "swapPercent": 74.353125,
+      "freeGiB": 19.104888916015625
+    }
+  ],
+  "admissionStatuses": [
+    {
+      "index": 0,
+      "status": 200
+    },
+    {
+      "index": 1,
+      "status": 200
+    },
+    {
+      "index": 2,
+      "status": 200
+    },
+    {
+      "index": 3,
+      "status": 200
+    },
+    {
+      "index": 4,
+      "status": 200
+    },
+    {
+      "index": 5,
+      "status": 200
+    },
+    {
+      "index": 6,
+      "status": 200
+    },
+    {
+      "index": 7,
+      "status": 200
+    },
+    {
+      "index": 8,
+      "status": 200
+    }
+  ],
+  "roomLimit": 8,
+  "existingQaRoomVerified": true,
+  "setupMs": 11364,
+  "workloadMs": 10959,
+  "messages": 32,
+  "deliveries": 256,
+  "expectedDeliveries": 256,
+  "peerDeliveryMs": {
+    "samples": 224,
+    "p50": 84,
+    "p95": 118,
+    "max": 118
+  },
+  "ninthGuestDenied": true,
+  "status": "passed",
+  "completedAt": "2026-11-07T04:19:36.066Z"
+}

@@ -1,0 +1,44 @@
+{
+  "startedAt": "2026-11-07T13:50:29.456Z",
+  "source": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "version": "33862058-10a5-4a6f-9659-38841d70292f",
+  "ordinaryGuests": 2,
+  "physicalCapture": false,
+  "recording": false,
+  "aiModeration": "off",
+  "providerCredentials": false,
+  "scope": "One harmless report submission from actual ordinary cross-entry guests in an owned QA room. Human moderator inspection/dismissal remains pending.",
+  "checks": [
+    "Two cross-entry ordinary guests use one owned temporary QA room",
+    "Received harmless line is reported once and acknowledged by the actual server",
+    "Neither entrance gains moderator-page access",
+    "Own QA room closes normally after report submission",
+    "Both guests log out and copied cookies are denied"
+  ],
+  "logout": [
+    200,
+    200
+  ],
+  "copiedCookieAfterLogout": [
+    401,
+    401
+  ],
+  "otherReportsReadOrChanged": false,
+  "humanReviewQualified": false,
+  "browserVersion": "156.0.8078.4",
+  "reportSubmissionAcknowledged": true,
+  "expectedModeratorAction": "Dismiss only this harmless test report; leave every other report unchanged. Do not ban or punish the synthetic participants.",
+  "ordinaryAdminStatuses": [
+    403,
+    403
+  ],
+  "ownedQaRoomClosed": true,
+  "captureRequests": 0,
+  "state": "PASSED_CURRENT_REPORT_SUBMISSION_CROSS_ENTRY_ROLE_ISOLATION_HUMAN_REVIEW_PENDING",
+  "allOwnedBrowserResourcesClosed": true,
+  "completedAt": "2026-11-07T13:50:33.289Z",
+  "publicExcerpt": {
+    "omission": "Unique synthetic report text/lookup marker omitted; owner-only original retained. No real participant text was collected.",
+    "humanReviewStillPending": true
+  }
+}

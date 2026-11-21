@@ -1,0 +1,218 @@
+{
+  "reviewedPr": {
+    "at": "2026-11-04T19:02:12.341405+00:00",
+    "source": "640fa3c5ae44f9caaca47c8ec35510880c673ecc",
+    "actualCheckout": "bffdf9437be8063c318a5ce856a4c0a2123de7cd",
+    "trackedModuleCount": 562,
+    "moduleOrderMatchesTrackedSource": true,
+    "exactlyOneTerminalSummaryPerModule": true,
+    "totalsWithinModuleLoopOnly": {
+      "passed": 12911,
+      "skipped": 60,
+      "failed": 0,
+      "errors": 0,
+      "xfailed": 0,
+      "xpassed": 0
+    },
+    "mainLogSha256": "a0815c23f5073880958f711fa0366f5d7c9de7c223621cb1015f1dec8a3a87f2",
+    "notPhysicalAudioEvidence": true,
+    "wholeTree": "fa148576d2c64d23250e53f20a76ff99947ab3f3",
+    "actualCheckoutTreeVerified": true,
+    "runId": 41886819913,
+    "jobId": 126774267714
+  },
+  "privateBuild": {
+    "at": "2026-11-04T19:02:12.396160+00:00",
+    "source": "e101465df5d204809619aafc8b65fd7925950e8a",
+    "actualCheckout": "e101465df5d204809619aafc8b65fd7925950e8a",
+    "trackedModuleCount": 562,
+    "moduleOrderMatchesTrackedSource": true,
+    "exactlyOneTerminalSummaryPerModule": true,
+    "totalsWithinModuleLoopOnly": {
+      "passed": 12911,
+      "skipped": 60,
+      "failed": 0,
+      "errors": 0,
+      "xfailed": 0,
+      "xpassed": 0
+    },
+    "mainLogSha256": "41258467711502db751a44fdd5b4fffc9e59f79393576558586fcd130246eb77",
+    "notPhysicalAudioEvidence": true,
+    "wholeTree": "6c783832939210eaf53df66b50c5ea3fd2fcde98",
+    "runId": 41886309202,
+    "jobId": 126771600761
+  },
+  "pr": 428,
+  "mergedAs": "12d939af29ae2b28f8d25cd21186d8c2d1eb8927",
+  "requiredChecks": [
+    "test",
+    "Test integrity guards",
+    "Transport (Go security and cross-build)",
+    "Reference service (protocol and container)",
+    "Windows native diagnostic control",
+    "iOS change gate"
+  ],
+  "requiredChecksAllSuccess": true,
+  "currentChecks": {
+    "head": "640fa3c5ae44f9caaca47c8ec35510880c673ecc",
+    "checks": [
+      {
+        "name": "Windows Release Trust (windows-x64)",
+        "conclusion": "skipped",
+        "status": "completed",
+        "id": 126785273920
+      },
+      {
+        "name": "Publish GitHub Release",
+        "conclusion": "skipped",
+        "status": "completed",
+        "id": 126785273359
+      },
+      {
+        "name": "macOS Release Trust (${{ matrix.target }})",
+        "conclusion": "skipped",
+        "status": "completed",
+        "id": 126785272241
+      },
+      {
+        "name": "Build Desktop (${{ matrix.target }})",
+        "conclusion": "skipped",
+        "status": "completed",
+        "id": 126785272059
+      },
+      {
+        "name": "Jamulus 3.12.3 update input (windows-x64)",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126784007470
+      },
+      {
+        "name": "Integration (real Jamulus 3.12.2)",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126784007434
+      },
+      {
+        "name": "Integration (real Jamulus 3.12.3)",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126784007393
+      },
+      {
+        "name": "Jamulus 3.12.3 update input (macos-universal)",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126784007381
+      },
+      {
+        "name": "Pocket Stage (iOS app)",
+        "conclusion": "skipped",
+        "status": "completed",
+        "id": 126774324516
+      },
+      {
+        "name": "Art companion (iPhone and iPad)",
+        "conclusion": "skipped",
+        "status": "completed",
+        "id": 126774323614
+      },
+      {
+        "name": "Jamulus 3.12.3 HEADLESS evidence (${{ matrix.target }})",
+        "conclusion": "skipped",
+        "status": "completed",
+        "id": 126774321051
+      },
+      {
+        "name": "Certify Jamulus/JACK (one hour, manual)",
+        "conclusion": "skipped",
+        "status": "completed",
+        "id": 126774269105
+      },
+      {
+        "name": "iOS change gate",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126774267732
+      },
+      {
+        "name": "test",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126774267714
+      },
+      {
+        "name": "Reference service (protocol and container)",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126774267642
+      },
+      {
+        "name": "Transport (Go security and cross-build)",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126774267555
+      },
+      {
+        "name": "Test integrity guards",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126774267403
+      },
+      {
+        "name": "Changelog fragment",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126774267387
+      },
+      {
+        "name": "Windows native diagnostic control",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126774267334
+      },
+      {
+        "name": "Web Join and Worker unit tests",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126774265470
+      },
+      {
+        "name": "Web Join Playwright e2e",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126774265107
+      },
+      {
+        "name": "Cloudflare Worker unit tests",
+        "conclusion": "success",
+        "status": "completed",
+        "id": 126773389760
+      }
+    ]
+  },
+  "regressionEvidence": {
+    "parent": "2 expected failures, preserved",
+    "firstBroaderRun": "101 passed,4 failures: reused environment lacked pinned websockets; preserved",
+    "focusedCorrectedRun": "105 passed with worktree-only pinned dependency",
+    "liveCorrectedSourceClients": "Both204; no frozen audio claim",
+    "localReceipts": [
+      {
+        "name": "mailbox-client-identity-red-nov04.json",
+        "sha256": "c432cc716c161fda8e57e961cb84c1a9b9a383b1ae89e9163b044807d7a623d4"
+      },
+      {
+        "name": "mailbox-client-identity-focused-green-nov04.json",
+        "sha256": "f8429d9d164a8e57e7a7cf795a258a8429e83af9ff883540b48b737393a75c52"
+      },
+      {
+        "name": "mailbox-client-identity-focused-green-v2-nov04.json",
+        "sha256": "0b8d777ae3d21e878f98d6b29b7838e2ab1b7831b6f07295cc6079ddab5d6e0f"
+      },
+      {
+        "name": "mailbox-client-identity-live-source-nov04.json",
+        "sha256": "200fd9fbde740532c448e73992db4341720de2e881ac60099d6ce95d371eadc0"
+      }
+    ]
+  },
+  "originalChangelogFailureJob": 126771132076
+}

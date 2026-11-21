@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-07T03:06:11.904340+00:00",
+  "source": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "activeVersion": "75655a50-9e13-4966-bb68-22b45a230c1d",
+  "deployment": "e01f4ed8-b966-42e8-bb50-631ef1a8f515",
+  "trafficPercent": 100,
+  "rollbackVersion": "50c62fa6-676c-4c1a-888f-ae4ceb74a3be",
+  "checks": {
+    "plainVarsUnchanged": true,
+    "durableNamespacesUnchanged": true,
+    "secretNamesUnchanged": true,
+    "compatibilityUnchanged": true,
+    "protectedBeta": true,
+    "aiOff": true,
+    "chatMediaTurnOff": true
+  },
+  "passed": true
+}

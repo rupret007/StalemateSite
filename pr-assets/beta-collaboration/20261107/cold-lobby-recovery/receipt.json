@@ -1,0 +1,49 @@
+{
+  "at": "2026-11-07T14:43:11.239308+00:00",
+  "parent": "ffe494fed634196a19a30c43c08ee5488a44de8f",
+  "scope": "Live anonymous before observation plus local Node/Vitest/Chromium previews of the prepared code. Not deployed after evidence. No physical capture, provider activation or private invitation.",
+  "testedChangedFileSha256": {
+    "hangout-worker/src/beta-entry.mjs": "ad6d0623e88c1ae0390bed2ce9a19db13b92a97544083d62f5bfa6559b719000",
+    "hangout-worker/tests/beta.test.js": "1efacaa79a8f94b54d3852353fa1d002948a307303c915cba7bf5f5e1f7a8f24"
+  },
+  "payloads": {
+    "anonymous-entry-inspection-nov07.json": {
+      "sha256": "7ac3a4553c619cd6a2a8908acccba87cc51f9f36de8ecc4ba3adcc3153549572",
+      "transform": "exact bytes",
+      "sourceFile": "anonymous-entry-inspection-nov07.json"
+    },
+    "cold-lobby-unit-second-run-nov07.json": {
+      "sha256": "ff1d099d315389e32f6cef0bb52161a5cfe8f485c927dfe9b06cff23fb9a0bbe",
+      "transform": "exact bytes",
+      "sourceFile": "cold-lobby-unit-second-run-nov07.json"
+    },
+    "cold-lobby-local-preview-nov07.json": {
+      "sha256": "f0ef8e0cc2350dbc08cf1abd855b73230299f8a356ac501f5b47eccce6134bbd",
+      "transform": "exact bytes",
+      "sourceFile": "cold-lobby-local-preview-nov07.json"
+    },
+    "cold-lobby-test-source-readback-nov07.json": {
+      "sha256": "1990a129c1f01c499ff0b08b9eda34be635bbde66880b0841eefa734d3618e12",
+      "transform": "exact bytes",
+      "sourceFile": "cold-lobby-test-source-readback-nov07.json"
+    },
+    "cold-lobby-unit-first-run-nov07.json": {
+      "sha256": "9822b8cf490a426fe2baed40ea2ed10eaf8b542919862421f3683e385195ce00",
+      "originalSourceSha256": "0decd8f004ad400a8e886a5b13db6568a0cc49715e6b0ae6753981a8a4e7676c",
+      "transform": "absolute owned QA-cache path replaced; declared excerpt",
+      "sourceFile": "cold-lobby-unit-first-run-nov07.json"
+    },
+    "cold-lobby-local-preview-375.png": {
+      "sha256": "593b6a716d42170454170321c9e5c24f4289459bc9beb3fb6c5b964529ae7e75",
+      "transform": "exact local preview screenshot; visually inspected; not deployed proof"
+    },
+    "cold-lobby-local-preview-390.png": {
+      "sha256": "c10f7b6e5812c971fa7145fadb7d2d2695f79be6ecd814f74fa9aac29a6abd8f",
+      "transform": "exact local preview screenshot; visually inspected; not deployed proof"
+    }
+  },
+  "all62RequirementsMustRemainUnchanged": true,
+  "firstLocalImportFailureRetained": true,
+  "allOriginalPrivateReceiptsRetained": true,
+  "privateDeploymentChanged": false
+}

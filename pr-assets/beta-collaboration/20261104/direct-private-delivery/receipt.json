@@ -1,0 +1,100 @@
+{
+  "at": "2026-11-04T09:02:37.494830+00:00",
+  "applicationSource": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "workerVersion": "dbcaddf5-dd3f-48e3-9826-0d7998ffdbc0",
+  "previousRollbackVersion": "a9724702-3ce5-418a-bbd4-950f2e169c9e",
+  "allEffectiveBindingsAndDoNamespacesUnchanged": true,
+  "allSecretBindingNamesPreserved": true,
+  "runtimeSettingsUnchanged": true,
+  "matchedPackagedSourceAssets": 68,
+  "servedAssetHashesVerified": [
+    {
+      "path": "r/45662413410ed051/lobby/lobby.js",
+      "sha256": "235978288e197c1a9aa6723e9aaa509c646467f7ced76b461b3c3b88ddd3667e"
+    },
+    {
+      "path": "r/45662413410ed051/lobby/lobby.css",
+      "sha256": "31e2fb8db3b52ae181c9fe06350f63533dc3791540fa42f0eb4b5da88b16cc37"
+    },
+    {
+      "path": "join/app.js",
+      "sha256": "3fa2127c8c99f0a7c6bc1e49545a1a94c9da2e7839f739df290d846bc51aa4a3"
+    },
+    {
+      "path": "join/session.js",
+      "sha256": "eb2a60f3de58485deb195bb6d9c79a6d58e11a476482fe2ea30ce5686df88900"
+    }
+  ],
+  "all62RequirementsUnchanged": true,
+  "publicBandNavigationChanged": false,
+  "mediaOrAiActivated": false,
+  "actualMusicQualified": false,
+  "privateNativeCohort": {
+    "runId": 41798291653,
+    "source": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+    "platformStatusAtObservation": {
+      "macos-arm64": "success",
+      "windows-x64": "success",
+      "linux-x64": "success",
+      "macos-x64": "in_progress"
+    },
+    "armActualArchive": {
+      "artifactId": 13308123307,
+      "actionsArchiveSha256": "b7abd792d87143de1b06a8a58f17fbc6ac367145372c864c9dac5a9555fcd4e1",
+      "innerZipSha256": "aaa09ccf7367a159a98a1b0a1ecdbfff8c63419e58a1db0f96db904d5c7138ce",
+      "privateTargetManifest": {
+        "build": "d3ea7c55b95b155e355d96d59491eb704d895bd2",
+        "target": "private-beta",
+        "version": 1
+      },
+      "architecture": "Mach-O 64-bit executable arm64",
+      "codesignDeepStrictExitCode": 0,
+      "signingKind": "ad-hoc private test build",
+      "installedOrMusicClaimed": false
+    }
+  },
+  "headroomEvidence": "Actual authenticated account-wide TURN/SFU GraphQL responses and query scopes plus current subscription/cycle were reviewed. Bounded-trial preflight qualified at its observation; private financial values and raw account responses stay owner-only. Recheck before actual trial. A chart No data alone is not sufficient.",
+  "pendingProviderAction": "Separate private browser TURN key creation/installation awaits browser action-time confirmation; no key created or copied. Existing desktop key unchanged.",
+  "files": [
+    {
+      "path": "drawing-first-attempt.json",
+      "bytes": 1325,
+      "sha256": "5af42b2892bcd3f883c73fe967182e89dce922be0dc85ae0b62d7daaaf395c1a"
+    },
+    {
+      "path": "drawing-layout-cleanup.json",
+      "bytes": 2175,
+      "sha256": "194d59728f5220af16b49f99b375e36cda60537674524f72d7d992c815ebb282"
+    },
+    {
+      "path": "guest-journeys.json",
+      "bytes": 921,
+      "sha256": "8524d0b7657546815be38fc9f8ea7372d8659ccf4381fff92960927ce106741c"
+    },
+    {
+      "path": "site201-v2-chromium-375.png",
+      "bytes": 60381,
+      "sha256": "5a94964d165187f5273790cd3ca7d7e81a7b783f5415f25769a4196899cd1cec"
+    },
+    {
+      "path": "site201-v2-chromium-390.png",
+      "bytes": 61827,
+      "sha256": "2a8b9eff5077607b106b9b0452ee3fa9d0f3f1594009140a4faca5b4cd8edc7f"
+    },
+    {
+      "path": "site201-v2-webkit-375.png",
+      "bytes": 63955,
+      "sha256": "a4e776aeb26cdbaf7a39d87283e82b887b64476c3b5275da2d38ee62a3668ae5"
+    },
+    {
+      "path": "site201-v2-webkit-390.png",
+      "bytes": 63212,
+      "sha256": "da12d4797c43764841797c38b30c992df9a1343ffbbcc41bfa9352e82581ba6a"
+    },
+    {
+      "path": "webkit-keyboard-diagnostic.json",
+      "bytes": 3106,
+      "sha256": "d2b132c742bf61917f4dcb3c0ff6015b4876c8c68a1e66c6eaf84e44c6f7b9c3"
+    }
+  ]
+}

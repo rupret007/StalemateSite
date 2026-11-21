@@ -1,0 +1,9 @@
+{
+  "at": "2026-11-07T12:35:07.726416+00:00",
+  "state": "FIRST_ARM_READONLY_POSTCHECK_STOPPED_INSPECT_BEFORE_RETRY",
+  "failureType": "AssertionError",
+  "toolTracebackLine": 16,
+  "noAdditionalMediaStarted": true,
+  "originalRemoteBrowserProofCopied": true,
+  "finalReadbackNotYetQualified": true
+}

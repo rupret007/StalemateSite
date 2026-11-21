@@ -1,0 +1,10 @@
+{
+  "state": "STOPPED_INSPECT_SAME_REPRODUCTION_NO_AUTOMATIC_RETRY",
+  "base": "32d3cdb5571e5c3d1e06eb99dde214ff6b282c89",
+  "startedAt": "2026-11-07T16:04:22.367036+00:00",
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "real8HourPass": false,
+  "failureType": "TimeoutExpired",
+  "completedAt": "2026-11-07T16:08:02.405916+00:00"
+}

@@ -1,0 +1,61 @@
+{
+  "state": "SETTINGS_AND_ALL66_SOURCE_CONTENTS_VERIFIED_HOSTED_ASSET_AND_JOURNEY_PROOF_PENDING",
+  "startedAt": "2026-11-07T17:14:46.692143+00:00",
+  "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "merge": "bfe0365eaef183cc282aaed38aecfecc7f0b84d0",
+  "tree": "09012724c8600815f9df111faa4014f7aeb220d1",
+  "rollbackVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "assets": 69,
+  "explicitExistingPlainVariables": 17,
+  "physicalCapture": false,
+  "turnCredentialsMinted": false,
+  "recording": false,
+  "publicSitesChanged": false,
+  "storyPoolUsed": false,
+  "remoteHelperSha256": "08cfb1f356e98a9d4aeeed47c66d647d4c9e33a94e01baa977bd778c61b014f6",
+  "settingsSha256Before": "56f62e14068b23f47b6af7bd908cc34dbed2a9a722fe99fb6b32f248eebf8255",
+  "deploymentAttempted": true,
+  "repairQualification": {
+    "originalExpiryFailurePreservedAndCleanupVerified": true,
+    "originalExpiryPassed": false,
+    "controlledNativeAlarmFixPassed": true,
+    "hostedRepairEightHourPassPending": true,
+    "releaseCandidateReady": false,
+    "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+    "originalFailedProofSha256": "29969789cc4ea0099fd8c02cbeaafc3aec28130a3c1b2cc5ba6c39f73b25f010",
+    "reviewedMerge": "bfe0365eaef183cc282aaed38aecfecc7f0b84d0"
+  },
+  "observedAt": "2026-11-07T17:14:55.828704+00:00",
+  "remoteProof": {
+    "state": "WRANGLER_RETURNED_SUCCESS_REQUIRES_LIVE_READBACK",
+    "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+    "startedAt": "2026-11-07T17:14:47.949430+00:00",
+    "deploymentAttempted": true,
+    "physicalCapture": false,
+    "credentialPersisted": false,
+    "all111SourceAndAssetHashesVerified": true,
+    "guardBefore": {
+      "load": 1.349609375,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.42
+    },
+    "exitCode": 0,
+    "guardAfter": {
+      "load": 1.3212890625,
+      "swapPercent": 5.322265625,
+      "freeGiB": 21.42
+    },
+    "completedAt": "2026-11-07T17:14:54.552661+00:00"
+  },
+  "exitCode": 0,
+  "deployment": "1a83f7e5-7ed1-4aa7-8af5-bd68fb6a8fcf",
+  "version": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "allEffectiveSettingsAndNamespacesPreserved": true,
+  "issuerUnchanged": true,
+  "deployedSourceModules": 66,
+  "assetReadbackPending": true,
+  "ordinaryHostedJourneyPending": true,
+  "releaseCandidateReady": false,
+  "completedAt": "2026-11-07T17:14:55.828695+00:00"
+}

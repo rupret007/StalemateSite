@@ -14,7 +14,7 @@
     const mq = (q) => { try { return Boolean(win.matchMedia && win.matchMedia(q).matches); } catch (error) { return false; } };
     const PHONE = V.isPhoneDevice({ ua: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints, coarse: mq('(pointer: coarse)'), fine: mq('(any-pointer: fine)'), cores: navigator.hardwareConcurrency });
     const CAM = PHONE
-        ? { width: { ideal: 480, max: 640 }, height: { ideal: 360, max: 480 }, frameRate: { ideal: 15, max: 20 } }
+        ? { width: { ideal: 640, max: 640 }, height: { ideal: 480, max: 480 }, frameRate: { ideal: 24, max: 24 } }
         : { width: { ideal: 640, max: 640 }, height: { ideal: 360, max: 480 }, frameRate: { ideal: 24, max: 24 } };
     const CANVAS_CAM = { width: { ideal: 640, max: 640 }, height: { ideal: 480, max: 480 }, frameRate: { ideal: 15, max: 15 }, facingMode: { ideal: 'environment' } };
     const CAM_BPS = 250000;
@@ -28,6 +28,7 @@
     const relayBase = (isLocal && params.get('relay')) || ($('meta[name="hangout-relay"]').content || '');
     const turnUrl = (isLocal && params.get('turn')) || ($('meta[name="hangout-turn"]').content || '');
     const previewKey = params.get('preview') || '';
+    const invitedActivity = params.get('activity');
 
     const ui = {
         gate: $('[data-gate]'), gateTitle: $('[data-gate-title]'), gateCopy: $('[data-gate-copy]'), gateStatus: $('[data-gate-status]'),
@@ -42,8 +43,15 @@
         reportStatus: $('[data-report-status]'), reportAvailability: $('[data-report-availability]'), reportSend: $('[data-report-send]'),
         reportRetry: $('[data-report-retry]'), reportNew: $('[data-report-new]'), reportClose: $('[data-report-close]'),
         mic: $('[data-mic]'), cam: $('[data-cam]'), hangup: $('[data-hangup]'), ask: $('[data-ask]'), turnStatus: $('[data-turn-status]'),
+        callControls: $('#room-call-controls'),
+        chatToggle: $('[data-chat-toggle]'), more: $('[data-more]'), modePill: $('[data-mode-pill]'), watchTitle: $('[data-watch-title]'), watchToggle: $('[data-watch-toggle]'),
+        soundtrack: $('[data-soundtrack]'), soundtrackPop: $('[data-soundtrack-pop]'), soundtrackVol: $('[data-soundtrack-vol]'), soundtrackMute: $('[data-soundtrack-mute]'),
+        consent: $('[data-consent]'), consentTitle: $('[data-consent-title]'), consentVideo: $('[data-consent-video]'), consentPlaceholder: $('[data-consent-placeholder]'),
+        consentMeterWrap: $('[data-consent-meter-wrap]'), consentMeter: $('[data-consent-meter]'), consentCopy: $('[data-consent-copy]'),
+        consentMicWrap: $('[data-consent-mic-wrap]'), consentMic: $('[data-consent-mic]'), consentError: $('[data-consent-error]'),
+        consentOn: $('[data-consent-on]'), consentSkip: $('[data-consent-skip]'),
         askTitle: $('[data-ask-title]'), askCopy: $('[data-ask-copy]'), askYes: $('[data-ask-yes]'), askNo: $('[data-ask-no]'),
-        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), videoStatus: $('[data-video-status]'),
+        yt: $('[data-yt]'), file: $('[data-file]'), tap: $('[data-tap]'), avResume: $('[data-av-resume]'), videoStatus: $('[data-video-status]'),
         bobToggle: $('[data-bob-toggle]'), bob: $('[data-bob]'), bobNow: $('[data-bob-now]'), bobHold: $('[data-bob-hold]'),
         bobRewind: $('[data-bob-rewind]'), bobCatchup: $('[data-bob-catchup]'), bobNudge: $('[data-bob-nudge]'),
         bobEpisodes: $('[data-bob-episodes]'), bobPalette: $('[data-bob-palette]'), bobBrushes: $('[data-bob-brushes]'),
@@ -51,6 +59,7 @@
         share: $('[data-share]'), pip: $('[data-pip]'), hand: $('[data-hand]'), view: $('[data-view-toggle]'), reacts: $('[data-reacts]'), reactFloat: $('[data-react-float]'),
         settings: $('[data-settings]'), settingsDlg: $('[data-settings-dlg]'), devCam: $('[data-dev-cam]'), devMic: $('[data-dev-mic]'), devSpk: $('[data-dev-spk]'),
         music: $('[data-music]'), jamNote: $('[data-jam-note]'), bgPicks: $('[data-bg-picks]'), bgStatus: $('[data-bg-status]'), bgSupport: $('[data-bg-support]'),
+        chat: $('#room-chat'), chatTitle: $('#room-chat-title'), chatClose: $('[data-room-chat-close]'),
         lock: $('[data-lock]'), allCamsOff: $('[data-all-cams-off]'), hands: $('[data-hands]'), tileMenu: $('[data-tile-menu]'),
         checkBtn: $('[data-check-btn]'), check: $('[data-check]'), checkVideo: $('[data-check-video]'), checkMeter: $('[data-check-meter]'), checkOut: $('[data-check-out]'), checkDone: $('[data-check-done]')
     };
@@ -61,7 +70,10 @@
         hostPub: null, hostPriv: null, isHost: false, lastHostSeq: 0, lastHostSigned: null, lastVideoSigned: null,
         lastClearSigned: null, drawingEpoch: 0, snapshotRequest: null, snapshotFresh: false, knownHostId: null,
         names: new Map(), name: '', snapshotDone: false, snapshotFrom: null, snapshotHasSeqProof: false, connected: false, ended: false, retries: 0, privateReports: false,
-        bob: { on: false, touched: false, lastNudge: 0 },
+        bob: { on: false, lastNudge: 0 },
+        watchLayout: invitedActivity === 'watch',
+        consent: { state: 'idle', stream: null, ac: null, frame: 0, version: 0, skipped: false },
+        soundtrack: { volume: 80, muted: false },
         av: {
             stream: null, rawCam: null, mic: false, cam: false, canvas: false, screen: null, hand: null, away: false, music: false,
             jam: params.get('kind') === 'jam', asked: {}, view: 'grid', pin: null, spot: null, locked: false, kicked: false,
@@ -73,7 +85,11 @@
     };
     win.__hangout = app; // test hook, read-only use
 
-    function say(text) { ui.status.textContent = text; }
+    let facesStatusPeer = null;
+    function say(text, retryPeerId = null) {
+        facesStatusPeer = retryPeerId;
+        ui.status.textContent = text;
+    }
     function setGate(text) { ui.gateStatus.textContent = text; }
 
     /* Private reports are deliberately outside chat state, encrypted snapshots,
@@ -504,7 +520,7 @@
             ? await signHost({ kind: 'hello', from: id, request }) : undefined;
         if (app.ended || app.ws !== socket || !app.connected || app.myId !== id || app.snapshotRequest !== request) return;
         await send({ type: 'hello', ...(to ? { to } : {}), ...(reply ? { reply: true } : {}),
-            name: app.name, av: avFlags(), protocol: 2, snapshotRequest: request, hostHello });
+            name: app.name, av: avFlags(), protocol: 2, activityOnlyVideo: true, snapshotRequest: request, hostHello });
     }
     async function confirmedHostHello(msg, meta) {
         const signed = msg.hostHello;
@@ -650,6 +666,10 @@
             clearTimeout(pace.timer); pace.timer = 0;
             pace.queue = pace.queue.filter((item) => !item.socket);
             app.connected = false;
+            if (app.consent.state === 'asking' || app.consent.stream) {
+                stopConsentPreview();
+                setConsentState('idle');
+            }
             staffReportDisconnected(ws);
             // Scrollback belongs to this live connection. Retained outbound
             // envelopes and the unsent composer draft remain separate.
@@ -676,6 +696,8 @@
 
     function endSession(reason) {
         app.ended = true; app.connected = false;
+        const drawingWasOpen = paintDrawing.open;
+        if (drawingWasOpen) paintDrawing.close();
         cancelRecovery();
         for (const job of snapshotJobs.values()) clearTimeout(job.timer);
         snapshotJobs.clear();
@@ -686,7 +708,7 @@
         clearTimeout(reconnectTimer); clearTimeout(pace.timer); clearTimeout(flushTimer);
         clearTimeout(videoPublishTimer); clearInterval(videoSyncTimer);
         pace.queue = []; pace.timer = 0; pending = []; live = null;
-        stopPreCheck(); stopAv(true); turnClient?.stop();
+        stopPreCheck(); paintConsent(); stopAv(true); turnClient?.stop();
         app.av.peers.clear(); app.av.opening.clear(); app.av.ice = null;
         app.names.clear(); app.state = H.emptyState(); app.lastVideoSigned = null;
         app.privateReports = false;
@@ -703,7 +725,9 @@
         ui.log.replaceChildren(); ui.tiles.replaceChildren(); ui.text.value = ''; ui.url.value = '';
         ui.peers.textContent = ''; ui.turnStatus.textContent = ''; redraw();
         ui.room.hidden = true; ui.gate.hidden = false; ui.enter.disabled = true;
+        syncSharedLayout();
         setGate(reason); say(reason);
+        if (drawingWasOpen) ui.gateStatus.focus();
     }
 
     async function onRelay(raw, ws, work) {
@@ -780,7 +804,13 @@
     function showPeers(n) {
         const names = Array.from(app.names.values());
         const count = Number(n) || 1;
-        ui.peers.textContent = count <= 1 ? 'Just you' : `${count} here${names.length ? `: ${names.slice(0, 5).join(', ')} + you` : ''}`;
+        ui.peers.textContent = count <= 1 ? 'Just you' : `${count} here`;
+        if (count > 1 && names.length) {
+            const roster = doc.createElement('span');
+            roster.className = 'peer-names';
+            roster.textContent = `: ${names.slice(0, 5).join(', ')} + you`;
+            ui.peers.append(roster);
+        }
     }
 
     async function handle(msg, meta) {
@@ -803,7 +833,9 @@
             if (!relayCurrent(meta) || !meta.peer.live) return;
             if (!msg.reply || askHost) await sendHello(meta.from, true);
             if (!relayCurrent(meta) || !meta.peer.live) return;
-            if (!msg.reply || app.isHost && S.validNonce(msg.snapshotRequest)) scheduleSnapshot(meta.from, msg.snapshotRequest);
+            if (!msg.reply || app.isHost && S.validNonce(msg.snapshotRequest)) {
+                scheduleSnapshot(meta.from, msg.snapshotRequest, msg.activityOnlyVideo === true);
+            }
             return;
         }
         case 'bye':
@@ -869,7 +901,7 @@
             acceptStroke(msg);
             return;
         case 'chat':
-            if (H.apply(app.state, msg, meta) === 'chat') receivedChatOrigins.set(app.state.chat[app.state.chat.length - 1], { peer: meta.from });
+            if (H.apply(app.state, msg, meta) === 'chat') { receivedChatOrigins.set(app.state.chat[app.state.chat.length - 1], { peer: meta.from }); noteUnreadChat(); }
             renderChat();
             return;
         case 'host':
@@ -886,6 +918,15 @@
             if (V.HOST_KINDS.includes(msg.body.kind)) applyHostAction(msg.body, msg, false);
             recordHost(msg, meta.t);
             return;
+        case 'watch-playback': {
+            const { source: requested, playing, pos, localApplied } = msg.body || {};
+            const source = H.cleanSource(requested);
+            if (!app.isHost || typeof playing !== 'boolean' || !Number.isFinite(pos) || pos < 0 || pos > 86400
+                || !canSharePlayback(source, { chooseEpisode: playing && pos === 0 })) return;
+            const control = { by: meta.from, localApplied: localApplied === true };
+            if (await hostPublish(source, playing, pos, control)) await syncToState(true);
+            return;
+        }
         case 'av':
             if (meta.received > meta.peer.avReceived) {
                 meta.peer.avReceived = meta.received;
@@ -928,11 +969,11 @@
         }
     }
 
-    function scheduleSnapshot(to, request) {
+    function scheduleSnapshot(to, request, activityOnlyVideo) {
         const previous = snapshotJobs.get(to);
         if (previous && previous.socket === app.ws && previous.request === request) return;
         if (previous) clearTimeout(previous.timer);
-        const job = { to, request, socket: app.ws, timer: 0 };
+        const job = { to, request, activityOnlyVideo, socket: app.ws, timer: 0 };
         snapshotJobs.set(to, job);
         job.timer = win.setTimeout(() => { void sendSnapshot(job); }, app.isHost ? 0 : 150 + Math.random() * 400);
     }
@@ -966,6 +1007,10 @@
             .filter(proof => Number.isSafeInteger(proof?.body?.seq))
             .sort((a, b) => b.body.seq - a.body.seq)[0] || null;
     }
+    function snapshotVideo(job) {
+        const video = app.lastVideoSigned;
+        return !job.activityOnlyVideo && video && H.isActivityOnlyVideo(video.signed.body) ? null : video;
+    }
     async function sendSnapshot(job) {
         if (!await settleState(job) || !snapshotJobCurrent(job)) return;
         const status = H.strokeRangeStatus(app.state);
@@ -985,7 +1030,7 @@
             const parts = S.makeChunks({ to: job.to, request: job.request, seq,
                 epoch: app.drawingEpoch, clear: app.lastClearSigned,
                 strokes: app.state.strokes.map(H.cleanSnapshotStroke),
-                video: app.lastVideoSigned, mods: [app.av.mods.lock, app.av.mods.spot].filter(Boolean) });
+                video: snapshotVideo(job), mods: [app.av.mods.lock, app.av.mods.spot].filter(Boolean) });
             for (const part of parts) {
                 let packet;
                 if (app.isHost) {
@@ -1002,7 +1047,7 @@
     }
     async function sendLegacySnapshot(job) {
         const to = job.to;
-        const video = app.lastVideoSigned;
+        const video = snapshotVideo(job);
         const mods = [app.av.mods.lock, app.av.mods.spot].filter(Boolean);
         const strokes = app.state.strokes.slice(-400);
         const chunks = [];
@@ -1037,7 +1082,14 @@
         stopPreCheck();
         ui.gate.hidden = true;
         ui.room.hidden = false;
+        if (invitedActivity === 'paint') setBob(true);
+        else syncSharedLayout();
+        if (mq('(max-width: 820px)')) {
+            doc.querySelector('.room-description').open = false;
+        }
+        syncChatDisclosure();
         doc.body.classList.toggle('is-host', app.isHost);
+        ui.bobToggle.hidden = !app.isHost;
         ui.hostNote.textContent = app.isHost ? 'You started this room, so you drive the video and the wipe.' : 'The person who started the room drives the video.';
         say('You’re in. Say hi?');
         iceServers();
@@ -1054,8 +1106,10 @@
             return;
         }
         if (invite) {
+            doc.body.classList.add('invite-entry');
             ui.gateTitle.textContent = 'You’re invited';
-            ui.gateCopy.textContent = 'Somebody wants to hang out. Pick a name (or don’t) and jump in.';
+            ui.gateCopy.textContent = 'Enter the name you want people in this room to see.';
+            ui.checkBtn.hidden = true;
             ui.enter.textContent = 'Jump in';
         }
         // Blank by default, remembered on this device; 🎲 fills in a fun name you can edit or reroll.
@@ -1083,12 +1137,14 @@
                 ui.enter.disabled = false;
             }
         });
-        if (invite && params.get('autojoin') === '1') ui.enter.click();
     }
 
     ui.copy.addEventListener('click', async () => {
         const linkUrl = new URL(win.location.href);
         linkUrl.searchParams.delete('preview');
+        const activity = doc.body.dataset.sharedLayout;
+        if (activity) linkUrl.searchParams.set('activity', activity);
+        else linkUrl.searchParams.delete('activity');
         const link = linkUrl.href;
         try {
             if (navigator.share && /Mobi/.test(navigator.userAgent)) await navigator.share({ title: 'Hang out with Stalemate', url: link });
@@ -1152,6 +1208,16 @@
     }
     H.COLORS.slice(0, 8).forEach((c, i) => addSwatch(ui.swatches, c, `Color ${i + 1}`));
     BOB.PALETTE.forEach((p) => addSwatch(ui.bobPalette, p.hex, p.name));
+    const sharedDrawing = $('[data-shared-drawing]');
+    const roomDrawing = sharedDrawing.parentElement;
+    const paintDrawing = $('[data-bob-drawing]');
+    const paintDrawingOpen = $('[data-bob-drawing-open]');
+    paintDrawingOpen.addEventListener('click', () => {
+        if (app.bob.on && !paintDrawing.open) paintDrawing.showModal();
+    });
+    paintDrawing.addEventListener('close', () => {
+        if (app.bob.on && !app.ended) ui.more.focus();
+    });
     function pickBrush(size) {
         ui.size.value = String(size);
         ui.bobBrushes.querySelectorAll('.brush').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.size) === size)));
@@ -1257,19 +1323,19 @@
     });
 
     /* ---------------- synced video (host drives) ---------------- */
-    const player = { kind: null, yt: null, loading: null, applying: 0, currentKey: '', readyKey: '', failedKey: '', autoplayBlocked: false, seenPlaying: false, playPending: false };
+    const player = { kind: null, yt: null, loading: null, applying: 0, currentKey: '', readyKey: '', failedKey: '', autoplayBlocked: false, buffering: false, seenPlaying: false, playPending: false };
     let videoPublishTimer;
     const youtube = win.HangoutYouTube.create({
         getElement: () => ui.yt, setElement: (element) => { ui.yt = element; },
         onStateChange: onYtState, onAutoplayBlocked: onYtAutoplayBlocked,
-        onError: () => videoFailure(player.currentKey)
+        onError: (error) => videoFailure(player.currentKey, error)
     });
 
-    function videoFailure(key) {
+    function videoFailure(key, error) {
         if (app.ended || player.currentKey !== key || player.kind !== 'yt') return;
         player.yt = null; player.readyKey = ''; player.failedKey = key; player.autoplayBlocked = false;
         player.seenPlaying = false; player.playPending = false;
-        ui.videoStatus.textContent = 'YouTube couldn’t load. Retry video when you’re ready.';
+        ui.videoStatus.textContent = win.HangoutYouTube.failureMessage(error, { canChooseVideo: Boolean(app.isHost) });
         ui.videoStatus.hidden = false;
         ui.tap.textContent = 'Retry video'; ui.tap.hidden = false;
     }
@@ -1296,6 +1362,7 @@
             ui.yt.hidden = true;
             ui.file.hidden = false;
             ui.file.src = H.FILE_SOURCES[source.id].src;
+            applySoundtrack();
             player.readyKey = key;
             return true;
         }
@@ -1309,9 +1376,10 @@
                 const instance = await youtube.select(source.id);
                 if (!instance || app.ended || player.currentKey !== key) return false;
                 player.yt = instance; player.readyKey = key;
+                applySoundtrack();
                 ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
                 return true;
-            } catch (_) { videoFailure(key); return false; }
+            } catch (error) { videoFailure(key, error); return false; }
         })();
         player.loading = loading;
         try { return await loading; }
@@ -1331,6 +1399,9 @@
     function hold(fn) {
         player.applying = Date.now() + 900;
         fn();
+        if (!app.isHost && canSharePlayback(app.state.video?.source)) {
+            playbackSample = { at: Date.now(), pos: localTime(), playing: localPlaying() };
+        }
     }
     function seekTo(s) { hold(() => { if (player.kind === 'file') ui.file.currentTime = s; else if (player.yt) player.yt.seekTo(s, true); }); }
     function playLocal() {
@@ -1346,12 +1417,36 @@
     async function acceptVideo(signed, t) {
         if (app.ended) return;
         const b = signed.body;
+        if (b.seq <= (app.lastVideoSigned?.signed.body.seq ?? -1)) return;
         const relayT = Number.isFinite(Number(b.t)) ? Number(b.t) : t;
-        if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t: relayT }) !== 'video') return;
+        const activityOnly = H.isActivityOnlyVideo(b);
+        if (activityOnly) {
+            if (!Number.isFinite(relayT) || relayT < 0) return;
+        } else if (H.apply(app.state, { type: 'video', source: b.source, playing: b.playing, pos: b.pos }, { t: relayT }) !== 'video') return;
         app.lastVideoSigned = { signed, t: relayT };
         app.lastHostSeq = Math.max(app.lastHostSeq, b.seq || 0);
+        if (b.control?.by !== app.myId) guestPlaybackTarget = null;
         showEpisode();
-        await syncToState(true);
+        // Native player controls already played on the initiating guest. The
+        // signed reply must not overwrite a subsequent local seek.
+        if (!activityOnly && (b.control?.by !== app.myId || !b.control.localApplied)) await syncToState(true);
+    }
+
+    function isPaintEpisode(source) {
+        return source?.kind === 'yt' && Boolean(BOB.findEpisode(source.id));
+    }
+
+    function canSharePlayback(source, { chooseEpisode = false } = {}) {
+        const selected = app.lastVideoSigned?.signed.body;
+        const activity = roomActivity();
+        if (!source || !selected?.source || selected.activity !== activity || activity === 'room') return false;
+        if (selected.source.kind === source.kind && selected.source.id === source.id) return true;
+        return chooseEpisode && selected.activity === 'paint' && isPaintEpisode(source);
+    }
+
+    let playbackSample = null, playbackIntentAt = 0, guestPlaybackTarget = null;
+    function expectedGuestPlaying(video) {
+        return guestPlaybackTarget !== null && Date.now() - playbackIntentAt < 750 ? guestPlaybackTarget : video.playing;
     }
 
     async function syncToState(force, retry = false) {
@@ -1362,12 +1457,20 @@
         if (!v.playing) { player.autoplayBlocked = false; ui.tap.hidden = true; }
         else if (player.autoplayBlocked && !force) return;
         const want = H.expectedPosition(v, app.clock.relayNow());
+        const drift = want - localTime();
         if (force || H.needsCorrection(localTime(), want)) seekTo(want);
+        else if (Math.abs(drift) >= 0.3 && v.playing) {
+            const rate = drift > 0 ? 1.05 : 0.95;
+            const rates = player.yt?.getAvailablePlaybackRates?.() || [];
+            if (rates.includes(rate) && player.yt?.setPlaybackRate) hold(() => player.yt.setPlaybackRate(rate));
+            else seekTo(want);
+        } else if (player.yt?.setPlaybackRate && (player.yt.getAvailablePlaybackRates?.() || []).includes(v.rate || 1)) hold(() => player.yt.setPlaybackRate(v.rate || 1));
         if (v.playing && !localPlaying()) playLocal();
         if (!v.playing && localPlaying()) pauseLocal();
     }
     const videoSyncTimer = win.setInterval(() => {
-        if (!app.connected) return;
+        if (doc.hidden || !app.connected) return;
+        if (!app.isHost && canSharePlayback(app.state.video?.source) && Date.now() - playbackIntentAt < 750) return;
         if (!app.isHost) return syncToState(false);
         const v = app.state.video;
         if (!v || !player.kind || (player.kind === 'yt' && !player.seenPlaying && v.playing) || player.autoplayBlocked || player.readyKey !== `${v.source.kind}:${v.source.id}` || Date.now() < player.applying) return;
@@ -1377,9 +1480,29 @@
             hostPublish(v.source, localPlaying(), localTime());
         }
     }, 2000);
+    win.setInterval(() => {
+        const v = app.state.video;
+        if (doc.hidden || !app.connected || app.isHost || !canSharePlayback(v?.source) || player.autoplayBlocked
+            || player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
+        const at = Date.now(), pos = localTime(), playing = localPlaying();
+        if (player.buffering) { playbackSample = { at, pos, playing }; return; }
+        if (playbackSample) {
+            const elapsed = (at - playbackSample.at) / 1000;
+            if (elapsed > 2) { playbackSample = { at, pos, playing }; void syncToState(false); return; }
+            const natural = elapsed * (playbackSample.playing ? (v.rate || 1) : 0);
+            const jumped = Math.abs((pos - playbackSample.pos) - natural) > 1;
+            const matchesShared = Math.abs(pos - H.expectedPosition(v, app.clock.relayNow())) < 1;
+            if (jumped && !matchesShared) void publishVideoIntent(v.source, playing, pos, { localApplied: true });
+        }
+        playbackSample = { at, pos, playing };
+    }, 250);
+    doc.addEventListener('visibilitychange', () => {
+        playbackSample = null;
+        if (!doc.hidden) void syncToState(true);
+    });
 
     let videoPublication = null;
-    async function hostPublish(source, playing, pos) {
+    async function hostPublish(source, playing, pos, control) {
         if (!app.connected || !app.isHost) return;
         // A newer video choice can retire an obsolete pending signature. Clear
         // and moderation transactions still run to completion in their order.
@@ -1391,15 +1514,18 @@
         videoPublication = publication;
         return hostWork(async () => {
             if (publication.cancelled || videoPublication !== publication) return false;
+            if (control && !canSharePlayback(source, { chooseEpisode: playing && pos === 0 })) return false;
             const seq = app.lastHostSeq = Math.max(app.lastHostSeq + 1, Date.now());
             const t = app.clock.relayNow();
+            const body = { kind: 'video', seq, source, playing, pos: Math.max(0, pos), t,
+                activity: roomActivity(), ...(control && { control }) };
             const signed = await Promise.race([
-                signHost({ kind: 'video', seq, source, playing, pos: Math.max(0, pos), t }), cancelled
+                signHost(body), cancelled
             ]);
             if (!signed || publication.cancelled || videoPublication !== publication
                 || !app.connected || app.ended || app.lastHostSeq !== seq) return false;
             publication.committed = true;
-            H.apply(app.state, { type: 'video', source, playing, pos }, { t });
+            if (source) H.apply(app.state, { type: 'video', source, playing, pos }, { t });
             app.lastVideoSigned = { signed, t };
             recordHost(signed, t);
             showEpisode();
@@ -1409,16 +1535,18 @@
     }
 
     function onLocalChange() {
-        if (!app.connected || !app.isHost || !app.state.video || player.autoplayBlocked || (player.kind === 'yt' && !player.seenPlaying && app.state.video.playing)) return;
         const v = app.state.video;
+        if (!app.connected || !v || (!app.isHost && !canSharePlayback(v.source))
+            || player.autoplayBlocked || (player.kind === 'yt' && !player.seenPlaying && v.playing)) return;
         if (player.readyKey !== `${v.source.kind}:${v.source.id}`) return;
         const playing = localPlaying();
         const pos = localTime();
         if (Date.now() < player.applying) {
             const want = v.playing ? H.expectedPosition(v, app.clock.relayNow()) : v.pos;
-            if (playing === v.playing && Math.abs(pos - want) < 2) return;
+            const expectedPlaying = app.isHost ? v.playing : expectedGuestPlaying(v);
+            if (playing === expectedPlaying && Math.abs(pos - want) < 2) return;
         }
-        hostPublish(v.source, playing, pos);
+        void publishVideoIntent(v.source, playing, pos, { localApplied: true });
     }
     function onYtAutoplayBlocked() {
         const v = app.state.video;
@@ -1427,12 +1555,20 @@
         // YouTube playVideo() returns void; policy denial is a separate event.
         // Keep the shared play request until a real user gesture starts playback.
         player.autoplayBlocked = true;
+        ui.tap.textContent = 'Tap to sync';
         ui.tap.hidden = false;
     }
     function onYtState(event) {
         if (app.ended || player.kind !== 'yt' || event.target !== player.yt || event.data !== player.yt?.getPlayerState()) return;
+        if (event.data === 3) { player.buffering = true; playbackSample = { at: Date.now(), pos: localTime(), playing: false }; return; }
+        if (event.data === 1 || event.data === 2) { player.buffering = false; playbackSample = { at: Date.now(), pos: localTime(), playing: event.data === 1 }; }
         if (event.data === 1) { player.seenPlaying = true; player.playPending = false; player.autoplayBlocked = false; ui.tap.hidden = true; }
         if (event.data !== 1 && event.data !== 2) return;
+        const video = app.state.video;
+        if (!app.isHost && canSharePlayback(video?.source)) {
+            if (expectedGuestPlaying(video) !== localPlaying()) onLocalChange();
+            return;
+        }
         clearTimeout(videoPublishTimer);
         const instance = player.yt, key = player.readyKey;
         videoPublishTimer = win.setTimeout(() => {
@@ -1442,12 +1578,31 @@
     ['play', 'pause', 'seeked'].forEach((e) => ui.file.addEventListener(e, onLocalChange));
     ui.tap.addEventListener('click', () => { if (player.kind !== 'yt') ui.tap.hidden = true; syncToState(true, true); });
 
+    async function publishVideoIntent(source, playing, pos, { localApplied = false, chooseEpisode = false } = {}) {
+        if (localApplied && doc.hidden) return false;
+        if (app.isHost) return hostPublish(source, playing, pos);
+        if (!app.connected || !canSharePlayback(source, { chooseEpisode })) return false;
+        // Guests send an intent. The host signs the result for playback and
+        // late-join snapshots in the same authority stream.
+        playbackIntentAt = Date.now();
+        guestPlaybackTarget = playing;
+        if (!localApplied && !chooseEpisode && player.readyKey === `${source.kind}:${source.id}`) {
+            seekTo(pos);
+            if (playing && !localPlaying()) playLocal();
+            else if (!playing && localPlaying()) pauseLocal();
+            localApplied = true;
+        }
+        playbackSample = { at: Date.now(), pos: localTime(), playing: localPlaying() };
+        await send({ type: 'watch-playback', body: { source, playing, pos, localApplied } });
+        return true;
+    }
+
     async function hostLoad(source) {
-        if (!app.isHost) { say('Only the person who started the room changes the video.'); return; }
-        player.readyKey = ''; // Stop old player events while the new intent is signed.
+        if (!app.isHost && !canSharePlayback(source, { chooseEpisode: true })) { say('Only the room host changes this video.'); return; }
+        if (app.isHost) player.readyKey = ''; // Ignore old player events while the new selection is signed.
         // Choosing a video is an explicit host action. Loading failures remain
         // local and cannot later replace a newer shared selection.
-        if (await hostPublish(source, true, 0)) await syncToState(true, true);
+        if (await publishVideoIntent(source, true, 0, { chooseEpisode: true }) && app.isHost) await syncToState(true, true);
     }
     ui.load.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -1467,6 +1622,57 @@
      * Media goes browser to browser (DTLS-SRTP), signaling rides the encrypted relay.
      * Every receiver has its own sender, so people only get our sharp feed when they're
      * watching us big (speaker view, pin, spotlight); everyone else gets a thumbnail. */
+    // Capture and play both start inside this tap: iOS refuses them anywhere else.
+    ui.avResume.addEventListener('click', () => { void resumeLocalMedia(true); });
+    /* Faces that stopped reconnecting (rebuild budget spent, see rebuildPc): an honest line that
+     * stays put, with one small button to try again. Chat and drawing never depend on it. */
+    ui.facesRetry = doc.createElement('p');
+    ui.facesRetry.className = 'faces-retry';
+    ui.facesRetry.hidden = true;
+    ui.facesRetry.setAttribute('data-faces-stuck', '');
+    ui.facesRetry.setAttribute('role', 'status');
+    ui.facesRetryText = doc.createElement('span');
+    ui.facesRetryBtn = doc.createElement('button');
+    ui.facesRetryBtn.type = 'button';
+    ui.facesRetryBtn.className = 'btn';
+    ui.facesRetryBtn.textContent = 'Try faces again';
+    ui.facesRetryBtn.setAttribute('data-faces-retry', '');
+    ui.facesRetry.append(ui.facesRetryText, ui.facesRetryBtn);
+    ui.avResume.insertAdjacentElement('beforebegin', ui.facesRetry);
+    const stuckFaces = () => Array.from(app.av.pcs.keys()).filter((id) => relayPeers.get(id)?.facesStopped);
+    function paintFacesRetry() {
+        const ids = stuckFaces();
+        if (!ids.length && ui.facesRetry.contains(doc.activeElement) && !ui.room.hidden) {
+            ui.callControls.focus({ preventScroll: true });
+        }
+        ui.facesRetry.hidden = !ids.length;
+        if (ids.length) ui.facesRetryText.textContent = `Faces with ${ids.map(peerName).join(', ')} aren’t connecting, so we stopped trying. Chat and draw still work.${turnStatus === 'ready' ? '' : ' If anyone is on cellular data, everyone should join the same Wi-Fi, then tap “Try faces again”.'}`;
+    }
+    ui.facesRetryBtn.addEventListener('click', () => {
+        for (const id of stuckFaces()) {
+            const peer = relayPeers.get(id);
+            peer.rebuilds = 0;
+            peer.facesStopped = false;
+            rebuildPc(id);
+        }
+        paintFacesRetry();
+    });
+
+    // The button stays up while remote playback or the local camera/mic still needs a tap.
+    const remoteFacesNeedingTap = new WeakSet();
+    const remoteFaceVideos = () => ui.tiles.querySelectorAll('.tile:not([data-tile="me"]) video');
+    const avResumeWhy = { video: false, audio: false };
+    function paintAvResume() {
+        if (!app.av.cam || app.av.screen) avResumeWhy.video = false;
+        if (!app.av.mic) avResumeWhy.audio = false;
+        const needsTap = avResumeWhy.video || avResumeWhy.audio
+            || [...remoteFaceVideos()].some((video) => remoteFacesNeedingTap.has(video));
+        if (!needsTap && doc.activeElement === ui.avResume && !ui.room.hidden) {
+            ui.callControls.focus({ preventScroll: true });
+        }
+        ui.avResume.hidden = !needsTap;
+    }
+    function captureNeedsTap(kind, on) { avResumeWhy[kind] = Boolean(on); paintAvResume(); }
     function avFlags() {
         return { mic: app.av.mic, cam: app.av.cam, canvas: app.av.canvas, screen: Boolean(app.av.screen), hand: app.av.hand, away: app.av.away };
     }
@@ -1507,7 +1713,7 @@
         layout();
     }
 
-    function ask(title, copy, { adult18 = false } = {}) {
+    function ask(title, copy, { adult18 = false, onYes = null } = {}) {
         if (ui.ask.open) return Promise.resolve(false);
         return new Promise((resolve) => {
             ui.askTitle.textContent = title;
@@ -1520,19 +1726,25 @@
                 if (v && confirmAge) app.av.adult18 = true;
                 resolve(v);
             };
-            ui.askYes.onclick = () => done(true);
+            // iOS only allows getUserMedia inside the tap that confirms, not after the dialog's promise.
+            ui.askYes.onclick = () => { try { if (onYes) onYes(); } catch (error) { /* toggle reads the failed capture */ } done(true); };
             ui.askNo.onclick = () => done(false);
             ui.ask.addEventListener('cancel', cancel);
-            if (ui.ask.showModal) ui.ask.showModal(); else done(win.confirm(`${title}\n\n${ui.askCopy.textContent}`));
+            if (ui.ask.showModal) ui.ask.showModal();
+            else if (win.confirm(`${title}\n\n${ui.askCopy.textContent}`)) { try { if (onYes) onYes(); } catch (error) { /* toggle reads the failed capture */ } done(true); }
+            else done(false);
         });
     }
 
     let turnClient;
+    let turnStatus = '';
     async function iceServers() {
         if (!turnClient) turnClient = win.HangoutTurn.createTurnClient({
             url: turnUrl, preview: relayAdmission(readInvite()), room: app.roomId,
             getDevice: () => { try { return localStorage.getItem('hangout-dev'); } catch (_) { return ''; } },
             onStatus: (status) => {
+                turnStatus = status;
+                paintFacesRetry();
                 ui.turnStatus.textContent = status === 'ready' ? 'Video relay available for connections that need it.'
                     : status === 'device-required' ? 'Direct connections only. Join the lobby once on this browser to enable relay access.'
                         : 'Video relay unavailable for now. Direct connections, chat and drawing remain available.';
@@ -1549,7 +1761,7 @@
     }
     win.addEventListener('pagehide', () => turnClient?.stop());
     win.addEventListener('pageshow', (event) => {
-        if (event.persisted && app.roomId) { turnClient = null; iceServers(); }
+        if (event.persisted && app.roomId) { turnClient = null; turnStatus = ''; iceServers(); }
     });
 
     function prefs() {
@@ -1560,65 +1772,114 @@
     }
     function camConstraints() {
         const p = prefs();
-        const c = Object.assign({}, CAM);
-        if (p.cam) c.deviceId = { ideal: p.cam };
+        const c = { ...(app.bob.on ? CANVAS_CAM : CAM) };
+        if (p.cam) {
+            delete c.facingMode;
+            c.deviceId = { ideal: p.cam };
+        }
         return c;
     }
 
     // A permission prompt can outlive leaving the call or host moderation.
     const captureVersion = { audio: 0, video: 0 };
+    function stopTrack(track) {
+        if (!track) return;
+        track.__hangoutStopped = true;
+        if (track.readyState !== 'ended') track.stop();
+    }
     function keepCapture(kind, version, stream, restore) {
         if (!app.ended && version === captureVersion[kind] && !app.av.kicked && (restore || !(app.av.locked && !(app.av.mic || app.av.cam)))) return true;
-        stream.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach(stopTrack);
         return false;
+    }
+    function adoptLocalTrack(kind, track) {
+        if (!track || track.__hangoutWatched || (kind === 'video' && app.av.screen === track)) return;
+        track.__hangoutWatched = true;
+        track.addEventListener('ended', () => {
+            queueMicrotask(() => {
+                if (track.__hangoutStopped || app.ended) return;
+                if (kind === 'video' && (!app.av.cam || app.av.screen)) return;
+                if (kind === 'audio' && !app.av.mic) return;
+                if (doc.visibilityState === 'hidden') return;
+                resumeLocalMedia();
+            });
+        });
     }
     function setTrack(kind, track) {
         if (!app.av.stream) app.av.stream = new MediaStream();
         app.av.stream.getTracks().filter((t) => t.kind === kind).forEach((t) => app.av.stream.removeTrack(t));
-        if (track) app.av.stream.addTrack(track);
+        if (track) {
+            app.av.stream.addTrack(track);
+            adoptLocalTrack(kind, track);
+        }
     }
     function stopRaw(kind) {
         captureVersion[kind] += 1;
         if (kind === 'video') {
-            if (app.av.screen) { app.av.screen.stop(); app.av.screen = null; }
+            if (app.av.screen) { stopTrack(app.av.screen); app.av.screen = null; }
             if (app.av.bg.proc) { const p = app.av.bg.proc; app.av.bg.proc = null; p.destroy().catch(() => {}); }
-            if (app.av.rawCam) { app.av.rawCam.stop(); app.av.rawCam = null; }
+            if (app.av.rawCam) { stopTrack(app.av.rawCam); app.av.rawCam = null; }
         }
-        if (app.av.stream) app.av.stream.getTracks().filter((t) => t.kind === kind).forEach((t) => t.stop());
+        if (app.av.stream) app.av.stream.getTracks().filter((t) => t.kind === kind).forEach(stopTrack);
         setTrack(kind, null);
     }
 
+    let primedCapture = null;
+    const openBrowserHint = 'Video needs Safari or Chrome. Tap ⋯ or Share, then Open in Safari (iPhone) or Open in Chrome (Android). Chat and games still work here.';
+    function needsOpenBrowserHint(error) {
+        return win.isSecureContext === false || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
+            || (Boolean(error) && /FBAN|FBAV|Instagram|GSA\/|Snapchat|Line\/|; wv\)/i.test(navigator.userAgent));
+    }
+    function startCapture(constraints) {
+        try { return navigator.mediaDevices.getUserMedia(constraints); }
+        catch (error) { return Promise.reject(error); }
+    }
+    function dropPrimed() {
+        const pending = primedCapture;
+        primedCapture = null;
+        if (pending && pending.then) pending.then((stream) => stream.getTracks().forEach((track) => track.stop())).catch(() => {});
+    }
     async function toggle(kind, restore) {
         if (app.ended) return;
         const turningOn = !app.av[kind] || (kind === 'cam' && Boolean(app.av.screen));
         const mediaKind = kind === 'cam' ? 'video' : 'audio';
         if (kind === 'cam' && app.av.canvas) { await toggleCanvasCam(); return; }
         if (turningOn) {
-            if (app.av.kicked) { say('The host took you off faces in this room. Chat and draw still work.'); return; }
-            if (!restore && app.av.locked && !(app.av.mic || app.av.cam)) { say('The host locked faces for now. Chat and draw still work.'); return; }
-            if (!restore && !(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
+            if (app.av.kicked) { dropPrimed(); say('The host took you off faces in this room. Chat and draw still work.'); return; }
+            if (!restore && app.av.locked && !(app.av.mic || app.av.cam)) { dropPrimed(); say('The host locked faces for now. Chat and draw still work.'); return; }
+            if (!restore && !(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) { dropPrimed(); say(`Faces are full (${V.MAX_CAMS} max). Chat and draw still work.`); return; }
+            if (needsOpenBrowserHint()) { say(openBrowserHint); return; }
             const version = ++captureVersion[mediaKind];
+            const constraints = kind === 'cam'
+                ? { video: camConstraints() }
+                : { audio: V.micConstraints(app.av.music, prefs().mic) };
             if (!app.av.asked[kind]) {
                 const ok = await ask(kind === 'cam' ? 'Turn on your camera?' : 'Turn on your mic?',
                     kind === 'cam'
                         ? 'Tap Allow on the next pop-up. Only this room sees you.'
                         : app.av.jam
                             ? 'This is for talking between songs. Your playing goes through WebJam, so keep this off while you play or people hear you twice. Your browser will ask: tap Allow.'
-                            : 'Tap Allow on the next pop-up. Only this room hears you.', { adult18: kind === 'cam' });
+                            : 'Tap Allow on the next pop-up. Only this room hears you.', {
+                        adult18: kind === 'cam',
+                        onYes: () => { primedCapture = startCapture(constraints); }
+                    });
                 if (!ok) return;
             }
-            if (version !== captureVersion[mediaKind]) return;
+            if (version !== captureVersion[mediaKind]) { dropPrimed(); return; }
+            const pending = primedCapture;
+            primedCapture = null;
             try {
                 if (kind === 'cam') {
-                    const got = await navigator.mediaDevices.getUserMedia({ video: camConstraints() });
+                    const got = await (pending || startCapture(constraints));
                     if (!keepCapture('video', version, got, restore)) return;
                     stopRaw('video');
                     app.av.rawCam = got.getVideoTracks()[0];
                     app.av.canvas = false;
+                    adoptLocalTrack('video', app.av.rawCam);
                     setTrack('video', app.av.rawCam);
                     if (app.av.bg.choice && app.av.bg.choice !== 'none') setBackground(app.av.bg.choice, true);
                 } else {
-                    const got = await navigator.mediaDevices.getUserMedia({ audio: V.micConstraints(app.av.music, prefs().mic) });
+                    const got = await (pending || startCapture(constraints));
                     if (!keepCapture('audio', version, got)) return;
                     stopRaw('audio');
                     setTrack('audio', got.getAudioTracks()[0]);
@@ -1628,10 +1889,16 @@
                 ensureAudioCtx();
             } catch (error) {
                 if (version !== captureVersion[mediaKind]) return;
+                if (needsOpenBrowserHint(error)) { say(openBrowserHint); return; }
+                // Busy camera still gets the voice-only offer below; a busy mic just gets the reload hint.
+                if (captureBusyOrStuck(error)) { say(captureBusyMessage(kind)); if (!(kind === 'cam' && !app.av.mic && !app.av.jam)) return; }
                 if (kind === 'cam' && !app.av.mic && !app.av.jam) {
                     // No camera (blocked, missing or busy)? Don't strand them: offer voice only.
-                    const voice = await ask('Camera’s not available', 'Join with just your voice? You can add the camera later.');
-                    if (version !== captureVersion[mediaKind]) return;
+                    const voiceConstraints = { audio: V.micConstraints(app.av.music, prefs().mic) };
+                    const voice = await ask('Camera’s not available', 'Join with just your voice? You can add the camera later.', {
+                        onYes: () => { primedCapture = startCapture(voiceConstraints); }
+                    });
+                    if (version !== captureVersion[mediaKind]) { dropPrimed(); return; }
                     if (voice) { app.av.asked.mic = true; await toggle('mic'); }
                     if (app.av.mic) { say('You’re in with voice only. To add video, allow Camera by the address bar, then tap the camera button.'); return; }
                 }
@@ -1667,11 +1934,13 @@
             if (!keepCapture('video', version, got, restore)) return;
             stopRaw('video');
             app.av.rawCam = got.getVideoTracks()[0];
+            adoptLocalTrack('video', app.av.rawCam);
             setTrack('video', app.av.rawCam);
             app.av.cam = true;
             app.av.canvas = true;
         } catch (error) {
             if (version !== captureVersion.video) return;
+            if (captureBusyOrStuck(error)) { say(captureBusyMessage('cam')); return; }
             say('Camera’s blocked. Tap the lock or “aA” icon by the address bar, allow Camera, then try again.');
             return;
         }
@@ -1721,8 +1990,6 @@
         ui.canvasCam.textContent = app.av.canvas ? 'Stop showing my canvas' : 'Show my real canvas';
         ui.mic.setAttribute('aria-pressed', String(app.av.mic));
         ui.cam.setAttribute('aria-pressed', String(app.av.cam && !app.av.screen));
-        ui.mic.textContent = app.av.mic ? 'Mute my mic' : (app.av.jam ? 'Talk (browser mic)' : 'Turn on my mic');
-        ui.cam.textContent = app.av.cam && !app.av.screen ? 'Turn off my camera' : 'Turn on my camera';
         ui.cam.disabled = app.av.canvas;
         ui.share.setAttribute('aria-pressed', String(Boolean(app.av.screen)));
         ui.share.textContent = app.av.screen ? 'Stop sharing' : 'Share screen';
@@ -1730,6 +1997,7 @@
         ui.hand.textContent = Number.isFinite(app.av.hand) ? 'Lower hand' : 'Raise hand';
         ui.hangup.hidden = !(app.av.mic || app.av.cam);
         paintControls();
+        paintConsent();
         doc.body.classList.toggle('faces-on', Boolean(app.av.mic || app.av.cam || app.av.peers.size));
         if (app.av.mic || app.av.cam) wakeLock(true); else wakeLock(false);
         await send({ type: 'av', av: avFlags() });
@@ -1741,10 +2009,16 @@
     }
 
     function paintControls() {
+        paintAvResume();
+        const shared = doc.body.classList.contains('shared-layout');
+        ui.mic.textContent = app.av.mic ? (shared ? 'Mute mic' : 'Mute my mic')
+            : (app.av.jam ? 'Talk (browser mic)' : shared ? 'Unmute mic' : 'Turn on my mic');
+        ui.cam.textContent = app.av.cam && !app.av.screen ? (shared ? 'Stop video' : 'Turn off my camera')
+            : (shared ? 'Start video' : 'Turn on my camera');
         // Phones show big icons with a one-word caption; the full words stay for screen readers and desktops.
         const ico = (el, i, short) => { el.dataset.ico = i; el.dataset.short = short; };
-        ico(ui.mic, app.av.mic ? '🎤' : '🔇', app.av.mic ? 'Mute' : (app.av.jam ? 'Talk' : 'Mic'));
-        ico(ui.cam, app.av.cam && !app.av.screen ? '📷' : '🚫', app.av.cam && !app.av.screen ? 'Cam off' : 'Camera');
+        ico(ui.mic, app.av.mic ? '🎙️' : '🔇', app.av.mic ? 'Mute' : (app.av.jam ? 'Talk' : 'Mic'));
+        ico(ui.cam, app.av.cam && !app.av.screen ? '📹' : '📷', app.av.cam && !app.av.screen ? 'Cam off' : 'Camera');
         ico(ui.hand, '✋', Number.isFinite(app.av.hand) ? 'Lower' : 'Hand');
         ico(ui.settings, '⚙️', 'Setup');
         ico(ui.pip, '⧉', 'Pop out');
@@ -1757,13 +2031,17 @@
      * share don't renegotiate. A sender is only added the first time a kind appears. */
     function syncTracks(entry) {
         const tracks = app.av.stream ? app.av.stream.getTracks() : [];
+        const replacements = [];
         for (const kind of ['audio', 'video']) {
             const t = tracks.find((x) => x.kind === kind) || null;
             const sender = entry.senders[kind];
+            // replaceTrack keeps the existing sender. addTrack is only the first
+            // time a kind appears, so a lock/resume does not renegotiate.
             if (!sender && t) entry.senders[kind] = entry.pc.addTrack(t, app.av.stream);
-            else if (sender && sender.track !== t) sender.replaceTrack(t).catch(() => {});
+            else if (sender && sender.track !== t) replacements.push(sender.replaceTrack(t));
         }
         applyEncoding();
+        if (replacements.length) Promise.all(replacements).then(() => applyEncoding()).catch(() => {});
     }
 
     /* One uplink plan for all viewers (see HangoutVideo.planUplink), then apply it. */
@@ -1777,6 +2055,7 @@
             for (const kind of ['audio', 'video']) {
                 const sender = entry.senders[kind];
                 if (!sender || !sender.track) continue;
+                if (typeof sender.getParameters !== 'function' || typeof sender.setParameters !== 'function') continue;
                 const p = sender.getParameters();
                 if (!p.encodings || !p.encodings.length) p.encodings = [{}];
                 if (kind === 'video') {
@@ -1795,6 +2074,17 @@
         }
     }
 
+    let echoTipShown = false;
+    function maybeShowEchoTip(entry) {
+        if (echoTipShown || app.av.music || entry.pc.connectionState !== 'connected') return;
+        // A late viewer can receive a track while their own camera is locked.
+        // Leave the lock explanation visible until they can join the call.
+        if (app.av.locked && !app.av.mic && !app.av.cam) return;
+        if (!entry.stream.getTracks().some((track) => track.readyState === 'live' && !track.muted)) return;
+        echoTipShown = true;
+        say("Same room? Use headphones, or keep only one phone's mic on, to avoid echo.");
+    }
+
     async function openPc(id) {
         const peer = relayPeers.get(id);
         if (!peer?.live || app.av.pcs.has(id) || app.av.removed.has(id)) return;
@@ -1810,10 +2100,10 @@
             const pc = new RTCPeerConnection({ iceServers: app.av.ice || STUN });
             const conn = navigator.connection || {};
             const thrifty = Boolean(conn.saveData) || conn.type === 'cellular' || /(^|-)2g|3g/.test(conn.effectiveType || '');
-            const entry = { pc, polite: app.myId > id, makingOffer: false, offerNeeded: false, waitingInitialOffer: false, ignoreOffer: false, settingRemoteAnswer: false, remoteOfferPending: false, remoteOfferJobs: 0, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, last: null };
+            const entry = { pc, polite: app.myId > id, makingOffer: false, offerNeeded: false, waitingInitialOffer: false, ignoreOffer: false, settingRemoteAnswer: false, remoteOfferPending: false, remoteOfferJobs: 0, pendingIce: [], relayed: false, stream: new MediaStream(), senders: {}, wantHi: false, tier: thrifty ? 'weak' : 'ok', hist: [], restarts: 0, restartTimer: 0, last: null };
             app.av.pcs.set(id, entry);
             const current = () => peer.live && app.av.pcs.get(id) === entry;
-            pc.onicecandidate = (e) => { if (current() && e.candidate) send({ type: 'rtc', to: id, ice: e.candidate.toJSON() }); };
+            pc.onicecandidate = (e) => { if (current() && e.candidate) send(rtcMsg(peer, id, { ice: e.candidate.toJSON() })); };
             const initial = () => !pc.localDescription && !pc.remoteDescription;
             const waitForInitialOffer = () => initial() && entry.polite && (app.av.mic || app.av.cam) && app.av.peers.has(id);
             entry.pumpOffer = async () => {
@@ -1843,7 +2133,7 @@
                     await pc.setLocalDescription(offer);
                     if (!current()) return;
                     entry.waitingInitialOffer = false;
-                    await send({ type: 'rtc', to: id, sdp: pc.localDescription.toJSON() });
+                    await send(rtcMsg(peer, id, { sdp: pc.localDescription.toJSON() }));
                 } catch (error) {
                     failed = true;
                     if (initialAttempt && !pc.remoteDescription) entry.waitingInitialOffer = true;
@@ -1868,14 +2158,29 @@
                     pruneStreamTracks(entry.stream);
                     layout();
                 };
+                e.track.addEventListener('unmute', () => { if (current()) { resumeRemotePlayback(); maybeShowEchoTip(entry); } });
                 pruneStreamTracks(entry.stream);
                 if (e.track.kind === 'audio') watchLevel(id, entry.stream);
+                maybeShowEchoTip(entry);
                 layout();
             };
             pc.onconnectionstatechange = () => {
                 if (!current()) return;
                 const s = pc.connectionState;
-                if (s === 'connected') { entry.restarts = 0; checkRelay(id, entry); layout(); }
+                clearTimeout(entry.steadyTimer);
+                entry.steadyTimer = 0;
+                if (s === 'connected') {
+                    entry.restarts = 0; clearTimeout(entry.restartTimer); entry.restartTimer = 0;
+                    peer.facesStopped = false;
+                    paintFacesRetry();
+                    if (facesStatusPeer === id) say(`Call connection with ${peerName(id)} restored.`);
+                    // Only a link that holds earns the rebuild budget back; one that flaps does not.
+                    entry.steadyTimer = win.setTimeout(() => {
+                        entry.steadyTimer = 0;
+                        if (current() && pc.connectionState === 'connected') peer.rebuilds = 0;
+                    }, REBUILD_STEADY_MS);
+                    checkRelay(id, entry); layout(); maybeShowEchoTip(entry);
+                }
                 if (s === 'disconnected') win.setTimeout(() => { if (pc.connectionState === 'disconnected') restartIce(id, entry); }, 3000);
                 if (s === 'failed') restartIce(id, entry);
             };
@@ -1892,17 +2197,75 @@
         }
     }
 
-    /* Reconnect: ICE restart a few times, then give up on that one face politely. */
+    /* Reconnect: paced ICE restarts (each one gets 2 s / 4 s / 8 s to finish its
+     * negotiation before the next counts), then replace the connection with a fresh one. */
+    const ICE_RETRY_MS = [2000, 4000, 8000];
+    /* Fresh connections we start per peer. The count lives on the peer, not the connection, so it
+     * survives each rebuild. It is earned back by a link that stays connected for REBUILD_STEADY_MS,
+     * by the browser coming back online, by "Try faces again", or by the peer rejoining (a rejoin
+     * is a new peer record). */
+    const MAX_REBUILDS = 3;
+    const REBUILD_STEADY_MS = 10000;
+    const rtcMsg = (peer, to, body) => Object.assign({ type: 'rtc', to }, peer.rtcEpoch ? { e: peer.rtcEpoch } : null, body);
     function restartIce(id, entry) {
-        if (app.av.pcs.get(id) !== entry) return;
+        if (app.av.pcs.get(id) !== entry || entry.restartTimer) return;
+        if (relayPeers.get(id)?.facesStopped) return;
+        if (entry.restarts >= ICE_RETRY_MS.length) { rebuildPc(id); return; }
+        const wait = ICE_RETRY_MS[entry.restarts];
         entry.restarts += 1;
-        if (entry.restarts > 3) {
-            say(`Couldn’t connect faces with ${peerName(id)}. Chat and draw still work.`);
-            closePc(id);
-            return;
-        }
         say(`Reconnecting to ${peerName(id)}…`);
         try { entry.pc.restartIce(); } catch (error) { /* old browser */ }
+        entry.restartTimer = win.setTimeout(() => {
+            entry.restartTimer = 0;
+            if (app.av.pcs.get(id) === entry && entry.pc.connectionState !== 'connected') restartIce(id, entry);
+        }, wait);
+    }
+
+    // The network is back: retry any face that is still down now instead of waiting out a backoff.
+    win.addEventListener('online', () => {
+        for (const peer of relayPeers.values()) { peer.rebuilds = 0; peer.facesStopped = false; }
+        paintFacesRetry();
+        for (const [id, entry] of app.av.pcs) {
+            if (entry.pc.connectionState === 'connected') continue;
+            clearTimeout(entry.restartTimer);
+            entry.restartTimer = 0;
+            entry.restarts = 0;
+            restartIce(id, entry);
+        }
+    });
+
+    /* Restarts ran out: start over with a fresh RTCPeerConnection on both ends. The
+     * epoch rides on every rtc message so signaling from the replaced connection is
+     * dropped and simultaneous rebuilds settle on one pair. */
+    function rebuildPc(id, epoch) {
+        const peer = relayPeers.get(id);
+        if (!peer?.live) { closePc(id); return; }
+        const mine = peer.rtcEpoch || 0;
+        if (epoch !== undefined && epoch <= mine) return;
+        if (epoch === undefined) {
+            if ((peer.rebuilds || 0) >= MAX_REBUILDS) { stopFaces(id, peer); return; }
+            peer.rebuilds = (peer.rebuilds || 0) + 1;
+        }
+        // The other side starting over is a new attempt too; its own budget bounds how often.
+        peer.facesStopped = false;
+        peer.rtcEpoch = epoch === undefined ? mine + 1 : epoch;
+        closePc(id);
+        if (epoch === undefined) {
+            say(`Couldn’t connect faces with ${peerName(id)} yet. Trying a fresh connection; chat and draw still work.`, id);
+            send(rtcMsg(peer, id, { reset: true }));
+        }
+        openPc(id);
+    }
+
+    /* Budget spent: stop restarting and rebuilding. The connection is left as it is, with no
+     * timers, so only a tap, the network returning or the other side can start it again. */
+    function stopFaces(id, peer) {
+        if (peer.facesStopped) return;
+        peer.facesStopped = true;
+        const entry = app.av.pcs.get(id);
+        if (entry) { clearTimeout(entry.restartTimer); entry.restartTimer = 0; }
+        say(`Faces with ${peerName(id)} aren’t connecting. Chat and draw still work.`, id);
+        paintFacesRetry();
     }
 
     async function checkRelay(id, entry) {
@@ -1955,6 +2318,10 @@
     async function onRtc(from, msg, peer) {
         if (!peer.live || app.av.removed.has(from)) return;
         if (!(app.av.mic || app.av.cam) && !app.av.peers.has(from)) return;
+        const epoch = Number.isSafeInteger(msg.e) && msg.e > 0 ? msg.e : 0;
+        if (epoch < (peer.rtcEpoch || 0)) return;
+        if (epoch > (peer.rtcEpoch || 0)) rebuildPc(from, epoch);
+        if (msg.reset) return;
         if (!app.av.pcs.has(from)) await openPc(from);
         const entry = app.av.pcs.get(from);
         if (!entry || !peer.live) return;
@@ -1987,7 +2354,7 @@
                         if (app.av.music) answer.sdp = V.musicSdp(answer.sdp);
                         await pc.setLocalDescription(answer);
                         if (!current()) return;
-                        await send({ type: 'rtc', to: from, sdp: pc.localDescription.toJSON() });
+                        await send(rtcMsg(peer, from, { sdp: pc.localDescription.toJSON() }));
                     }
                 } finally {
                     if (offer) {
@@ -2008,7 +2375,8 @@
 
     function closePc(id) {
         const entry = app.av.pcs.get(id);
-        if (entry) { entry.offerNeeded = false; entry.waitingInitialOffer = false; entry.pc.close(); app.av.pcs.delete(id); }
+        if (entry) { entry.offerNeeded = false; entry.waitingInitialOffer = false; clearTimeout(entry.restartTimer); clearTimeout(entry.steadyTimer); entry.pc.close(); app.av.pcs.delete(id); }
+        paintFacesRetry();
         app.av.relayed.delete(id);
         delete app.av.levels[id];
         const meter = app.av.meters.get(id);
@@ -2082,10 +2450,14 @@
     function presentIds() {
         const ids = [];
         for (const id of app.av.peers) if (!app.av.hidden.has(id)) ids.push(id);
-        if (app.av.cam || app.av.mic) ids.push('me'); // you go last, like every call app
+        // You go last, like every call app. Paint Along always shows your own tile (with a
+        // Start video prompt while your camera is off) once the join choice is made.
+        if (app.av.cam || app.av.mic || ((app.bob.on || doc.body.classList.contains('shared-layout')) && ui.consent.hidden && !app.av.kicked)) ids.push('me');
         return ids;
     }
     function layout() {
+        // Lock, kick, leaving Bob mode or turning a camera on elsewhere retires the consent card.
+        if (ui.consent.hidden === consentWanted()) { paintConsent(); return; }
         const ids = presentIds();
         const screenId = app.av.screen ? 'me' : Array.from(app.av.screenPeers).find((id) => app.av.peers.has(id)) || null;
         const auto = app.av.view === 'speaker' || Boolean(screenId) || Boolean(app.av.spot) || Boolean(app.av.pin);
@@ -2108,6 +2480,20 @@
         renderHands();
     }
 
+    // Remote autoplay is blocked on iOS until a tap. One tap plays and unmutes every face.
+    async function playRemoteFace(video, gesture = false) {
+        const stream = video.srcObject;
+        if (!stream?.active || (!gesture && remoteFacesNeedingTap.has(video))) return;
+        try {
+            await video.play();
+        } catch (error) {
+            // Reattaching the stream can abort an earlier play while the new one starts.
+            if (error?.name === 'AbortError' || !video.paused || video.srcObject !== stream || !ui.tiles.contains(video)) return;
+            remoteFacesNeedingTap.add(video);
+            paintAvResume();
+        }
+    }
+
     function bars(tier) {
         const n = { good: 4, ok: 3, weak: 2, bad: 1 }[tier] || 0;
         return `${'▮'.repeat(n)}${'▯'.repeat(4 - n)}`;
@@ -2124,7 +2510,14 @@
             const v = doc.createElement('video');
             v.autoplay = true;
             v.playsInline = true;
+            v.setAttribute('playsinline', '');
+            v.setAttribute('webkit-playsinline', '');
             v.muted = id === 'me';
+            if (id !== 'me') {
+                v.addEventListener('playing', () => {
+                    if (!v.paused && v.readyState >= v.HAVE_FUTURE_DATA && remoteFacesNeedingTap.delete(v)) paintAvResume();
+                });
+            }
             const cap = doc.createElement('figcaption');
             const nm = doc.createElement('span');
             nm.className = 'nm';
@@ -2145,13 +2538,25 @@
             const react = doc.createElement('em');
             react.className = 'react';
             react.setAttribute('aria-live', 'polite');
-            tile.append(v, cap, badge, more, react);
+            const startVideo = doc.createElement('button');
+            startVideo.type = 'button';
+            startVideo.className = 'tile-start-video';
+            startVideo.textContent = '📷 Start video';
+            startVideo.setAttribute('aria-label', 'Start video');
+            startVideo.addEventListener('click', (event) => { event.stopPropagation(); startVideoPrompt(); });
+            tile.append(v, cap, badge, more, react, ...(id === 'me' ? [startVideo] : []));
             ui.tiles.append(tile);
             if (id !== 'me' && app.av.sink && v.setSinkId) v.setSinkId(app.av.sink).catch(() => {});
         }
         const v = tile.querySelector('video');
+        // A camera track that joins a stream the <video> already holds may never start decoding in
+        // WebKit (suspected on GStreamer builds, unknown on Apple's): attach again, once per new track.
+        const face = id !== 'me' && stream ? (stream.getVideoTracks().find((t) => t.readyState === 'live') || null) : null;
+        const lateFace = Boolean(face) && v.srcObject === stream && v.__hangoutFace !== face;
+        if (lateFace) v.srcObject = null;
         if (v.srcObject !== (stream || null)) v.srcObject = stream || null;
-        if (id !== 'me' && v.paused && stream) v.play().catch(() => {});
+        v.__hangoutFace = face;
+        if (id !== 'me' && stream && (v.paused || lateFace)) void playRemoteFace(v);
         const isCanvas = id === 'me' ? app.av.canvas : app.av.canvasPeers.has(id);
         const isScreen = id === 'me' ? Boolean(app.av.screen) : app.av.screenPeers.has(id);
         const camOn = id === 'me' ? app.av.cam : app.av.camPeers.has(id);
@@ -2160,7 +2565,7 @@
         tile.classList.toggle('tile--screen', isScreen);
         tile.classList.toggle('tile--big', big);
         tile.classList.toggle('tile--nocam', !camOn || paused || (id !== 'me' && app.av.awayPeers.has(id)));
-        tile.classList.toggle('tile--mirror', id === 'me' && camOn && !isScreen && !isCanvas);
+        tile.classList.toggle('tile--mirror', id === 'me' && camOn && !isScreen && !isCanvas && !app.bob.on);
         tile.dataset.initial = (peerName(id).trim()[0] || '?').toUpperCase();
         const label = id === 'me'
             ? (app.av.canvas ? `${app.name}’s canvas (you)` : `${app.name} (you)`)
@@ -2349,26 +2754,181 @@
                 if (app.av.bg.proc) await app.av.bg.proc.restart({ kind: 'video', track: got.getVideoTracks()[0], element: app.av.bg.el });
                 if (!keepCapture('video', version, got)) return;
                 app.av.rawCam = got.getVideoTracks()[0];
+                adoptLocalTrack('video', app.av.rawCam);
                 setTrack('video', app.av.bg.proc ? app.av.bg.proc.processedTrack : app.av.rawCam);
                 pendingCamera = null;
-                if (old) old.stop();
+                if (old) stopTrack(old);
             }
             if (kind === 'mic' && app.av.mic) await restartMic();
             for (const entry of app.av.pcs.values()) syncTracks(entry);
             layout();
         } catch (error) {
-            if (pendingCamera) pendingCamera.getTracks().forEach((track) => track.stop());
+            if (pendingCamera) pendingCamera.getTracks().forEach(stopTrack);
             say('Couldn’t switch to that device. Is another app using it?');
         }
     }
-    async function restartMic() {
+    // Runs synchronously so a tap can start the mic capture before any await.
+    function primeMic() {
         const version = ++captureVersion.audio;
-        const got = await navigator.mediaDevices.getUserMedia({ audio: V.micConstraints(app.av.music, prefs().mic) });
-        if (!keepCapture('audio', version, got)) return;
+        const capture = startCapture({ audio: V.micConstraints(app.av.music, prefs().mic) });
+        capture.catch(() => {});
+        return { version, capture };
+    }
+    async function restartMic(primed) {
+        const { version, capture } = primed || primeMic();
+        const got = await capture;
+        if (!keepCapture('audio', version, got)) return false;
         stopRaw('audio');
         setTrack('audio', got.getAudioTracks()[0]);
         for (const entry of app.av.pcs.values()) syncTracks(entry);
         if (app.av.ac) watchLevel('me', app.av.stream);
+        captureNeedsTap('audio', false);
+        return true;
+    }
+    // Refused inside a tap for one of these reasons is a real "no", not a missing gesture.
+    function captureDenied(error) {
+        return Boolean(error) && (error.name === 'NotAllowedError' || error.name === 'SecurityError' || error.name === 'NotFoundError');
+    }
+    function captureBusyOrStuck(error) {
+        return Boolean(error) && (['NotReadableError', 'AbortError', 'TrackStartError'].includes(error.name)
+            || (error.name === 'NotAllowedError' && /AVAudioSession/i.test(error.message || '')));
+    }
+    function captureBusyMessage(kind) {
+        return `Your ${kind === 'cam' ? 'camera' : 'mic'} is busy or stuck. End any FaceTime or phone call, then reload this page. Chat and games still work.`;
+    }
+    async function restartCam(gesture) {
+        if (app.ended || app.av.kicked || !app.av.cam || app.av.screen) return false;
+        const canvas = app.av.canvas;
+        const version = ++captureVersion.video;
+        let got;
+        try {
+            // No await before this call: inside a tap it has to run in the tap itself.
+            got = await startCapture({ video: canvas ? CANVAS_CAM : camConstraints() });
+        } catch (error) {
+            if (version !== captureVersion.video || !app.av.cam || doc.visibilityState === 'hidden') return false;
+            if (captureBusyOrStuck(error)) {
+                captureNeedsTap('video', false);
+                say(captureBusyMessage('cam'));
+                return 'busy';
+            }
+            // After a screen lock or app switch iOS refuses the camera outside a tap. That is not
+            // the person turning it off: keep it on and ask for one tap instead.
+            if (!gesture || !captureDenied(error)) { captureNeedsTap('video', true); return false; }
+            captureNeedsTap('video', false);
+            await dropCameraKeepVoice();
+            return false;
+        }
+        if (!keepCapture('video', version, got, true)) return false;
+        if (!app.av.cam || app.av.screen || app.av.canvas !== canvas || doc.visibilityState === 'hidden') {
+            got.getTracks().forEach(stopTrack);
+            return false;
+        }
+        const track = got.getVideoTracks()[0];
+        if (!track) { got.getTracks().forEach(stopTrack); return false; }
+        const old = app.av.rawCam;
+        let send = track;
+        if (app.av.bg.proc && !canvas) {
+            try {
+                await app.av.bg.proc.restart({ kind: 'video', track, element: app.av.bg.el });
+                if (!keepCapture('video', version, got, true) || !app.av.cam) return false;
+                send = app.av.bg.proc.processedTrack || track;
+            } catch (error) {
+                const proc = app.av.bg.proc;
+                app.av.bg.proc = null;
+                if (proc) proc.destroy().catch(() => {});
+                send = track;
+            }
+        }
+        if (version !== captureVersion.video || !app.av.cam || app.av.screen) {
+            stopTrack(track);
+            return false;
+        }
+        app.av.rawCam = track;
+        adoptLocalTrack('video', track);
+        setTrack('video', send);
+        if (old && old !== track) stopTrack(old);
+        for (const entry of app.av.pcs.values()) syncTracks(entry);
+        captureNeedsTap('video', false);
+        return true;
+    }
+    async function dropCameraKeepVoice() {
+        if (!app.av.cam || app.av.screen) return;
+        const voice = app.av.mic;
+        stopRaw('video');
+        app.av.cam = false;
+        app.av.canvas = false;
+        await refreshAv();
+        say(voice
+            ? 'You’re in with voice only. To add video, allow Camera by the address bar, then tap the camera button.'
+            : 'Camera’s blocked. Tap the lock or “aA” icon by the address bar, allow Camera, then try again.');
+    }
+    function localCapture(kind) {
+        if (!app.av.stream) return null;
+        return app.av.stream.getTracks().find((track) => track.kind === kind) || null;
+    }
+    let resumeJob = null;
+    function resumeLocalMedia(gesture) {
+        if (app.ended || doc.visibilityState === 'hidden') return Promise.resolve();
+        // A tap never waits behind an automatic attempt: its captures must start in the tap.
+        if (resumeJob && !gesture) return resumeJob;
+        const job = recoverLocalMedia(Boolean(gesture)).finally(() => { if (resumeJob === job) resumeJob = null; });
+        resumeJob = job;
+        return job;
+    }
+    async function recoverLocalMedia(gesture) {
+        if (app.ended || doc.visibilityState !== 'visible') return;
+        const plan = V.resumeCapture({
+            visible: true,
+            ended: app.ended,
+            kicked: app.av.kicked,
+            micOn: app.av.mic,
+            camOn: app.av.cam,
+            screen: Boolean(app.av.screen),
+            audio: localCapture('audio'),
+            video: app.av.rawCam || localCapture('video')
+        });
+        // Everything that needs the tap starts here, before the first await.
+        const playJob = gesture ? resumeRemotePlayback(true) : null;
+        const camJob = plan.video ? restartCam(gesture) : null;
+        const micPrimed = plan.audio && app.av.mic ? primeMic() : null;
+        const busyCam = camJob && (await camJob) === 'busy';
+        let busyMic = false;
+        if (micPrimed) {
+            try {
+                await restartMic(micPrimed);
+            } catch (error) {
+                if (!app.ended && app.av.mic && doc.visibilityState === 'visible' && micPrimed.version === captureVersion.audio) {
+                    if (captureBusyOrStuck(error)) {
+                        captureNeedsTap('audio', false);
+                        say(captureBusyMessage('mic'));
+                        busyMic = true;
+                    } else if (!gesture || !captureDenied(error)) {
+                        // Refused outside a tap: the mic stays on as far as the person is concerned.
+                        captureNeedsTap('audio', true);
+                    } else {
+                        captureNeedsTap('audio', false);
+                        stopRaw('audio');
+                        app.av.mic = false;
+                        await refreshAv();
+                        say('Mic’s blocked. Tap the lock or “aA” icon by the address bar, allow Microphone, then try again.');
+                    }
+                }
+            }
+        }
+        if (playJob) await playJob;
+        else if (doc.visibilityState === 'visible') await resumeRemotePlayback();
+        if (!busyCam && !busyMic && (avResumeWhy.video || avResumeWhy.audio)) say('Tap “Tap to resume video” to bring your camera and mic back.');
+        layout();
+    }
+    async function resumeRemotePlayback(gesture = false) {
+        if (gesture) {
+            ensureAudioCtx();
+            if (app.av.ac && app.av.ac.state === 'suspended') app.av.ac.resume().catch(() => {});
+        }
+        await Promise.all([...remoteFaceVideos()].map((video) => {
+            if (gesture) video.muted = false;
+            if (gesture || video.paused) return playRemoteFace(video, gesture);
+        }));
     }
     async function setMusic(on) {
         app.av.music = Boolean(on);
@@ -2454,7 +3014,7 @@
         }
     }
 
-    /* ---------------- phones: keep awake, pause camera when hidden ---------------- */
+    /* ---------------- phones: keep awake; reopen a camera the OS ended ---------------- */
     async function wakeLock(on) {
         try {
             if (on && !app.av.lock && navigator.wakeLock && doc.visibilityState === 'visible') {
@@ -2472,7 +3032,10 @@
             applyEncoding();
             send({ type: 'av', av: avFlags() });
         }
-        if (!hidden && (app.av.mic || app.av.cam)) wakeLock(true);
+        if (!hidden) {
+            if (app.av.mic || app.av.cam) wakeLock(true);
+            resumeLocalMedia();
+        }
     });
 
     /* ---------------- pre-join check ---------------- */
@@ -2524,6 +3087,7 @@
             lines.push('🎤 Say something: the bar should jump.');
         } catch (error) {
             if (activeCheck !== check) return;
+            if (needsOpenBrowserHint(error)) { ui.checkOut.textContent = openBrowserHint; return; }
             lines.push('⚠️ Camera or mic is blocked. Allow them by the address bar if you want faces. Chat and draw work either way.');
         }
         ui.checkOut.textContent = lines.join(' ');
@@ -2555,8 +3119,14 @@
     }
 
     ui.canvasCam.addEventListener('click', () => toggleCanvasCam());
-    ui.mic.addEventListener('click', () => toggle('mic'));
-    ui.cam.addEventListener('click', () => toggle('cam'));
+    ui.mic.addEventListener('click', () => {
+        if (!ui.consent.hidden) focusConsent();
+        else toggle('mic');
+    });
+    ui.cam.addEventListener('click', () => {
+        if (doc.body.dataset.sharedLayout && !app.av.cam) startVideoPrompt();
+        else toggle('cam');
+    });
     ui.share.addEventListener('click', () => toggleScreen());
     ui.pip.hidden = !(doc.pictureInPictureEnabled || 'webkitSetPresentationMode' in HTMLVideoElement.prototype);
     ui.pip.addEventListener('click', () => {
@@ -2586,17 +3156,369 @@
     ui.bgSupport.textContent = deviceStrength() === 'no' ? 'This device can’t do backgrounds.' : '';
 
 
+    /* ---------------- Webex-style call chrome: chat drawer, More, Music ---------------- */
+    const chatPhone = win.matchMedia('(max-width: 820px)');
+    function chatIsVisible() {
+        if (ui.room.hidden) return false;
+        if (doc.body.classList.contains('shared-layout')) return !doc.body.classList.contains('chat-closed');
+        const phoneCall = chatPhone.matches && doc.body.classList.contains('faces-on');
+        return !ui.room.hasAttribute('data-room-chat-closed')
+            && (!phoneCall || ui.room.hasAttribute('data-room-chat-shown'));
+    }
+    function syncChatDisclosure(hadFocus = ui.chat.contains(doc.activeElement)) {
+        const visible = chatIsVisible();
+        ui.chatToggle.setAttribute('aria-expanded', String(visible));
+        if (hadFocus && !visible && !ui.room.hidden) ui.chatToggle.focus({ preventScroll: true });
+    }
+    function resetChatUnread() {
+        delete ui.chatToggle.dataset.unread;
+        ui.chatToggle.textContent = 'Chat';
+    }
+    function setChatOpen(open) {
+        const hadFocus = ui.chat.contains(doc.activeElement);
+        if (!doc.body.classList.contains('shared-layout')) {
+            ui.room.toggleAttribute('data-room-chat-closed', !open);
+            ui.room.toggleAttribute('data-room-chat-shown', open);
+            syncChatDisclosure(hadFocus);
+            (open ? ui.chatTitle : ui.chatToggle).focus();
+            return;
+        }
+        doc.body.classList.toggle('chat-closed', !open);
+        syncChatDisclosure(hadFocus);
+        if (open) {
+            resetChatUnread();
+            ui.log.scrollTop = ui.log.scrollHeight;
+            setMore(false);
+        }
+    }
+    ui.chatClose.hidden = false;
+    ui.chatToggle.addEventListener('click', () =>
+        setChatOpen(!doc.body.classList.contains('shared-layout') || !chatIsVisible()));
+    ui.chatClose.addEventListener('click', () => setChatOpen(false));
+    ui.chat.addEventListener('focusin', () => {
+        if (doc.body.classList.contains('shared-layout') || ui.room.hasAttribute('data-room-chat-closed')) return;
+        ui.room.setAttribute('data-room-chat-shown', '');
+        syncChatDisclosure();
+    });
+    ui.chat.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || event.defaultPrevented || doc.body.classList.contains('shared-layout')) return;
+        event.preventDefault();
+        setChatOpen(false);
+    });
+    chatPhone.addEventListener('change', () => syncChatDisclosure());
+    new MutationObserver(() => syncChatDisclosure()).observe(doc.body, { attributes: true, attributeFilter: ['class'] });
+    function noteUnreadChat() {
+        if (!doc.body.classList.contains('shared-layout') || !doc.body.classList.contains('chat-closed')) return;
+        const n = Math.min(99, Number(ui.chatToggle.dataset.unread || 0) + 1);
+        ui.chatToggle.dataset.unread = String(n);
+        ui.chatToggle.textContent = `Chat (${n} new)`;
+    }
+    function setMore(open) {
+        doc.body.classList.toggle('more-open', Boolean(open));
+        ui.more.setAttribute('aria-expanded', String(Boolean(open)));
+        if (open) setSoundtrackPop(false);
+    }
+    ui.more.addEventListener('click', () => setMore(!doc.body.classList.contains('more-open')));
+    // Picking something under More closes the sheet so it never sits over the stage.
+    doc.querySelector('[data-callbar-more]').addEventListener('click', (event) => {
+        if (event.target.closest('button') && doc.body.classList.contains('more-open')) setMore(false);
+    });
+
+    /* Local video volume is independent of the site music preference and call audio. */
+    try {
+        const saved = JSON.parse(localStorage.getItem('hangout-soundtrack') || 'null');
+        if (saved && Number.isFinite(Number(saved.volume))) app.soundtrack.volume = Math.max(0, Math.min(100, Number(saved.volume)));
+        if (saved) app.soundtrack.muted = Boolean(saved.muted);
+    } catch (error) { /* private mode */ }
+    function applySoundtrack() {
+        const s = app.soundtrack;
+        const vol = Math.max(0, Math.min(100, Math.round(s.volume)));
+        const silent = s.muted || vol === 0;
+        try { ui.file.volume = vol / 100; } catch (error) { /* read-only volume (iOS) */ }
+        if (silent) { ui.file.muted = true; ui.file.__soundtrackMuted = true; }
+        else if (ui.file.__soundtrackMuted) { ui.file.muted = false; ui.file.__soundtrackMuted = false; }
+        const yt = player.yt;
+        if (yt) {
+            try {
+                if (typeof yt.setVolume === 'function') yt.setVolume(vol);
+                if (silent && typeof yt.mute === 'function') { yt.mute(); yt.__soundtrackMuted = true; }
+                else if (!silent && yt.__soundtrackMuted && typeof yt.unMute === 'function') { yt.unMute(); yt.__soundtrackMuted = false; }
+            } catch (error) { /* player not ready */ }
+        }
+        paintSoundtrack();
+    }
+    function paintSoundtrack() {
+        const s = app.soundtrack;
+        const silent = s.muted || s.volume <= 0;
+        ui.soundtrack.textContent = silent ? 'Video muted' : 'Video sound';
+        ui.soundtrack.dataset.ico = silent ? '🔇' : '🔊';
+        ui.soundtrack.dataset.short = silent ? 'Muted' : 'Video';
+        ui.soundtrack.setAttribute('aria-pressed', String(!silent));
+        ui.soundtrack.setAttribute('aria-label', silent ? 'Video muted' : `Video sound ${Math.round(s.volume)}%`);
+        ui.soundtrackMute.textContent = s.muted ? 'Unmute video' : 'Mute video';
+        ui.soundtrackMute.setAttribute('aria-pressed', String(s.muted));
+        ui.soundtrackVol.value = String(Math.round(s.volume));
+    }
+    function setSoundtrack(patch) {
+        Object.assign(app.soundtrack, patch);
+        try { localStorage.setItem('hangout-soundtrack', JSON.stringify(app.soundtrack)); } catch (error) { /* private mode */ }
+        applySoundtrack();
+    }
+    function setSoundtrackPop(open) {
+        ui.soundtrackPop.hidden = !open;
+        ui.soundtrack.setAttribute('aria-expanded', String(Boolean(open)));
+        if (open) setMore(false);
+    }
+    ui.soundtrack.addEventListener('click', () => setSoundtrackPop(ui.soundtrackPop.hidden));
+    ui.soundtrackVol.addEventListener('input', () => setSoundtrack({ volume: Number(ui.soundtrackVol.value), muted: Number(ui.soundtrackVol.value) > 0 ? false : app.soundtrack.muted }));
+    ui.soundtrackMute.addEventListener('click', () => setSoundtrack({ muted: !app.soundtrack.muted }));
+    doc.addEventListener('keydown', (event) => { if (event.key === 'Escape') { setSoundtrackPop(false); setMore(false); } });
+    doc.addEventListener('click', (event) => {
+        if (!ui.soundtrackPop.hidden && !event.target.closest('[data-soundtrack-pop],[data-soundtrack]')) setSoundtrackPop(false);
+    });
+    paintSoundtrack();
+
+    /* ---------------- one combined camera + mic consent step (Paint Along) ----------------
+     * Nothing is captured until the person taps "Turn on camera". One getUserMedia call asks
+     * for camera and mic together, the live preview stays on this device, and only "Join with
+     * camera" sends it to the room. Lock, kick and the faces cap are checked again on join. */
+    function consentWanted() {
+        return Boolean(!ui.room.hidden && app.myId && !app.ended
+            && (app.bob.on || doc.body.classList.contains('shared-layout'))
+            && !app.av.cam && !app.av.mic && !app.av.kicked && !app.av.locked && !app.consent.skipped);
+    }
+    function stopConsentPreview() {
+        const c = app.consent;
+        c.version += 1;
+        if (c.stream) c.stream.getTracks().forEach(stopTrack);
+        c.stream = null;
+        win.cancelAnimationFrame(c.frame);
+        if (c.ac) { c.ac.close().catch(() => {}); c.ac = null; }
+        ui.consentVideo.srcObject = null;
+        ui.consentMeter.value = 0;
+    }
+    function setConsentState(state, error) {
+        app.consent.state = state;
+        ui.consent.dataset.state = state;
+        const previewing = state === 'preview' || state === 'voice';
+        const ageText = app.av.adult18 ? '' : 'I’m 18+ · ';
+        ui.consentPlaceholder.hidden = state === 'preview';
+        ui.consentMeterWrap.hidden = !previewing;
+        ui.consentMicWrap.hidden = state !== 'preview';
+        ui.consentError.hidden = !error;
+        ui.consentError.textContent = error || '';
+        ui.consentOn.disabled = state === 'asking';
+        ui.consentTitle.textContent = state === 'preview' ? 'Looking good? Join when ready'
+            : state === 'voice' ? 'No camera found' : state === 'denied' ? 'Camera and mic are blocked' : 'Join with camera and mic';
+        ui.consentOn.textContent = state === 'asking' ? 'Waiting for your browser…'
+            : state === 'preview' ? 'Join with camera'
+                : state === 'voice' ? 'Join with just my mic'
+                    : state === 'denied' ? 'Try again' : `${ageText}Turn on camera`;
+        ui.consentCopy.textContent = state === 'preview' ? 'Only you can see this preview. Tap Join to share it with this room.'
+            : state === 'voice' ? 'Your mic works. You can add the camera later with Start video.'
+                : state === 'asking' ? 'Tap Allow on the pop-up so the room can see and hear you.'
+                    : app.bob.on ? 'Point your camera at your canvas. Only people in this room can see and hear you. Cameras are for adults 18+.'
+                        : 'Your browser will ask for camera and mic access. Only people in this room can see and hear you. Cameras are for adults 18+.';
+        if (state === 'voice') ui.consentPlaceholder.textContent = '🎙️ Mic only: no camera was found.';
+        else ui.consentPlaceholder.textContent = '📷 Your preview shows here. Nothing turns on until you tap the button.';
+    }
+    function paintConsent() {
+        const want = consentWanted();
+        if (!want && (app.consent.state === 'asking' || app.consent.stream)) stopConsentPreview();
+        if (!want && app.consent.state !== 'idle') setConsentState('idle');
+        const changed = ui.consent.hidden === want;
+        ui.consent.hidden = !want;
+        doc.body.classList.toggle('consent-open', want);
+        if (changed && app.consent.state === 'idle') setConsentState('idle');
+        if (changed) layout();
+    }
+    function meterConsent(stream) {
+        const c = app.consent;
+        const track = stream.getAudioTracks()[0];
+        if (!track || !(win.AudioContext || win.webkitAudioContext)) return;
+        try {
+            const ac = new (win.AudioContext || win.webkitAudioContext)();
+            c.ac = ac;
+            const an = ac.createAnalyser();
+            ac.createMediaStreamSource(new MediaStream([track])).connect(an);
+            const buf = new Float32Array(an.fftSize);
+            const tick = () => {
+                if (c.stream !== stream) return;
+                an.getFloatTimeDomainData(buf);
+                let peak = 0;
+                for (let i = 0; i < buf.length; i += 1) peak = Math.max(peak, Math.abs(buf[i]));
+                ui.consentMeter.value = Math.min(1, peak * 3);
+                c.frame = win.requestAnimationFrame(tick);
+            };
+            tick();
+        } catch (error) { /* no meter, preview still works */ }
+    }
+    function consentBlockedReason() {
+        if (!app.connected) return 'The room is reconnecting. Try again when you’re back in.';
+        if (app.av.kicked) return 'The host took you off camera in this room. Chat and painting still work.';
+        if (app.av.locked && !(app.av.mic || app.av.cam)) return 'The host locked cameras for now. Chat and painting still work.';
+        if (!(app.av.mic || app.av.cam) && avCount() >= V.MAX_CAMS) return `Cameras are full (${V.MAX_CAMS} max). Chat and painting still work.`;
+        return '';
+    }
+    function requestConsent() {
+        // Runs inside the tap: iOS only lets getUserMedia start from the gesture itself.
+        if (!consentWanted()) return;
+        const blocked = consentBlockedReason();
+        if (blocked) { setConsentState('denied', blocked); return; }
+        if (needsOpenBrowserHint()) { setConsentState('denied', openBrowserHint); return; }
+        stopConsentPreview();
+        app.av.adult18 = true;
+        const version = app.consent.version;
+        const audio = V.micConstraints(app.av.music, prefs().mic);
+        setConsentState('asking');
+        startCapture({ video: camConstraints(), audio }).then((stream) => {
+            if (version !== app.consent.version || !consentWanted()) { stream.getTracks().forEach(stopTrack); return; }
+            app.consent.stream = stream;
+            ui.consentVideo.srcObject = stream;
+            ui.consentMic.checked = !app.av.jam;
+            setConsentState('preview');
+            meterConsent(stream);
+        }).catch(async (error) => {
+            if (version !== app.consent.version) return;
+            if (needsOpenBrowserHint(error)) { setConsentState('denied', openBrowserHint); return; }
+            const name = error && error.name;
+            // A missing or busy camera should not strand someone who has a working mic.
+            if (name === 'NotFoundError' || name === 'OverconstrainedError' || captureBusyOrStuck(error)) {
+                try {
+                    const voice = await startCapture({ audio });
+                    if (version !== app.consent.version || !consentWanted()) { voice.getTracks().forEach(stopTrack); return; }
+                    app.consent.stream = voice;
+                    setConsentState('voice');
+                    meterConsent(voice);
+                    return;
+                } catch (voiceError) { /* fall through to the blocked message */ }
+                if (version !== app.consent.version) return;
+            }
+            setConsentState('denied', captureBusyOrStuck(error)
+                ? 'Another app or tab is using your camera. Close it, then tap Try again.'
+                : 'Your browser blocked the camera and mic. Tap the lock or “aA” icon by the address bar, allow Camera and Microphone, then tap Try again. Or join without camera: chat and painting still work.');
+        });
+    }
+    async function joinFromConsent() {
+        const c = app.consent;
+        const stream = c.stream;
+        if (!stream || !consentWanted()) return;
+        const blocked = consentBlockedReason();
+        if (blocked) { stopConsentPreview(); setConsentState('denied', blocked); return; }
+        const video = stream.getVideoTracks().find((t) => t.readyState === 'live');
+        const audio = stream.getAudioTracks().find((t) => t.readyState === 'live');
+        const wantMic = c.state === 'voice' || ui.consentMic.checked;
+        // Hand the tracks to the call; the preview no longer owns them.
+        c.stream = null;
+        c.version += 1;
+        win.cancelAnimationFrame(c.frame);
+        if (c.ac) { c.ac.close().catch(() => {}); c.ac = null; }
+        ui.consentVideo.srcObject = null;
+        if (video) {
+            stopRaw('video');
+            app.av.rawCam = video;
+            app.av.canvas = false;
+            adoptLocalTrack('video', video);
+            setTrack('video', video);
+            app.av.asked.cam = true;
+            app.av.cam = true;
+            if (app.av.bg.choice && app.av.bg.choice !== 'none') setBackground(app.av.bg.choice, true);
+        }
+        if (audio && wantMic) {
+            stopRaw('audio');
+            setTrack('audio', audio);
+            app.av.asked.mic = true;
+            app.av.mic = true;
+        } else if (audio) {
+            stopTrack(audio);
+            app.av.asked.mic = true; // permission granted; Unmute later needs no second explainer
+        }
+        ensureAudioCtx();
+        setConsentState('idle');
+        await refreshAv();
+        say(app.av.cam ? 'You’re on camera. Stop video or Mute mic any time from the bar.' : 'You’re in with your mic. Tap Start video to add your camera.');
+    }
+    function skipConsent() {
+        stopConsentPreview();
+        app.consent.skipped = true;
+        setConsentState('idle');
+        paintConsent();
+        say('You’re in without camera. Tap Start video on your tile or the bar whenever you like.');
+    }
+    function focusConsent() {
+        ui.consentOn.focus({ preventScroll: true });
+        ui.consent.scrollIntoView({ block: 'nearest' });
+    }
+    function startVideoPrompt() {
+        if (app.av.cam) return;
+        if (doc.body.dataset.sharedLayout && !app.av.asked.cam && !app.av.mic) {
+            app.consent.skipped = false;
+            paintConsent();
+            if (!ui.consent.hidden) { focusConsent(); return; }
+        }
+        toggle('cam');
+    }
+    ui.consentOn.addEventListener('click', () => {
+        const s = app.consent.state;
+        if (s === 'preview' || s === 'voice') joinFromConsent();
+        else if (s !== 'asking') requestConsent();
+    });
+    ui.consentSkip.addEventListener('click', skipConsent);
+    win.addEventListener('pagehide', stopConsentPreview);
+
+    function roomActivity() {
+        return app.bob.on ? 'paint' : app.watchLayout ? 'watch' : 'room';
+    }
+    function syncSharedLayout() {
+        const activity = roomActivity();
+        const mode = ui.room.hidden || activity === 'room' ? '' : activity;
+        if ((doc.body.dataset.sharedLayout || '') === mode) return;
+        const chatHadFocus = ui.chat.contains(doc.activeElement);
+        win.SharedRoomLayout?.set(mode, Boolean(mode));
+        ui.modePill.hidden = !mode;
+        ui.modePill.textContent = mode === 'paint' ? 'Paint Along' : 'Watch a Movie Together';
+        ui.watchTitle.textContent = mode === 'watch' ? 'Watch a Movie Together' : 'Watch';
+        ui.watchToggle.hidden = Boolean(mode);
+        ui.canvasCam.hidden = mode === 'watch';
+        ui.room.removeAttribute('data-room-chat-closed');
+        ui.room.removeAttribute('data-room-chat-shown');
+        doc.body.classList.toggle('chat-closed', Boolean(mode) && chatPhone.matches);
+        resetChatUnread();
+        syncChatDisclosure(chatHadFocus);
+        paintControls();
+        setMore(false);
+        setSoundtrackPop(false);
+        paintConsent();
+        layout();
+    }
+
     /* ---------------- Bob Ross Paint-Along ---------------- */
-    function setBob(on, byUser) {
+    function setBob(on) {
+        const wasOn = app.bob.on;
         app.bob.on = Boolean(on);
-        if (byUser) app.bob.touched = true;
+        if (app.bob.on && !wasOn) { playbackSample = null; playbackIntentAt = Date.now(); }
         doc.body.classList.toggle('bob-mode', app.bob.on);
+        syncSharedLayout();
         ui.bob.hidden = !app.bob.on;
+        if (app.bob.on !== wasOn) {
+            if (!app.bob.on) paintDrawing.close();
+            (app.bob.on ? paintDrawing : roomDrawing).append(sharedDrawing);
+            paintDrawingOpen.hidden = !app.bob.on;
+        }
         ui.bobToggle.setAttribute('aria-pressed', String(app.bob.on));
-        ui.bobToggle.textContent = app.bob.on ? 'Leave Bob mode' : 'Paint along with Bob';
+        ui.bobToggle.textContent = app.bob.on ? 'Exit Paint Along' : '🎨 Paint along with Bob';
+        ui.bobHold.classList.toggle('host-only', !app.bob.on);
+        ui.bobRewind.classList.toggle('host-only', !app.bob.on);
+        ui.bobEpisodes.closest('details')?.classList.toggle('host-only', !app.bob.on);
+        ui.hostNote.textContent = app.bob.on ? 'Everyone can play, pause, seek and choose a Bob Ross episode.'
+            : app.isHost ? 'You started this room, so you drive the video and the wipe.' : 'The person who started the room drives the video.';
+        // No camera prompt pops up on its own (remote playback can switch Bob mode on): the inline
+        // camera+mic consent card waits for the person's tap. "Show my real canvas" stays under More.
+        paintConsent();
+        layout();
         if (app.bob.on) {
             if (!BOB.PALETTE.some((p) => p.hex === color)) pickColor(BOB.PALETTE[1].hex);
-            const details = ui.bob.querySelector('details');
+            const details = ui.bobEpisodes.closest('details');
             if (details && win.matchMedia && win.matchMedia('(max-width: 820px)').matches) details.open = false;
         }
     }
@@ -2606,8 +3528,18 @@
     }
     function showEpisode() {
         const ep = currentEpisode();
-        if (ep && !app.bob.on && !app.bob.touched) setBob(true);
-        ui.bobNow.textContent = ep ? `Now painting: ${ep.title} · ${BOB.label(ep)}` : 'No happy accidents yet. The host picks an episode.';
+        const activity = app.lastVideoSigned?.signed.body.activity;
+        if (!app.isHost && H.validRoomActivity(activity)) {
+            app.watchLayout = activity === 'watch';
+            if (app.bob.on !== (activity === 'paint')) setBob(activity === 'paint');
+        } else if (!app.isHost && ep && !app.bob.on && !app.watchLayout) setBob(true);
+        syncSharedLayout();
+        const video = app.state.video;
+        const by = app.lastVideoSigned?.signed.body.control?.by;
+        const author = by === app.myId ? app.name : app.names.get(by);
+        const pausedBy = video && !video.playing && author ? ` · Paused by ${author}` : '';
+        ui.bobNow.textContent = ep ? `Now painting: ${ep.title} · ${BOB.label(ep)}${pausedBy}`
+            : 'No happy accidents yet. The host picks an episode.';
         ui.bobEpisodes.querySelectorAll('.ep').forEach((b) => b.setAttribute('aria-current', String(Boolean(ep) && b.dataset.bobEp === ep.id)));
         const playing = !app.state.video || Boolean(app.state.video.playing);
         ui.bobHold.setAttribute('aria-pressed', String(!playing));
@@ -2632,22 +3564,38 @@
         li.append(b);
         ui.bobEpisodes.append(li);
     });
-    ui.bobToggle.addEventListener('click', () => setBob(!app.bob.on, true));
+    function publishRoomActivity(activity) {
+        if (!app.isHost || !app.connected) return;
+        app.watchLayout = activity === 'watch';
+        setBob(activity === 'paint');
+        const url = new URL(win.location.href);
+        if (activity === 'room') url.searchParams.delete('activity');
+        else url.searchParams.set('activity', activity);
+        win.history.replaceState(null, '', url);
+        const v = app.state.video;
+        // Carry the mode in the host-signed, replay-protected state already
+        // included in snapshots. A room with no video still has a mode.
+        void hostPublish(v?.source ?? null, v?.playing ?? false, v ? H.expectedPosition(v, app.clock.relayNow()) : 0);
+    }
+    ui.watchToggle.addEventListener('click', () => publishRoomActivity('watch'));
+    ui.bobToggle.addEventListener('click', () => {
+        publishRoomActivity(app.bob.on ? 'room' : 'paint');
+    });
     ui.bobHold.addEventListener('click', async () => {
         const v = app.state.video;
-        if (!app.isHost || !v) return;
+        if ((!app.isHost && !app.bob.on) || !v) return;
         const pos = player.readyKey === `${v.source.kind}:${v.source.id}` ? localTime() : H.expectedPosition(v, app.clock.relayNow());
-        if (await hostPublish(v.source, !v.playing, pos)) {
-            await syncToState(true);
+        if (await publishVideoIntent(v.source, !v.playing, pos)) {
+            if (app.isHost) await syncToState(true);
             say(v.playing ? 'Paused for everyone. Beat the devil out of that brush.' : 'Back to painting.');
         }
     });
     ui.bobRewind.addEventListener('click', async () => {
         const v = app.state.video;
-        if (!app.isHost || !v) return;
+        if ((!app.isHost && !app.bob.on) || !v) return;
         const current = player.readyKey === `${v.source.kind}:${v.source.id}` ? localTime() : H.expectedPosition(v, app.clock.relayNow());
-        if (await hostPublish(v.source, v.playing, Math.max(0, current - 15))) {
-            await syncToState(true);
+        if (await publishVideoIntent(v.source, v.playing, Math.max(0, current - 15))) {
+            if (app.isHost) await syncToState(true);
             say('Rewound 15 seconds for everyone.');
         }
     });

@@ -1,0 +1,108 @@
+{
+  "observationUtc": "2026-11-11",
+  "website": {
+    "pr": 259,
+    "merge": "02891edb6875e5256620fd0638355f906d8f6f69",
+    "testedTree": "13ed8d9e49103ab2ae05ed11ce7d164f165e381a",
+    "runs": [
+      42927427386,
+      42927459868
+    ],
+    "perRun": {
+      "unit": 2110,
+      "browser": 904,
+      "root": 34,
+      "project": 34
+    }
+  },
+  "upstream": {
+    "pr": 470,
+    "merge": "f539f58ce69fed02af16e830bed76be16dd642d1",
+    "browserRun": 42926600241,
+    "browserCases": 79
+  },
+  "privateDelivery": {
+    "siteVersion": "e12b3fa5-fdea-4a48-9de6-b6b8a44e2e39",
+    "deployment": "119276a8-9735-448d-82ba-75f52d2430dc",
+    "immediateRollback": "31f8271c-27d9-4d52-ab33-23884c79bae9",
+    "originalRollback": "2c5c81e5-1aa4-4ea7-be69-cacda13c20e8",
+    "issuerVersion": "fd37578f-13cd-4fce-b557-35c0d962ef9d",
+    "backendSource": "c83dfaff1fe924ea0a70cfc902731234113f0c09",
+    "workerSha256": "9fefc1a13eaecb138be633e85d19039c15969f7066b7e71b6123636858493b78",
+    "all28BindingsAndOperationalSettingsVerified": true,
+    "anonymousAccessBoundariesUnchanged": true,
+    "publicEntrancesChanged": false,
+    "servedFilesVerified": 33,
+    "changedFiles": [
+      "join/PROVENANCE.json",
+      "join/app.js",
+      "join/errors.js",
+      "join/index.html"
+    ],
+    "isolatedGuestSessionClosed": true
+  },
+  "deployedChrome": {
+    "privateAdmissionGateObserved": true,
+    "timedExpiryObserved": false
+  },
+  "loopbackPreview": {
+    "scope": "Staged website bytes with offline fixture",
+    "desktopChromeWidths": [
+      375,
+      390
+    ],
+    "replacementFixtureReopenedAudioSetup": true,
+    "headlessChromiumScreenshots": [
+      {
+        "width": 375,
+        "scrollWidth": 375,
+        "focused": "status",
+        "captureCalls": 0,
+        "externalRequests": 0,
+        "file": "expired-invite-375.png",
+        "sha256": "6b46244ca1c52059d2943e891739c585a3730752677c63fe1d27ae505cf4f655"
+      },
+      {
+        "width": 390,
+        "scrollWidth": 390,
+        "focused": "status",
+        "captureCalls": 0,
+        "externalRequests": 0,
+        "file": "expired-invite-390.png",
+        "sha256": "fe622052e408ca914c20ffb72aaadb6b1f8253e53fd7ddbdc3ee14772ea383e7"
+      }
+    ]
+  },
+  "desktop": {
+    "source": "ae49c915070f2951db9ff441c23c7f0a9d90ce1b",
+    "miniShortcutSelectsVerifiedPackageAndIdleLaunchQuitPassed": true,
+    "intelShortcutSelectsVerifiedPackage": true,
+    "intelActualStartupPending": true,
+    "originalShortcutObjectsPreserved": true
+  },
+  "sharedTrack": {
+    "sameGeneratedFilesStagedOnBothMacs": true,
+    "durationSeconds": 40,
+    "sampleRate": 48000,
+    "channels": 2,
+    "physicalMixQualified": false
+  },
+  "webex": {
+    "miniSavedLinkValidated": true,
+    "miniAppInstalled": true,
+    "intelSavedLinkPresent": false,
+    "intelStandardApplicationLocationsContainWebex": false,
+    "meetingOrMediaQualified": false
+  },
+  "localCapacity": {
+    "loopbackSocketTiers": [
+      50,
+      150
+    ],
+    "roomsAtLargestTier": 30,
+    "localWorkerdSocketTier": 50,
+    "hostedCapacityQualified": false
+  },
+  "agreementAccepted": false,
+  "liveReplacementAndPhysicalMediaPending": true
+}

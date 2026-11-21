@@ -1,0 +1,46 @@
+{
+  "state": "APPLICATION_REVIEW_CANDIDATE_NOT_DEPLOYED",
+  "preparedAt": "2026-11-07T21:20:40.423858+00:00",
+  "source": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+  "upstreamPr": 452,
+  "dependsOnUpstreamPr": 451,
+  "websiteBaseCandidate": "66909130659ae2574884540bfc7024c5355cb99b",
+  "all13UpstreamAndShippedInputsMatch": true,
+  "licenseUnchanged": true,
+  "all62RequirementsUnchanged": true,
+  "payloads": {
+    "arm-proof.json": "4cbb0f15150b9855b46745dae4dd60daaa4b2a40c878ebf68db059af9a48dab4",
+    "intel-proof.json": "456fa5c5809e0dc231afe3d92013ed4ec97ee61ab24cdebdb5a7c0e5ead3f834",
+    "prior-website-ci.json": "21056983faf6b57dc347e61c8dc94154211077b187acc9831b9af5f291e1d969",
+    "upstream-application-ci.json": "c61b670ae12043e7363b7424565e9bc5a192059061c692162733c5ed933cbb7b",
+    "upstream-browser-ci.json": "93730d5be7434f7a72a84211540a127c7425f895d80793b30748784571a656ac",
+    "windows-proof.json": "8ffef946929075a773c9b9bc673695ceb1f797b822953c9c7cf77cdfe7d9666a"
+  },
+  "actualPrivateVersionUnchangedByPreparation": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "physicalMusicSharedTrackAndOtherAcceptanceRemainPending": true,
+  "finalizedAt": "2026-11-07T21:49:00.373095+00:00",
+  "upstreamReviewedAndMerged": true,
+  "upstreamMerge": "25806b6bcabee1f73c0c0d614f8450cdb61bd12e",
+  "upstreamMergeTreeEqualsHead": true,
+  "parentReviewedAndMerged": true,
+  "parentMerge": "bcc1554ea60cb939564206493f50456996381661",
+  "allThreeUpstreamNormalCiRunsPassed": true,
+  "platformsQualified": {
+    "Intel macOS15.7.9 WebKit27.2": {
+      "units": 40,
+      "focusedBrowserCases": 24
+    },
+    "Apple Silicon macOS15.8.2 WebKit27.2": {
+      "units": 40,
+      "focusedBrowserCases": 24
+    },
+    "Windows11 Chrome156.0.8078.80": {
+      "units": 40,
+      "focusedBrowserCases": 24
+    }
+  },
+  "upstreamNormalBrowserCases": 57,
+  "originalWebsiteCandidateCiPassed": true,
+  "originalWebsiteCandidateCiScope": "6690913 importing parent f5 only; not this combined source",
+  "newExactHeadWebsiteCiStillRequired": true
+}

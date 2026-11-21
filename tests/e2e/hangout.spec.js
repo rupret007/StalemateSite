@@ -1,3 +1,4 @@
+const { expectOrdinaryMediaLabel } = require('./support/ordinary-media-labels');
 // Two real browsers in one hidden room, synced over the local stand-in for the relay Worker.
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
@@ -46,7 +47,9 @@ async function hostAndGuest(browser) {
 }
 
 async function drawLine(page) {
-    const box = await page.locator('[data-canvas]').boundingBox();
+    const canvas = page.locator('[data-canvas]');
+    await canvas.evaluate(element => element.scrollIntoView({ block: 'center' }));
+    const box = await canvas.boundingBox();
     await page.mouse.move(box.x + 40, box.y + 40);
     await page.mouse.down();
     for (let i = 1; i <= 10; i += 1) await page.mouse.move(box.x + 40 + i * 20, box.y + 40 + i * 10);
@@ -506,12 +509,14 @@ test('guest snapshot cannot tamper with video timestamp to skew late joiner play
     await late.fill('[data-name]', 'Pat');
     await late.click('[data-enter]');
     const lateId = await late.evaluate(() => window.__hangout.myId);
+    await expect.poll(() => late.evaluate(() => Boolean(window.__hangout.state.video && window.__hangout.lastVideoSigned))).toBe(true);
     await late.evaluate(() => {
         const app = window.__hangout;
         app.snapshotDone = false;
         app.snapshotFrom = null;
         app.snapshotHasSeqProof = false;
         app.state.video = null;
+        app.lastVideoSigned = null; // Reset the signed cache with the synthetic empty playback state.
     });
     const forgedT = Date.now() - 3_600_000;
     const signedT = await guest.evaluate(async ({ to, forged }) => {
@@ -756,7 +761,7 @@ test('mic-only peer attaches an active media element so remote audio plays', asy
 
     await guest.click('[data-mic]');
     await guest.click('[data-ask-yes]');
-    await expect(host.locator('[data-mic]')).toHaveText('Turn on my mic');
+    await expectOrdinaryMediaLabel(host, 'audio', false);
 
     await expect.poll(() => host.evaluate(() => {
         const v = document.querySelector('[data-tiles] .tile:not([data-tile="me"]) video');
@@ -833,7 +838,7 @@ test('camera and mic are opt-in with a plain explainer, then connect peer to pee
 
     await host.click('[data-cam]');
     await host.click('[data-ask-yes]');
-    await expect(host.locator('[data-cam]')).toHaveText('Turn off my camera');
+    await expectOrdinaryMediaLabel(host, 'video', true);
     const settings = await host.evaluate(() => window.__hangout.av.stream.getVideoTracks()[0].getSettings());
     expect(settings.width).toBeLessThanOrEqual(640);
     expect(settings.frameRate).toBeLessThanOrEqual(24);
@@ -971,47 +976,108 @@ test('crawling every public page from the homepage never reaches the room', asyn
     expect(seen.size).toBeGreaterThan(2);
 });
 
-test('Bob Ross Paint-Along: picker, palette, brushes, pause-for-everyone, catch up and nudge', async ({ browser }) => {
+test('Bob Ross Paint-Along: shared episodes, real canvas camera, pause, seek and late sync', async ({ browser }) => {
     const { host, guest } = await hostAndGuest(browser);
     await expect(host.locator('[data-bob]')).toBeHidden();
     await host.click('[data-bob-toggle]');
+    if (await host.locator('[data-ask-no]').isVisible()) await host.click('[data-ask-no]');
     await expect(host.locator('[data-bob-episodes] .ep')).toHaveCount(12);
+    await host.locator('[data-more]').click();
+    await host.getByRole('button', { name: 'Draw on the shared canvas', exact: true }).click();
     await expect(host.locator('[data-bob-palette] .swatch')).toHaveCount(12);
-    await expect(host.locator('[data-bob-palette] [aria-label="Phthalo Blue"]')).toBeVisible();
-    await expect(guest.locator('[data-bob-episodes]')).toBeHidden();
+    await expect(host.locator('[data-bob-palette]').getByRole('button', { name: 'Phthalo Blue', exact: true })).toBeVisible();
+    await expect(host.locator('.draw')).toBeHidden();
+    await host.getByRole('button', { name: 'Close drawing', exact: true }).click();
 
     // Picking an episode loads it for everyone and flips guests into Bob mode.
     await host.click('[data-bob-ep="uj5FE70BcB0"]');
     await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-video-id', 'uj5FE70BcB0');
     await expect(guest.locator('body')).toHaveClass(/bob-mode/);
+    if (await guest.locator('[data-ask-no]').isVisible()) await guest.click('[data-ask-no]');
     await expect(guest.locator('[data-bob-now]')).toContainText('Waterside Way · S8 E4');
-    await expect(guest.locator('[data-bob-hold]')).toBeHidden();
+    await expect(guest.locator('[data-bob-hold]')).toBeVisible();
     await expect(guest.locator('[data-bob-catchup]')).toBeVisible();
 
-    // Painting in Van Dyke Brown with the fan brush syncs across.
+    await guest.locator('[data-more]').click();
+    await guest.getByRole('button', { name: 'Draw on the shared canvas', exact: true }).click();
     await guest.click('[data-bob-palette] [aria-label="Van Dyke Brown"]');
-    await guest.click('[data-bob-brushes] .brush:has-text("Fan brush")');
+    await guest.locator('[data-bob-brushes] .brush', { hasText: 'Fan brush' }).click();
     await drawLine(guest);
-    await expect.poll(() => host.evaluate(() => window.__hangout.state.strokes.map((s) => `${s.color}/${s.size}`))).toContain('#221b15/16');
+    await expect.poll(() => host.evaluate(() => window.__hangout.state.strokes.map(stroke => `${stroke.color}/${stroke.size}`)))
+        .toContain('#221b15/16');
+    await guest.getByRole('button', { name: 'Close drawing', exact: true }).click();
 
-    // Guest nudges, host pauses for everyone, then resumes.
     await guest.click('[data-bob-nudge]');
     await expect(host.locator('[data-status]')).toContainText('needs a sec');
-    await host.click('[data-bob-hold]');
-    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
-    await expect(host.locator('[data-bob-hold]')).toHaveText('Back to painting');
-    await host.click('[data-bob-hold]');
-    await expect(guest.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
 
-    // A guest who wanders off can catch up to the host in one tap.
-    await guest.evaluate(() => { window.__ytLog[0].seekTo(400); });
-    await guest.click('[data-bob-catchup]');
+    // Any participant can pause and resume the shared player.
+    await guest.click('[data-bob-hold]');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
+    await expect(guest.locator('[data-bob-now]')).toContainText('Paused by');
+    await guest.click('[data-bob-hold]');
+    await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'playing');
+
+    const catchUp = guest.getByRole('button', { name: 'Catch me up', exact: true });
+    // Displace the local player at click time so periodic sync can't fix it first.
+    await catchUp.evaluate(button => button.addEventListener('click', () => {
+        const localPlayer = window.__ytLog[0];
+        localPlayer.seekTo(400);
+        button.dataset.beforeCatchUp = String(localPlayer.getCurrentTime());
+    }, { capture: true, once: true }));
+    await catchUp.click();
+    expect(Number(await catchUp.getAttribute('data-before-catch-up'))).toBeGreaterThanOrEqual(400);
+    await expect(guest.locator('[data-status]')).toHaveText('Caught up with the host.');
     await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(30);
 
-    // Host rewinds 15s for everyone.
-    await host.evaluate(() => window.__ytLog[0].seekTo(100));
-    await host.click('[data-bob-rewind]');
+    // A guest's seek is shared immediately with everyone in Paint Along.
+    await guest.evaluate(() => { window.__ytLog[0].seekTo(400); });
+    await expect.poll(() => host.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeGreaterThan(395);
+
+    // Any participant can rewind for the room.
+    await guest.evaluate(() => window.__ytLog[0].seekTo(100));
+    await expect.poll(() => host.evaluate(() => {
+        const position = window.__ytLog[0].getCurrentTime();
+        return position >= 100 && position < 110;
+    })).toBe(true);
+    await guest.click('[data-bob-rewind]');
     await expect.poll(() => guest.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(95);
+    await expect.poll(() => host.evaluate(() => window.__ytLog[0].getCurrentTime())).toBeLessThan(95);
+
+    await guest.locator('[data-more]').click();
+    await guest.getByRole('button', { name: 'Draw on the shared canvas', exact: true }).click();
+    const drawing = guest.getByRole('dialog', { name: 'Draw on the shared canvas', exact: true });
+    await expect(drawing).toBeVisible();
+    await guest.evaluate(() => window.__hangout.ws.close(4401));
+    await expect(drawing).toBeHidden();
+    const terminalStatus = guest.locator('[data-gate-status]');
+    await expect(terminalStatus).toContainText('Your private invitation or sign-in expired');
+    await expect(terminalStatus).toBeFocused();
+});
+
+test('both participants see a live remote tile in Hang Out and Paint Along phone layout stays separated', async ({ browser }) => {
+    const { host, guest } = await hostAndGuest(browser);
+    for (const page of [host, guest]) {
+        await page.click('[data-cam]');
+        if (await page.locator('[data-ask-yes]').isVisible()) await page.click('[data-ask-yes]');
+    }
+    const remoteWidth = page => page.evaluate(() => [...document.querySelectorAll('[data-tiles] .tile video')]
+        .find(video => video.closest('[data-tile]')?.dataset.tile !== 'me')?.videoWidth || 0);
+    await expect.poll(() => remoteWidth(host), { timeout: 15000 }).toBeGreaterThan(0);
+    await expect.poll(() => remoteWidth(guest), { timeout: 15000 }).toBeGreaterThan(0);
+
+    await host.setViewportSize({ width: 390, height: 844 });
+    await guest.setViewportSize({ width: 390, height: 844 });
+    await host.click('[data-bob-toggle]');
+    await expect(host.locator('body')).toHaveClass(/bob-mode/);
+    const boxes = await host.evaluate(() => ['.screen', '[data-tiles]', '.callbar', '[data-chat-details]']
+        .map(selector => ({ selector, box: document.querySelector(selector)?.getBoundingClientRect().toJSON() }))
+        .filter(item => item.box && item.box.width && item.box.height));
+    const overlap = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+    for (let i = 0; i < boxes.length; i += 1) for (let j = i + 1; j < boxes.length; j += 1) {
+        expect(overlap(boxes[i].box, boxes[j].box), `${boxes[i].selector} overlaps ${boxes[j].selector}`).toBe(false);
+    }
+    await expect.poll(() => remoteWidth(host), { timeout: 15000 }).toBeGreaterThan(0);
+    await expect.poll(() => remoteWidth(guest), { timeout: 15000 }).toBeGreaterThan(0);
 });
 
 test('show your real canvas: opt-in, rectangular tile for everyone, still capped', async ({ browser }) => {

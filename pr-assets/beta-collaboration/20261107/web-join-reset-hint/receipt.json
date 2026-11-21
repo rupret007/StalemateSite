@@ -1,0 +1,38 @@
+{
+  "applicationBase": "981b88dce3b579b8d0fedae4daf4095177817a26",
+  "upstream": "e735a048de82e26c424e31964a30f1dfbd548df9",
+  "upstreamPR": "https://github.com/rupret007/webjam/pull/449",
+  "importedRuntimeFilesChanged": [
+    "errors.js",
+    "mailbox.js"
+  ],
+  "all13FilesMatchUpstream": true,
+  "assetUnitChecksPassed": 3,
+  "browserChecksPassed": 8,
+  "browserProjects": [
+    "chromium",
+    "webkit-community"
+  ],
+  "widths": [
+    375,
+    390
+  ],
+  "browserRetries": 0,
+  "parentNegativeFailsAtMissingHint": true,
+  "providerResponses": "mocked 503 then 429 cap, with and without a 60-second Retry-After hint",
+  "physicalCapture": false,
+  "liveProviderCalls": false,
+  "quotaChanges": false,
+  "privateDeploymentChanged": false,
+  "publicSitesChanged": false,
+  "fullMusicAcceptance": false,
+  "screenshotsVisuallyInspected": true,
+  "screenshots": {
+    "chromium-375.png": "6fb5e55b9947deda8590c4624799251dc1150fdf67ec8e85707dac7b8c47d9e0",
+    "webkit-390.png": "ca9a94e889158c0aff4289fc078b8ab91eae861960dc7e99392744b0938895b9"
+  },
+  "runtimeSha256": {
+    "errors.js": "e20c4eb68da2f22991cc25ed3d8fb94756a71aaf9222e9a6834916e362a8f3f6",
+    "mailbox.js": "b419f8d69c2f57a6668a9c05b638780a0d3c4e68fff03f3fbc3f48709c387cb2"
+  }
+}

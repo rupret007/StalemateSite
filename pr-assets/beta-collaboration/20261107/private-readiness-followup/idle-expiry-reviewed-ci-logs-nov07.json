@@ -1,0 +1,62 @@
+{
+  "state": "ALL_FOUR_EXACT_HEAD_RUNS_LOGS_REVIEWED",
+  "head": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "base": "32d3cdb5571e5c3d1e06eb99dde214ff6b282c89",
+  "pr": 232,
+  "runs": [
+    {
+      "run": 42391463329,
+      "job": 128459747155,
+      "event": "pull_request",
+      "id": 128459747155,
+      "chars": 335825,
+      "summary": [
+        "2026-11-07T16:32:45.8638384Z  Test Files  137 passed (137)",
+        "2026-11-07T16:32:45.8651538Z       Tests  2074 passed (2074)",
+        "2026-11-07T17:07:33.3484660Z   813 passed (34.8m)",
+        "2026-11-07T17:09:07.1095657Z   34 passed (1.5m)",
+        "2026-11-07T17:10:39.6759570Z   34 passed (1.5m)"
+      ],
+      "failures": [],
+      "unitFilesPassed": 137,
+      "unitTestsPassed": 2074,
+      "browserTestsPassed": 813,
+      "rootSmokePassed": 34,
+      "projectSmokePassed": 34,
+      "noReportedRetryOrFlakySummary": true
+    },
+    {
+      "run": 42391424444,
+      "job": 128459633541,
+      "event": "push",
+      "id": 128459633541,
+      "chars": 336909,
+      "summary": [
+        "2026-11-07T16:32:22.5614797Z  Test Files  137 passed (137)",
+        "2026-11-07T16:32:22.5628891Z       Tests  2074 passed (2074)",
+        "2026-11-07T17:07:34.2067912Z   813 passed (35.2m)",
+        "2026-11-07T17:09:08.2930476Z   34 passed (1.5m)",
+        "2026-11-07T17:10:41.4072036Z   34 passed (1.5m)"
+      ],
+      "failures": [],
+      "unitFilesPassed": 137,
+      "unitTestsPassed": 2074,
+      "browserTestsPassed": 813,
+      "rootSmokePassed": 34,
+      "projectSmokePassed": 34,
+      "noReportedRetryOrFlakySummary": true
+    }
+  ],
+  "nativeLocalJobIds": [
+    128459747116,
+    128459633522
+  ],
+  "nativeLocalRuns": [
+    42391463294,
+    42391424436
+  ],
+  "nativeLocalLogsReviewed": true,
+  "nativeScope": "Actual local workerd fixtures, including zero-network provider-start callback boundary; external provider activation and requested frozen native-provider CI qualification are not established.",
+  "originalFullEightHourFailureUnchanged": true,
+  "storyPoolOrKarenUsed": false
+}

@@ -305,6 +305,100 @@ export function rectInsideViewport(rect, viewportWidth, viewportHeight, epsilon 
   );
 }
 
+function tablePlayMountTarget(doc) {
+  const win = doc.defaultView;
+  if (!win) {
+    return null;
+  }
+  if (win.innerWidth > 760) {
+    return null;
+  }
+  const pit = doc.getElementById('mobilePit');
+  if (pit && win.getComputedStyle(pit).display !== 'none') {
+    if (pit.id === 'mobilePit' && !doc.body.classList.contains('jack-table-first')) {
+      return null;
+    }
+    return { parent: pit, slotClass: 'suite-a11y-pit-slot' };
+  }
+  if (!pit) {
+    const dock = doc.querySelector('section.table .action-dock, .table .action-dock');
+    if (dock) {
+      return { parent: dock, slotClass: 'suite-a11y-table-dock-slot' };
+    }
+  }
+  return null;
+}
+
+function ensureMountSlot(doc, target) {
+  let slot = target.parent.querySelector(`:scope > #suite-arcade-a11y-mount, :scope > .${target.slotClass}`);
+  if (!slot) {
+    slot = doc.createElement('div');
+    slot.className = target.slotClass;
+    target.parent.insertBefore(slot, target.parent.firstChild);
+  }
+  const previous = doc.getElementById('suite-arcade-a11y-mount');
+  if (previous && previous !== slot) { previous.removeAttribute('id'); }
+  slot.id = 'suite-arcade-a11y-mount';
+  return slot;
+}
+
+/**
+ * Moves the colorblind toggle into the sticky mobile pit / table dock when that chrome is active.
+ * @param {Document} doc
+ */
+export function syncArcadeA11yMount(doc) {
+  if (!doc?.body || isSuiteHubPage(doc)) {
+    return null;
+  }
+  const toggle = doc.getElementById('suite-arcade-a11y-toggle');
+  const tableTarget = tablePlayMountTarget(doc);
+  if (tableTarget) {
+    const slot = ensureMountSlot(doc, tableTarget);
+    if (toggle && toggle.parentElement !== slot) {
+      slot.appendChild(toggle);
+      toggle.className = 'suite-arcade-a11y-toggle suite-arcade-a11y-toggle--inline';
+    }
+    const bodySlot = doc.querySelector('body > .suite-a11y-body-slot');
+    if (bodySlot && bodySlot !== slot && bodySlot.childElementCount === 0) {
+      bodySlot.remove();
+    }
+    return slot;
+  }
+  if (!toggle) {
+    return ensureArcadeA11yMount(doc);
+  }
+  const header = doc.querySelector('.suite-a11y-header-slot');
+  if (header) {
+    const previous = doc.getElementById('suite-arcade-a11y-mount');
+    if (previous && previous !== header) { previous.removeAttribute('id'); }
+    header.id = 'suite-arcade-a11y-mount';
+    if (toggle.parentElement !== header) {
+      header.appendChild(toggle);
+      toggle.className = 'suite-arcade-a11y-toggle suite-arcade-a11y-toggle--inline';
+    }
+    if (previous?.matches('.suite-a11y-pit-slot, .suite-a11y-body-slot') && !previous.childElementCount) {
+      previous.remove();
+    }
+    return header;
+  }
+  let bodySlot = doc.querySelector('body > .suite-a11y-body-slot');
+  if (!bodySlot) {
+    bodySlot = doc.createElement('div');
+    bodySlot.id = 'suite-arcade-a11y-mount';
+    bodySlot.className = 'suite-a11y-play-shell-slot suite-a11y-body-slot';
+    doc.body.appendChild(bodySlot);
+  }
+  if (toggle.parentElement !== bodySlot) {
+    bodySlot.appendChild(toggle);
+    toggle.className = 'suite-arcade-a11y-toggle suite-arcade-a11y-toggle--floating';
+  }
+  const pitSlot = doc.querySelector('.suite-a11y-pit-slot, .suite-a11y-table-dock-slot');
+  if (pitSlot && pitSlot !== bodySlot && pitSlot.childElementCount === 0) {
+    pitSlot.remove();
+  }
+  return bodySlot;
+}
+
 function resolveA11yToggleMount(doc) {
   if (isSuiteHubPage(doc)) {
     return null;
@@ -398,6 +492,10 @@ export function ensureArcadeA11yMount(doc) {
         topbar.appendChild(slot);
       }
       return slot;
+    }
+    const tableTarget = tablePlayMountTarget(doc);
+    if (tableTarget) {
+      return ensureMountSlot(doc, tableTarget);
     }
     // Bottom-right body mount: stays in the viewport (topbar scrolls on tall table pages).
     const slot = doc.createElement('div');

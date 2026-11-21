@@ -11,7 +11,7 @@
             onReady(event) {
                 if (number === 1 && window.__ytLoaderFailure === 'never-ready') return;
                 if (number === 1 && window.__ytLoaderFailure === 'provider-error') {
-                    events.onError?.({ target: event.target, data: 100 });
+                    events.onError?.({ target: event.target, data: window.__ytLoaderErrorCode ?? 100 });
                     return;
                 }
                 if (number === 2 && window.__ytLoaderFailure === 'hold-second-ready') {
@@ -26,6 +26,7 @@
                 events.onReady?.(event);
             }
         } });
+        control.failCurrent = code => events.onError?.({ target: player, data: code });
         // The genuine API supports destroy(); this opt-in fixture preserves a
         // target for the next real construction after failure/timeout cleanup.
         const id = typeof node === 'string' ? node : node.id;

@@ -1,0 +1,11 @@
+{
+  "state": "OLD_OWNED_90MIN_ASSERTION_STOPPED_NEW_BOUNDED_REPAIR_OBSERVER_OWNS_AWAKE",
+  "oldPid": 55579,
+  "newObserverPid": 55905,
+  "newAwakePid": 55906,
+  "newAwakeBoundedSeconds": 29400,
+  "onlyExactOldOwnedCommandStopped": true,
+  "systemPowerPreferencesChanged": false,
+  "originalExpiryProofChanged": false,
+  "completedAt": "2026-11-07T17:19:02.866235+00:00"
+}

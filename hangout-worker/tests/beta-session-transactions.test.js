@@ -1,6 +1,7 @@
 // @vitest-environment node
 // Real lifecycle entrypoints over a serial, rollback-capable storage fixture.
 // This does not qualify Cloudflare transaction retries or deployed migration.
+import { GAME_NIGHT_IDLE, GAME_NIGHT_LENGTH } from '../src/game-night-lifetime.mjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BetaSessions, BETA_MINT_PER_IP_HOUR, BETA_SESSION_ROOM_LIMIT } from '../src/beta-sessions.mjs';
 import { BETA_TTL, betaSession } from '../src/beta-auth.mjs';
@@ -123,6 +124,24 @@ describe('transactional beta lifecycle through existing endpoints', () => {
         expect(Object.values(h.state.snapshot().get('mint-rates'))).toEqual([{ count: 1, until: Date.now() + 3600000 }]);
         const cookie = retry.headers.get('Set-Cookie').split(';')[0];
         expect((await betaSession(new Request(`${ORIGIN}/beta/state`, { headers: { Cookie: cookie } }), h.env)).access.sid).toBeTruthy();
+    });
+
+    it('enforces Game Night idle and hard expiry on the legacy registry path', async () => {
+        const h = harness();
+        const at = Date.now();
+        const ordinary = { exp: at + GAME_NIGHT_LENGTH, iph: IPH };
+        expect((await h.operation('register', ordinary)).status).toBe(403);
+        const guest = { ...ordinary, gameNight: true };
+        expect((await h.operation('register', guest)).status).toBe(200);
+        expect((await h.operation('room', { ...guest, room: 'other-room' })).status).toBe(403);
+
+        vi.setSystemTime(at + GAME_NIGHT_IDLE - 1);
+        expect((await h.operation('game-night-activity', guest)).status).toBe(200);
+        vi.setSystemTime(at + 2 * GAME_NIGHT_IDLE - 2);
+        expect((await h.operation('check', guest)).status).toBe(200);
+        vi.setSystemTime(at + 2 * GAME_NIGHT_IDLE - 1);
+        expect((await h.operation('check', guest)).status).toBe(403);
+        expect((await h.operation('game-night-activity', guest)).status).toBe(403);
     });
 
     it('rolls back the session and mint allowance when scheduling registration fails', async () => {

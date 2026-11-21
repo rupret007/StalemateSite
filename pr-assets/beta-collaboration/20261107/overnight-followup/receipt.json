@@ -1,0 +1,61 @@
+{
+  "websiteSource": "b35e5fcf5904eb99e17de653ddd2234e553bbada",
+  "websiteVersion": "33862058-10a5-4a6f-9659-38841d70292f",
+  "browser": "WebKit27.2 on Intel macOS",
+  "ordinaryWorkloadGuests": 9,
+  "rooms": 3,
+  "membersPerRoom": 3,
+  "messages": 36,
+  "expectedAndObservedDeliveries": 108,
+  "duplicates": 0,
+  "crossRoomDeliveries": 0,
+  "copiedCookiesDeniedAfterLogout": 9,
+  "keyboardChord": "Option-Tab; plain Tab failure preserved",
+  "viewports": [
+    [
+      375,
+      844
+    ],
+    [
+      390,
+      844
+    ],
+    [
+      640,
+      512
+    ],
+    [
+      320,
+      256
+    ]
+  ],
+  "visuallyInspectedScreenshots": [
+    [
+      375,
+      844
+    ],
+    [
+      320,
+      256
+    ]
+  ],
+  "noPhysicalCapture": true,
+  "noProviderCredentials": true,
+  "noNewCapacityClaim": true,
+  "controllerSummaryFailurePreserved": true,
+  "eightHourObserverStillPending": true,
+  "files": {
+    "hosted-keyboard-reflow-nov07.json": "9bae75522498b9c37a9018157e19d8d98ebbb2f22cea7a1e00540ade68624c53",
+    "hosted-keyboard-reflow-attempt2-nov07.json": "545b2bde592867b35d85da51391a2eda26c39cc3dc7a4072650f583727be1e77",
+    "hosted-keyboard-reflow-option-tab-nov07.json": "fe529c9089e4f8b797217a12bf02e9bd19d2640d2b900a7ab8f075c250cb5338",
+    "hosted-three-room-workload-nov07.json": "80e07a12080009bdfb0f83ac6661c013c7dcde52a0527af11b4700166766f051",
+    "hosted-three-room-workload-controller-nov07.json": "6e37b82d5c8302ae50811f02242a2ea2f399cd8b2a90354b660a020a4904c495",
+    "keyboard-reflow-375x844-nov07.png": "f5410fc39242f6eaec98755cb8f65924df4a4060716581bbeb8293167f98449f",
+    "keyboard-reflow-390x844-nov07.png": "cb666602cd1e6c894d0629255a2049ac69188a4b727094da2ccb6a4e57639a5d",
+    "keyboard-reflow-640x512-nov07.png": "d593997c0b6d820e74d42ececb5541173fbd6d889e08faadd27bc1df16b53b9a",
+    "keyboard-reflow-320x256-nov07.png": "ac22a078f640609ab9b8e7aa05daefce78da7d0e19e9e47182ca1d942b71d185",
+    "official-driver-system-download.json": "17cf61dc54f784de33da262143600cd6bda517ec0cb99cbe05c63a650bd7284f",
+    "shared-track-file-prepared.json": "4ac0b0562b4d561863a463458f80b136a52fb1faffeeb32b7723b8551d3d4519",
+    "official-driver-staged.json": "cc9304ee2b088eb405564984f762abf01bc921f964853d71f921e18df544ca4f"
+  }
+}

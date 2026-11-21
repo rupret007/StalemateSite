@@ -1,0 +1,19 @@
+{
+  "encoder": {
+    "package": "qrcode-generator",
+    "version": "1.4.4",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/qrcode-generator/-/qrcode-generator-1.4.4.tgz",
+    "tarballIntegrity": "sha512-HM7yY8O2ilqhmULxGMpcHSF1EhJJ9yBj8gvDEuZ6M+KGJ0YY2hKpnXvRD+hZPLrDVck3ExIGhmPtSdcjC+guuw==",
+    "unmodifiedPrefixBytes": 56694,
+    "upstreamSourceSha256": "18ae399f81182bc9de916e9c77b195df20cc58d6f2d55a62b085a299f1bf1780",
+    "shippedSha256": "ab9e2f8092c32a5a3887444915ec019291e4d1713783a551e134ee062e2d29d0",
+    "changes": "Full upstream MIT notice appended; first-party canvas wrapper adds 4-module quiet zone, integer scaling, no bearer DOM attribute."
+  },
+  "decoder": {
+    "package": "jsqr",
+    "version": "1.4.0",
+    "license": "Apache-2.0",
+    "scope": "test-only devDependency; not shipped to visitors"
+  }
+}

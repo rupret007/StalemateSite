@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -282,6 +282,135 @@ describe('strict representation, physical corruption and resource ceilings', () 
             await tx.put(key, { v: 1, bytes: bytes.byteLength, chunks: 1, sha256: sha(bytes) });
         });
         await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+    });
+
+    it.each([
+        ['numeric alias', '{"n":1.0}'],
+        ['exponent alias', '{"n":1e0}'],
+        ['escaped Unicode alias', '{"s":"\\u0061"}'],
+        ['escaped slash alias', '{"s":"a\\/b"}'],
+        ['integer-key ordering alias', '{"2":2,"1":1}'],
+        ['negative zero', '{"n":-0}'],
+        ['duplicate keys', '{"a":1,"a":1}']
+    ])('canonical-byte validation rejects %s with an authentic raw hash', async (_name, json) => {
+        const f = await fixture(); await write(f, 'record', null);
+        const key = manifestKey(f, 'record'), bytes = enc.encode(json);
+        expect(() => JSON.parse(json)).not.toThrow();
+        await f.driver.transaction(async tx => {
+            await tx.put(partKey(key, 0), bytes);
+            await tx.put(key, { v: 1, bytes: bytes.byteLength, chunks: 1, sha256: sha(bytes) });
+        });
+        const before = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+    });
+
+    it('canonical-byte validation retains one fresh integrity digest per read and detached aliases', async () => {
+        const f = await fixture(), shared = { text: 'é🎸', value: [1, true, null] };
+        await write(f, 'record', { left: shared, right: shared });
+        const before = physicalSnapshot(f.driver), spy = vi.spyOn(crypto.subtle, 'digest');
+        const first = await read(f, 'record');
+        expect(spy).toHaveBeenCalledTimes(1);
+        first.left.value.push('local');
+        expect(first.right.value).toEqual([1, true, null]);
+        const second = await read(f, 'record');
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(second).toEqual({ left: shared, right: shared });
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+        const key = manifestKey(f, 'record');
+        await f.driver.transaction(async tx => {
+            const bytes = await tx.get(partKey(key, 0));
+            const offset = bytes.indexOf('1'.charCodeAt(0)); expect(offset).toBeGreaterThan(0);
+            bytes[offset] = '2'.charCodeAt(0); // Still valid canonical JSON, but not the committed hash.
+            await tx.put(partKey(key, 0), bytes);
+        });
+        const corrupt = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(spy).toHaveBeenCalledTimes(3);
+        expect(physicalSnapshot(f.driver)).toEqual(corrupt);
+    });
+
+    it('canonical-byte validation rejects fresh canonical corruption against the stored raw digest', async () => {
+        const f = await fixture(); await write(f, 'record', { value: 1 });
+        expect(await read(f, 'record')).toEqual({ value: 1 });
+        const key = manifestKey(f, 'record');
+        await f.driver.transaction(tx => tx.put(partKey(key, 0), enc.encode('{"value":2}')));
+        const before = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+    });
+
+    it.each([1, 2, 3, 4, 5, 8, 9])('bounded final-page probe preserves valid and extra-part checks at %i chunks', async chunks => {
+        const f = await fixture(), value = 'x'.repeat((chunks - 1) * DURABLE_RECORD_CEILINGS.chunkBytes + 7);
+        await write(f, 'record', value); const key = manifestKey(f, 'record');
+        expect(f.driver.rows().get(key).chunks).toBe(chunks);
+        f.driver.resetOperations(); expect(await read(f, 'record')).toBe(value);
+        const lists = f.driver.stats.operations.filter(event => event.name === 'list');
+        expect(lists).toHaveLength(Math.ceil(chunks / 4) + (chunks % 4 === 0 ? 1 : 0));
+        expect(lists.every(event => event.value.limit >= 1 && event.value.limit <= 4)).toBe(true);
+        // Include a gap: an orphan beyond the expected adjacent key is still refused.
+        await f.driver.transaction(tx => tx.put(partKey(key, chunks + 2), new Uint8Array([1])));
+        const before = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+    });
+
+    it.each([1, 3, 4, 5, 8, 9])('bounded final-page probe refuses missing or malformed last part at %i chunks', async chunks => {
+        const f = await fixture(), value = 'x'.repeat((chunks - 1) * DURABLE_RECORD_CEILINGS.chunkBytes + 7);
+        await write(f, 'record', value); const key = manifestKey(f, 'record'), last = partKey(key, chunks - 1);
+        const original = f.driver.rows().get(last);
+        await f.driver.transaction(tx => tx.delete(last));
+        const missing = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(missing);
+        await f.driver.transaction(tx => tx.put(last, [...original]));
+        const malformed = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(malformed);
+    });
+
+    for (const chunks of [3, 4, 5, 8]) it.each(['not-map', 'extra-row', 'foreign-key', 'missing-row'])
+    ('bounded final-page probe poisons malformed page %s at ' + chunks + ' chunks', async fault => {
+        const f = await fixture(); await write(f, 'record', 'x'.repeat((chunks - 1) * 65536 + 7));
+        const key = manifestKey(f, 'record'), prefix = key.replace(':manifest:', ':part:') + ':';
+        const before = physicalSnapshot(f.driver);
+        const storage = { transaction: callback => f.driver.transaction(raw => callback({ ...raw, list: async options => {
+            const result = await raw.list(options);
+            if (options.prefix !== prefix || options.startAfter !== (chunks > 4 ? partKey(key, 3) : undefined)) return result;
+            if (fault === 'not-map') return [...result];
+            if (fault === 'extra-row') return new Map([...result, [partKey(key, chunks + 3), new Uint8Array([1])]]);
+            if (fault === 'foreign-key') return new Map([...result].map(([name, value], i) => [i ? name : 'foreign:part:0000', value]));
+            return new Map([...result].slice(1));
+        } })) };
+        const store = createDurableRecordStorage({ storage, namespace: 'disk-test', maxRecordBytes: 1024 * 1024 });
+        await expect(store.transaction(async tx => {
+            await tx.put('will-rollback', true);
+            try { await tx.get('record'); } catch { /* corruption must poison the transaction */ }
+        })).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+    });
+
+    it.each([4, 8])('bounded final-page probe rejects orphan after an exact full page of %i chunks', async chunks => {
+        const f = await fixture(); await write(f, 'record', 'x'.repeat((chunks - 1) * 65536 + 7));
+        const key = manifestKey(f, 'record');
+        await f.driver.transaction(tx => tx.put(partKey(key, chunks + 2), new Uint8Array([1])));
+        const before = physicalSnapshot(f.driver);
+        await expect(read(f, 'record')).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
+    });
+
+    it.each([3, 4, 8])('bounded final-page probe rejects reordered final chunks for %i chunks', async chunks => {
+        const f = await fixture(); await write(f, 'record', 'x'.repeat((chunks - 1) * 65536 + 7));
+        const key = manifestKey(f, 'record'), prefix = key.replace(':manifest:', ':part:') + ':';
+        const before = physicalSnapshot(f.driver);
+        const storage = { transaction: callback => f.driver.transaction(raw => callback({ ...raw, list: async options => {
+            const result = await raw.list(options);
+            return options.prefix === prefix && options.startAfter === (chunks > 4 ? partKey(key, 3) : undefined)
+                ? new Map([...result].reverse()) : result;
+        } })) };
+        const store = createDurableRecordStorage({ storage, namespace: 'disk-test', maxRecordBytes: 1024 * 1024 });
+        await expect(store.transaction(tx => tx.get('record'))).rejects.toThrow('storage-corrupt');
+        expect(physicalSnapshot(f.driver)).toEqual(before);
     });
 
     it('bounds aggregate transaction writes at 16 MiB and rolls back two accepted 8 MiB records', async () => {

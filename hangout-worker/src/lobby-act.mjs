@@ -36,11 +36,19 @@ export function applyClear(chan) {
     return true;
 }
 
-export function applyVideo(chan, body, relayNow) {
+export function sameVideoSource(current, requested) {
+    const next = H.cleanSource(requested);
+    const previous = H.cleanSource(current);
+    return !!(next && previous && next.kind === previous.kind && next.id === previous.id);
+}
+
+export function applyVideo(chan, body, relayNow, by = '') {
     if (!VIDEO_KINDS.has(chan.kind)) return null;
     const state = { strokes: [], chat: [], video: chan.act.video };
     if (H.apply(state, { type: 'video', source: body && body.source, playing: body && body.playing, pos: body && body.pos }, { t: relayNow }) !== 'video') return null;
-    chan.act.video = state.video;
+    const requestedRate = Number(body.rate);
+    chan.act.video = { ...state.video, rate: Number.isFinite(requestedRate) ? Math.min(2, Math.max(0.25, requestedRate)) : 1,
+        updatedAt: relayNow, seq: (chan.act.video?.seq || 0) + 1, by };
     return chan.act.video;
 }
 

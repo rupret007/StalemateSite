@@ -1,0 +1,54 @@
+{
+  "startedAt": "2026-11-07T04:12:23.782Z",
+  "source": "b61bb416d7af39d2fe3a41529ddd65520e5305ca",
+  "version": "75655a50-9e13-4966-bb68-22b45a230c1d",
+  "scope": "Nine independent Chromium guest contexts on one Mac and one normal Internet connection. Eight-seat invite-only room, four rounds of chat, no physical media or load beyond this tier.",
+  "rounds": 4,
+  "guestsInRoom": 8,
+  "captureRequests": 0,
+  "logout": [
+    200,
+    200,
+    200
+  ],
+  "stateAfterLogout": [
+    401,
+    401,
+    401
+  ],
+  "guards": [
+    {
+      "load": 5.29638671875,
+      "swapPercent": 74.821875,
+      "freeGiB": 19.29104995727539
+    },
+    {
+      "load": 5.29638671875,
+      "swapPercent": 74.821875,
+      "freeGiB": 19.290882110595703
+    },
+    {
+      "load": 5.29638671875,
+      "swapPercent": 74.821875,
+      "freeGiB": 19.28982925415039
+    },
+    {
+      "load": 5.0322265625,
+      "swapPercent": 74.821875,
+      "freeGiB": 19.28989028930664
+    },
+    {
+      "load": 5.0322265625,
+      "swapPercent": 74.821875,
+      "freeGiB": 19.289508819580078
+    }
+  ],
+  "roomLimit": 8,
+  "status": "failed",
+  "failure": {
+    "stage": "join-eight-guests",
+    "type": "AssertionError"
+  },
+  "completedAt": "2026-11-07T04:12:28.081Z",
+  "interpretation": "Eight guests was the target. This FAILED attempt stopped on the fourth admission without recording its HTTP status; the three admitted sessions were all logged out and subsequent state requests returned 401. It supplies no eight-person workload pass."
+}

@@ -1,6 +1,10 @@
 # The Apache custom-domain mirror serves the repository root. Keep development
 # files outside its public boundary, as the Pages package already does.
 # Match root paths (and the existing project prefix), never public asset suffixes.
-RedirectMatch 404 "(?i)^/(?:StalemateSite/)?(?:\.git|\.github|\.openai|scripts|tests|node_modules|docs|pr-assets|dist|preview-dist|test-results|playwright-report|GPT|backup_restore_point|hangout-worker|hangout-internal)(?:/|$)"
-RedirectMatch 404 "(?i)^/(?:StalemateSite/)?(?:README\.md|AGENTS\.md|CURSOR_HANDOFF_WEBJAM\.md|package\.json|package-lock\.json|playwright\.config\.js|playwright\.live\.config\.js|vitest\.config\.js|\.gitattributes|\.gitignore|\.htaccess)(?:/|$)"
+RedirectMatch 404 "(?i)^/(?:StalemateSite/)?(?:\.git|\.github|\.openai|scripts|tests|node_modules|docs|pr-assets|dist|preview-dist|test-evidence|test-results|playwright-report|GPT|backup_restore_point|hangout-worker|hangout-internal)(?:/|$)"
+RedirectMatch 404 "(?i)^/(?:StalemateSite/)?(?:README\.md|AGENTS\.md|PROGRESS\.md|BLOCKED\.md|CURSOR_HANDOFF_WEBJAM\.md|package\.json|package-lock\.json|playwright\.config\.js|playwright\.live\.config\.js|vitest\.config\.js|\.gitattributes|\.gitignore|\.htaccess)(?:/|$)"
 RedirectMatch 404 "(?i)^/(?:StalemateSite/)?\.env(?:\.[^/]+)?(?:/|$)"
+# Local builds may leave generated Worker assets and development settings.
+RedirectMatch 404 "(?i)^/(?:StalemateSite/)?(?:\.beta-assets|\.pilot-assets|\.wrangler|\.local|\.dev\.vars(?:\.[^/]+)?)(?:/|$)"
+# The room tree contains a private rehearsal note alongside public assets.
+RedirectMatch 404 "(?i)^/(?:StalemateSite/)?r/[^/]+/TWO-HOUSE-TEST\.md(?:/|$)"

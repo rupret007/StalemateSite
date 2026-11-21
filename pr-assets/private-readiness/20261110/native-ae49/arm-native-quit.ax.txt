@@ -1,0 +1,11 @@
+Window: "WebJam", App: WebJam.
+0 WebJam, Secondary Actions: Cancel, Pick
+	1 menu Secondary Actions: Cancel
+		2 Services
+			3 menu Secondary Actions: Cancel
+				4 (disabled) No Services Apply
+				5 Services Settings…
+		6 Hide WebJam, ID: hide:
+		7 Hide Others, ID: hideOtherApplications:
+		8 Show All, ID: unhideAllApplications:
+		9 Quit WebJam, ID: qt_itemFired:

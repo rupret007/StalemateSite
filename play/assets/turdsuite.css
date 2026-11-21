@@ -1209,6 +1209,38 @@ body > .suite-a11y-play-shell-slot.suite-a11y-body-slot .suite-arcade-a11y-toggl
 .suite-a11y-dock-slot {
   margin-right: 4px;
 }
+/* Crapjack / Crappy Eights: keep Clr in the sticky play dock (scrolls with Smart). */
+.suite-a11y-pit-slot {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+#mobilePit:has(> .suite-a11y-pit-slot) {
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 760px) {
+  .action-dock:has(> .suite-a11y-table-dock-slot) {
+    grid-template-columns: 44px repeat(4, minmax(0, 1fr));
+    align-items: stretch;
+    position: fixed;
+    left: max(10px, env(safe-area-inset-left, 0px));
+    right: max(10px, env(safe-area-inset-right, 0px));
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    z-index: 25;
+    margin: 0;
+  }
+  section.table:has(.action-dock > .suite-a11y-table-dock-slot) .hand-wrap {
+    padding-bottom: 76px;
+  }
+  .suite-a11y-table-dock-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    grid-row: 1;
+    grid-column: 1;
+  }
+}
 .suite-arcade-a11y-toggle--inline,
 .suite-arcade-a11y-toggle--title {
   position: relative;

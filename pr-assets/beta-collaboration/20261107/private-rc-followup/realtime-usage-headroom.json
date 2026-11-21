@@ -1,0 +1,33 @@
+{
+  "observedAt": "2026-11-07T03:36:55.706Z",
+  "scope": "Actual signed-in Cloudflare account dashboard; read-only account-wide Realtime usage and plan. No purchases, subscription changes, credentials or activation.",
+  "accountPlanObserved": "Realtime active; renews November 15, 2026",
+  "workersPlanObserved": "Workers Free active",
+  "billingCycle": "2026-10-15 through 2026-11-14",
+  "usageObserved": "2026-10-15 through 2026-11-07",
+  "includedTierGB": 1000,
+  "combinedRealtimeUsageDisplay": "0 Gigabytes; rounded display, not literal zero traffic",
+  "billableUsageDisplay": "0 Gigabytes",
+  "currentUsageCostUSD": 0,
+  "projectedCycleCostUSD": 0,
+  "allUsageWithinIncludedTier": true,
+  "turnAnalytics": {
+    "window": "Last 30 days",
+    "filters": "No app/key filter",
+    "egressDisplay": "6.4MB",
+    "ingressDisplay": "9.07MB"
+  },
+  "sfu": {
+    "applications": "No Serverless SFU Applications created",
+    "analyticsWindow": "Last 30 days",
+    "analyticsDisplay": "No data; not treated as a measured zero-byte aggregate"
+  },
+  "boundedPrivateMusicUsageHeadroomQualified": true,
+  "remainingChecks": [
+    "Refresh account usage before a later live trial",
+    "Confirm existing issuer cap has recovered without raising or clearing it",
+    "Verify MacBook is idle before the guarded generated-audio trial",
+    "Physical listening, actual Shared Track mix and Webex remain separate"
+  ],
+  "evidenceScope": "Read-only dashboard observations transcribed at the stated time. Source screenshots remain owner-only locally; no billing address, payment method, invoice, credential or account identifier is included."
+}

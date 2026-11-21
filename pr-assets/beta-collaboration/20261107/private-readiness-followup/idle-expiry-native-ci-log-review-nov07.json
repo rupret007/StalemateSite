@@ -1,0 +1,273 @@
+{
+  "head": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "state": "TWO_COMPLETED_NATIVE_LOCAL_CI_JOB_LOGS_REVIEWED_FULL_BROWSER_JOBS_PENDING",
+  "jobs": [
+    {
+      "id": 128459747116,
+      "reviewed": true,
+      "proofs": [
+        {
+          "flags": {
+            "localMappingQualified": true,
+            "hostedLimitQualified": false,
+            "rawOversizeAccepted": true
+          },
+          "scope": "Pinned local workerd SQLite record mapping, eight concurrent callers and whole-runtime crash recovery only; no hosted size-limit enforcement, replication, PITR, authority/key, capacity, native audio or release qualification. Concurrent success does not prove callbacks retried.",
+          "noLiveOwnedProcesses": null
+        },
+        {
+          "flags": {
+            "localNativeLifecycleQualified": true,
+            "miniflareDisposed": true,
+            "noLiveOwnedProcesses": true,
+            "temporaryStateRemoved": true
+          },
+          "scope": null,
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localNativeLobbyEffectsQualified": true,
+            "miniflareDisposed": true,
+            "noLiveOwnedProcesses": true,
+            "temporaryStateRemoved": true
+          },
+          "scope": null,
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "productionOwnSharingCompositionQualified": true,
+            "nativeC2RetentionHandlerQualified": true,
+            "hostedAlarmSchedulerQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "productionOwnSharingCompositionQualified": true,
+            "nativeLocalHealthyAckProbeQualified": true,
+            "hostedScaleQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "nativeLocalNonAckPressureQualified": true,
+            "originalNinePlusThreeQualifiedByThisMode": false,
+            "hostedScaleQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Separate three-current-SID C3 application-ACK credit pressure proof in actual local workerd/SQLite. Real HELP output, zero-ACK probe4413 with128-frame/native-send/credit witness, healthy ACK/publication and real revocation isolation, one-binding owned-process-loss recovery and no text replay. Synthetic consent only. Does not requalify original9+3/Delta/Echo modes, physical slow TCP/browser/WAN/shared-fanout capacity/150-native/soak or hosted limits/cost.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "nativeLocalFiftyGuestFanoutQualified": true,
+            "originalNinePlusThreeQualifiedByThisMode": false,
+            "hostedScaleQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Separate50-real-guest native C3 fanout proof:12publications/600actualdeliveries,50pacedACKstreams,actualrevocation49livebindings thenwholeprocessloss/coldpruning/nohistory. Syntheticpolicy/grants only. Native-local Node/Miniflare bridge observations,notbrowser/WAN/150tier/reconnectstorm/many-room/soak/hostedcapacityorSLO. Doesnotrequalifycanonical9+3/fault/Stop/reportmodes.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionIncidentSourceCompositionQualified": true,
+            "incidentAuthorityAndKeyQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "productionIncidentSourceCompositionQualified": true,
+            "incidentAuthorityAndKeyQualified": false,
+            "productionOwnSharingCompositionQualified": true,
+            "combinedParticipationIncidentSourceCompositionQualified": true,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "nativeOwnerStartInvocationBoundaryQualified": true,
+            "zeroNetworkCallbackOnly": true,
+            "originalNinePlusThreeQualifiedByThisMode": false,
+            "providerActivationQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Separate four-real-guest native C3 original-owner/read-only-TX/start-invocation proof with zero-network callbacks. Actual Stop/revoke, callback-initiated close, held-response healthy progress and owned-process-loss cleanup. Explicit synthetic consent/provider readiness only; production AI remains off. Not canonical9+3/fault requalification, external provider activation, physical wire/crash exactly-once, hostedPITR/scale/SLO, legal/guardian or nativeaudio proof.",
+          "noLiveOwnedProcesses": true
+        }
+      ]
+    },
+    {
+      "id": 128459633522,
+      "reviewed": true,
+      "proofs": [
+        {
+          "flags": {
+            "localMappingQualified": true,
+            "hostedLimitQualified": false,
+            "rawOversizeAccepted": true
+          },
+          "scope": "Pinned local workerd SQLite record mapping, eight concurrent callers and whole-runtime crash recovery only; no hosted size-limit enforcement, replication, PITR, authority/key, capacity, native audio or release qualification. Concurrent success does not prove callbacks retried.",
+          "noLiveOwnedProcesses": null
+        },
+        {
+          "flags": {
+            "localNativeLifecycleQualified": true,
+            "miniflareDisposed": true,
+            "noLiveOwnedProcesses": true,
+            "temporaryStateRemoved": true
+          },
+          "scope": null,
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localNativeLobbyEffectsQualified": true,
+            "miniflareDisposed": true,
+            "noLiveOwnedProcesses": true,
+            "temporaryStateRemoved": true
+          },
+          "scope": null,
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "productionOwnSharingCompositionQualified": true,
+            "nativeC2RetentionHandlerQualified": true,
+            "hostedAlarmSchedulerQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "productionOwnSharingCompositionQualified": true,
+            "nativeLocalHealthyAckProbeQualified": true,
+            "hostedScaleQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. Optional three-visitor paced native-local ACK workload; raw envelopes validated before semantic normalization and actual serialized control grants reconciled. Latencies include Node/Miniflare native bridge; no throughput tier or public SLO claim. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "nativeLocalNonAckPressureQualified": true,
+            "originalNinePlusThreeQualifiedByThisMode": false,
+            "hostedScaleQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Separate three-current-SID C3 application-ACK credit pressure proof in actual local workerd/SQLite. Real HELP output, zero-ACK probe4413 with128-frame/native-send/credit witness, healthy ACK/publication and real revocation isolation, one-binding owned-process-loss recovery and no text replay. Synthetic consent only. Does not requalify original9+3/Delta/Echo modes, physical slow TCP/browser/WAN/shared-fanout capacity/150-native/soak or hosted limits/cost.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "nativeLocalFiftyGuestFanoutQualified": true,
+            "originalNinePlusThreeQualifiedByThisMode": false,
+            "hostedScaleQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Separate50-real-guest native C3 fanout proof:12publications/600actualdeliveries,50pacedACKstreams,actualrevocation49livebindings thenwholeprocessloss/coldpruning/nohistory. Syntheticpolicy/grants only. Native-local Node/Miniflare bridge observations,notbrowser/WAN/150tier/reconnectstorm/many-room/soak/hostedcapacityorSLO. Doesnotrequalifycanonical9+3/fault/Stop/reportmodes.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionIncidentSourceCompositionQualified": true,
+            "incidentAuthorityAndKeyQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "productionIncidentSourceCompositionQualified": true,
+            "incidentAuthorityAndKeyQualified": false,
+            "productionOwnSharingCompositionQualified": true,
+            "combinedParticipationIncidentSourceCompositionQualified": true,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Actual betaFetch guest cookies, real local WebSocket visitors, actual HangoutLobby and SQLite authority/effect transactions. Explicit test-only known-empty bootstrap. Whole owned runtime killed with visitors connected; fresh runtime recovery. Required production C3 bridge selected; actual caller-only HTTP status/Stop narrows the existing synthetic ledger, keeps the same socket for a delivered-message report, then persists withdrawal across process loss before real logout. Only operator/guardian consent decisions are explicitly synthetic. No real enrollment/guardian or external provider qualification. Required production I3a source bridge and existing I1 over actual records transactions; separate incident appointment/policy and privately retained test key are synthetic only. This does not qualify real incident authority, purpose-key provisioning or key recovery. No browser cookie-storage, real Access OTP/staff identity, C2 guardian consent, hosted deployment/drain/limits/cost, TURN/camera, or native WebJam installation/audio qualification.",
+          "noLiveOwnedProcesses": true
+        },
+        {
+          "flags": {
+            "localGatewayWebSocketSessionAuthorityQualified": true,
+            "productionParticipationCompositionQualified": true,
+            "guardianDecisionsQualified": false,
+            "nativeOwnerStartInvocationBoundaryQualified": true,
+            "zeroNetworkCallbackOnly": true,
+            "originalNinePlusThreeQualifiedByThisMode": false,
+            "providerActivationQualified": false,
+            "temporaryStateRemoved": true
+          },
+          "scope": "Separate four-real-guest native C3 original-owner/read-only-TX/start-invocation proof with zero-network callbacks. Actual Stop/revoke, callback-initiated close, held-response healthy progress and owned-process-loss cleanup. Explicit synthetic consent/provider readiness only; production AI remains off. Not canonical9+3/fault requalification, external provider activation, physical wire/crash exactly-once, hostedPITR/scale/SLO, legal/guardian or nativeaudio proof.",
+          "noLiveOwnedProcesses": true
+        }
+      ]
+    }
+  ],
+  "limits": "Includes local workerd mapping/lifecycle and zero-network provider-start callbacks. Does not qualify external provider activation, physical audio, hosted eight-hour expiry, public legal/guardian readiness or all original modes."
+}

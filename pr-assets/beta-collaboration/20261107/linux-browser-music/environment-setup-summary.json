@@ -1,0 +1,36 @@
+{
+  "scope": "Environment setup summary, not a full original launch transcript",
+  "initialSandboxProbeState": "FAILED_INSPECT_ORIGINAL_SANDBOX_PROBE_NO_WEAKENED_RETRY",
+  "originalFailedProbeSha256": "70fa81a014f5c4d84bfae3b725acec159a7f0cb8e986b7f3e052baab496a0ea9",
+  "missingLibraries": [
+    "libnspr4.so => not found",
+    "libnss3.so => not found",
+    "libnssutil3.so => not found",
+    "libasound.so.2 => not found"
+  ],
+  "unprivilegedUserNamespaceExitCode": 0,
+  "securityPolicyChanged": false,
+  "originalFailedProcessGone": true,
+  "nodeOfficialSource": {
+    "nodeVersion": "22.22.1",
+    "archive": "node-v22.22.1-linux-x64.tar.xz",
+    "sha256": "9a6bc82f9b491279147219f6a18add1e18424dce90d41d2a5fcd69d4924ba3aa",
+    "primarySource": "https://nodejs.org/dist/v22.22.1/SHASUMS256.txt",
+    "httpsVerification": true,
+    "metadataSha256": "b4e0a68b3fd205e27a000f5722d7932cf31c1e0b6b3d9101bcb153abfd5d8023"
+  },
+  "playwrightVersion": "1.64.1",
+  "lockedInputSha256": {
+    "package.json": "c1e8fa441e9bb22bc01dca2b1d6b4d18de110be140ea0977eea130b417891b2f",
+    "package-lock.json": "86b1ee78fbedd88f3ec262deca993fcadcc95bff1c12be327158a2bbe748afd0"
+  },
+  "privateLibraryPackagesReady": true,
+  "postDependencySandboxProbeState": "SANDBOXED_LINUX_BROWSER_LAUNCHED_AND_CLOSED",
+  "sandboxRequired": true,
+  "browserVersion": "156.0.8078.4",
+  "allOwnedOfflineBrowserResourcesClosed": true,
+  "globalSystemPackageInstallation": false,
+  "distributionWasAlreadyRunning": true,
+  "physicalCapture": false,
+  "scopeLimit": "Headless Chromium on Ubuntu26.04.1 x86_64/WSL2, not a physical Linux desktop or audio interface"
+}

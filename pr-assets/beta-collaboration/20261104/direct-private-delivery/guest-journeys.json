@@ -1,0 +1,35 @@
+{
+  "source": "de2b01725925d2f78ee21af33f68f3eb4eb95407",
+  "runtime": "dbcaddf5-dd3f-48e3-9826-0d7998ffdbc0",
+  "at": "2026-11-04T08:28:06.032Z",
+  "origin": "https://stalemate-hangout-beta.jeffstory007.workers.dev",
+  "scope": "Actual private service, isolated synthetic guest clients; chat/source badges/fresh-join privacy on the verified new deployment; no media or staff action. Not public band-page navigation or physical music.",
+  "stages": [
+    "guest-A-connected",
+    "guest-B-connected",
+    "guest-C-connected"
+  ],
+  "outsiderStateStatus": 401,
+  "crossEntryBadgesOnRealMessages": true,
+  "hiddenSourceBadgeOnNewMessage": true,
+  "lobbyExchange": true,
+  "guestChannelExchange": true,
+  "freshJoinPrivacy": true,
+  "captureRequests": 0,
+  "independentGuests": 3,
+  "ok": true,
+  "logoutStatuses": [
+    [
+      200,
+      401
+    ],
+    [
+      200,
+      401
+    ],
+    [
+      200,
+      401
+    ]
+  ]
+}

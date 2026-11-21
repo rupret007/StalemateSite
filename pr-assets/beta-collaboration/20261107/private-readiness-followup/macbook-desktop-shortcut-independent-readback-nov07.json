@@ -1,0 +1,12 @@
+{
+  "source": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "shortcutStillPointsToVerifiedCurrentBundle": true,
+  "canonicalManifestAndCodecStillMatch": true,
+  "ownedWebJamAppPids": [],
+  "independentRemoteProofSha256": "05619a0ee94d559e6ad6a112e31dc81831e23981d05234f0060fe7010e355812",
+  "sameOriginalExpiryObserverStillRunning": true,
+  "originalObserverPid": 52043,
+  "appOrMicLaunched": false,
+  "securitySettingsChanged": false,
+  "at": "2026-11-07T15:43:37.440238+00:00"
+}

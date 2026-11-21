@@ -37,6 +37,29 @@ cascade. Neither failure was resolved by raising caps or omitting recipients.
 One short passing run is not a soak test or proof against every adversarial
 reader. Raw private-room relay and media traffic have separate limits.
 
+### November 6 private-candidate baseline
+
+The commands above passed on application tree
+`588509579d6a95d089a3207eea4a2f4d9ab70a12`. The private website used that
+same tree. The measurements below were made locally on the Mac Mini.
+
+| Loopback workload | Admission p95 | Lobby text p95 | Room text p95 | 16 simultaneous reconnects |
+| --- | ---: | ---: | ---: | ---: |
+| 50 clients, 5 rounds, 10 rooms | 3.120 ms | 3.553 ms | 1.155 ms | 66.565 ms |
+| 150 clients, 10 rounds, 30 rooms | 11.495 ms | 5.419 ms | 2.950 ms | 198.416 ms |
+
+At 150 connections, the next ordinary guest received HTTP 429. Both runs
+restored the expected room counts after restart, continued serving healthy
+peers when a client stopped acknowledging updates, and found no ordinary
+chat in stored state or reconnect history.
+
+In three additional loopback Chromium trials, an eight-person Art room
+delivered chat and a canvas stroke to all seven peers. The ninth guest was
+refused while the room was full, received no room chat, and could join in
+38–51 ms after a seat opened. Median chat and stroke delivery were 14 ms and
+5 ms across 21 recipients per action. These short runs qualify the exercised
+local paths. Hosted load, WAN recovery, and media capacity need separate runs.
+
 ## Separate native fifty-guest workload
 
 The explicit local command is:

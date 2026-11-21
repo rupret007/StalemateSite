@@ -1,0 +1,103 @@
+{
+  "source": "d8c08fb88b94429f03d13d9beaf01d8ffd301e1a",
+  "activeVersion": "c2271048-aaa3-4649-8e9e-48dd46212da5",
+  "engine": "chromium",
+  "scope": "Actual invitation-protected Cloudflare service; isolated synthetic guests, no live media, provider credentials, signed identity fixtures, or human moderation.",
+  "startedAt": "2026-11-07T17:15:41.147Z",
+  "checks": [
+    "Uninvited guests cannot read private state or Web Join JavaScript",
+    "Stalemate invitation, nickname and connected chat",
+    "Rad Dad invitation, nickname and connected chat",
+    "Both entrances share one lobby and display the arrival-site badge",
+    "Private runtime JavaScript and styles match the candidate exactly",
+    "Mobile chat contains page width and keeps input and Send visible at 375 and 390px",
+    "Manual reconnect retains an unsent draft and starts fresh scrollback",
+    "Two guests create and join an Art room with a received canvas stroke",
+    "The server allows the room host and refuses an ordinary guest topic change",
+    "A Jam host can invite a guest and share a browser destination on the preserved origin",
+    "Both own QA rooms close through the normal host command",
+    "Logout revokes copied cookies and protected code and closes the active page"
+  ],
+  "captureRequests": 0,
+  "assets": [
+    "join/index.html",
+    "join/policy.js",
+    "join/session.js",
+    "join/config.js",
+    "join/audio.js",
+    "join/errors.js",
+    "join/style.css",
+    "join/prejoin.js",
+    "join/crypto.js",
+    "join/mailbox.js",
+    "join/app.js",
+    "r/45662413410ed051/lobby/lobby.css",
+    "r/45662413410ed051/lobby/lobby.js"
+  ],
+  "logout": [
+    200,
+    200
+  ],
+  "browserVersion": "156.0.8078.4",
+  "executionEndpoint": "Linux Ubuntu26.04.1 x86_64 Chromium156 under WSL2 on NucBox; headless, not physical Linux audio/display",
+  "mobile": [
+    {
+      "viewport": 375,
+      "pageWidth": 375,
+      "inputLeft": 46,
+      "inputRight": 294,
+      "sendRight": 357,
+      "sendLeft": 299,
+      "fontSize": "16px"
+    },
+    {
+      "viewport": 390,
+      "pageWidth": 390,
+      "inputLeft": 46,
+      "inputRight": 309,
+      "sendRight": 372,
+      "sendLeft": 314,
+      "fontSize": "16px"
+    }
+  ],
+  "reconnectMs": 223,
+  "reconnectSenderState": {
+    "modes": {
+      "m": false,
+      "i": false,
+      "k": false,
+      "l": 150,
+      "t": true,
+      "S": 3,
+      "C": false,
+      "Q": false,
+      "locked": false
+    },
+    "connection": "connected",
+    "budget": "ok",
+    "lock": "off"
+  },
+  "browserInvitationShared": true,
+  "setupMs": [
+    {
+      "source": "stalemate",
+      "ms": 889
+    },
+    {
+      "source": "rad-dad",
+      "ms": 779
+    }
+  ],
+  "status": "passed",
+  "completedAt": "2026-11-07T17:15:50.735Z",
+  "guardBefore": {
+    "load1": 0.8203125,
+    "memoryAvailableGiB": 14.41,
+    "swapPercent": 14.55373764038086,
+    "freeGiB": 721.87
+  },
+  "sandboxRequired": true,
+  "physicalCapture": false,
+  "audioOutputMuted": true,
+  "privateLibrariesOnly": true
+}

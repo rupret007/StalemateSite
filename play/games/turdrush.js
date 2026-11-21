@@ -1,4 +1,4 @@
-import { createRun, startRun, pauseRun, resumeRun, act, advance } from './turdrush-core.js?v=6120b7f3c87dd2c2';
+import { createRun, startRun, pauseRun, resumeRun, act, advance, classifyRushSwipe, queueRushSwipe, rushSwipeAction } from './turdrush-core.js?v=fa8a8ce86510b759';
 import { TurdRushRenderer } from './turdrush-renderer.js?v=3f4caf204b692b96';
 
 const $ = id => document.getElementById(id);
@@ -177,24 +177,16 @@ function input(action) {
   return tryInput(action);
 }
 function flushSwipe() {
-  if (!pendingSwipe) {return;}
-  if (state.phase !== 'running' || !available || $('rush-guide').open || state.elapsed > pendingSwipe.until) {
-    pendingSwipe = null; return;
-  }
-  if (pendingSwipe.lane === state.player.lane) {pendingSwipe = null; return;}
-  tryInput(pendingSwipe.lane < state.player.lane ? 'left' : 'right');
+  const action = rushSwipeAction(state, pendingSwipe);
+  if (!action || !available || $('rush-guide').open) {pendingSwipe = null; return;}
+  tryInput(action);
   if (pendingSwipe.lane === state.player.lane) {pendingSwipe = null;}
 }
 function swipeInput(action, owner) {
   if (action !== 'left' && action !== 'right') {input(action); return;}
-  // Distinct fast flicks can arrive during the core's100ms cooldown. Keep one
-  // bounded destination, so opposite corrections cancel instead of disappearing
-  // or replaying an extra direction later. Edge swipes accrue no movement debt.
-  const live = pendingSwipe && state.elapsed <= pendingSwipe.until;
-  const from = live ? pendingSwipe.lane : state.player.lane;
-  const lane = Math.max(0, Math.min(2, from + (action === 'left' ? -1 : 1)));
-  if (live && lane === from) {return;}
-  pendingSwipe = lane === state.player.lane ? null : { lane, owner, until: state.elapsed + .25 };
+  const next = queueRushSwipe(state, pendingSwipe, action, owner);
+  if (next === pendingSwipe) {return;}
+  pendingSwipe = next;
   flushSwipe();
 }
 function unavailable(message) {
@@ -282,10 +274,8 @@ canvas.addEventListener('pointerdown', event => {
 });
 function swipe(event) {
   if (!gesture || gesture.id !== event.pointerId || gesture.consumed || state.phase !== 'running') {return;}
-  const x = event.clientX - gesture.x, y = event.clientY - gesture.y;
-  if (Math.max(Math.abs(x), Math.abs(y)) < 18) {return;}
-  if (Math.abs(x) > Math.abs(y) * 1.12) { swipeInput(x > 0 ? 'right' : 'left', gesture); gesture.consumed = true; }
-  else if (Math.abs(y) > Math.abs(x) * 1.12) { swipeInput(y > 0 ? 'slide' : 'jump', gesture); gesture.consumed = true; }
+  const action = classifyRushSwipe(event.clientX - gesture.x, event.clientY - gesture.y);
+  if (action) {swipeInput(action, gesture); gesture.consumed = true;}
 }
 canvas.addEventListener('pointermove', swipe);
 canvas.addEventListener('pointerup', event => { swipe(event); if (gesture?.id === event.pointerId) {gesture = null;} });

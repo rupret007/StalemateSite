@@ -1,0 +1,53 @@
+{
+  "at": "2026-11-04T18:44:59.498565+00:00",
+  "head": "6fb76538be242605192f7bd8f2820f59cfcf4f79",
+  "headTree": "0acaadf85a3ce063dd11515f0ebb4c108cbaab90",
+  "jobs": [
+    {
+      "kind": "source",
+      "jobId": 126513742661,
+      "runId": 41812140221,
+      "checkout": "6fb76538be242605192f7bd8f2820f59cfcf4f79",
+      "unitFiles": 137,
+      "unitPasses": 2061,
+      "mainBrowserPasses": 763,
+      "separateDeploymentPathPasses": [
+        34,
+        34
+      ],
+      "retryOrFlakySummary": false,
+      "logSha256": "b87e03e23a480199154f886d17164f7b18e66e0813b5f027ecb5d93fc0311fd7",
+      "logBytes": 331317
+    },
+    {
+      "kind": "pr",
+      "jobId": 126513762585,
+      "runId": 41812146346,
+      "checkout": "b854cea3f7c187614fdb01bd95757d8f4dff94df",
+      "unitFiles": 137,
+      "unitPasses": 2061,
+      "mainBrowserPasses": 763,
+      "separateDeploymentPathPasses": [
+        34,
+        34
+      ],
+      "retryOrFlakySummary": false,
+      "logSha256": "26de7f063dc58cfc618a63089f9e1b58d0a74092a9cb8470e6dff0bb46e80aaf",
+      "logBytes": 332061
+    }
+  ],
+  "prTreeComparisonPending": false,
+  "pagesJobs": [
+    {
+      "id": 126529435679,
+      "conclusion": "skipped"
+    },
+    {
+      "id": 126529695186,
+      "conclusion": "skipped"
+    }
+  ],
+  "prTreeVerifiedViaGitHub": "0acaadf85a3ce063dd11515f0ebb4c108cbaab90",
+  "qualifiedAt": "2026-11-04T18:47:46.899500+00:00",
+  "scope": "Current6fb documentation head only; application remainsde2 and has a separately observed later origin-only private deployment"
+}

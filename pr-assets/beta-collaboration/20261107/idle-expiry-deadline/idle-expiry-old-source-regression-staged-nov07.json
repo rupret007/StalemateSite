@@ -1,0 +1,52 @@
+{
+  "state": "OLD_SOURCE_REGRESSION_RESULT_REQUIRES_FAILURE_REVIEW",
+  "base": "32d3cdb5571e5c3d1e06eb99dde214ff6b282c89",
+  "startedAt": "2026-11-07T16:15:07.033890+00:00",
+  "physicalCapture": false,
+  "providerCredentials": false,
+  "real8HourPass": false,
+  "result": {
+    "state": "OLD_SOURCE_REGRESSION_RESULT_REQUIRES_FAILURE_REVIEW",
+    "base": "32d3cdb5571e5c3d1e06eb99dde214ff6b282c89",
+    "startedAt": "2026-11-07T16:15:11.880196+00:00",
+    "guardBefore": {
+      "load1": 0.01123046875,
+      "memoryAvailableGiB": 14.497371673583984,
+      "swapPercent": 15.034818649291992,
+      "freeGiB": 722.5134773254395
+    },
+    "physicalCapture": false,
+    "providerCredentials": false,
+    "liveDeploymentChanged": false,
+    "real8HourExpiryQualified": false,
+    "guardBeforeTests": {
+      "load1": 0.0908203125,
+      "memoryAvailableGiB": 14.470661163330078,
+      "swapPercent": 15.034818649291992,
+      "freeGiB": 722.4014625549316
+    },
+    "unitExitCode": 1,
+    "summary": [
+      " Test Files  1 failed (1)",
+      "      Tests  3 failed | 27 passed (30)",
+      "   Duration  766ms (transform 332ms, setup 0ms, import 431ms, tests 247ms, environment 0ms)",
+      "\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 3 \u23af\u23af\u23af\u23af\u23af\u23af\u23af",
+      " FAIL  hangout-worker/tests/beta-lifecycle.test.js > private socket expiry, hibernation and cost caps > schedules idle lobby maintenance no later than the existing guest deadline",
+      "AssertionError: expected 1792407650000 to be less than or equal to 1792407600000",
+      " FAIL  hangout-worker/tests/beta-lifecycle.test.js > private socket expiry, hibernation and cost caps > brings a late lobby alarm forward when the same guest reconnects near expiry",
+      "AssertionError: expected 1792407650000 to be less than or equal to 1792407600000",
+      " FAIL  hangout-worker/tests/beta-lifecycle.test.js > private socket expiry, hibernation and cost caps > brings a late lobby alarm forward when a live binding is restored near expiry",
+      "TypeError: Cannot read properties of undefined (reading 'readyState')"
+    ],
+    "guardAfter": {
+      "load1": 0.0908203125,
+      "memoryAvailableGiB": 14.449024200439453,
+      "swapPercent": 15.034818649291992,
+      "freeGiB": 722.4014549255371
+    },
+    "all43SourceInputsStillMatch": true,
+    "logSha256": "32de5837ed7335a78de35822e58a0a39940dd7e8b8746225f7084a2850c2f14b",
+    "completedAt": "2026-11-07T16:15:14.593952+00:00"
+  },
+  "completedAt": "2026-11-07T16:15:10.418583+00:00"
+}

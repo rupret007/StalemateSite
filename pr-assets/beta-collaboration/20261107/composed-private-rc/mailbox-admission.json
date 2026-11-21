@@ -1,0 +1,23 @@
+{
+  "at": "2026-11-07T05:51:29.718Z",
+  "issuerVersion": "4db649fa-a465-44b4-8487-414987b3a660",
+  "scope": "One ordinary GET for a new empty synthetic web mailbox from the real protected Join origin; no retry, host offer, TURN credential mint, capture or media",
+  "requestCount": 1,
+  "credentialsMinted": false,
+  "nativeHostStarted": false,
+  "physicalCapture": false,
+  "fullWebJoinRecoveryVerified": false,
+  "response": {
+    "status": 204,
+    "bodyBytes": 0,
+    "noStore": true,
+    "resetHintPresent": false
+  },
+  "captureCalls": 0,
+  "currentWebMailboxAdmissionVerified": true,
+  "status": "passed",
+  "logout": 200,
+  "copiedCookieReplay": 401,
+  "existingHoldFileUnchanged": true,
+  "completedAt": "2026-11-07T05:51:32.600Z"
+}

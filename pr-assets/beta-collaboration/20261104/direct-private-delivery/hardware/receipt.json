@@ -1,0 +1,29 @@
+{
+  "at": "2026-11-04T20:35:06.018875+00:00",
+  "scope": "Physical hardware/installation failures and recovery evidence; current exact documentation CI",
+  "requirementsFileSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+  "physicalMusicQualified": false,
+  "publicLaunch": false,
+  "files": [
+    {
+      "path": "intel-installation.json",
+      "bytes": 1193,
+      "sha256": "de8b7cf73f3642f4200b3df710b76944a255161c101cd1f286dfe0da99870fee"
+    },
+    {
+      "path": "music-room-preparation.json",
+      "bytes": 1171,
+      "sha256": "07935f0387dd1dc2b55354c7c80e538851fbe515f046a22631f7693115ada938"
+    },
+    {
+      "path": "native-host-attempts.json",
+      "bytes": 4142,
+      "sha256": "fdbe1b48414fcc6964787d861bdd4d8a53944cc1175ff19d657f86bedfe3be56"
+    },
+    {
+      "path": "website202-dc863-ci.json",
+      "bytes": 1493,
+      "sha256": "affb3f3fa577bac6091dfff5912ad2d1601bc52336b22995b32093f2e0726e92"
+    }
+  ]
+}

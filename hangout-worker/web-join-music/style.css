@@ -1,0 +1,27 @@
+/* Keep the protected browser receiver's audio controls easy to tap. */
+.join-card button, .mic-picker select, main > details > summary, .headphones {
+  min-block-size: 48px;
+  min-inline-size: 48px;
+}
+
+main > details > summary {
+  align-content: center;
+}
+
+.headphones {
+  align-items: center;
+  padding-block: 8px;
+}
+
+/* The guest opens this page inside a phone-sized frame above the Jam room, so
+   trim the page chrome to keep the mic check and Join on one screen. Flat
+   selectors: nested bare type selectors need Safari 17.2. */
+@media (max-width: 480px) {
+  :root:has(meta[name="private-music"]):has(.join-card) body { padding: 8px 12px; }
+  :root:has(meta[name="private-music"]):has(.join-card) h1 { margin-block: 4px 8px; font-size: 1.35rem; }
+  :root:has(meta[name="private-music"]) .join-card { padding: 10px 12px; }
+  :root:has(meta[name="private-music"]) #listen-actions .actions { margin-top: 8px; }
+  :root:has(meta[name="private-music"]) #listen-guidance { flex: 1 1 9rem; margin: 0; font-size: .875rem; }
+  :root:has(meta[name="private-music"]) #prejoin { margin-top: 8px; }
+  :root:has(meta[name="private-music"]) #prejoin-heading { margin-bottom: 4px; }
+}

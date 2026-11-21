@@ -1,3 +1,4 @@
+const { expectOrdinaryMediaLabel } = require('./support/ordinary-media-labels');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { test, expect } = require('@playwright/test');
@@ -28,7 +29,7 @@ async function join(page, target, name) {
 }
 async function turnOn(page, kind) {
     await page.click(kind === 'video' ? '[data-cam]' : '[data-mic]'); await page.click('[data-ask-yes]');
-    await expect(page.locator(kind === 'video' ? '[data-cam]' : '[data-mic]')).toHaveText(kind === 'video' ? 'Turn off my camera' : 'Mute my mic');
+    await expectOrdinaryMediaLabel(page, kind, true);
 }
 async function decoded(page, kind = 'video') {
     await expect.poll(() => page.evaluate(async (kind) => {
@@ -221,7 +222,7 @@ test('turning passive wakes an initial waiter before the leader sees its earlier
         expect(await leader.evaluate(() => window.__hangout.av.peers.size)).toBe(0);
         expect(await follower.evaluate(() => window.__startupWire.offer)).toBe(0);
         await follower.click('[data-cam]');
-        await expect(follower.locator('[data-cam]')).toHaveText('Turn on my camera');
+        await expectOrdinaryMediaLabel(follower, 'video', false);
         await decoded(follower);
         expect(await follower.evaluate(() => window.__startupWire.offer)).toBeGreaterThan(0);
         await leader.evaluate(() => window.__releaseFollowerCameraOn());
@@ -243,7 +244,7 @@ test('a remote camera-off wakes an active initial waiter', async ({ browser }) =
     try {
         await expect.poll(() => follower.evaluate(() => [...window.__hangout.av.pcs.values()][0]?.waitingInitialOffer)).toBe(true);
         await leader.click('[data-cam]');
-        await expect(leader.locator('[data-cam]')).toHaveText('Turn on my camera');
+        await expectOrdinaryMediaLabel(leader, 'video', false);
         await expect.poll(() => follower.evaluate(() => window.__startupWire.offer)).toBeGreaterThan(0);
         await leader.evaluate(() => window.__releaseStartupLeader());
         await decoded(leader);
@@ -302,7 +303,7 @@ test('a synthetic offer failure retains debt without self-retry until a later me
     // A genuine later media transition is the retry stimulus; no direct pump call.
     await target.evaluate(() => { window.__offerFaultProof.externalChangeAllowed = true; });
     await target.click('[data-cam]');
-    await expect(target.locator('[data-cam]')).toHaveText('Turn on my camera');
+    await expectOrdinaryMediaLabel(target, 'video', false);
     await decoded(other, 'audio'); await decoded(target, 'video');
     await expect.poll(() => target.evaluate(() => window.__offerFaultProof.calls)).toBeGreaterThan(1);
     await expect.poll(() => target.evaluate(() => [...window.__hangout.av.pcs.values()][0].offerNeeded)).toBe(false);
@@ -318,7 +319,7 @@ test('a synthetic offer failure retains debt without self-retry until a later me
     const beforeRestoredVideo = await videoFrames();
     // Restore real video using the already-approved camera; this adds no prompt.
     await target.click('[data-cam]');
-    await expect(target.locator('[data-cam]')).toHaveText('Turn off my camera');
+    await expectOrdinaryMediaLabel(target, 'video', true);
     await decoded(other, 'video');
     await expect.poll(videoFrames, { timeout: 15000 }).toBeGreaterThan(beforeRestoredVideo);
     await test.info().attach('synthetic-offer-failure-debt', { body: JSON.stringify(beforeExternalChange), contentType: 'application/json' });

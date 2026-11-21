@@ -1,0 +1,48 @@
+{
+  "at": "2026-11-07T07:19:12.446422+00:00",
+  "readOnly": true,
+  "billingObservation": {
+    "recordedAt": "2026-11-07T07:07:19.539813+00:00",
+    "observationMethod": "Existing signed-in Cloudflare billable-usage tab explicitly reloaded through CUA in this turn",
+    "product": "Realtime bandwidth",
+    "includedGB": 1000,
+    "displayedUsageGB": 0.01,
+    "displayedBillableGB": 0,
+    "displayedCurrentCostUSD": 0,
+    "displayedProjectedCostUSD": 0,
+    "cycle": "2026-10-15 through 2026-11-14",
+    "observedThrough": "2026-11-07",
+    "providerSaysWithinIncludedTier": true,
+    "roundedDisplayIsNotExactTrafficOrSpendingGuarantee": true,
+    "subscriptionOrLimitChanged": false,
+    "qualifiedForExistingOneHostOneGuestBoundedPrivateTrial": true,
+    "physicalCaptureAllowedByThisReceipt": false
+  },
+  "liveVersions": {
+    "stalemate-hangout-beta": "33862058-10a5-4a6f-9659-38841d70292f",
+    "webjam-turn-credentials": "4db649fa-a465-44b4-8487-414987b3a660"
+  },
+  "allLiveSettingsUnchanged": true,
+  "usage": {
+    "callsTurnUsageAdaptiveGroups": {
+      "rows": [
+        {
+          "sum": {
+            "egressBytes": 6403824,
+            "ingressBytes": 9066188
+          }
+        }
+      ],
+      "emptyIsNotZeroUsageOrHeadroom": true
+    },
+    "callsUsageAdaptiveGroups": {
+      "rows": [],
+      "emptyIsNotZeroUsageOrHeadroom": true
+    }
+  },
+  "holdMarkerChanged": false,
+  "capConditionPreviouslyConfirmedClearByNormalCredentials": "2026-11-07T06:32:19.178Z",
+  "freshNativeProductionCredentialCheckRequiredBeforeBrowserJoin": true,
+  "approvedScope": "One generated native host and one Windows browser guest at a time; each under155seconds, no physical capture or media recording; no quota/activation changes",
+  "noStoryPool": true
+}

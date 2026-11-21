@@ -1,0 +1,337 @@
+import { GAME_INVITE_UNAVAILABLE } from '/r/45662413410ed051/lobby/game-night.mjs';
+import { unlockGameNightAudio } from '/r/45662413410ed051/lobby/game-night-audio.mjs';
+
+const status = document.querySelector('[data-guest-status]');
+const invite = document.querySelector('[data-guest-invite]');
+const join = document.querySelector('[data-guest-join]');
+const retry = document.querySelector('[data-guest-retry]');
+const askHost = document.querySelector('[data-guest-fresh]');
+const freshMessage = document.querySelector('[data-guest-fresh-message]');
+const FRESH_LINK = 'Ask the host for a fresh link.';
+const gameTitle = document.querySelector('[data-guest-game]');
+const resumeGuest = document.querySelector('[data-resume-guest]') !== null;
+const passPrefix = 'gn:pass:';
+const joinedInvitePrefix = 'gn:joined-invite:';
+const lastTableKey = 'gn:last-table';
+const tableIdPattern = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
+const passPattern = /^[a-f0-9]{64}$/;
+const lobbyPath = '/r/45662413410ed051/lobby/?game-guest=1';
+const gameDestination = tableId => lobbyPath + (typeof tableId === 'string' && tableIdPattern.test(tableId) ? '&table=' + tableId : '');
+const requestedTable = resumeGuest ? new URLSearchParams(location.search).get('table') : null;
+const inviter = document.querySelector('[data-guest-inviter]');
+const guestName = document.querySelector('[data-guest-name]');
+const expiry = document.querySelector('[data-guest-expiry]');
+const returnToRoom = document.querySelector('[data-guest-return]');
+const webJam = document.querySelector('[data-webjam-guest]') !== null;
+const historyKey = webJam ? 'webJamGameNightInvite' : 'gameNightInvite';
+const restored = !location.hash && !location.search ? history.state?.[historyKey] : null;
+const fragment = new URLSearchParams(location.hash.slice(1));
+const code = restored?.code ?? fragment.get(webJam ? 'grant' : 'invite');
+// Only WebJam's pre-reservation offer requests waiting. A refresh keeps the original deadline.
+let waitUntil = webJam ? restored?.waitUntil ?? (fragment.get('wait') === '1' ? -1 : 0) : 0;
+const attempt = restored?.attempt ?? crypto.randomUUID().replaceAll('-', '');
+const pass = restored?.pass ?? Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
+let watching = restored?.watch === true;
+let chosenName = typeof restored?.nick === 'string' ? restored.nick : undefined;
+let suggestedName = '';
+let nicknameError = '';
+let confirmedGame = typeof restored?.confirmedGame === 'string' ? restored.confirmedGame : '';
+const hasInvitation = typeof code === 'string' && (webJam ? /^[A-Za-z0-9_-]{32,128}$/.test(code) : code.length > 0 && code.length <= 250);
+
+async function sha256(value) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function retainInvitation(confirmedGame) {
+    // A refresh can use this history entry, without putting the link back in the address.
+    history.replaceState({ [historyKey]: { code, attempt, pass, confirmedGame, waitUntil, watch: watching, nick: chosenName } }, '', location.pathname);
+}
+
+function clearInvitation() {
+    history.replaceState(null, '', location.pathname);
+}
+
+if (hasInvitation) retainInvitation(confirmedGame);
+else if (!resumeGuest && (location.hash || location.search || restored)) clearInvitation();
+
+async function request(action, data) {
+    const path = webJam ? '/beta/game-night/room-grant/redeem' : '/beta/game-night/invitation/' + action;
+    const body = webJam ? { value: code, ...data } : { code, ...data };
+    const response = await fetch(path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10000)
+    });
+    const value = await response.json();
+    if (!response.ok) throw Object.assign(new Error(value.error), { status: response.status, tableFull: value.tableFull === true });
+    return value;
+}
+
+async function acceptInvitation() {
+    const body = { age13: true, attempt, passHash: await sha256(pass) };
+    if (chosenName) body.nick = chosenName;
+    let retriedConnection = false;
+    for (;;) {
+        try { return await request('accept', body); }
+        catch (error) {
+            if (!retriedConnection && ['TypeError', 'SyntaxError', 'TimeoutError'].includes(error?.name)) {
+                retriedConnection = true;
+                status.textContent = watching ? 'Reconnecting to the table…' : 'Reconnecting to confirm your seat…';
+                continue;
+            }
+            const remaining = waitUntil - Date.now();
+            if (!webJam || error.status !== 410 || remaining <= 0) throw error;
+            join.textContent = 'Waiting for host…';
+            status.textContent = 'Waiting for your host to reserve your Chess seat…';
+            await new Promise(resolve => setTimeout(resolve, Math.min(2000, remaining)));
+        }
+    }
+}
+
+async function describe() {
+    retry.hidden = true;
+    if (!hasInvitation) {
+        // An existing WebJam member can return to their room when the grant is missing.
+        if (!webJam) {
+            showClosedInvitation('This link is missing its Game Night invitation.');
+            return;
+        }
+        status.textContent = 'Open the Game Night invitation your host sent you.';
+        if (returnToRoom) returnToRoom.hidden = false;
+        return;
+    }
+    try {
+        const tableId = localStorage.getItem(joinedInvitePrefix + await sha256(code));
+        if (tableIdPattern.test(tableId || '') && passPattern.test(localStorage.getItem(passPrefix + tableId) || '')) {
+            location.replace(gameDestination(tableId));
+            return;
+        }
+    } catch { /* Browsers without local storage can return using the saved lobby address. */ }
+    if (webJam) {
+        if (waitUntil !== 0) gameTitle.textContent = 'Royal Flush Chess';
+        status.textContent = 'You were invited from WebJam.';
+        invite.hidden = false;
+        if (document.activeElement === document.body || document.activeElement === retry) join.focus({ preventScroll: true });
+        return;
+    }
+    status.textContent = 'Checking your invitation…';
+    try {
+        const { game, host, watch, inviteExpiresAt, guestName: defaultName } = await request('details');
+        if (expiry && Number.isSafeInteger(inviteExpiresAt) && inviteExpiresAt > 0 && inviteExpiresAt <= 8.64e15) {
+            const time = expiry.querySelector('time');
+            time.dateTime = new Date(inviteExpiresAt).toISOString();
+            time.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(inviteExpiresAt);
+            expiry.hidden = false;
+        }
+        watching = watch === true;
+        join.textContent = watching ? 'Watch game' : 'Join game';
+        if (watching) document.querySelector('#guest-agreement').textContent = 'By choosing Watch game, you confirm you’re 13+ and agree to the house rules.';
+        inviter.textContent = `${host} invited you to ${watching ? 'watch' : 'play'}.`;
+        inviter.hidden = false;
+        gameTitle.textContent = game;
+        status.textContent = '';
+        if (guestName) {
+            suggestedName = defaultName ?? '';
+            guestName.value = chosenName ?? suggestedName;
+            guestName.closest('label').hidden = false;
+            guestName.disabled = false;
+        }
+        invite.hidden = false;
+        join.disabled = false;
+        if (nicknameError) showNicknameError();
+        else if (document.activeElement === document.body || document.activeElement === retry) join.focus({ preventScroll: true });
+    } catch (error) {
+        status.textContent = error.status === 410 ? GAME_INVITE_UNAVAILABLE : 'Couldn’t check the invitation. Try again.';
+        retry.hidden = error.status === 410;
+        if (error.status === 410) {
+            clearInvitation();
+            offerFreshLink();
+            status.tabIndex = -1;
+            status.focus({ preventScroll: true });
+        } else if (document.activeElement === document.body) {
+            retry.focus({ preventScroll: true });
+        }
+    }
+}
+
+function showNicknameError() {
+    status.textContent = nicknameError;
+    guestName.setAttribute('aria-invalid', 'true');
+    guestName.setAttribute('aria-describedby', status.id);
+    guestName.focus();
+}
+
+async function accept() {
+    retry.hidden = true;
+    join.disabled = true;
+    if (guestName) {
+        guestName.disabled = true;
+        if (nicknameError) {
+            nicknameError = '';
+            guestName.removeAttribute('aria-invalid');
+            guestName.removeAttribute('aria-describedby');
+        }
+    }
+    status.textContent = watching ? 'Opening the table…' : 'Joining the game…';
+    try {
+        const { next, tableId } = await acceptInvitation();
+        if (next !== lobbyPath) throw new Error('Unexpected destination');
+        if (tableIdPattern.test(tableId || '')) {
+            try {
+                localStorage.setItem(passPrefix + tableId, pass);
+                localStorage.setItem(joinedInvitePrefix + await sha256(code), tableId);
+                localStorage.setItem(lastTableKey, tableId);
+                sessionStorage.setItem(lastTableKey, tableId);
+            } catch { /* The session cookie still admits the guest. */ }
+        }
+        clearInvitation();
+        location.replace(gameDestination(tableId));
+    } catch (error) {
+        if (error.status === 422 && guestName) {
+            // The guest must be able to edit this name before another accept,
+            // including after reloading while the original accept was pending.
+            nicknameError = error.message;
+            confirmedGame = '';
+            retainInvitation(confirmedGame);
+            if (invite.hidden) {
+                await describe();
+                return;
+            }
+        }
+        const tableFull = webJam && error.status === 409 && error.tableFull;
+        const closed = tableFull || error.status === 410;
+        status.textContent = 'Couldn’t join just now. Try again.';
+        if (tableFull) status.textContent = returnToRoom ? 'This table is full. Return to your room to wait for an open seat.'
+            : 'This table is full. Ask your host for a new invite when a seat opens.';
+        else if (closed) status.textContent = webJam && waitUntil > 0
+            ? 'Your Chess seat wasn’t confirmed. Ask your host for a new WebJam invite.' : GAME_INVITE_UNAVAILABLE;
+        else if ([422, 429, 503].includes(error.status)) status.textContent = error.message;
+        if (status.textContent === GAME_INVITE_UNAVAILABLE) offerFreshLink();
+        if (closed) {
+            clearInvitation();
+            invite.hidden = true;
+            if (returnToRoom) returnToRoom.hidden = false;
+            if (webJam) {
+                gameTitle.tabIndex = -1;
+                gameTitle.setAttribute('aria-describedby', status.id);
+                gameTitle.focus();
+            } else {
+                status.tabIndex = -1;
+                status.focus({ preventScroll: true });
+            }
+        } else if (invite.hidden) {
+            retry.hidden = false;
+            if (document.activeElement === document.body) retry.focus({ preventScroll: true });
+        } else {
+            join.disabled = false;
+            if (guestName) guestName.disabled = false;
+            join.textContent = watching ? 'Watch game' : 'Join game';
+            if (nicknameError) showNicknameError();
+            else if (document.activeElement === document.body) join.focus({ preventScroll: true });
+        }
+    }
+}
+
+// Native form submission from the nickname field activates the Join button
+// too. Unlock on that trusted activation before navigation starts.
+join.addEventListener('click', event => {
+    if (!watching) unlockGameNightAudio(event);
+});
+invite.addEventListener('submit', event => {
+    event.preventDefault();
+    if (join.disabled) return;
+    if (waitUntil === -1) waitUntil = Date.now() + 25_000;
+    if (!webJam && guestName) {
+        const byChoice = guestName.value.trim();
+        chosenName = byChoice && byChoice !== suggestedName ? byChoice : undefined;
+    }
+    retainInvitation(gameTitle.textContent);
+    void accept();
+});
+
+function offerFreshLink() {
+    if (!askHost) return;
+    askHost.hidden = false;
+    askHost.textContent = FRESH_LINK;
+}
+
+async function shareFreshLink() {
+    const message = 'Could you send me a fresh Game Night link?';
+    const payload = { title: 'Game Night', text: message };
+    if (typeof navigator.share === 'function') {
+        try { await navigator.share(payload); return; }
+        catch (error) { if (error?.name === 'AbortError') return; }
+    }
+    if (typeof navigator.clipboard?.writeText === 'function') {
+        try {
+            await navigator.clipboard.writeText(message);
+            if (askHost) askHost.textContent = 'Copied. Send it to your host.';
+            return;
+        } catch { /* Show the message on the page when copying is blocked. */ }
+    }
+    if (freshMessage) {
+        freshMessage.textContent = `Message your host in the app you usually use. “${message}”`;
+        freshMessage.hidden = false;
+        freshMessage.focus();
+    }
+}
+
+function showClosedInvitation(message = GAME_INVITE_UNAVAILABLE) {
+    status.textContent = message;
+    offerFreshLink();
+    status.tabIndex = -1;
+    status.focus({ preventScroll: true });
+}
+
+async function resume() {
+    let tableId, savedPass;
+    retry.hidden = true;
+    try {
+        tableId = requestedTable || sessionStorage.getItem(lastTableKey) || localStorage.getItem(lastTableKey);
+        if (tableIdPattern.test(tableId || '')) savedPass = localStorage.getItem(passPrefix + tableId);
+    } catch { /* This browser may block local storage. */ }
+    if (!passPattern.test(savedPass || '')) {
+        showClosedInvitation();
+        return;
+    }
+    status.textContent = 'Connecting…';
+    try {
+        const response = await fetch('/beta/game-night/invitation/resume', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tableId, pass: savedPass }),
+            signal: AbortSignal.timeout(10000)
+        });
+        if (response.status === 410) {
+            showClosedInvitation();
+            try {
+                localStorage.removeItem(passPrefix + tableId);
+                if (localStorage.getItem(lastTableKey) === tableId) localStorage.removeItem(lastTableKey);
+                if (sessionStorage.getItem(lastTableKey) === tableId) sessionStorage.removeItem(lastTableKey);
+            } catch { /* The rejected pass cannot authorize a session. */ }
+            return;
+        }
+        if (!response.ok) throw Object.assign(new Error('Could not resume'), { status: response.status });
+        const { next } = await response.json();
+        if (next !== lobbyPath) throw new Error('Could not resume');
+        location.replace(gameDestination(tableId));
+    } catch (error) {
+        status.textContent = error?.status === 429
+            ? 'Too many reconnect attempts. Wait a minute, then try again.'
+            : 'Couldn’t reconnect. Try again.';
+        retry.hidden = false;
+        retry.focus({ preventScroll: true });
+    }
+}
+
+retry.addEventListener('click', () => void (resumeGuest ? resume() : confirmedGame ? accept() : describe()));
+askHost?.addEventListener('click', () => { void shareFreshLink(); });
+if (resumeGuest) {
+    void resume();
+} else if (hasInvitation && confirmedGame) {
+    // Resume only an accept attempt already confirmed by this guest.
+    gameTitle.textContent = confirmedGame;
+    if (webJam) invite.hidden = false;
+    void accept();
+} else {
+    void describe();
+}

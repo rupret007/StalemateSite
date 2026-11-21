@@ -1,0 +1,26 @@
+{
+  "at": "2026-11-07T18:38:53.6441418Z",
+  "proofSha256": "ce00dcaefcada9cbf6ba812753abcc7e01abc1f1565b777bca065713ea4fb706",
+  "harnessSha256": "262e2d7ac6a0cd400c7d4b0729504ed22b769eb78b40c69646c85b748103e0e7",
+  "ownership": {
+    "nodePid": 34064,
+    "ownedChromePid": 30140,
+    "harnessSha256": "262e2d7ac6a0cd400c7d4b0729504ed22b769eb78b40c69646c85b748103e0e7",
+    "startedAt": "2026-11-07T18:37:47.4409723Z",
+    "physicalCapture": false
+  },
+  "recordedNodeStillLive": false,
+  "ownedNodes": [],
+  "ownedChrome": [],
+  "listeners": [],
+  "effectiveExecutionPolicy": "Restricted",
+  "temporaryLaunchTaskPresent": false,
+  "state": "PASSED_SAME_WINDOWS_BROWSER_PROOF_HARNESS_AND_NODE_BROWSER_LISTENER_CLEANUP_VERIFIED",
+  "screenshots": {
+    "windows-c227-390.png": "fbb3cf12481bcc1bbf8ddc8c35e01283ae5ad175120c72ba598bfce57be806c7",
+    "windows-c227-375.png": "abec6c8d981238be8f496d505de4bf5a58d8053254b3aa2606ff108d19bbf943"
+  },
+  "physicalCapture": false,
+  "providerIssuance": false,
+  "releaseCandidateComplete": false
+}

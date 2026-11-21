@@ -1,0 +1,54 @@
+{
+  "at": "2026-11-04T19:16:34.601761+00:00",
+  "scope": "Afternoon private activation, HTTP fix and actual physical Wi-Fi chat; earlier receipts/failures preserved",
+  "requirementsFileSha256": "3d5db107977f652a1bd51286c02657aaff70c9c3590adb876e03f6d909679999",
+  "physicalMusicQualified": false,
+  "publicLaunch": false,
+  "files": [
+    {
+      "path": "arm-fixed-join-invalid.png",
+      "bytes": 46280,
+      "sha256": "964de2761a1bdc579d67b461b0d4ea2f4dccf9797947c5b5612d5c616ede20fa"
+    },
+    {
+      "path": "intel-wireless-375.png",
+      "bytes": 69583,
+      "sha256": "80baf8601b842e3e8baaca3b9d6fe439d08f4c0693fbc2689551ed1d6e44bf0d"
+    },
+    {
+      "path": "intel-wireless-390.png",
+      "bytes": 70339,
+      "sha256": "89ed6bc0544239d1be904009097a0134831aaa20c6cade123bebdcd61828cea7"
+    },
+    {
+      "path": "native-fixed-arm-recovery.json",
+      "bytes": 1051,
+      "sha256": "22441efbf97aad07929363e24dba25713cda96b006c56e71bbb063a9875ea844"
+    },
+    {
+      "path": "native-fixed-packages.json",
+      "bytes": 12928,
+      "sha256": "580f9f75c4aa7983c17557538d8633e88eb04c9fae891ffc32bd55831a8d8396"
+    },
+    {
+      "path": "native428-ci.json",
+      "bytes": 6503,
+      "sha256": "987164379f02616600223f6e84268c42b517dbdede50636fbf8a4872030e79b5"
+    },
+    {
+      "path": "provider-activation.json",
+      "bytes": 4796,
+      "sha256": "6c6d853773832b1147f7cce5ee88b03b17bd8c9e93016c6aa4e72aaecf131eb0"
+    },
+    {
+      "path": "website202-6fb-ci.json",
+      "bytes": 1548,
+      "sha256": "8230b14c21f40b16049b2a22f0dd7c81114f5b674a13fbd3e32b7883659b9919"
+    },
+    {
+      "path": "wireless-two-mac-chat.json",
+      "bytes": 1717,
+      "sha256": "6c2e209fbaa0e0d862306e88d1d49b10d6fd7dcfd72af5739d89f26481c5f816"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "state": "CURRENT_BROWSER_JOURNEYS_VERIFIED_RELEASE_CANDIDATE_PENDING",
+  "preparedAt": "2026-11-08T03:26:32.004698+00:00",
+  "websiteSource": "ac9b82f42c8d6952193f5cbefbf11fc04816821d",
+  "websiteMerge": "84e77d6d8513a4f8ecce713835b97aa3a547b66c",
+  "websiteTree": "7037bd7b5a4b32841af313402545256b5943053e",
+  "privateVersion": "449fe7d2-0ac3-41b8-b622-fda2453b38db",
+  "nativeSource": "76b1fd74c0f8a77df2c9d6b42f7fde87dadfaf7c",
+  "webJoinSource": "5dde45d2e841fd19ff9c1fd055f88520fbf778e4",
+  "all62RequirementsUnchanged": true,
+  "canonicalRequirementCellsSha256": "94001557e0ea50e92e0e7ab6b63592092d6540c2debdf616e6a5d85318370988",
+  "physicalListeningEvidenceAdded": false,
+  "recordingsIncluded": false,
+  "invitationValuesOrCredentialsIncluded": false,
+  "productionSitesChanged": false,
+  "storyPoolUsed": false,
+  "releaseCandidateReady": false,
+  "files": {
+    "ci-review.json": {
+      "bytes": 6848,
+      "sha256": "09b41b0d4cb3fc8136cc09a004f95b76130ede2a01f1226b1ed102df71ba7e5a"
+    },
+    "entry-toolkit-reuse.json": {
+      "bytes": 1844,
+      "sha256": "1253b0fb4307bde94f48db58b859913d9c5303b1e9ae69c5f7b24ab3fa40ad58"
+    },
+    "hosted-webkit-375-heartbeat-ac9-nov08.png": {
+      "bytes": 92073,
+      "sha256": "cf49d72ae38c2380b01de204e38a2f7464e3ca10aef9d5d51c7d85ba83bd2d31"
+    },
+    "hosted-webkit-390-heartbeat-ac9-nov08.png": {
+      "bytes": 92905,
+      "sha256": "4939c184b454443715376e9db074c44fb398864df7da5b58685b0d0c21c2ea2d"
+    },
+    "keepalive-observation.json": {
+      "bytes": 2689,
+      "sha256": "28e8c2914e7e176a70433d69572f759196662a9e9022bd3433b8b4e78e91e95c"
+    },
+    "keepalive-postcheck-recovery.json": {
+      "bytes": 1635,
+      "sha256": "dc0c5d7a418887bbd116418bbb907f9c85688462b32cd8fb8aa2a6d35ac6b84d"
+    },
+    "mac-journeys.json": {
+      "bytes": 3717,
+      "sha256": "d4c9d1729cff374cfd11427e122fc0dac5e3df41971f0d89ab0dd48333fab596"
+    },
+    "original-repaired-expiry.json": {
+      "bytes": 2243,
+      "sha256": "b06d9e106c97ee73404f40c36299f131c44b03ff5d0a04940adc36c96542d5ff"
+    },
+    "private-delivery.json": {
+      "bytes": 1351,
+      "sha256": "a74c798931ba2baa51abbe3e251780422480f86c4a458b9774560db19a4ae95f"
+    },
+    "qa-harnesses/hosted-keepalive-observation.cjs": {
+      "bytes": 10088,
+      "sha256": "c7059480b2511017e222e370f8a12a9ca368e1dc61a8b5c9008b70b85ac5eb64"
+    },
+    "qa-harnesses/intel-hosted-journeys.cjs": {
+      "bytes": 14713,
+      "sha256": "9192525225beeded6dad1bfb7cc42f993fc401bd27bbde4e01f0ae19905424b4"
+    },
+    "qa-harnesses/windows-hosted-journeys.cjs": {
+      "bytes": 10345,
+      "sha256": "9e9ca1a2b22e1b22bd09c137188b843a4361ad845680e211531c6fb17a43cfa6"
+    },
+    "retained-preflight-stops.json": {
+      "bytes": 778,
+      "sha256": "7c01f3255db4536502e60e46bf12d74779cc7daa404cd77f843458f6c846777a"
+    },
+    "windows-heartbeat-ac9-375.png": {
+      "bytes": 46390,
+      "sha256": "40a21e035f643cc9aba33ea72059092f6d6c1f4f60ddfa1ac41917f277323c9f"
+    },
+    "windows-heartbeat-ac9-390.png": {
+      "bytes": 46832,
+      "sha256": "954308717106a4d6deabf2831bb5a2865ad727f03f19daa82203c5d5318c93ca"
+    },
+    "windows-journeys.json": {
+      "bytes": 3965,
+      "sha256": "66584f8bebd1fbe3294483ad3803022f0b153306b8b29d8f1ff66aac9322c1f0"
+    }
+  },
+  "remainingEssentials": [
+    "Current native Mac to Windows Chrome clear speech and short musical passage",
+    "Actual desktop Shared Track WAV mix and packaged MP3 role",
+    "Second network when available",
+    "Actual Webex video and manual exclusive audio handoff",
+    "Current human moderation and remaining accessibility/operations acceptance",
+    "Full public operator/all-ages/legal readiness remains outside demonstrated private engineering proof"
+  ]
+}
