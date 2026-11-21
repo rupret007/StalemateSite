@@ -1895,6 +1895,8 @@ import { discordCallLink, gameInviteCode, gameNightInvite, gameNightLabels, game
     }
     function arcadeMatchState(game, table, scope, state, sendMatch, reconnecting) {
         if (reconnecting) {
+            if (arcadeInvitation?.game === game && arcadeInvitation.room === scope?.room
+                && arcadeInvitation.ref === scope.ref) arcadeInvitation.sent = false;
             table.invite = null;
             updateTableInvite(table, currentGameNight());
             return;
