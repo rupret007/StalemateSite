@@ -5,7 +5,25 @@ export const DURABLE_RECORD_CEILINGS = Object.freeze({ chunkBytes: 65536, record
     transactionReadBytes: 32 * 1024 * 1024, transactionWriteBytes: 16 * 1024 * 1024, rowOperations: 4096, listPage: 4, nodes: 100000, depth: 64 });
 const enc = new TextEncoder(), dec = new TextDecoder('utf-8', { fatal: true });
 const fail = reason => { throw Error(reason); };
-const digest = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(n => n.toString(16).padStart(2, '0')).join('');
+const webDigest = async bytes => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(n => n.toString(16).padStart(2, '0')).join('');
+// Same SHA-256 as WebCrypto. Node's createHash avoids the per-call subtle
+// boundary that dominated repeated record verification. Workerd without
+// node:crypto has no getBuiltinModule and keeps the portable digest, so this
+// module still loads there without importing node:crypto.
+let nodeDigest;
+const digest = async bytes => {
+    if (nodeDigest === undefined) {
+        nodeDigest = null;
+        const getBuiltin = globalThis.process?.getBuiltinModule;
+        if (typeof getBuiltin === 'function') {
+            try {
+                const { createHash } = getBuiltin('node:crypto');
+                if (typeof createHash === 'function') nodeDigest = data => createHash('sha256').update(data).digest('hex');
+            } catch { nodeDigest = null; }
+        }
+    }
+    return nodeDigest ? nodeDigest(bytes) : webDigest(bytes);
+};
 const exact = (value, keys) => value && Object.getPrototypeOf(value) === Object.prototype
     && Reflect.ownKeys(value).length === keys.length && keys.every(key => {
         const d = Object.getOwnPropertyDescriptor(value, key); return d?.enumerable && Object.hasOwn(d, 'value');

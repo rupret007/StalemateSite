@@ -23,6 +23,26 @@ const SESSION = 'authority-session:', CONNECTION = 'authority-connection:', RATE
 const SID = /^[a-z0-9-]{16,64}$/, REF = /^[A-Za-z0-9_-]{1,128}$/, ACCOUNT = /^a_[A-Za-z0-9_-]{43}$/;
 const LIMIT = 1000, CONNECTION_LIMIT = 200, ROOM_LIMIT = 16, BATCH = 16, INTERVAL = 60000;
 const clone = value => structuredClone(value);
+// Repeated helper reads inside one resolve otherwise re-hash and re-encode the
+// whole session and connection indexes. The snapshot dies with the transaction.
+// Frozen plain JSON keeps one descriptor from mutating the row the next one reads.
+function readSnapshot(tx) {
+    const rows = new Map();
+    const freeze = value => {
+        if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+        const prototype = Object.getPrototypeOf(value);
+        if (prototype !== Object.prototype && prototype !== Array.prototype) return value;
+        for (const child of Object.values(value)) freeze(child);
+        return Object.freeze(value);
+    };
+    return Object.freeze({
+        get: async key => {
+            if (!rows.has(key)) rows.set(key, freeze(await tx.get(key)));
+            return rows.get(key);
+        },
+        list: options => tx.list(options)
+    });
+}
 const fail = () => { throw Error('lobby-authority-unavailable'); };
 const ensure = value => { if (!value) fail(); };
 const exact = (value, keys) => value && Object.getPrototypeOf(value) === Object.prototype
@@ -244,9 +264,13 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
     });
     return Object.freeze({
         records,
-        resolveParticipationConnection: value => transact(async tx => {
+        resolveParticipationConnection: value => records.transaction(async tx => {
+            const current = readSnapshot(tx);
+            await initialized(current); ensure((await configuredMarker(current)).inviteVersion === betaVersion(env));
             const binding = bindingFrom(value);
-            return await validateBinding(tx, binding) ? participationIdentity(tx, binding.betaSid, binding.expiresAt) : null;
+            const result = await validateBinding(current, binding) ? await participationIdentity(current, binding.betaSid, binding.expiresAt) : null;
+            await configuredMarker(current);
+            return result;
         }),
         async resolveParticipationConnections(values) {
             ensure(Array.isArray(values) && values.length <= CONNECTION_LIMIT);
@@ -254,13 +278,9 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
             return records.transaction(async tx => {
                 // Preparation only: native reads are shared inside this one
                 // read-only transaction, never across actions or commit fences.
-                // Each validator still sees an independent row and checks its
-                // own descriptor, current role and live clock on every call.
-                const rows = new Map();
-                const current = Object.freeze({ get: async key => {
-                    if (!rows.has(key)) rows.set(key, await tx.get(key));
-                    return clone(rows.get(key));
-                } });
+                // Each descriptor still rechecks its own claims, current role
+                // and live clock. The shared rows are frozen for this transaction.
+                const current = readSnapshot(tx);
                 await initialized(current); ensure((await configuredMarker(current)).inviteVersion === betaVersion(env));
                 const identities = [];
                 for (const value of descriptors) {
