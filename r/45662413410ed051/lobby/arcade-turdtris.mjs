@@ -25,7 +25,7 @@ const markup = `
     <div class="tris-arena">
         <div class="tris-primary" data-tris-playfield>
             <canvas width="240" height="480" role="img" aria-label="Turdtris playfield" tabindex="0" aria-describedby="tris-keyboard"></canvas>
-            <b class="tris-countdown" aria-hidden="true" data-tris-countdown hidden></b>
+            <div class="tris-countdown" aria-hidden="true" data-tris-countdown hidden><span>Starts in</span> <b></b></div>
         </div>
         <aside class="tris-rival">
             <span data-tris-rival></span>
@@ -156,6 +156,10 @@ export function mountArcadeTurdtris(container, onMatch) {
         return board;
     }
 
+    function setStatus(message) {
+        if (message !== status.textContent) status.textContent = message;
+    }
+
     function drawFrame(time) {
         raf = 0;
         const match = model?.match;
@@ -188,11 +192,18 @@ export function mountArcadeTurdtris(container, onMatch) {
                 : Math.max(0, Math.ceil((match.endsAt - Math.max(at, match.startsAt)) / 1000)) * 1000);
             if (clock.textContent !== clockText) clock.textContent = clockText;
             overlay.hidden = !seconds || !!match.result;
-            overlay.textContent = seconds || '';
+            const count = overlay.querySelector('b');
+            const countText = seconds ? String(seconds) : '';
+            if (count.textContent !== countText) count.textContent = countText;
             const playable = connection === 'ready' && !!match.self && !match.result && !seconds && shown.status === 'playing' && at < match.endsAt;
             table.dataset.phase = match.result ? 'finished' : seconds ? 'countdown' : 'play';
             table.dataset.sequence = match.self?.sequence ?? '';
             for (const button of controls.children) button.disabled = !playable;
+            if (connection === 'ready' && match.self && !match.result && shown.status === 'playing') {
+                const cue = seconds ? 'Get ready to stack.' : playable && !match.self.sequence
+                    ? 'Go! Tap ⇊ or press Space to drop.' : 'Race to 40';
+                setStatus(cue);
+            }
             const primaryLabel = match.self ? 'You' : 'Player 1';
             $('[data-tris-score]').textContent = `${primaryLabel} · ${shown.lines}/40 · ${shown.score.toLocaleString()} pts`;
             $('[data-tris-rival]').textContent = `${match.self ? 'Opponent' : 'Player 2'} · ${rival.lines}/40${rival.status === 'top-out' ? ' · Out' : ''}`;
@@ -236,9 +247,9 @@ export function mountArcadeTurdtris(container, onMatch) {
             if (seat && model.rematch === seat) message += ' · Rematch requested';
         } else if (match) {
             message = !seat ? 'Watching the race' : match.self.board.status === 'top-out' ? 'Your board topped out. Opponent still playing.'
-                : match.self.board.status === 'cleared' ? '40 lines cleared. Confirming the finish…' : 'Race to 40';
+                : match.self.board.status === 'cleared' ? '40 lines cleared. Confirming the finish…' : null;
         }
-        if (message !== status.textContent) status.textContent = message;
+        if (message !== null) setStatus(message);
         main.hidden = !action;
         main.dataset.command = action;
         main.textContent = label;
