@@ -4,8 +4,9 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const SLUG = '45662413410ed051';
+const SLUG = `${TEST_SLUG}`;
 const KEY = 'local-preview-key-0001';
 const FAKE_YT = path.join(__dirname, 'support/fake-youtube.js');
 const SHOTS = process.env.HANGOUT_VIDEO_SHOTS || '';

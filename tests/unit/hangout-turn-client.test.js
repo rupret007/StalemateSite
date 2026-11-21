@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
-const { createTurnClient, signedDevice } = createRequire(import.meta.url)('../../r/45662413410ed051/turn-client.js');
+import { productFile } from '../support/product-room.cjs';
+const { createTurnClient, signedDevice } = createRequire(import.meta.url)(productFile('turn-client.js'));
 const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(32)}`;
 const ICE = [{ urls: ['turn:relay.example:3478'], username: 'fixture', credential: 'fixture-password' }];
 const STUN = [{ urls: 'stun:stun.cloudflare.com:3478' }];

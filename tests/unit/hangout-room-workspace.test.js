@@ -3,7 +3,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 
-const read = (name) => readFileSync(new URL(`../../r/45662413410ed051/${name}`, import.meta.url), 'utf8');
+import { productFile } from '../support/product-room.cjs';
+const read = (name) => readFileSync(productFile(`${name}`), 'utf8');
 const windows = [];
 afterEach(() => { for (const window of windows.splice(0)) window.close(); });
 

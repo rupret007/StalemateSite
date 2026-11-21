@@ -4,8 +4,9 @@ import { mkdtempSync, writeFileSync, readdirSync, readFileSync, rmSync } from 'n
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { communityIntegration, communityJoinLink, communityLinkHtml, communityPublicManifest } from '../../hangout-worker/src/community-integration.mjs';
-import { createEntrySiteRegistry, entryReturn } from '../../r/45662413410ed051/entry-sites.mjs';
+import { createEntrySiteRegistry, entryReturn } from '#product-room/entry-sites.mjs';
 
+import { productRoomName } from '../support/product-room.cjs';
 const config = () => ({ version: 1, communityAddress: 'https://community.example.test/beta/', sites: [
     { id: 'stalemate', label: 'Stalemate', origins: ['https://stalemate.band'], returnUrl: 'https://stalemate.band/', permissions: ['link', 'badge', 'return'], enabled: true, domainVerified: true },
     { id: 'rad-dad', label: 'Rad Dad', origins: ['https://raddadband.com'], returnUrl: 'https://raddadband.com/', permissions: ['link', 'badge', 'return'], enabled: true, domainVerified: true },
@@ -75,7 +76,7 @@ describe('public community integration contract', () => {
     });
 
     it('permits explicit loopback fixtures without weakening the production HTTPS default', () => {
-        const value = config(); value.communityAddress = 'http://127.0.0.1:4321/r/45662413410ed051/lobby/';
+        const value = config(); value.communityAddress = `http://127.0.0.1:4321/r/${productRoomName}/lobby/`;
         expect(() => communityIntegration(value)).toThrow();
         expect(communityIntegration(value, { allowLoopback: true }).communityAddress).toBe(value.communityAddress);
         value.communityAddress = 'http://lan-machine.test/';

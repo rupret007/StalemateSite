@@ -2,7 +2,7 @@
 // Hang Out lobby engine: IRC commands, server-side permissions, filters, PMs, moderation, budget, stats.
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { createLobby, COMMANDS, LOBBY, validWebjamInvite, validWebJoin } from '../../hangout-worker/src/lobby-core.mjs';
-import { discordCallLink } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { discordCallLink } from '#product-room/lobby/game-night.mjs';
 import { checkText, checkNick, normalize } from '../../hangout-worker/src/filter.mjs';
 
 let clock;

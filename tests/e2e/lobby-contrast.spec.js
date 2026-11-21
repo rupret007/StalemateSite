@@ -3,7 +3,8 @@ const { randomUUID } = require('node:crypto');
 const { writeFile } = require('node:fs/promises');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
-const ROOT = '/r/45662413410ed051/';
+const { TEST_SLUG } = require('./support/lobby-fixture');
+const ROOT = `/r/${TEST_SLUG}/`;
 
 async function sample(page, { text = [], fields = [], placeholders = [] }) {
     return page.evaluate(({ text, fields, placeholders }) => {

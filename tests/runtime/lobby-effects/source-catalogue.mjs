@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { isAbsolute, normalize, relative, sep } from 'node:path';
 
+import { productRoomName } from '../../support/product-room.cjs';
 export const NATIVE_LOBBY_INPUTS = Object.freeze([
     'fixture/worker.mjs',
     ...[
@@ -11,9 +12,9 @@ export const NATIVE_LOBBY_INPUTS = Object.freeze([
         'transport-budget.mjs', 'participation-checkpoint.mjs',
         'lobby-incident-sources.mjs', 'incident-cases.mjs'
     ].map(name => 'application/hangout-worker/src/' + name),
-    'application/r/45662413410ed051/sync-core.js',
-    'application/r/45662413410ed051/entry-sites.mjs',
-    'application/r/45662413410ed051/lobby/game-night.mjs',
+    `application/r/${productRoomName}/sync-core.js`,
+    `application/r/${productRoomName}/entry-sites.mjs`,
+    `application/r/${productRoomName}/lobby/game-night.mjs`,
     ...[
         'index.mjs', 'index.js', 'censor/TextCensor.js', 'matcher/BlacklistedTerm.js',
         'censor/BuiltinStrategies.js', 'matcher/MatchPayload.js', 'matcher/Matcher.js',

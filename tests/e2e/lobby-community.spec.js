@@ -1,10 +1,11 @@
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium community flows');
 let relay;
 test.beforeEach(({ baseURL }) => { relay = hangoutRelayWsBase(baseURL, `community-${randomUUID()}`); });
-const url = (owner = false) => `/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}${owner ? '&owner=1' : ''}`;
+const url = (owner = false) => `/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}${owner ? '&owner=1' : ''}`;
 async function visitor(browser, nick, account, viewport) {
     const ctx = await browser.newContext({ viewport }); const page = await ctx.newPage();
     if (account) await page.addInitScript((identity) => {

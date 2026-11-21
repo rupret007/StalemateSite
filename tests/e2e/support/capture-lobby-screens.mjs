@@ -1,11 +1,14 @@
 // Local-only: screenshots of the hidden lobby, a room, the jam hand-off, terms and the band panel (desktop + phone).
 // Usage: STALEMATE_TEST_PORT=4392 node scripts/serve-test.cjs & node tests/e2e/support/capture-lobby-screens.mjs <outDir>
+import { createRequire } from 'node:module';
 import { chromium } from '@playwright/test';
 import { startRelay } from '../../../scripts/hangout-relay-dev.mjs';
 
+const require = createRequire(import.meta.url);
+const { TEST_SLUG: SLUG } = require('./lobby-fixture.js');
+
 const OUT = process.argv[2] || 'pr-assets/lobby';
 const BASE = `http://127.0.0.1:${process.env.STALEMATE_TEST_PORT || 4392}`;
-const SLUG = '45662413410ed051';
 const KEY = 'local-preview-key-0001';
 const ADMIN = 'local-dev-admin-key-0001';
 const relay = await startRelay({ previewKey: KEY, origins: BASE, devAdminKey: ADMIN, lobbyLimits: { pmMinLobbyMs: 0, roomPerDevice: 0, roomsPerIpHour: 99, defaultSlow: 0, burst: 50 } });

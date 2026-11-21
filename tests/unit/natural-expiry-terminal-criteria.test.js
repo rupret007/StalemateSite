@@ -3,11 +3,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 
+import { productFile } from '../support/product-room.cjs';
 const require = createRequire(import.meta.url);
 const { createDiagnostics } = require('../../scripts/lib/natural-expiry-diagnostics.cjs');
 const receipt = JSON.parse(readFileSync(new URL('../../pr-assets/beta-collaboration/20261031/private-demo-progress/receipt.json', import.meta.url), 'utf8'));
-const lobbyJs = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
-const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
+const lobbyJs = readFileSync(productFile('lobby/lobby.js'), 'utf8');
+const discovery = readFileSync(productFile('lobby/discovery-core.js'), 'utf8');
 
 describe('beta session expiry terminal lobby state', () => {
     it('documents ended as the session-revocation connection state, not offline', () => {

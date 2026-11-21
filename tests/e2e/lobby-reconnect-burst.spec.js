@@ -3,6 +3,7 @@
 // is not hosted/C3 authority, WAN, high-load or native audio qualification.
 const http = require('node:http');
 const { test, expect } = require('@playwright/test');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 async function lossyRelay(baseURL) {
     const { createHangoutRelay } = await import('../../scripts/hangout-relay-dev.mjs');
@@ -91,7 +92,7 @@ test('five visitors recover together from TCP loss without replay, duplicate lin
             await context.route('**/*', route => new URL(route.request().url()).origin === fixture.origin ? route.continue() : route.abort());
             const page = await context.newPage(); pages.push(page);
             page.on('pageerror', error => errors.push(error.message));
-            const target = new URL('/r/45662413410ed051/lobby/', fixture.origin);
+            const target = new URL(`/r/${TEST_SLUG}/lobby/`, fixture.origin);
             target.searchParams.set('preview', 'local-preview-key-0001'); target.searchParams.set('relay', fixture.url);
             await page.goto(target.href);
             await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute('content', /connect-src 'self'/);

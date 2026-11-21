@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { productRoomName } from '../support/product-room.cjs';
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
-const roomJs = readFileSync(join(repoRoot, 'r/45662413410ed051/room.js'), 'utf8');
+const roomJs = readFileSync(join(repoRoot, `r/${productRoomName}/room.js`), 'utf8');
 
 describe('hangout invite gate', () => {
     it('opens the gate for preview or a fragment invite, not a bare room URL', () => {

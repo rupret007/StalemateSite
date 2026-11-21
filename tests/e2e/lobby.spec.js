@@ -2,8 +2,9 @@
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const SLUG = '45662413410ed051';
+const SLUG = `${TEST_SLUG}`;
 const KEY = 'local-preview-key-0001';
 const ADMIN = 'local-dev-admin-key-0001';
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium carries the lobby suite');

@@ -12,6 +12,7 @@ import { findDuelSolution } from '../../hangout-worker/arcade/games/turdomania-d
 import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race.js';
 import '../../hangout-worker/arcade/games/turdrummy-rules.js';
 
+import { productRoomName } from '../support/product-room.cjs';
 const runProcess = promisify(execFile);
 const isMatchView = frame => frame.t === 'snapshot' || frame.t === 'match-state';
 
@@ -197,7 +198,7 @@ export async function runArcadeBrowser(engine, origin, invitation, evidence, ent
         try {
             await host.setViewportSize(viewport);
             // A lost connection preserves the table. An explicit Leave intentionally retires its seat.
-            await host.goto(origin + '/r/45662413410ed051/lobby/?via=rad-dad');
+            await host.goto(origin + `/r/${productRoomName}/lobby/?via=rad-dad`);
             await host.getByLabel('Your nick').fill('LinkHost');
             await host.locator('[data-enter]').click();
             await expect(host.locator('[data-connection]')).toHaveText('Connected');

@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { ENTRY_SITES, createEntrySiteRegistry, entrySitesFromConfig, normalizeEntrySource, entrySourceFromParams,
-    entryBadge, entryReturn, entryHandoff, readEntryHandoff, gameNightEntry, gameNightFragment } from '../../r/45662413410ed051/entry-sites.mjs';
+    entryBadge, entryReturn, entryHandoff, readEntryHandoff, gameNightEntry, gameNightFragment } from '#product-room/entry-sites.mjs';
 
 it('carries an exact Game Night room locator only from the explicit entrance', () => {
     const params = new URLSearchParams('game-night=1&via=rad-dad');

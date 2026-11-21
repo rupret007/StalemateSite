@@ -4,8 +4,9 @@ const { randomUUID } = require('node:crypto');
 const { resolve } = require('node:path');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const LOBBY = '/r/45662413410ed051/lobby/';
+const LOBBY = `/r/${TEST_SLUG}/lobby/`;
 const sites = {
     stalemate: { label: 'Stalemate', origin: 'http://stalemate-entry.test' },
     'rad-dad': { label: 'Rad Dad', origin: 'http://rad-dad-entry.test' },

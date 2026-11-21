@@ -7,8 +7,9 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { productRoomName } from '../support/product-room.cjs';
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
-const SLUG = '45662413410ed051';
+const SLUG = productRoomName;
 const ROOM = join(repoRoot, 'r', SLUG);
 const SKIP = new Set(['node_modules', '.git', 'tests', 'r', 'dist', 'playwright-report', 'test-results', 'live-results', 'hangout-worker', 'pr-assets', '.pilot-assets', '.beta-assets', '.local', '.wrangler']);
 

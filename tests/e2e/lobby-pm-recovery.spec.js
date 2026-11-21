@@ -3,6 +3,7 @@
 const { test, expect } = require('@playwright/test');
 const { writeFile } = require('node:fs/promises');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'PM recovery fixture uses Chromium.');
 
@@ -38,7 +39,7 @@ async function community(browser, baseURL, { privateContextFeature = 1, privateP
             engine.connect(identity);
         });
         const relay = hangoutRelayWsBase(baseURL, 'pm-wake-fixture');
-        await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await page.goto(`/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
         await expect(page.locator('[data-connection]')).toHaveText('Connected'); return page;
     };

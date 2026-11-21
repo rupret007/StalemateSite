@@ -2,6 +2,7 @@
 // browser timers. This is not real-time idle/hibernation or hosted expiry proof.
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 test.use({ permissions: [], video: 'off' });
 const INTERVAL = 5 * 60 * 1000;
 
@@ -27,7 +28,7 @@ async function fixture(page, baseURL, version = 1) {
         socket.send(JSON.stringify({ t: 'hello', role: 'fan', lock: 'off', shield: false, budget: 'ok', needNick: true,
             features: version === undefined ? {} : { transportPing: version } }));
     });
-    await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(hangoutRelayWsBase(baseURL, 'idle-heartbeat-fixture'))}`);
+    await page.goto(`/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(hangoutRelayWsBase(baseURL, 'idle-heartbeat-fixture'))}`);
     await page.fill('[data-nick]', 'QuietGuest'); await page.click('[data-enter]');
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
     await page.clock.pauseAt(new Date('2026-11-07T00:01:00Z'));

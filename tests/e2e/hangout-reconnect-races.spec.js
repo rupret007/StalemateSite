@@ -3,8 +3,9 @@ const { randomUUID } = require('node:crypto');
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/';
+const ROOT = `/r/${TEST_SLUG}/`;
 const KEY = 'local-preview-key-0001';
 const FIRST = 'BtnyqIHTDMM';
 const SECOND = 'Dws9G6UFyUQ';

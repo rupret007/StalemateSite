@@ -3,10 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 
-const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
-const core = readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8');
-const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby-room.js', import.meta.url), 'utf8');
-const youtube = readFileSync(new URL('../../r/45662413410ed051/youtube-player.js', import.meta.url), 'utf8');
+import { productFile } from '../support/product-room.cjs';
+const html = readFileSync(productFile('lobby/index.html'), 'utf8');
+const core = readFileSync(productFile('sync-core.js'), 'utf8');
+const client = readFileSync(productFile('lobby/lobby-room.js'), 'utf8');
+const youtube = readFileSync(productFile('youtube-player.js'), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };

@@ -4,6 +4,7 @@ const http = require('node:http');
 const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 async function entrySite(href, label) {
     const server = http.createServer((req, res) => {
@@ -22,7 +23,7 @@ const viewports = [
 
 for (const { width, height, mobile } of viewports) test(`three website entrances share chat, source choices and creative rooms at ${width}px`, async ({ browser, baseURL }, testInfo) => {
     const { communityIntegration, communityJoinLink } = await import('../../hangout-worker/src/community-integration.mjs');
-    const integration = communityIntegration({ version: 1, communityAddress: `${baseURL}/r/45662413410ed051/lobby/`, sites: [
+    const integration = communityIntegration({ version: 1, communityAddress: `${baseURL}/r/${TEST_SLUG}/lobby/`, sites: [
         { id: 'stalemate', label: 'Stalemate', origins: ['https://stalemate.band'], returnUrl: 'https://stalemate.band/', permissions: ['link', 'badge', 'return'], enabled: true, domainVerified: true },
         { id: 'rad-dad', label: 'Rad Dad', origins: ['https://raddadband.com'], returnUrl: 'https://raddadband.com/', permissions: ['link', 'badge', 'return'], enabled: true, domainVerified: true },
         { id: 'makers', label: 'Makers & Friends', origins: ['https://makers.example.test'], permissions: ['link', 'badge'], enabled: true, domainVerified: true }

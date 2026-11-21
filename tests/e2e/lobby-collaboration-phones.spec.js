@@ -4,11 +4,12 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 test('phone visitors chat and draw together, retain drafts on reconnect, and get no missed backlog', async ({ page, browser, baseURL }) => {
     const errors = []; page.on('pageerror', (error) => errors.push(error.message));
     const relay = hangoutRelayWsBase(baseURL, `phone-${randomUUID()}`);
-    const url = `/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`;
+    const url = `/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`;
     const hostContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     try {
         const host = await hostContext.newPage(); await host.goto(url);
@@ -43,7 +44,7 @@ test('phone visitors chat and draw together, retain drafts on reconnect, and get
 
 test('phone watch room receives host play, pause and seek changes', async ({ page, browser, baseURL }) => {
     const relay = hangoutRelayWsBase(baseURL, `watch-phone-${randomUUID()}`);
-    const url = `/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`;
+    const url = `/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`;
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const fakeYouTube = path.join(__dirname, 'support/fake-youtube.js');
     const prepare = async (target, nick) => {

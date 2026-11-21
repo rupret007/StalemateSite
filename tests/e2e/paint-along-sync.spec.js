@@ -5,6 +5,7 @@ const { randomUUID } = require('node:crypto');
 const { test: base, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const { chromiumMediaLaunch, installWebKitMedia } = require('./support/webkit-media');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const test = base.extend({
     launchOptions: [async ({ browserName, launchOptions }, use) => {
@@ -15,7 +16,7 @@ const test = base.extend({
 });
 test.use({ permissions: ['camera', 'microphone'] });
 
-const SLUG = '45662413410ed051';
+const SLUG = `${TEST_SLUG}`;
 const KEY = 'local-preview-key-0001';
 const FAKE_YT = path.join(__dirname, 'support/fake-youtube.js');
 

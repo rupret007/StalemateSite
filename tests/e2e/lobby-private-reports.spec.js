@@ -1,8 +1,9 @@
 // Controlled staff WebSocket snapshots exercise UI only, not Access or durability.
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/';
+const ROOT = `/r/${TEST_SLUG}/`;
 const FIRST = 'pr' + 'A'.repeat(43);
 const SECOND = 'pr' + 'B'.repeat(43);
 const report = (extra = {}) => ({ id: FIRST, at: 1800000000000, kind: 'message', claimedName: 'ClaimedGuest',

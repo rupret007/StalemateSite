@@ -2,6 +2,7 @@ const { randomUUID } = require('node:crypto');
 const { openCanvasControls } = require('./support/lobby-canvas-controls');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const sizes = [{ width: 375, height: 812 }, { width: 390, height: 844 }, { width: 1440, height: 900 }, { width: 1440, height: 900, chatPadding: true }, { width: 1440, height: 900, resize: true }];
 
@@ -217,7 +218,7 @@ for (const viewport of sizes) {
             };
         });
         const relay = hangoutRelayWsBase(baseURL, `room-workspace-${randomUUID()}`);
-        await page.goto(`/r/45662413410ed051/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await page.goto(`/r/${TEST_SLUG}/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
         await page.locator('[data-name]').fill('RoomHost');
         await page.locator('[data-enter]').click();
 

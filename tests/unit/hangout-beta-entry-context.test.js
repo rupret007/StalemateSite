@@ -4,15 +4,16 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { signBeta } from '../../hangout-worker/src/beta-auth.mjs';
 import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
-import { GAME_INVITE_UNAVAILABLE, gameNightReturnHint } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { GAME_INVITE_UNAVAILABLE, gameNightReturnHint } from '#product-room/lobby/game-night.mjs';
 import { BetaSessions } from '../../hangout-worker/src/beta-sessions.mjs';
-import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
+import { createChatAnnouncements } from '#product-room/lobby/chat-announcements.mjs';
 import { createHangoutClientTestModules, entryFunctions } from './hangout-lobby-client-stub.mjs';
 
-const root = '/r/45662413410ed051/';
+import { productFile, productRoomPath } from '../support/product-room.cjs';
+const root = productRoomPath();
 function env(extra = {}) {
     return { HANGOUT_BETA_MODE: 'protected', HANGOUT_HMAC_KEY: 'h'.repeat(40), HANGOUT_BETA_INVITE_KEY: 'i'.repeat(40), HANGOUT_PREVIEW_KEY: 'p'.repeat(40),
-        ASSETS: { fetch: vi.fn(async () => new Response(readFileSync(new URL('../../r/45662413410ed051/entry-sites.mjs', import.meta.url), 'utf8'))) },
+        ASSETS: { fetch: vi.fn(async () => new Response(readFileSync(productFile('entry-sites.mjs'), 'utf8'))) },
         LOBBY: {}, QUOTA: {}, ROOMS: {}, BETA_SESSIONS: {}, ...extra };
 }
 
@@ -506,9 +507,9 @@ describe('optional storage in the actual private beta client', () => {
 
     for (const failure of ['getter', 'setItem']) {
         it(`consumes an authenticated gateway bootstrap and joins without browser storage (${failure})`, async () => {
-            const page = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
-            const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
-            const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
+            const page = readFileSync(productFile('lobby/index.html'), 'utf8');
+            const client = readFileSync(productFile('lobby/lobby.js'), 'utf8');
+            const discovery = readFileSync(productFile('lobby/discovery-core.js'), 'utf8');
             const config = env({ HANGOUT_ENTRY_SITES: JSON.stringify([{ id: 'makers', label: 'Makers' }]),
                 ASSETS: { fetch: async () => new Response(page, { headers: { 'Content-Type': 'text/html' } }) } });
             const values = new Map();

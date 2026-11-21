@@ -1,16 +1,15 @@
 const fs = require('node:fs');
-const path = require('node:path');
+const { productFile, roomPath } = require('./lobby-fixture');
 
 // Renderer controls use the production DOM, core and room module with native
 // canvas pixels. Private admission and physical input remain covered separately.
 async function openCanvasControls(page) {
-    const root = path.resolve(__dirname, '../../..');
-    const html = fs.readFileSync(path.join(root, 'r/45662413410ed051/lobby/index.html'), 'utf8')
+    const html = fs.readFileSync(productFile('lobby/index.html'), 'utf8')
         .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
     await page.route('**/canvas-controls', route => route.fulfill({ contentType: 'text/html', body: html }));
     await page.goto('/canvas-controls');
     for (const file of ['sync-core.js', 'video-core.js', 'youtube-player.js', 'bob-ross.js', 'lobby/lobby-room.js']) {
-        await page.addScriptTag({ url: '/r/45662413410ed051/' + file });
+        await page.addScriptTag({ url: roomPath(file) });
     }
     await page.evaluate(() => {
         const channel = { name: '#canvas-control', kind: 'art', names: [{ nick: 'Painter', id: 'self' }] };

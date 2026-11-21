@@ -1,9 +1,10 @@
 // Explicit browser fixtures exercise review UI without a provider, credentials, or AI network requests.
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'Admin fixture coverage uses Chromium.');
-const ROOT = '/r/45662413410ed051/';
+const ROOT = `/r/${TEST_SLUG}/`;
 const aiStatus = (state = 'ready') => ({ enabled: true, mode: 'review-only', state, checked: 5, flagged: 2, failed: 1, skipped: 3, used: 6, limit: 100, pending: 1 });
 const snapshot = (changes = {}) => ({
     lock: 'off', lockAuto: false, shield: false, shieldAuto: false, slow: 3,

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createLobby, REPORT_ALREADY_QUEUED_NOTICE, REPORT_QUEUED_LABEL, REPORT_QUEUED_NOTICE } from '../../hangout-worker/src/lobby-core.mjs';
 
+import { productFile } from '../support/product-room.cjs';
 let now, engine, frames, writes, identities, sequence;
 function boot(persist) {
     frames = []; writes = [];
@@ -214,7 +215,7 @@ describe('durable report acknowledgement', () => {
             expect(text).not.toMatch(/@/);
         }
         const engineSource = readFileSync(new URL('../../hangout-worker/src/lobby-core.mjs', import.meta.url), 'utf8');
-        const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
+        const client = readFileSync(productFile('lobby/lobby.js'), 'utf8');
         const coverage = readFileSync(new URL('../../hangout-internal/HANGOUT_REPORT_COVERAGE.md', import.meta.url), 'utf8');
         expect(engineSource).not.toContain('Reported to the moderators');
         expect(engineSource).not.toContain('Already reported. Thanks.');

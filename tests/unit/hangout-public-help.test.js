@@ -4,9 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
 import { BETA_COOKIE, signBeta } from '../../hangout-worker/src/beta-auth.mjs';
 
+import { productFile, productRoomPath } from '../support/product-room.cjs';
 const origin = 'https://help.fixture.test';
-const root = '/r/45662413410ed051/';
-const terms = readFileSync(new URL(`../../r/45662413410ed051/terms/index.html`, import.meta.url), 'utf8');
+const root = productRoomPath();
+const terms = readFileSync(productFile(`terms/index.html`), 'utf8');
 function fixture(configured = true, contact = 'moderator@example.test') {
     const unavailable = vi.fn(() => { throw Error('Public help must not call community services'); });
     const binding = { idFromName: unavailable, get: unavailable };

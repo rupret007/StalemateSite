@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { productRoomName } from '../support/product-room.cjs';
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
-const SLUG = '45662413410ed051';
+const SLUG = productRoomName;
 const ROOM = join(repoRoot, 'r', SLUG);
 const GOATCOUNTER = 'https://stalemate.goatcounter.com';
 

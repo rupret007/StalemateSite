@@ -7,8 +7,9 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { productRoomName } from '../support/product-room.cjs';
 const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
-const SLUG = '45662413410ed051';
+const SLUG = productRoomName;
 
 describe('GitHub Pages package', () => {
     it('copies only the public site and never ships tests or node_modules', () => {
@@ -112,7 +113,7 @@ describe('GitHub Pages package', () => {
         });
         try {
             expect(result.status, result.stderr).toBe(0);
-            const roomDir = join(repoRoot, 'dist/r/45662413410ed051');
+            const roomDir = join(repoRoot, `dist/r/${productRoomName}`);
             expect(existsSync(join(roomDir, 'index.html'))).toBe(true);
             expect(existsSync(join(roomDir, 'room.js'))).toBe(true);
             expect(existsSync(join(roomDir, 'room.css'))).toBe(true);

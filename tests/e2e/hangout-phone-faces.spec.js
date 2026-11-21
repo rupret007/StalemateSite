@@ -7,10 +7,11 @@ function tapHeight(box) {
     return box ? Math.max(box.height, box.width) : 0;
 }
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const FAKE_YT = path.join(__dirname, 'support/fake-youtube.js');
 
-const SLUG = '45662413410ed051';
+const SLUG = `${TEST_SLUG}`;
 const KEY = 'local-preview-key-0001';
 const SHOT_DIR = path.join('test-results', 'hangout-phone-faces');
 const VIEWPORTS = [

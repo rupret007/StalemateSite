@@ -5,15 +5,16 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs';
 
-const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
-const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
-const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
+import { productFile, productRoomName } from '../support/product-room.cjs';
+const html = readFileSync(productFile('lobby/index.html'), 'utf8');
+const client = readFileSync(productFile('lobby/lobby.js'), 'utf8');
+const discovery = readFileSync(productFile('lobby/discovery-core.js'), 'utf8');
 const invitationRoomInstance = 'a'.repeat(32);
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 
 async function visitor(via = 'stalemate', features = { entrySources: 1 }, options = {}) {
-    const dom = new JSDOM(html, { url: `${options.secureOrigin ? 'https' : 'http'}://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
+    const dom = new JSDOM(html, { url: `${options.secureOrigin ? 'https' : 'http'}://127.0.0.1:4320/r/${productRoomName}/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
     windows.push(dom);
     const { window } = dom, timers = new Map(), sockets = []; let timerId = 0, elapsed = 0;
     let socketCreated;
@@ -63,7 +64,7 @@ async function visitor(via = 'stalemate', features = { entrySources: 1 }, option
 
 it.each([false, true])('generated activity room focus respects a moved-focus choice: %s', async moved => {
     const { window, ws, welcome, join } = await visitor();
-    window.eval(readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8'));
+    window.eval(readFileSync(productFile('sync-core.js'), 'utf8'));
     welcome(); join();
     const doc = window.document, start = doc.querySelector('[data-start="art"]');
     start.focus(); start.click();
@@ -893,7 +894,7 @@ describe('participation-safe one-tap Music offer', () => {
     it('keeps browser Music in the guest lobby through a Paint room switch and removes it when the offer ends', async () => {
         const fixture = await setup({ privateMusicProvider: 1 });
         const { window, ws } = fixture, { document } = window;
-        window.eval(readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8'));
+        window.eval(readFileSync(productFile('sync-core.js'), 'utf8'));
         window.open = vi.fn();
         const offer = { ...invite(), hostMode: 'browser', origin: window.location.origin };
         ws.receive(offer);
@@ -979,7 +980,7 @@ describe('participation-safe one-tap Music offer', () => {
     it('shows unconfirmed host End Music feedback while Paint is active', async () => {
         const { window, ws } = await setup({ privateMusicProvider: 1 });
         const { document } = window;
-        window.eval(readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8'));
+        window.eval(readFileSync(productFile('sync-core.js'), 'utf8'));
         window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
         window.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new window.Event('close')); };
         window.BroadcastChannel = class { addEventListener() {} postMessage() {} close() {} };
@@ -2099,7 +2100,7 @@ describe('browser client privacy and bounded delivery wiring', () => {
 describe('activity tools recovery', () => {
     async function drawingVisitor({ rendererReady = false, joinInitially = true } = {}) {
         const v = await visitor();
-        v.window.eval(readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8'));
+        v.window.eval(readFileSync(productFile('sync-core.js'), 'utf8'));
         v.welcome(); v.join();
         const joinArt = (name = '#drawing-recovery', ref = 'd'.repeat(32)) => v.ws.receive({ t: 'join', ch: {
             name, kind: 'art', keepRef: ref, modes: { C: true }, names: [{ nick: 'Viewer', prefix: '@' }]

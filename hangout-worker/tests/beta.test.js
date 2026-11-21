@@ -7,6 +7,7 @@ import { BETA_COOKIE, BETA_IDENTITY_COOKIE, BETA_TTL, betaSession, makeDemoInvit
 import { accountId } from '../src/auth.mjs';
 import { BetaSessions } from '../src/beta-sessions.mjs';
 
+import { productRoomName } from '../../tests/support/product-room.cjs';
 const origin = 'https://beta.example';
 const invite = 'private-beta-test-invitation-'.repeat(2);
 const secret = 'private-beta-test-signature-'.repeat(2);
@@ -80,13 +81,13 @@ describe('real invitation-only beta boundary', () => {
 
     it('protects every product page, static asset, room, TURN and socket before lookup, including HEAD', async () => {
         const config = env();
-        for (const path of ['/r/45662413410ed051/lobby/', '/r/45662413410ed051/lobby/lobby.js', '/assets/favicon.svg', '/lobby', '/lobby-owner', '/lobby-admin', '/room', '/turn', '/beta/state', '/beta/bootstrap.js']) {
+        for (const path of [`/r/${productRoomName}/lobby/`, `/r/${productRoomName}/lobby/lobby.js`, '/assets/favicon.svg', '/lobby', '/lobby-owner', '/lobby-admin', '/room', '/turn', '/beta/state', '/beta/bootstrap.js']) {
             expect((await betaFetch(request(path), config, deps)).status).toBe(401);
         }
         expect((await betaFetch(request('/assets/favicon.svg', { method: 'HEAD' }), config, deps)).status).toBe(401);
         expect(config.ASSETS.fetch).not.toHaveBeenCalled();
     });
-    it.each(['/r/45662413410ed051/lobby', '/r/45662413410ed051/lobby/', '/r/45662413410ed051/lobby/index.html', '/r/45662413410ed051/%6cobby/%69ndex.html'])(
+    it.each([`/r/${productRoomName}/lobby`, `/r/${productRoomName}/lobby/`, `/r/${productRoomName}/lobby/index.html`, `/r/${productRoomName}/%6cobby/%69ndex.html`])(
         'offers a same-origin invitation path for a logged-out lobby bookmark: %s', async (path) => {
             const config = env();
             const response = await betaFetch(request(path + '?next=https://attacker.example/&via=untrusted'), config, deps);
@@ -112,14 +113,14 @@ describe('real invitation-only beta boundary', () => {
         });
     it('does not replace protected code, API, websocket or write denials with a lobby page', async () => {
         const config = env();
-        for (const path of ['/r/45662413410ed051/lobby/lobby.js', '/r/45662413410ed051/lobby/lobby.css', '/beta/state', '/beta/bootstrap.js', '/lobby', '/room', '/turn', '/join/app.js']) {
+        for (const path of [`/r/${productRoomName}/lobby/lobby.js`, `/r/${productRoomName}/lobby/lobby.css`, '/beta/state', '/beta/bootstrap.js', '/lobby', '/room', '/turn', '/join/app.js']) {
             const response = await betaFetch(request(path), config, deps);
             expect(response.status).toBe(401);
             expect(response.headers.get('Content-Type')).toContain('text/plain');
             expect(await response.text()).not.toContain('Enter invitation');
         }
         for (const options of [{ upgrade: 'websocket' }, { method: 'POST' }]) {
-            const response = await betaFetch(request('/r/45662413410ed051/lobby/', options), config, deps);
+            const response = await betaFetch(request(`/r/${productRoomName}/lobby/`, options), config, deps);
             expect(response.status).toBe(401);
             expect(response.headers.get('Content-Type')).toContain('text/plain');
         }
@@ -127,12 +128,12 @@ describe('real invitation-only beta boundary', () => {
     });
     it('serves the actual lobby after invitation admission and keeps registry outages as failures', async () => {
         const config = env(), cookie = await unlock(config);
-        const response = await betaFetch(request('/r/45662413410ed051/lobby/', { cookie }), config, deps);
+        const response = await betaFetch(request(`/r/${productRoomName}/lobby/`, { cookie }), config, deps);
         expect(response.status).toBe(200);
         expect(await response.text()).toContain('Product');
         expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
         config.BETA_SESSIONS.get = () => ({ fetch: async () => new Response('unavailable', { status: 503 }) });
-        const outage = await betaFetch(request('/r/45662413410ed051/lobby/', { cookie }), config, deps);
+        const outage = await betaFetch(request(`/r/${productRoomName}/lobby/`, { cookie }), config, deps);
         expect(outage.status).toBe(503);
         expect(await outage.text()).not.toContain('Enter invitation');
         expect(config.ASSETS.fetch).toHaveBeenCalledTimes(1);
@@ -140,7 +141,7 @@ describe('real invitation-only beta boundary', () => {
     it('fails closed for missing mode, secrets and bindings', async () => {
         for (const name of ['HANGOUT_BETA_MODE', 'HANGOUT_BETA_INVITE_KEY', 'HANGOUT_HMAC_KEY', 'HANGOUT_PREVIEW_KEY', 'ASSETS', 'LOBBY', 'QUOTA', 'ROOMS', 'BETA_SESSIONS']) {
             const config = env(); delete config[name];
-            expect((await betaFetch(request('/r/45662413410ed051/lobby/'), config, deps)).status).toBe(503);
+            expect((await betaFetch(request(`/r/${productRoomName}/lobby/`), config, deps)).status).toBe(503);
         }
     });
     it('protects Web Join assets before lookup and scopes its stricter audio policy to that page', async () => {
@@ -168,7 +169,7 @@ describe('real invitation-only beta boundary', () => {
             expect(result.headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(), microphone=(self)');
             expect(await result.text()).not.toContain('/beta/bootstrap.js');
         }
-        const lobby = await betaFetch(request('/r/45662413410ed051/lobby/', { cookie }), config, deps);
+        const lobby = await betaFetch(request(`/r/${productRoomName}/lobby/`, { cookie }), config, deps);
         expect(lobby.headers.get('Content-Security-Policy')).not.toContain('webjam-turn-credentials');
         expect(await lobby.text()).toContain('/beta/bootstrap.js');
     });
@@ -297,12 +298,12 @@ describe('real email and staff authorization', () => {
         const config = env(), cookie = await unlock(config);
         const login = await betaFetch(request('/lobby-admin/login', { cookie, token: await jwt('admin@example.test', staffAudience) }), config, deps);
         expect(login.status).toBe(303);
-        expect(login.headers.get('Location')).toBe('/r/45662413410ed051/admin/?signed-in=1');
+        expect(login.headers.get('Location')).toBe(`/r/${productRoomName}/admin/?signed-in=1`);
         expect(login.headers.get('Cache-Control')).toBe('no-store');
         const signedIn = cookieOf(login);
-        expect((await betaFetch(request('/r/45662413410ed051/admin/?signed-in=1', { cookie: signedIn }), config, deps)).status).toBe(200);
+        expect((await betaFetch(request(`/r/${productRoomName}/admin/?signed-in=1`, { cookie: signedIn }), config, deps)).status).toBe(200);
         // The hint grants neither the protected page nor the staff socket.
-        expect((await betaFetch(request('/r/45662413410ed051/admin/?signed-in=1', { cookie: await unlock(config) }), config, deps)).status).toBe(403);
+        expect((await betaFetch(request(`/r/${productRoomName}/admin/?signed-in=1`, { cookie: await unlock(config) }), config, deps)).status).toBe(403);
         expect((await betaFetch(request(`/lobby-admin?preview=${preview}&signed-in=1`, { cookie: signedIn, upgrade: true }), config, deps)).status).toBe(403);
     });
     it('binds identity cookies to their invitation session and rejects wrong-purpose and pilot signatures', async () => {
@@ -314,15 +315,15 @@ describe('real email and staff authorization', () => {
         const token = await signBeta('identity', claims, secret);
         expect(await readBeta('access', token, secret)).toBeNull();
         expect(await betaSession(request('/beta/state', { cookie: `${BETA_COOKIE}=${token}` }), config)).toBeNull();
-        expect((await betaFetch(request('/r/45662413410ed051/admin/', { cookie: `${other}; ${identity}` }), config, deps)).status).toBe(403);
-        expect((await betaFetch(request('/r/45662413410ed051/%61dmin/admin.js', { cookie: other }), config, deps)).status).toBe(403);
+        expect((await betaFetch(request(`/r/${productRoomName}/admin/`, { cookie: `${other}; ${identity}` }), config, deps)).status).toBe(403);
+        expect((await betaFetch(request(`/r/${productRoomName}/%61dmin/admin.js`, { cookie: other }), config, deps)).status).toBe(403);
     });
     it('re-verifies staff JWT even with an authentic identity cookie', async () => {
         const config = env(), cookie = await unlock(config), token = await jwt('mod@example.test', staffAudience);
         const login = await betaFetch(request('/lobby-admin/login', { cookie, token }), config, deps);
         const both = cookieOf(login);
         expect((await betaFetch(request(`/lobby-admin?preview=${preview}`, { cookie: both, upgrade: true }), config, deps)).status).toBe(403);
-        expect((await betaFetch(request('/r/45662413410ed051/admin/', { cookie: both }), config, deps)).status).toBe(200);
+        expect((await betaFetch(request(`/r/${productRoomName}/admin/`, { cookie: both }), config, deps)).status).toBe(200);
     });
     it('disconnects live sockets before logout and refuses to claim success when persistence is unavailable', async () => {
         const config = env(), cookie = await unlock(config), fetch = vi.fn(async () => new Response('closed'));
@@ -358,7 +359,7 @@ describe('beta product bootstrapping', () => {
         expect(writeHint).toHaveBeenCalledTimes(2);
         expect(remembered.get('hangout-preview')).toBe(preview);
         expect(remembered.get('hangout-owner')).toBe('0');
-        const page = await betaFetch(request('/r/45662413410ed051/lobby/', { cookie }), { ...config, HANGOUT_TURN_ENABLED: '1', HANGOUT_TURNSTILE_SITEKEY: 'public-site-key' }, deps);
+        const page = await betaFetch(request(`/r/${productRoomName}/lobby/`, { cookie }), { ...config, HANGOUT_TURN_ENABLED: '1', HANGOUT_TURNSTILE_SITEKEY: 'public-site-key' }, deps);
         const html = await page.text();
         expect(html).toContain('wss://beta.example'); expect(html).toContain('https://beta.example/turn'); expect(html).toContain('public-site-key'); expect(html).toContain('/beta/bootstrap.js');
         expect(page.headers.get('Cache-Control')).toBe('no-store'); expect(page.headers.get('X-Robots-Tag')).toContain('noindex');
@@ -376,12 +377,12 @@ describe('beta product bootstrapping', () => {
         expect((await betaFetch(request('/beta/privacy'), config, deps)).status).toBe(303);
         const redirect = await betaFetch(request('/beta/privacy', { cookie }), config, deps);
         expect(redirect.status).toBe(303); expect(redirect.headers.get('Location')).toContain('/terms/');
-        const page = await betaFetch(request('/r/45662413410ed051/terms/', { cookie }), { ...config, HANGOUT_MODERATION_CONTACT: 'moderation@example.test' }, deps);
+        const page = await betaFetch(request(`/r/${productRoomName}/terms/`, { cookie }), { ...config, HANGOUT_MODERATION_CONTACT: 'moderation@example.test' }, deps);
         const publicHtml = await page.text();
         expect(publicHtml).toContain('href="mailto:moderation@example.test"');
         expect(publicHtml).not.toContain('/beta/bootstrap.js');
         expect(page.headers.get('Set-Cookie')).toBeNull();
-        const invalid = await betaFetch(request('/r/45662413410ed051/terms/', { cookie }), { ...config, HANGOUT_MODERATION_CONTACT: 'bad" onclick="alert(1)' }, deps);
+        const invalid = await betaFetch(request(`/r/${productRoomName}/terms/`, { cookie }), { ...config, HANGOUT_MODERATION_CONTACT: 'bad" onclick="alert(1)' }, deps);
         const html = await invalid.text(); expect(html).toContain('Moderation contact is not configured.'); expect(html).not.toContain('onclick=');
     });
     it('ships a separate guarded beta configuration with no provider secrets or synthetic identity controls', () => {
@@ -453,7 +454,7 @@ describe('verified beta logout removes browser identity data', () => {
         const replay = `${jar.header()}; ${oldIdentity}`;
         expect((await betaSession(request('/beta/state', { cookie: replay }), config)).identity).toBeNull();
         expect(await (await betaFetch(request('/beta/state', { cookie: replay }), config, deps)).json()).toMatchObject({ kind: 'guest', role: 'fan' });
-        expect((await betaFetch(request('/r/45662413410ed051/admin/', { cookie: replay }), config, deps)).status).toBe(403);
+        expect((await betaFetch(request(`/r/${productRoomName}/admin/`, { cookie: replay }), config, deps)).status).toBe(403);
     });
     it.each(identities)('preserves $kind cookies for closure retry and clears them only after it succeeds', async identity => {
         const config = env(), jar = await signIn(config, identity), signedIn = jar.header();

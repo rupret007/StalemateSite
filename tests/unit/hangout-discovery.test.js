@@ -4,8 +4,9 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
+import { productFile } from '../support/product-room.cjs';
 const require = createRequire(import.meta.url);
-const { ACTIVITY, QUIET_PROMPT, describeRooms, summarizeLobby, isMention, describeVisit, visitView, calendarReminder, icsText } = require('../../r/45662413410ed051/lobby/discovery-core.js');
+const { ACTIVITY, QUIET_PROMPT, describeRooms, summarizeLobby, isMention, describeVisit, visitView, calendarReminder, icsText } = require(productFile('lobby/discovery-core.js'));
 const room = (name, overrides = {}) => ({ name, kind: 'art', title: 'Drawing room', count: 1, max: 8, locked: false, key: false, cams: true, ...overrides });
 const visitor = (nick, overrides = {}) => ({ nick, away: false, band: false, ...overrides });
 
@@ -114,7 +115,7 @@ describe('IRC nickname mentions', () => {
 });
 
 it('loads as a standalone browser script without CommonJS or browser side effects', () => {
-    const source = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
+    const source = readFileSync(productFile('lobby/discovery-core.js'), 'utf8');
     expect(source).not.toMatch(/Date\.now|localStorage|fetch\(|WebSocket|document\./);
     const sandbox = { window: {}, Intl };
     vm.runInNewContext(source, sandbox);
@@ -271,7 +272,7 @@ describe('quiet visits and confirmed gatherings', () => {
         expect(visitView(describeVisit({ connection: 'reconnecting', me: 'MeHere', channel: { names: [visitor('MeHere')] } })).lobbyCount).toBe('Main conversation');
         expect(visitView({ connection: 'connected', known: true, others: 1.5, selfPresent: true }).lobbyCount).toBe('Main conversation');
         expect(visitView({ connection: 'connected', known: true, others: 0, selfPresent: false }).lobbyCount).toBe('0 here · chat');
-        const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
+        const client = readFileSync(productFile('lobby/lobby.js'), 'utf8');
         expect(client).toContain("$('[data-lobby-count]').textContent = view.lobbyCount;");
         expect(client).not.toContain('here · chat');
     });

@@ -4,7 +4,7 @@ import { gameNightPassRecord } from '../../hangout-worker/src/game-night-pass.mj
 import { gameGuestScope, gameInvitationRequest } from '../../hangout-worker/src/game-night-invitations.mjs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
-import { gameNightReturnHint, gameNightRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
+import { gameNightReturnHint, gameNightRoomName } from '#product-room/lobby/game-night.mjs';
 
 const { gameGuestNick, availableGameGuestNick } = createLobby();
 

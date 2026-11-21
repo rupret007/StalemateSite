@@ -8,6 +8,7 @@ const fs = require('node:fs/promises');
 const { test: base, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const { chromiumMediaLaunch, installWebKitMedia } = require('./support/webkit-media');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const test = base.extend({
     launchOptions: [async ({ browserName, launchOptions }, use) => {
@@ -18,7 +19,7 @@ const test = base.extend({
     }, { scope: 'worker' }]
 });
 
-const SLUG = '45662413410ed051';
+const SLUG = `${TEST_SLUG}`;
 const KEY = 'local-preview-key-0001';
 const FAKE_YT = path.join(__dirname, 'support/fake-youtube.js');
 const EPISODE = 'uj5FE70BcB0';
@@ -157,7 +158,14 @@ async function expectBigLabeledControls(page) {
     expect(await bg('[data-mic]')).toBe('rgb(31, 122, 69)');
 }
 
-async function paintAlongPair(browser, origin, viewport, prefix) {
+async function expectStageDominates(host) {
+    const area = async (sel) => { const b = await host.locator(sel).boundingBox(); return b.width * b.height; };
+    expect(await area('[data-tiles] .tile:not([data-tile="me"])')).toBeGreaterThan(await area('[data-tiles] .tile[data-tile="me"]'));
+    expect(await area('.watch .screen')).toBeGreaterThan(await area('[data-tiles] .tile:not([data-tile="me"])'));
+}
+
+async function paintAlongPair(browser, origin, viewport, shotPrefix) {
+    if (shotPrefix) await fs.mkdir(SHOTS, { recursive: true });
     const host = await openPage(browser, viewport);
     await enter(host, roomUrl(origin), 'Host');
     const invite = host.url();
@@ -174,29 +182,26 @@ async function paintAlongPair(browser, origin, viewport, prefix) {
     await expect(guest.locator('body')).toHaveClass(/bob-mode/);
     await expect(guest.locator('[data-ask]')).toBeHidden();
 
-    await joinWithCamera(host, path.join(SHOTS, `${prefix}-join-consent.png`));
+    await joinWithCamera(host, shotPrefix ? path.join(SHOTS, `${shotPrefix}-join-consent.png`) : undefined);
     await joinWithCamera(guest);
-    await expect.poll(() => remoteWidth(host), { timeout: 20000 }).toBeGreaterThan(0);
-    await expect.poll(() => remoteWidth(guest), { timeout: 20000 }).toBeGreaterThan(0);
-    for (const page of [host, guest]) {
+    await Promise.all([
+        expect.poll(() => remoteWidth(host), { timeout: 20000 }).toBeGreaterThan(0),
+        expect.poll(() => remoteWidth(guest), { timeout: 20000 }).toBeGreaterThan(0)
+    ]);
+    await Promise.all([host, guest].map(async page => {
         await expect(page.locator('[data-tiles] .tile')).toHaveCount(2);
         await expect(page.locator('[data-tiles] .tile[data-tile="me"]')).toBeVisible();
         await expect(page.locator('[data-tiles] .tile:not([data-tile="me"])')).toBeVisible();
-    }
-    // Remote face is bigger than the self view.
-    const area = async (sel) => { const b = await host.locator(sel).boundingBox(); return b.width * b.height; };
-    expect(await area('[data-tiles] .tile:not([data-tile="me"])')).toBeGreaterThan(await area('[data-tiles] .tile[data-tile="me"]'));
-    // The stage is the largest surface.
-    expect(await area('.watch .screen')).toBeGreaterThan(await area('[data-tiles] .tile:not([data-tile="me"])'));
+    }));
     return { host, guest };
 }
 
-test('Paint Along phone 390x844: stage on top, faces row, chat drawer, pinned labeled bar', async ({ browser, baseURL }) => {
-    test.setTimeout(120000);
+test('Paint Along phone 390x844: stage on top, faces row and pinned labeled bar', async ({ browser, baseURL }) => {
     await fs.mkdir(SHOTS, { recursive: true });
     const { host, guest } = await paintAlongPair(browser, baseURL, PHONE, 'phone');
     const stage = await host.locator('.watch .screen').boundingBox();
     await expectPlayingStage(host);
+    await expectStageDominates(host);
     expect(stage.width).toBeGreaterThanOrEqual(PHONE.width - 16);
     expect(Math.abs(stage.width / stage.height - 16 / 9)).toBeLessThan(0.05);
     const closed = await expectNoOverlap(host, PHONE, { chat: false });
@@ -204,8 +209,13 @@ test('Paint Along phone 390x844: stage on top, faces row, chat drawer, pinned la
     expect(closed['[data-tiles]'].y + closed['[data-tiles]'].height).toBeLessThanOrEqual(closed['.callbar'].y);
     await expectBigLabeledControls(host);
     await host.screenshot({ path: path.join(SHOTS, 'phone-stage.png') });
+    expect(host.errors).toEqual([]);
+    expect(guest.errors).toEqual([]);
+});
 
-    // Chat drawer opens between the faces and the bar; it never covers the stage.
+test('Paint Along phone 390x844: chat drawer sits between the faces and the bar', async ({ browser, baseURL }) => {
+    await fs.mkdir(SHOTS, { recursive: true });
+    const { host, guest } = await paintAlongPair(browser, baseURL, PHONE);
     await expect(guest.locator('.chat')).toBeHidden(); // phones start with the drawer closed
     await guest.click('[data-chat-toggle]');
     await guest.fill('[data-text]', 'Happy little trees');
@@ -220,8 +230,12 @@ test('Paint Along phone 390x844: stage on top, faces row, chat drawer, pinned la
     await host.screenshot({ path: path.join(SHOTS, 'phone-chat-drawer.png') });
     await host.click('[data-chat-toggle]');
     await expect(host.locator('.chat')).toBeHidden();
+    expect(host.errors).toEqual([]);
+    expect(guest.errors).toEqual([]);
+});
 
-    // Muting the shared video leaves the conversation alone.
+test('Paint Along phone 390x844: video mute leaves the mic alone and the camera can restart', async ({ browser, baseURL }) => {
+    const { host, guest } = await paintAlongPair(browser, baseURL, PHONE);
     await host.click('[data-soundtrack]');
     await expect(host.locator('[data-soundtrack-pop]')).toBeVisible();
     await host.click('[data-soundtrack-mute]');
@@ -231,7 +245,6 @@ test('Paint Along phone 390x844: stage on top, faces row, chat drawer, pinned la
     await host.keyboard.press('Escape');
     await expect(host.locator('[data-soundtrack-pop]')).toBeHidden();
 
-    // Red = off, and the self tile offers a big Start video prompt.
     await host.click('[data-cam]');
     await expect(host.locator('[data-cam]')).toHaveText('Start video');
     expect(await host.locator('[data-cam]').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(179, 38, 30)');
@@ -244,10 +257,10 @@ test('Paint Along phone 390x844: stage on top, faces row, chat drawer, pinned la
 });
 
 test('Paint Along desktop 1440x900: Webex layout with stage, filmstrip, chat panel and control bar', async ({ browser, baseURL }) => {
-    test.setTimeout(120000);
     await fs.mkdir(SHOTS, { recursive: true });
     const { host, guest } = await paintAlongPair(browser, baseURL, DESKTOP, 'desktop');
     await expectPlayingStage(host);
+    await expectStageDominates(host);
     const b = await expectNoOverlap(host, DESKTOP, { chat: true });
     const stage = b['.watch .screen'];
     // The stage takes most of the screen: left of the side panel, at least 60% of the width.
@@ -271,8 +284,12 @@ test('Paint Along desktop 1440x900: Webex layout with stage, filmstrip, chat pan
     await expect(host.locator('[data-settings]')).toBeVisible();
     await host.click('[data-more]');
     await expect(host.locator('[data-canvas-cam]')).toBeHidden();
+    expect(host.errors).toEqual([]);
+    expect(guest.errors).toEqual([]);
+});
 
-    // Shared playback is still for everyone: a guest pause reaches the host.
+test('Paint Along desktop 1440x900: a guest pause reaches the host', async ({ browser, baseURL }) => {
+    const { host, guest } = await paintAlongPair(browser, baseURL, DESKTOP);
     await guest.click('[data-bob-hold]');
     await expect(host.locator('[data-fake-yt]')).toHaveAttribute('data-state', 'paused');
     expect(host.errors).toEqual([]);
@@ -290,13 +307,14 @@ async function watchTogetherPair(browser, origin, viewport) {
     await expect(host.locator('[data-peers]')).toContainText('2 here');
     await joinWithCamera(host);
     await joinWithCamera(guest);
-    await expect.poll(() => remoteWidth(host), { timeout: 20000 }).toBeGreaterThan(0);
-    await expect.poll(() => remoteWidth(guest), { timeout: 20000 }).toBeGreaterThan(0);
+    await Promise.all([
+        expect.poll(() => remoteWidth(host), { timeout: 20000 }).toBeGreaterThan(0),
+        expect.poll(() => remoteWidth(guest), { timeout: 20000 }).toBeGreaterThan(0)
+    ]);
     return { host, guest };
 }
 
 test('Watch Together phone 390x844: stage, filmstrip and pinned controls', async ({ browser, baseURL }) => {
-    test.setTimeout(120000);
     await fs.mkdir(SHOTS, { recursive: true });
     const { host, guest } = await watchTogetherPair(browser, baseURL, PHONE);
     await expect(host.locator('body')).toHaveClass(/shared-layout/);
@@ -307,6 +325,12 @@ test('Watch Together phone 390x844: stage, filmstrip and pinned controls', async
     expect(b['[data-tiles]'].y + b['[data-tiles]'].height).toBeLessThanOrEqual(b['.callbar'].y);
     await expectBigLabeledControls(host);
     await host.screenshot({ path: path.join(SHOTS, 'watch-phone-stage.png') });
+    expect(host.errors).toEqual([]);
+    expect(guest.errors).toEqual([]);
+});
+
+test('Watch Together phone 390x844: chat drawer stays between the faces and the bar', async ({ browser, baseURL }) => {
+    const { host, guest } = await watchTogetherPair(browser, baseURL, PHONE);
     await host.click('[data-chat-toggle]');
     const open = await expectNoOverlap(host, PHONE, { chat: true });
     expect(open['.chat'].y + open['.chat'].height).toBeLessThanOrEqual(open['.callbar'].y);
@@ -315,7 +339,6 @@ test('Watch Together phone 390x844: stage, filmstrip and pinned controls', async
 });
 
 test('Watch Together desktop 1440x900: Webex stage, filmstrip, chat and control bar', async ({ browser, baseURL }) => {
-    test.setTimeout(120000);
     await fs.mkdir(SHOTS, { recursive: true });
     const { host, guest } = await watchTogetherPair(browser, baseURL, DESKTOP);
     await expectPlayingStage(host);
@@ -329,20 +352,26 @@ test('Watch Together desktop 1440x900: Webex stage, filmstrip, chat and control 
     expect(guest.errors).toEqual([]);
 });
 
-test('Paint Along consent: denial shows how to retry, retry works, join without camera, rejoin asks again', async ({ browser, baseURL }) => {
-    test.setTimeout(90000);
+async function openSoloPaint(browser, baseURL, { deny = false } = {}) {
     const page = await openPage(browser, PHONE);
-    // Simulate a blocked camera/mic until the person fixes it in the browser.
-    await page.addInitScript(() => {
-        window.__denyMedia = true;
-        const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-        navigator.mediaDevices.getUserMedia = (c) => window.__denyMedia
-            ? Promise.reject(new DOMException('Permission denied', 'NotAllowedError')) : real(c);
-    });
+    if (deny) {
+        // Simulate a blocked camera/mic until the person fixes it in the browser.
+        await page.addInitScript(() => {
+            window.__denyMedia = true;
+            const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+            navigator.mediaDevices.getUserMedia = (c) => window.__denyMedia
+                ? Promise.reject(new DOMException('Permission denied', 'NotAllowedError')) : real(c);
+        });
+    }
     await enter(page, roomUrl(baseURL), 'Solo');
     const invite = page.url();
     await page.click('[data-bob-toggle]');
     await expect(page.locator('[data-consent]')).toBeVisible();
+    return { page, invite };
+}
+
+test('Paint Along consent: denial shows how to retry and retry reaches preview', async ({ browser, baseURL }) => {
+    const { page } = await openSoloPaint(browser, baseURL, { deny: true });
     await page.click('[data-consent-on]');
     await expect(page.locator('[data-consent]')).toHaveAttribute('data-state', 'denied');
     await expect(page.locator('[data-consent-error]')).toContainText('allow Camera and Microphone');
@@ -352,17 +381,29 @@ test('Paint Along consent: denial shows how to retry, retry works, join without 
     await page.evaluate(() => { window.__denyMedia = false; });
     await page.click('[data-consent-on]');
     await expect(page.locator('[data-consent]')).toHaveAttribute('data-state', 'preview');
-    // Changing their mind: Join without camera stops the preview and captures nothing.
+    expect(page.errors).toEqual([]);
+});
+
+test('Paint Along consent: join without camera stops the preview and the self tile asks again', async ({ browser, baseURL }) => {
+    const { page } = await openSoloPaint(browser, baseURL);
+    await page.click('[data-consent-on]');
+    await expect(page.locator('[data-consent]')).toHaveAttribute('data-state', 'preview');
     await page.click('[data-consent-skip]');
     await expect(page.locator('[data-consent]')).toBeHidden();
     expect(await page.evaluate(() => [...document.querySelectorAll('video')].some((v) => v.srcObject && v.srcObject.getTracks().some((t) => t.readyState === 'live')))).toBe(false);
     await expect(page.locator('[data-tile="me"] .tile-start-video')).toBeVisible();
-    // The self-tile prompt brings the same single consent step back.
     await page.click('[data-tile="me"] .tile-start-video');
     await expect(page.locator('[data-consent]')).toBeVisible();
     await expect(page.locator('[data-consent-on]')).toBeFocused();
+    expect(page.errors).toEqual([]);
+});
 
-    // Leave and rejoin: the room never turns the camera back on by itself.
+test('Paint Along consent: leaving and rejoining asks again and leaves the camera off', async ({ browser, baseURL }) => {
+    const { page, invite } = await openSoloPaint(browser, baseURL);
+    await page.click('[data-consent-on]');
+    await expect(page.locator('[data-consent]')).toHaveAttribute('data-state', 'preview');
+    await page.click('[data-consent-skip]');
+    await expect(page.locator('[data-consent]')).toBeHidden();
     await page.click('.callbar .leave-room');
     await expect(page).toHaveURL(/\/lobby\//);
     page.errors = []; // only the room page matters here, not the lobby we passed through

@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const match = vi.hoisted(() => ({ options: null, send: null }));
-vi.mock('../../r/45662413410ed051/lobby/game-night-match-client.mjs', async original => ({
+vi.mock('#product-room/lobby/game-night-match-client.mjs', async original => ({
     ...await original(),
     createGameNightMatchClient: options => {
         match.options = options;
         return { start() {}, stop() {}, matchOpen: () => false, matchUnavailable: () => false, send: frame => match.send(frame) };
     }
 }));
-vi.mock('../../r/45662413410ed051/lobby/game-night-audio.mjs', () => ({ gameNightCue: () => {} }));
+vi.mock('#product-room/lobby/game-night-audio.mjs', () => ({ gameNightCue: () => {} }));
 vi.mock('/play/games/turdspades-engine.js', () => ({ suggestSpadesBid: () => 3 }));
 
-import { WATCH_SYNC_INTERVAL, mountArcadeTurdSpades } from '../../r/45662413410ed051/lobby/arcade-turdspades.mjs';
+import { WATCH_SYNC_INTERVAL, mountArcadeTurdSpades } from '#product-room/lobby/arcade-turdspades.mjs';
 import { WATCH_ACTIVITY_INTERVAL } from '../../hangout-worker/src/arcade-transport.mjs';
 import { GAME_NIGHT_IDLE } from '../../hangout-worker/src/game-night-lifetime.mjs';
 

@@ -3,6 +3,7 @@ const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { test: base, expect, devices } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const FAKE_YT = path.join(__dirname, 'support/fake-youtube.js');
 
@@ -126,7 +127,7 @@ async function openHost(context, origin) {
     await routeYouTube(context);
     const host = await context.newPage();
     const relay = hangoutRelayWsBase(origin, `paint-focus-${randomUUID()}`);
-    await host.goto(`/r/45662413410ed051/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+    await host.goto(`/r/${TEST_SLUG}/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
     await enter(host, 'Host');
     return host;
 }
@@ -340,39 +341,68 @@ async function expectPhoneStage(page) {
     expect(unobstructed).toBe(true);
 }
 
-test('the Paint Along stage stays fully visible above two live tiles and open chat at both phone sizes', async ({ context, peerBrowser, baseURL, viewport }) => {
-    test.setTimeout(60000);
-    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
+async function livePaintPair(context, peerBrowser, baseURL, viewport) {
+    const pair = await sharedPair(context, peerBrowser, baseURL, viewport);
     try {
-        await joinCameraPair(host, guest);
-        for (const page of [host, guest]) {
+        await joinCameraPair(pair.host, pair.guest);
+        await Promise.all([pair.host, pair.guest].map(async page => {
             const tiles = page.locator('[data-tiles] .tile');
             await expect(tiles).toHaveCount(2);
             await expect.poll(() => tiles.locator('video').evaluateAll(videos =>
                 videos.filter(video => video.videoWidth > 0).length
             ), { timeout: 20000 }).toBe(2);
-        }
-        for (const size of [viewport, { width: 375, height: 667 }, { width: 375, height: 657 }]) {
-            await host.setViewportSize(size);
-            await expectPhoneStage(host);
-            await host.locator('[data-chat-toggle]').click();
-            await expect(host.locator('.chat')).toBeVisible();
-            await expectPhoneStage(host);
-            await expect(host.getByRole('textbox', { name: 'Message', exact: true })).toBeInViewport({ ratio: 1 });
-            await expect(host.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
-            const composer = await host.locator('[data-say]').boundingBox();
-            const dock = await host.getByRole('group', { name: 'Call controls', exact: true }).boundingBox();
-            expect(composer.y + composer.height).toBeLessThanOrEqual(dock.y);
-            if (size.height === 657) {
-                await host.getByRole('textbox', { name: 'Message', exact: true }).fill('Ready to paint along. I can see the lesson and everyone in the room.');
-                await host.getByRole('button', { name: 'Send', exact: true }).click();
-                await expect(host.locator('[data-log]')).toContainText('I can see the lesson');
-                await expectPhoneStage(host);
-            }
-            await host.screenshot({ path: test.info().outputPath(`paint-stage-chat-${size.width}x${size.height}.png`) });
-            if (size.width === 390) await saveShot(host, 'paint-along-two-tiles.png');
-            await host.locator('[data-chat-toggle]').click();
-        }
+        }));
+        return pair;
+    } catch (error) {
+        await pair.guestContext.close();
+        throw error;
+    }
+}
+
+async function expectOpenChatStage(host, size, { longChat = false, shot } = {}) {
+    await host.setViewportSize(size);
+    await expectPhoneStage(host);
+    await host.locator('[data-chat-toggle]').click();
+    await expect(host.locator('.chat')).toBeVisible();
+    await expectPhoneStage(host);
+    await expect(host.getByRole('textbox', { name: 'Message', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(host.getByRole('button', { name: 'Send', exact: true })).toBeInViewport({ ratio: 1 });
+    const composer = await host.locator('[data-say]').boundingBox();
+    const dock = await host.getByRole('group', { name: 'Call controls', exact: true }).boundingBox();
+    expect(composer.y + composer.height).toBeLessThanOrEqual(dock.y);
+    if (longChat) {
+        await host.getByRole('textbox', { name: 'Message', exact: true }).fill('Ready to paint along. I can see the lesson and everyone in the room.');
+        await host.getByRole('button', { name: 'Send', exact: true }).click();
+        await expect(host.locator('[data-log]')).toContainText('I can see the lesson');
+        await expectPhoneStage(host);
+    }
+    await host.screenshot({ path: test.info().outputPath(`paint-stage-chat-${size.width}x${size.height}.png`) });
+    if (shot) await saveShot(host, shot);
+    await host.locator('[data-chat-toggle]').click();
+}
+
+test('the Paint Along stage stays fully visible above two live tiles and open chat at 390x844', async ({ context, peerBrowser, baseURL, viewport }) => {
+    const { host, guestContext } = await livePaintPair(context, peerBrowser, baseURL, viewport);
+    try {
+        await expectOpenChatStage(host, viewport, { shot: 'paint-along-two-tiles.png' });
+    } finally {
+        await guestContext.close();
+    }
+});
+
+test('the Paint Along stage stays fully visible above two live tiles and open chat at 375x667', async ({ context, peerBrowser, baseURL, viewport }) => {
+    const { host, guestContext } = await livePaintPair(context, peerBrowser, baseURL, viewport);
+    try {
+        await expectOpenChatStage(host, { width: 375, height: 667 });
+    } finally {
+        await guestContext.close();
+    }
+});
+
+test('the Paint Along stage stays fully visible above two live tiles and a long chat line at 375x657', async ({ context, peerBrowser, baseURL, viewport }) => {
+    const { host, guestContext } = await livePaintPair(context, peerBrowser, baseURL, viewport);
+    try {
+        await expectOpenChatStage(host, { width: 375, height: 657 }, { longChat: true });
     } finally {
         await guestContext.close();
     }
@@ -466,9 +496,8 @@ async function expectTouchTargets(root) {
     expect(small).toEqual([]);
 }
 
-test('the phone layout gives camera consent priority and keeps labeled 48px controls', async ({ page, context, peerBrowser, baseURL, viewport }) => {
-    test.setTimeout(60000);
-    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
+test('the phone layout gives camera consent priority before cameras start', async ({ page, context, peerBrowser, baseURL, viewport }) => {
+    const { host, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
     try {
         await page.goto(inviteFor(host).href);
         await expectTouchTargets(page.locator('body'));
@@ -478,6 +507,14 @@ test('the phone layout gives camera consent priority and keeps labeled 48px cont
         await expect(camera).toHaveCSS('background-color', 'rgb(31, 122, 69)');
         expect((await camera.boundingBox()).width).toBeGreaterThan((await consent.locator('[data-consent-skip]').boundingBox()).width);
         await expectTouchTargets(consent);
+    } finally {
+        await guestContext.close();
+    }
+});
+
+test('the phone layout keeps labeled 48px controls after two cameras join', async ({ context, peerBrowser, baseURL, viewport }) => {
+    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport);
+    try {
         await joinCameraPair(host, guest);
         const tiles = host.locator('[data-tiles] .tile');
         await expect(tiles).toHaveCount(2);
@@ -506,15 +543,15 @@ test('the phone layout gives camera consent priority and keeps labeled 48px cont
     }
 });
 
-test('Watch a Movie Together uses the shared phone stage and keeps video selection with the host', async ({ context, peerBrowser, baseURL, viewport }) => {
-    test.setTimeout(60000);
-    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport, 'watch');
+async function watchLayoutPair(context, peerBrowser, baseURL, viewport) {
+    const pair = await sharedPair(context, peerBrowser, baseURL, viewport, 'watch');
     try {
-        for (const page of [host, guest]) {
+        const { host, guest } = pair;
+        await Promise.all([host, guest].map(async page => {
             await expect(page.locator('body')).toHaveAttribute('data-shared-layout', 'watch');
             await expect(page.locator('[data-bob]')).toBeHidden();
             await expect(page.locator('[data-canvas]')).toBeHidden();
-        }
+        }));
         await joinCameraPair(host, guest);
         await expect(host.locator('[data-load]')).toBeVisible();
         await expect(guest.locator('[data-load]')).toBeHidden();
@@ -529,15 +566,43 @@ test('Watch a Movie Together uses the shared phone stage and keeps video selecti
         await expect.poll(() => tiles.locator('video').evaluateAll(videos =>
             videos.filter(video => video.videoWidth > 0).length
         ), { timeout: 20000 }).toBe(2);
-        for (const size of [viewport, { width: 375, height: 667 }]) {
-            await guest.setViewportSize(size);
-            await guest.locator('[data-chat-toggle]').click();
-            await expectPhoneStage(guest);
-            await expectTouchTargets(guest.locator('body'));
-            if (size.width === 390) await saveShot(guest, 'watch-a-movie-together.png');
-            await guest.locator('[data-chat-toggle]').click();
-        }
+        return pair;
+    } catch (error) {
+        await pair.guestContext.close();
+        throw error;
+    }
+}
 
+async function expectWatchChatStage(guest, size, shot) {
+    await guest.setViewportSize(size);
+    await guest.locator('[data-chat-toggle]').click();
+    await expectPhoneStage(guest);
+    await expectTouchTargets(guest.locator('body'));
+    if (shot) await saveShot(guest, shot);
+    await guest.locator('[data-chat-toggle]').click();
+}
+
+test('Watch a Movie Together uses the shared phone stage and keeps video selection with the host at 390x844', async ({ context, peerBrowser, baseURL, viewport }) => {
+    const { guest, guestContext } = await watchLayoutPair(context, peerBrowser, baseURL, viewport);
+    try {
+        await expectWatchChatStage(guest, viewport, 'watch-a-movie-together.png');
+    } finally {
+        await guestContext.close();
+    }
+});
+
+test('Watch a Movie Together uses the shared phone stage at 375x667', async ({ context, peerBrowser, baseURL, viewport }) => {
+    const { guest, guestContext } = await watchLayoutPair(context, peerBrowser, baseURL, viewport);
+    try {
+        await expectWatchChatStage(guest, { width: 375, height: 667 });
+    } finally {
+        await guestContext.close();
+    }
+});
+
+test('a Watch Together guest pause, seek and play reaches the host', async ({ context, peerBrowser, baseURL, viewport }) => {
+    const { host, guest, guestContext } = await sharedPair(context, peerBrowser, baseURL, viewport, 'watch');
+    try {
         await guest.evaluate(() => window.__ytLog[0].pauseVideo());
         for (const [person, page] of [['host', host], ['guest', guest]]) {
             await expect(page.locator('[data-fake-yt]'), `${person} receives guest pause`).toHaveAttribute('data-state', 'paused');

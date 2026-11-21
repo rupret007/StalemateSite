@@ -1,8 +1,8 @@
-import * as gameNightFunctions from '../../r/45662413410ed051/lobby/game-night.mjs';
-import * as entryFunctions from '../../r/45662413410ed051/entry-sites.mjs';
-import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
-import { createIdleHeartbeat } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
-import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
+import * as gameNightFunctions from '#product-room/lobby/game-night.mjs';
+import * as entryFunctions from '#product-room/entry-sites.mjs';
+import { createEntrySharing } from '#product-room/lobby/entry-sharing.mjs';
+import { createIdleHeartbeat } from '#product-room/lobby/idle-heartbeat.mjs';
+import { createChatAnnouncements } from '#product-room/lobby/chat-announcements.mjs';
 import { vi } from 'vitest';
 
 export { entryFunctions, gameNightFunctions };

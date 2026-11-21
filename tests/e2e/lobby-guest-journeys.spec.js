@@ -4,8 +4,9 @@
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/lobby/';
+const ROOT = `/r/${TEST_SLUG}/lobby/`;
 const INVITE = 'Join our synthetic rehearsal on WebJam:\nPaste this whole message.\nwebjam://join?v=3&r=fixture&i=guest_journey_capability';
 test.use({ permissions: ['camera'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
 

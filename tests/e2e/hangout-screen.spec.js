@@ -1,6 +1,7 @@
 const { expectOrdinaryMediaLabel } = require('./support/ordinary-media-labels');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const KEY = 'local-preview-key-0001';
 test.use({
@@ -13,7 +14,7 @@ test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
 
 async function join(page) {
     await page.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());
-    await page.goto(`/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
+    await page.goto(`/r/${TEST_SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
     await page.fill('[data-name]', 'Artist');
     await page.click('[data-enter]');
     await expect(page.locator('[data-room]')).toBeVisible();

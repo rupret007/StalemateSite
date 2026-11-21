@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
-const { enqueue } = createRequire(import.meta.url)('../../r/45662413410ed051/video-core.js');
+import { productFile } from '../support/product-room.cjs';
+const { enqueue } = createRequire(import.meta.url)(productFile('video-core.js'));
 
 describe('private-room moderation delivery', () => {
     it('moves host actions before signaling backlog without reordering signed actions', () => {

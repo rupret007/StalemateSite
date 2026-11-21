@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createChatAnnouncements } from '../../r/45662413410ed051/lobby/chat-announcements.mjs';
+import { createChatAnnouncements } from '#product-room/lobby/chat-announcements.mjs';
 
 function setup() {
     document.body.innerHTML = '<ol role="log" aria-live="polite" aria-label="Conversation"></ol>';

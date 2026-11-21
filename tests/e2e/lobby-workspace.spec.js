@@ -1,10 +1,11 @@
 const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 async function enter(page, baseURL) {
     const relay = hangoutRelayWsBase(baseURL, `workspace-${randomUUID()}`);
-    await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+    await page.goto(`/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
     await page.fill('[data-nick]', 'WorkspaceFan');
     await page.click('[data-enter]');
     await expect(page.locator('[data-connection]')).toHaveText('Connected');

@@ -4,7 +4,9 @@ const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const { installNoCaptureSentinel } = require('./helpers/no-capture-sentinel.cjs');
-const ROOT = '/r/45662413410ed051/lobby/';
+const { productRoomPath, roomPath } = require('./support/lobby-fixture');
+const ROOT = productRoomPath('lobby/');
+const LOBBY = roomPath('lobby/');
 
 for (const width of [390, 1440]) test(`protected newcomer reaches a shared room and leaves safely at ${width}px`, async ({ browser }, testInfo) => {
     const { privateCommunity } = await import('./helpers/private-community.mjs');
@@ -302,13 +304,13 @@ for (const { width, status } of [{ width: 375, status: 401 }, { width: 390, stat
             await context.route('**/beta/bootstrap.js', route => route.fulfill({ contentType: 'text/javascript', body: '// Private-shell marker only.' }));
             await context.route('**/beta/', route => route.fulfill({ contentType: 'text/html', body: '<h1>Your private invitation</h1>' }));
             await context.route('**/beta/state', route => { checks++; return route.fulfill({ status, contentType: 'text/plain', body: status === 401 ? 'Private invitation required.' : 'Temporarily unavailable.' }); });
-            await context.route(url => url.pathname === ROOT, async route => {
+            await context.route(url => url.pathname === LOBBY, async route => {
                 const response = await route.fetch();
                 await route.fulfill({ response, body: (await response.text()).replace('<head>', '<head><script src="/beta/bootstrap.js"></script>') });
             });
             const page = await context.newPage();
             const relay = hangoutRelayWsBase(baseURL, `private-entry-${randomUUID()}`) + '/unavailable';
-            await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+            await page.goto(`${LOBBY}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
             await page.fill('[data-nick]', 'ReturningGuest'); await page.click('[data-enter]');
             const notice = page.locator('[data-gate-status]');
             const entry = page.getByRole('link', { name: 'Open private entry', exact: true });
@@ -355,7 +357,7 @@ test('an open connection without a welcome times out and the guest can retry', a
     });
     await page.clock.install();
     const relay = hangoutRelayWsBase(baseURL, 'join-timeout');
-    await page.goto(`${ROOT}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+    await page.goto(`${LOBBY}?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
     await page.fill('[data-nick]', 'RetryGuest');
     await page.click('[data-enter]');
     await expect.poll(() => attempts).toBe(1);
@@ -511,7 +513,7 @@ for (const width of [375, 390, 1440]) test(`protected nickname picker failure ex
             viewport: { width, height: width === 375 ? 667 : width === 390 ? 844 : 900 }, reducedMotion: 'reduce' });
         await context.route('**/*', route => new URL(route.request().url()).origin === community.origin ? route.continue() : route.abort());
         const sentinel = await installNoCaptureSentinel(context);
-        await context.route(community.origin + '/r/45662413410ed051/names.js', route => { blocked++; return route.abort('failed'); });
+        await context.route(community.origin + productRoomPath('names.js'), route => { blocked++; return route.abort('failed'); });
         const page = await context.newPage(); page.on('pageerror', error => errors.push(error.name));
         await page.goto(community.origin + '/beta/?via=rad-dad#invite=' + community.invitation);
         await page.getByRole('link', { name: /Choose a nickname and join/ }).press('Enter');

@@ -3,8 +3,9 @@ import { webcrypto } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { productFile } from '../support/product-room.cjs';
 const require = createRequire(import.meta.url);
-const S = require('../../r/45662413410ed051/private-snapshot.js');
+const S = require(productFile('private-snapshot.js'));
 const subtle = webcrypto.subtle;
 const clone = value => JSON.parse(JSON.stringify(value));
 let keys, savedLock, savedVideo, savedClear;

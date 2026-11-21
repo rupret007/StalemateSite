@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 
-const read = name => readFileSync(new URL('../../r/45662413410ed051/' + name, import.meta.url), 'utf8');
+import { productFile } from '../support/product-room.cjs';
+const read = name => readFileSync(productFile(name), 'utf8');
 const html = read('lobby/index.html');
 const core = read('sync-core.js');
 const client = read('lobby/lobby-room.js');

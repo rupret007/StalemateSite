@@ -1,4 +1,5 @@
 const { defineConfig, configDefaults } = require('vitest/config');
+const { productRoomDir } = require('./tests/support/product-room.cjs');
 
 const capacityFixtures = [
     'tests/unit/hangout-lobby-media-blocking-capacity.test.js',
@@ -6,6 +7,11 @@ const capacityFixtures = [
 ];
 
 module.exports = defineConfig({
+    resolve: {
+        alias: [
+            { find: '#product-room/', replacement: `${productRoomDir}/` }
+        ]
+    },
     test: {
         environment: 'jsdom',
         // Project include arrays merge with this one; keep the root empty so

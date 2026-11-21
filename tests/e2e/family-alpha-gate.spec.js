@@ -11,9 +11,10 @@
 const { randomBytes, randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const PHONE = { width: 390, height: 844 };
-const LOBBY = '/r/45662413410ed051/lobby/';
+const LOBBY = `/r/${TEST_SLUG}/lobby/`;
 const PREVIEW = 'local-preview-key-0001';
 const WAIT_FOR_HOST = /wait(ing)? for (the )?host/i;
 const arcadeFeatures = { arcadeChess: 1, arcadeTurdSpades: 1, arcadeTurdanoid: 1 };
@@ -72,7 +73,7 @@ async function gameNight(browser, baseURL, { extraFeatures = {}, extraGames = []
         await transport.presenceChanged(scope);
     };
 
-    async function phone(nick, { viewport = PHONE } = {}) {
+    async function phone(nick, { viewport = PHONE, waitUntil } = {}) {
         const sid = randomUUID(), session = { betaSid: sid, betaInviteVersion: '1' };
         const person = { nick, sid, identity: null, matches: new Map(), matchFrames: [] };
         people.set(nick, person);
@@ -127,7 +128,7 @@ async function gameNight(browser, baseURL, { extraFeatures = {}, extraGames = []
                 } finally { upgrading = null; }
             });
         });
-        await page.goto(`${LOBBY}?preview=${PREVIEW}&relay=${encodeURIComponent(hangoutRelayWsBase(baseURL, 'family-alpha-gate'))}`);
+        await page.goto(`${LOBBY}?preview=${PREVIEW}&relay=${encodeURIComponent(hangoutRelayWsBase(baseURL, 'family-alpha-gate'))}`, waitUntil ? { waitUntil } : undefined);
         await enter(page, nick);
         return page;
     }
@@ -169,8 +170,8 @@ async function enter(page, nick) {
 }
 
 // The host opens Game Night and each guest accepts a person-bound invitation.
-async function room(fixture, nicks) {
-    const pages = await Promise.all(nicks.map(nick => fixture.phone(nick)));
+async function room(fixture, nicks, phoneOptions = {}) {
+    const pages = await Promise.all(nicks.map(nick => fixture.phone(nick, phoneOptions)));
     const [host, ...guests] = pages;
     const start = host.getByRole('button', { name: /Game Night/ });
     if (!await start.isVisible()) await host.locator('.phonetabs [data-show="rooms"]').click();
@@ -288,30 +289,44 @@ if (['chromium', 'webkit'].includes(probeBrowser)) {
         await button.tap();
     }
 
+    async function seatedTapMatch(browser, baseURL, feature, table, main, match) {
+        expect(browser.browserType().name()).toBe(probeBrowser);
+        const fixture = await gameNight(browser, baseURL, feature
+            ? { extraFeatures: { [feature]: 1 }, extraGames: [table.game] } : {});
+        try {
+            const [host, guest] = await room(fixture, ['TapHost', 'TapGuest'], { waitUntil: 'domcontentloaded' });
+            await Promise.all([showTable(host, table), showTable(guest, table)]);
+            await tapPhoneAction(host.locator(`${main}[data-command="open"]`));
+            await tapPhoneAction(guest.locator(`${main}[data-command="join"]`));
+            await expect(host.locator(match)).toBeVisible();
+            await expect(guest.locator(match)).toBeVisible();
+            return { fixture, host, guest };
+        } catch (error) {
+            await fixture.close();
+            throw error;
+        }
+    }
+
     test.describe(`Game Night action tap targets · ${probeBrowser}`, () => {
         for (const [game, statusStem, feature, main, match] of actionGames) {
-            test(`${game} opener and rematch`, async ({ browser, baseURL }) => {
-                test.slow();
-                expect(browser.browserType().name()).toBe(probeBrowser);
-                const fixture = await gameNight(browser, baseURL, feature
-                    ? { extraFeatures: { [feature]: 1 }, extraGames: [game] } : {});
+            const table = { game, status: `[data-${statusStem}-status]` };
+
+            test(`${game} opener`, async ({ browser, baseURL }) => {
+                const seated = await seatedTapMatch(browser, baseURL, feature, table, main, match);
+                await seated.fixture.close();
+            });
+
+            test(`${game} rematch`, async ({ browser, baseURL }) => {
+                const seated = await seatedTapMatch(browser, baseURL, feature, table, main, match);
                 try {
-                    const [host, guest] = await room(fixture, ['TapHost', 'TapGuest']);
-                    const table = { game, status: `[data-${statusStem}-status]` };
-                    await showTable(host, table);
-                    await showTable(guest, table);
-                    await tapPhoneAction(host.locator(`${main}[data-command="open"]`));
-                    await tapPhoneAction(guest.locator(`${main}[data-command="join"]`));
-                    await expect(host.locator(match)).toBeVisible();
-                    await expect(guest.locator(match)).toBeVisible();
-                    const first = (await fixture.record(game))[game].id;
-                    await finish(fixture, table, 'TapGuest');
-                    await tapPhoneAction(host.locator(`${main}[data-command="rematch"]`));
-                    const accept = guest.locator(`${main}[data-command="rematch"]`);
+                    const first = (await seated.fixture.record(game))[game].id;
+                    await finish(seated.fixture, table, 'TapGuest');
+                    await tapPhoneAction(seated.host.locator(`${main}[data-command="rematch"]`));
+                    const accept = seated.guest.locator(`${main}[data-command="rematch"]`);
                     await expect(accept).toHaveText(/^Accept /);
                     await tapPhoneAction(accept);
-                    await expect.poll(async () => (await fixture.record(game))[game].id).not.toBe(first);
-                } finally { await fixture.close(); }
+                    await expect.poll(async () => (await seated.fixture.record(game))[game].id).not.toBe(first);
+                } finally { await seated.fixture.close(); }
             });
         }
     });

@@ -5,12 +5,12 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 
-const root = '../../r/45662413410ed051/';
-const html = readFileSync(new URL(`${root}lobby/index.html`, import.meta.url), 'utf8');
-const core = readFileSync(new URL(`${root}sync-core.js`, import.meta.url), 'utf8');
-const lessons = readFileSync(new URL(`${root}bob-ross.js`, import.meta.url), 'utf8');
-const client = readFileSync(new URL(`${root}lobby/lobby-room.js`, import.meta.url), 'utf8');
-const youtube = readFileSync(new URL(`${root}youtube-player.js`, import.meta.url), 'utf8');
+import { productFile } from '../support/product-room.cjs';
+const html = readFileSync(productFile('lobby/index.html'), 'utf8');
+const core = readFileSync(productFile(`sync-core.js`), 'utf8');
+const lessons = readFileSync(productFile(`bob-ross.js`), 'utf8');
+const client = readFileSync(productFile(`lobby/lobby-room.js`), 'utf8');
+const youtube = readFileSync(productFile(`youtube-player.js`), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 const deferred = () => { let resolve, reject; return { promise: new Promise((done, fail) => { resolve = done; reject = fail; }), resolve: value => resolve(value), reject: error => reject(error) }; };

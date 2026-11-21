@@ -3,7 +3,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 
-const lobby = join(dirname(fileURLToPath(import.meta.url)), '../../r/45662413410ed051/lobby');
+import { productRoomName } from '../support/product-room.cjs';
+const lobby = join(dirname(fileURLToPath(import.meta.url)), `../../r/${productRoomName}/lobby`);
 const readLobby = name => readFileSync(join(lobby, name), 'utf8');
 const phoneMedia = new Set([
     '(max-width: 900px)',

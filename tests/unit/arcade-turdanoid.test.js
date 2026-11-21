@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { TurdanoidBrickRace } from '../../play/games/turdanoid-race.js';
 
+import { productRoomName } from '../support/product-room.cjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const client = vi.hoisted(() => ({ sent: [], handlers: null }));
 
-vi.mock('../../r/45662413410ed051/lobby/game-night-match-client.mjs', () => ({
+vi.mock('#product-room/lobby/game-night-match-client.mjs', () => ({
     matchConnectionErrors: {},
     createGameNightMatchClient: options => {
         client.handlers = options;
@@ -19,7 +20,7 @@ vi.mock('../../r/45662413410ed051/lobby/game-night-match-client.mjs', () => ({
     }
 }));
 
-const { mountArcadeTurdanoid } = await import('../../r/45662413410ed051/lobby/arcade-turdanoid.mjs');
+const { mountArcadeTurdanoid } = await import('#product-room/lobby/arcade-turdanoid.mjs');
 
 const launchWaitText = 'Launch is not active yet. The countdown is still running.';
 const race = new TurdanoidBrickRace('race-12345', 50_000, null, 1);
@@ -47,7 +48,7 @@ function inputs() {
 
 describe('Turdanoid brick race phone friction', () => {
     it('keeps a full-width board in the short landscape brick rules', () => {
-        const css = readFileSync(path.join(root, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
+        const css = readFileSync(path.join(root, `r/${productRoomName}/lobby/lobby.css`), 'utf8');
         const start = css.indexOf('@media (max-height: 450px) and (max-width: 900px) and (orientation: landscape)');
         const landscape = css.slice(start, css.indexOf('@media (prefers-reduced-motion: reduce)', start));
         const brickRules = [...landscape.matchAll(/([^{}]+)\{([^{}]+)\}/g)]
@@ -80,7 +81,7 @@ describe('Turdanoid brick race phone friction', () => {
     });
 
     it('launches from a tap on the stuck ball and lets a drag only aim', () => {
-        const source = readFileSync(path.join(root, 'r/45662413410ed051/lobby/arcade-turdanoid.mjs'), 'utf8');
+        const source = readFileSync(path.join(root, `r/${productRoomName}/lobby/arcade-turdanoid.mjs`), 'utf8');
         expect(source.match(/queue\('serve'\)/g)).toEqual(["queue('serve')"]);
         const view = mount();
         view.publish(54_000);

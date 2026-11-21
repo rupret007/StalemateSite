@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import pilot from '../src/pilot-entry.mjs';
 import { PILOT_TTL, signPilot, readPilot, pilotSession } from '../src/pilot-auth.mjs';
+import { productRoomName } from '../../tests/support/product-room.cjs';
 const origin = 'https://pilot.example';
 const op = 'operator-test-key-'.repeat(3);
 const guest = 'guest-test-key-'.repeat(3);
@@ -14,7 +15,7 @@ async function unlock(config, key) { return cookie(await pilot.fetch(request('/p
 describe('separate protected hosted pilot', () => {
     it('protects every product asset and state, including JS and HEAD, before asset lookup', async () => {
         const config = env();
-        for (const path of ['/r/45662413410ed051/lobby/', '/r/45662413410ed051/lobby/lobby.js', '/assets/favicon.svg', '/pilot/state', '/pilot/bootstrap.js']) {
+        for (const path of [`/r/${productRoomName}/lobby/`, `/r/${productRoomName}/lobby/lobby.js`, '/assets/favicon.svg', '/pilot/state', '/pilot/bootstrap.js']) {
             const result = await pilot.fetch(request(path), config); expect(result.status).toBe(401);
             expect(result.headers.get('X-Robots-Tag')).toContain('noindex');
         }
@@ -24,7 +25,7 @@ describe('separate protected hosted pilot', () => {
     it('fails closed before serving assets if a pilot secret or binding is missing', async () => {
         for (const missing of ['PILOT_MODE', 'PILOT_OPERATOR_KEY', 'HANGOUT_PREVIEW_KEY', 'HANGOUT_HMAC_KEY', 'ASSETS', 'LOBBY', 'QUOTA']) {
             const config = env(); delete config[missing];
-            expect((await pilot.fetch(request('/r/45662413410ed051/lobby/'), config)).status).toBe(503);
+            expect((await pilot.fetch(request(`/r/${productRoomName}/lobby/`), config)).status).toBe(503);
         }
     });
     it('requires exact-origin JSON admission and refuses invalid invitation codes', async () => {
@@ -39,7 +40,7 @@ describe('separate protected hosted pilot', () => {
         const result = await pilot.fetch(request('/pilot/state', { cookie: auth }), config);
         expect(await result.json()).toMatchObject({ role: 'fan', operator: false });
         expect((await pilot.fetch(request('/pilot/identity', { method: 'POST', cookie: auth, body: { role: 'owner', label: 'Impersonator' } }), config)).status).toBe(403);
-        const page = await pilot.fetch(request('/r/45662413410ed051/lobby/', { cookie: auth }), config);
+        const page = await pilot.fetch(request(`/r/${productRoomName}/lobby/`, { cookie: auth }), config);
         expect(await page.text()).toContain('Private Stalemate pilot');
         expect(page.headers.get('Cache-Control')).toBe('no-store');
     });

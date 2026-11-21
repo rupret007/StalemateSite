@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
+import { productRoomName } from '../support/product-room.cjs';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../..');
 import {
     arcadeLobbyPanelSelector,
@@ -12,7 +13,7 @@ import {
     GAME_NIGHT_LOBBY_ORDER,
     gameNightLabels,
     placeArcadePanelInLobbyOrder,
-} from '../../r/45662413410ed051/lobby/game-night.mjs';
+} from '#product-room/lobby/game-night.mjs';
 
 const OLD_LOBBY_ORDER = Object.freeze([
     'chess', 'crapeights', 'turdrummy', 'turdspades', 'turdjack', 'turdtris', 'turdomania', 'turdrush', 'turdanoid'
@@ -25,7 +26,7 @@ function expectedDesktopGridRowAreas() {
 }
 
 function readDesktopCardTableGridRowAreas() {
-    const css = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.css'), 'utf8');
+    const css = readFileSync(join(repoRoot, `r/${productRoomName}/lobby/lobby.css`), 'utf8');
     const block = css.match(
         /\.game-night:has\(\.arcade-card-table\[open\] \[data-card-table\]:not\(\[hidden\]\)\)\s*\{[^}]*grid-template:\s*([^;]+);/
     );
@@ -55,7 +56,7 @@ describe('Game Night beta lobby lineup', () => {
     });
 
     it('wires lobby.js arcadeTables through GAME_NIGHT_LOBBY_ORDER', () => {
-        const lobby = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.js'), 'utf8');
+        const lobby = readFileSync(join(repoRoot, `r/${productRoomName}/lobby/lobby.js`), 'utf8');
         expect(lobby).toContain('GAME_NIGHT_LOBBY_ORDER.map(game => [game, arcadeTableDefs[game]])');
     });
 
@@ -67,7 +68,7 @@ describe('Game Night beta lobby lineup', () => {
     });
 
     it('keeps the remaining desktop games in lineup order while Chess is active', () => {
-        const css = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/arcade-chess.css'), 'utf8');
+        const css = readFileSync(join(repoRoot, `r/${productRoomName}/lobby/arcade-chess.css`), 'utf8');
         const grid = css.match(/grid-template:\s*("chess heading"[^;]+);/);
         expect(grid, 'desktop Chess grid').toBeTruthy();
         const gameRows = [...grid[1].matchAll(/"chess\s+(\w+)"/g)].map(match => match[1])
@@ -76,7 +77,7 @@ describe('Game Night beta lobby lineup', () => {
     });
 
     it('repositions panels after mount so DOM follows GAME_NIGHT_LOBBY_ORDER', () => {
-        const lobby = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.js'), 'utf8');
+        const lobby = readFileSync(join(repoRoot, `r/${productRoomName}/lobby/lobby.js`), 'utf8');
         expect(lobby).toContain('placeArcadePanelInLobbyOrder');
     });
 });
@@ -139,7 +140,7 @@ describe('placeArcadePanelInLobbyOrder', () => {
 
 describe('drawArcadeTable WebJam chess', () => {
     function controllerPlacementBlock() {
-        const lobby = readFileSync(join(repoRoot, 'r/45662413410ed051/lobby/lobby.js'), 'utf8');
+        const lobby = readFileSync(join(repoRoot, `r/${productRoomName}/lobby/lobby.js`), 'utf8');
         const start = lobby.indexOf('        if (table.controller) {');
         const end = lobby.indexOf('        if (!scope || table.loading) return;');
         expect(start).toBeGreaterThan(-1);

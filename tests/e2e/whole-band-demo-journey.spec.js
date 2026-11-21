@@ -4,6 +4,7 @@ const { readFile } = require('node:fs/promises');
 const path = require('node:path');
 const { promisify } = require('node:util');
 const { devices, expect, test } = require('@playwright/test');
+const { productRoomPath } = require('./support/lobby-fixture');
 
 // WPE's OpenAL backend probes a missing sound card while the Music frame
 // builds its capture. The null driver is silent and immediate; the test still
@@ -14,7 +15,7 @@ test.use({
     }
 });
 
-const lobbyPath = '/r/45662413410ed051/lobby/';
+const lobbyPath = productRoomPath('lobby/');
 const release = 'https://github.com/rupret007/webjam/releases/latest';
 const guestName = 'G3Guest';
 const musicFrame = '[data-music-session-content] iframe';

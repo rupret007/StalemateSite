@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const ROOM = join(fileURLToPath(new URL('../..', import.meta.url)), 'r', '45662413410ed051');
+import { productRoomName } from '../support/product-room.cjs';
+const ROOM = join(fileURLToPath(new URL('../..', import.meta.url)), 'r', `${productRoomName}`);
 const relayMeta = readFileSync(join(ROOM, 'index.html'), 'utf8').match(/name="hangout-relay" content="([^"]+)"/)[1];
 
 const ROOM_CSP =

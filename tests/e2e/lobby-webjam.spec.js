@@ -3,6 +3,7 @@ const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
 const jsQR = require('jsqr');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG, lobbyPathPattern } = require('./support/lobby-fixture');
 // Full clipboard format from WebJam build_invite_message and direct_stun_invite.
 // This opaque transport fixture is never sent to a WebJam service.
 const INVITE = `Join beta rehearsal on WebJam:\nKeep this room open.\nOpen WebJam, choose Join, then paste this full invitation.\nwebjam://join?v=3&r=direct-stun&i=opaque_fixture_only\nwebjam-signal:V0pTRQ${'x'.repeat(3000)}`;
@@ -19,7 +20,7 @@ test('two visitors can copy an unchanged app invite, with a fallback when clipbo
             } });
         });
         const page = await context.newPage();
-        await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await page.goto(`/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
         await expect(page.locator('[data-app]')).toBeVisible();
         return page;
@@ -75,7 +76,7 @@ async function browserRoom(browser, baseURL, configured, viewport) {
         if (controls) {
             // Synthetic own-status HTTP only; real consent/identity ordering
             // belongs to the native gateway suite, not this client fixture.
-            await context.route(url => url.pathname === '/r/45662413410ed051/lobby/', async route => {
+            await context.route(url => url.pathname === `/r/${TEST_SLUG}/lobby/`, async route => {
                 const response = await route.fetch();
                 await route.fulfill({ response, body: (await response.text()).replace('<head>', '<head><script src="/beta/bootstrap.js"></script>') });
             });
@@ -100,7 +101,7 @@ async function browserRoom(browser, baseURL, configured, viewport) {
             socket.connectToServer();
             onLobbySocket(socket);
         });
-        await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await page.goto(`/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
         try { await expect(page.locator('[data-connection]')).toHaveText('Connected'); }
         catch (error) {
@@ -439,7 +440,7 @@ test('a bandmate reaches the jam room within three clicks of opening the copied 
             }
         }, { relay });
         const bandmate = await bandmateContext.newPage();
-        await bandmate.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+        await bandmate.goto(`/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
         await bandmate.fill('[data-nick]', 'LinkBandmate');
         await bandmate.click('[data-enter]');
         await expect(bandmate.locator('[data-connection]')).toHaveText('Connected');
@@ -472,7 +473,7 @@ test('a bandmate reaches the jam room within three clicks of opening the copied 
         // redirect. The nick gate is on that lobby page, so wait for it before
         // deciding whether Let me in still has to be tapped.
         await bandmate.goto(browserInvite, { waitUntil: 'commit' });
-        await bandmate.waitForURL(/\/r\/45662413410ed051\/lobby\//, { timeout: 5000 });
+        await bandmate.waitForURL(lobbyPathPattern(), { timeout: 5000 });
         if (await bandmate.locator('[data-gate]').isVisible()) {
             await bandmate.fill('[data-nick]', 'LinkBandmate');
             await bandmate.click('[data-enter]');

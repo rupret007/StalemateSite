@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const { resolveTestPort, parseHangoutRelayPath } = require('./lib/e2e-test-server.cjs');
+const { rewriteRoomRequest } = require('../tests/e2e/support/lobby-fixture');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = resolveTestPort(process.env);
@@ -122,7 +123,7 @@ async function main() {
         }
 
         const url = new URL(request.url, origin);
-        const urlPath = url.pathname;
+        const urlPath = rewriteRoomRequest(url.pathname);
 
         const relayRoute = parseHangoutRelayPath(urlPath);
         if (relayRoute?.pathname === '/__test/modlog.json') {

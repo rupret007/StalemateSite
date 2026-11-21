@@ -6,8 +6,9 @@ const http = require('node:http');
 const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/';
+const ROOT = `/r/${TEST_SLUG}/`;
 const PREVIEW = 'local-preview-key-0001';
 const LOCAL_STAFF = 'local-dev-admin-key-0001';
 const escapeHtml = value => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);

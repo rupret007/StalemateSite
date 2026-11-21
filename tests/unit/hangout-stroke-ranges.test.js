@@ -2,8 +2,9 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
+import { productFile } from '../support/product-room.cjs';
 const require = createRequire(import.meta.url);
-const H = require('../../r/45662413410ed051/sync-core.js');
+const H = require(productFile('sync-core.js'));
 const point = (index) => [index / 10000, index / 10000];
 const points = (start, count) => Array.from({ length: count }, (_, index) => point(start + index));
 const stroke = (id, pts, extra = {}) => ({ id, color: '#000000', size: 8, pts, ...extra });

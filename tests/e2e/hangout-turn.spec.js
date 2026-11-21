@@ -1,11 +1,12 @@
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 const KEY = 'local-preview-key-0001';
 const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(32)}`;
 test.use({ permissions: ['camera', 'microphone'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
 let testOrigin;
 test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
-const roomUrl = (extra = '') => `/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}${extra}`;
+const roomUrl = (extra = '') => `/r/${TEST_SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}${extra}`;
 async function enter(page) {
     await page.fill('[data-name]', 'Media tester'); await page.click('[data-enter]');
     await expect(page.locator('[data-room]')).toBeVisible();

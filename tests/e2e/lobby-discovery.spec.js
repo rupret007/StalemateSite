@@ -2,12 +2,13 @@
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'Desktop and phone layouts use Chromium here.');
 // A mocked external challenge callback connects to a loopback test relay. Chromium's
 // local-network provenance check otherwise blocks that fixture; production CSP stays enforced.
 test.use({ launchOptions: { args: ['--disable-features=LocalNetworkAccessChecks'] } });
-const ROOT = '/r/45662413410ed051/lobby/';
+const ROOT = `/r/${TEST_SLUG}/lobby/`;
 const KEY = 'local-preview-key-0001';
 let origin;
 let relayNamespace;

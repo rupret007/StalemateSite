@@ -11,6 +11,7 @@ import { unpackRushRacer } from '../../hangout-worker/arcade/games/turdrush-race
 import { Miniflare, convertV4MiniflareOptions } from './durable-records/node_modules/miniflare/dist/src/index.js';
 import { createArcadePreviewSite } from './arcade-preview-site.mjs';
 
+import { productRoomName } from '../support/product-room.cjs';
 const origin = 'https://local-fixture.invalid';
 const serve = process.argv.includes('--serve');
 const fixtureSigningKey = 'owned-arcade-fixture-hmac-not-for-deployment-2026';
@@ -73,7 +74,7 @@ assert.ok(siteGuest === undefined || browserName && !mixedRef && !relay &&
     'choose a browser and --site-guest=stalemate or --site-guest=rad-dad (requires ARCADE_PREVIEW_RAD_DAD)');
 const previousAssets = new Map();
 if (mixedRef) {
-    const root = 'r/45662413410ed051/';
+    const root = `r/${productRoomName}/`;
     const files = execFileSync('git', ['ls-tree', '-r', '--name-only', '-z', mixedRef, '--', root + 'entry-sites.mjs', root + 'lobby/'],
         { cwd: app, encoding: 'utf8' }).split('\0').filter(Boolean);
     // The old page, lazy game adapters and their imports must come from the
@@ -363,7 +364,7 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
             });
             assert.equal(response.status(), 200, 'the fixture guest already has community access');
             await response.dispose();
-            await page.goto(browserOrigin + '/r/45662413410ed051/lobby/');
+            await page.goto(browserOrigin + `/r/${productRoomName}/lobby/`);
             await page.getByLabel('Your nick').fill(phone ? 'ReturnPhone' : 'ReturnDesktop');
             await page.locator('[data-enter]').click();
             await expect(page.locator('[data-connection]')).toHaveText('Connected');
@@ -501,7 +502,7 @@ async function verifyWebJamGuestBrowser(match, matchId, seated, standby, unavail
             await expect(back).toBeHidden();
             await member.getByRole('button', { name: 'Join game' }).click();
             await expect(back).toBeVisible();
-            await expect(back).toHaveAttribute('href', '/r/45662413410ed051/lobby/?webjam-return=1');
+            await expect(back).toHaveAttribute('href', `/r/${productRoomName}/lobby/?webjam-return=1`);
             assert.ok((await back.boundingBox()).height >= 44, 'the return action is phone sized');
             await capture(member, 'member-' + step);
             await back.click();
@@ -524,7 +525,7 @@ async function verifyWebJamChess() {
     const { expect } = await import('@playwright/test');
     const browserOrigin = (await mf.ready).origin;
     const browser = await { chromium, webkit }[browserName].launch();
-    const privateLobby = browserOrigin + '/r/45662413410ed051/lobby/';
+    const privateLobby = browserOrigin + `/r/${productRoomName}/lobby/`;
     const scope = page => page.evaluate(() => {
         const { selfId: actor, active: room, chans } = window.__lobby;
         return { actor, room, ref: chans.get(room).keepRef };
@@ -1647,7 +1648,7 @@ const fixtureWorker = fileURLToPath(new URL('./lobby-session-authority/worker.mj
 async function bundleRollbackSource(revision) {
     const previous = join(directory, 'previous-source');
     await mkdir(previous);
-    const archive = execFileSync('git', ['archive', revision, 'hangout-worker', 'r/45662413410ed051', 'package-lock.json'],
+    const archive = execFileSync('git', ['archive', revision, 'hangout-worker', `r/${productRoomName}`, 'package-lock.json'],
         { cwd: app, maxBuffer: 32 * 1024 * 1024 });
     execFileSync('tar', ['-x', '-C', previous], { input: archive });
     assert.deepEqual(await readFile(join(previous, 'package-lock.json')), await readFile(join(app, 'package-lock.json')),
@@ -1720,7 +1721,7 @@ try {
         const { runArcadeBrowser } = await import('./arcade-browser.mjs');
         const browserOrigin = (await mf.ready).origin;
         if (mixedRef) {
-            const previousArcade = previousAssets.has('/r/45662413410ed051/lobby/game-night-match-client.mjs');
+            const previousArcade = previousAssets.has(`/r/${productRoomName}/lobby/game-night-match-client.mjs`);
             await runArcadeBrowser(browserName, browserOrigin, invite, evidence, null, browserMedia, false, { previousClient: true, previousArcade });
             options.modules[0].contents = await bundleRollbackSource(mixedRef);
             await mf.setOptions(convertV4MiniflareOptions(options));

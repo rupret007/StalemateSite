@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createIdleHeartbeat, LOBBY_IDLE_HEARTBEAT_MS as interval } from '../../r/45662413410ed051/lobby/idle-heartbeat.mjs';
+import { createIdleHeartbeat, LOBBY_IDLE_HEARTBEAT_MS as interval } from '#product-room/lobby/idle-heartbeat.mjs';
 
 afterEach(() => vi.useRealTimers());
 function fixture() {

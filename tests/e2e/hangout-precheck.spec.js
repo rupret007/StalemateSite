@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const KEY = 'local-preview-key-0001';
 test.use({
@@ -30,7 +31,7 @@ async function openCheck(page, { delayMedia = false } = {}) {
             close() { this.closed = true; }
         };
     }, { delayMedia });
-    await page.goto(`/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
+    await page.goto(`/r/${TEST_SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
     await page.click('[data-check-btn]');
     await expect(page.locator('[data-ask-copy]')).toContainText('18 or older');
     await page.click('[data-ask-yes]');
@@ -85,7 +86,7 @@ test('restarting the check releases the previous preview and closes the latest o
 test('missing mediaDevices explains how to open video while chat still works', async ({ page, browser }) => {
     const hint = 'Video needs Safari or Chrome. Tap ⋯ or Share, then Open in Safari (iPhone) or Open in Chrome (Android). Chat and games still work here.';
     await page.addInitScript(() => { delete Navigator.prototype.mediaDevices; });
-    await page.goto(`/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
+    await page.goto(`/r/${TEST_SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`);
     expect(await page.evaluate(() => navigator.mediaDevices)).toBeUndefined();
 
     await page.click('[data-check-btn]');

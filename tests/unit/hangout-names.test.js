@@ -6,7 +6,8 @@ import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { checkNick } from '../../hangout-worker/src/filter.mjs';
 
-const src = readFileSync(fileURLToPath(new URL('../../r/45662413410ed051/names.js', import.meta.url)), 'utf8');
+import { productFile } from '../support/product-room.cjs';
+const src = readFileSync(fileURLToPath(productFile('names.js')), 'utf8');
 const ctx = {};
 vm.runInNewContext(src, ctx);
 const { roll, all, LEGENDARY } = ctx.StaleNames;

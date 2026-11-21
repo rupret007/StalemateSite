@@ -3,8 +3,9 @@ const http = require('node:http');
 const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/lobby/';
+const ROOT = `/r/${TEST_SLUG}/lobby/`;
 const MOCK_SESSION = `export function waitFor() { return Promise.resolve(); }
 export class WebJoinSession {
   constructor({ onStatus = () => {}, onTrack = () => {}, stream, audioContext }) {
@@ -82,7 +83,7 @@ async function lobbyContext(browser, baseURL, { trackClicks = false, webJoinFixt
 
 test('Stalemate entry through jam room to connected browser Web Join with few bandmate clicks', async ({ browser, baseURL }, testInfo) => {
     const { communityIntegration, communityJoinLink } = await import('../../hangout-worker/src/community-integration.mjs');
-    const integration = communityIntegration({ version: 1, communityAddress: `${baseURL}/r/45662413410ed051/lobby/`, sites: [
+    const integration = communityIntegration({ version: 1, communityAddress: `${baseURL}/r/${TEST_SLUG}/lobby/`, sites: [
         { id: 'stalemate', label: 'Stalemate', origins: ['https://stalemate.band'], returnUrl: 'https://stalemate.band/', permissions: ['link', 'badge', 'return'], enabled: true, domainVerified: true }
     ] }, { allowLoopback: true });
     const target = new URL(communityJoinLink(integration, 'stalemate').href);

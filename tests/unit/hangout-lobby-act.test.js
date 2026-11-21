@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { createRequire } from 'node:module';
 import { applyClear, applyStroke, applyVideo, cleanRtc, actSnapshot } from '../../hangout-worker/src/lobby-act.mjs';
 
+import { productFile } from '../support/product-room.cjs';
 const require = createRequire(import.meta.url);
-const H = require('../../r/45662413410ed051/sync-core.js');
+const H = require(productFile('sync-core.js'));
 
 const chan = (kind) => ({ kind, act: { strokes: [], video: null } });
 

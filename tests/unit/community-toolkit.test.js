@@ -7,10 +7,11 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
+import { productRoomName } from '../support/product-room.cjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const exporter = 'hangout-worker/tools/package-community-toolkit.mjs';
 const sourceNames = [exporter, 'scripts/package-community-entry.mjs', 'hangout-worker/src/community-integration.mjs',
-    'r/45662413410ed051/entry-sites.mjs', 'hangout-internal/community-integration.example.json'];
+    `r/${productRoomName}/entry-sites.mjs`, 'hangout-internal/community-integration.example.json'];
 const temporary = [], address = 'https://community.example.test/beta/';
 const sha = value => createHash('sha256').update(value).digest('hex');
 afterEach(() => { for (const dir of temporary.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });
@@ -60,9 +61,9 @@ describe('committed-source community entry toolkit', () => {
             const bytes = fs.readFileSync(path.join(f.out, file.path)); expect(sha(bytes)).toBe(file.sha256); expect(bytes.length).toBe(file.bytes);
         }
         const inputs = { 'entry-link-builder': 'scripts/package-community-entry.mjs', 'integration-contract': 'hangout-worker/src/community-integration.mjs',
-            'entry-registry': 'r/45662413410ed051/entry-sites.mjs', 'registration-example': 'hangout-internal/community-integration.example.json' };
+            'entry-registry': `r/${productRoomName}/entry-sites.mjs`, 'registration-example': 'hangout-internal/community-integration.example.json' };
         for (const file of manifest.sourceFiles) expect(sha(f.rawGit('show', `${f.head}:${inputs[file.name] || file.name}`))).toBe(file.sha256);
-        expect(fs.readFileSync(path.join(f.out, 'lib/community-integration.mjs'), 'utf8').replace("'./entry-sites.mjs'", "'../../r/45662413410ed051/entry-sites.mjs'"))
+        expect(fs.readFileSync(path.join(f.out, 'lib/community-integration.mjs'), 'utf8').replace("'./entry-sites.mjs'", `'../../r/${productRoomName}/entry-sites.mjs'`))
             .toBe(f.rawGit('show', `${f.head}:hangout-worker/src/community-integration.mjs`).toString());
         expect(fs.readFileSync(path.join(f.out, 'scripts/package-community-entry.mjs'), 'utf8').replace("'../lib/community-integration.mjs'", "'../hangout-worker/src/community-integration.mjs'"))
             .toBe(f.rawGit('show', `${f.head}:scripts/package-community-entry.mjs`).toString());
@@ -71,7 +72,7 @@ describe('committed-source community entry toolkit', () => {
         expect(example.communityAddress).toBe(address); expect(example.sites.every(site => !site.enabled && !site.domainVerified)).toBe(true);
         const contents = allFiles(f.out).map(name => fs.readFileSync(path.join(f.out, name), 'utf8')).join('\n');
         expect(contents).not.toContain('PRIVATE_FIXTURE_NEVER_EXPORT'); expect(contents).not.toContain('DIRTY_TEMPLATE_NEVER_EXPORT');
-        expect(contents).not.toContain('45662413410ed051');
+        expect(contents).not.toContain(productRoomName);
         expect(contents).not.toContain(f.top); expect(fs.readFileSync(path.join(f.repo, 'hangout-internal/community-integration.example.json'), 'utf8')).toBe('DIRTY_TEMPLATE_NEVER_EXPORT');
     });
 
@@ -122,7 +123,7 @@ describe('committed-source community entry toolkit', () => {
     });
 
     it('refuses missing, symlinked and uncommitted executable source without producing a partial toolkit', () => {
-        const f = workspace(), module = path.join(f.repo, 'r/45662413410ed051/entry-sites.mjs');
+        const f = workspace(), module = path.join(f.repo, `r/${productRoomName}/entry-sites.mjs`);
         const original = fs.readFileSync(module); fs.appendFileSync(module, '\n// uncommitted fixture\n');
         expect(run(f).status).not.toBe(0); expect(fs.existsSync(f.out)).toBe(false);
         fs.writeFileSync(module, original); fs.unlinkSync(module); fs.symlinkSync('../../../.env', module); f.commit();

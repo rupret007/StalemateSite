@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const KEY = 'local-preview-key-0001';
 test.use({
@@ -46,7 +47,7 @@ async function turnOn(page, kind) {
     await expect(page.locator(`[data-${kind}]`)).toHaveAttribute('aria-pressed', 'true');
 }
 
-const roomUrl = () => `/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`;
+const roomUrl = () => `/r/${TEST_SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`;
 
 test('camera first, then mic: speaker detection starts and follows a new mic track after muting', async ({ page }) => {
     await join(page, roomUrl(), 'Speaker');

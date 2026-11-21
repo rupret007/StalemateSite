@@ -5,7 +5,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createLobby, LOBBY_LIMITS } from '../../hangout-worker/src/lobby-core.mjs';
-import { createEntrySiteRegistry } from '../../r/45662413410ed051/entry-sites.mjs';
+import { createEntrySiteRegistry } from '#product-room/entry-sites.mjs';
 import { accountId } from '../../hangout-worker/src/auth.mjs';
 
 const SOURCE = 'capacity-community-entry-fixture'.padEnd(32, 'x');

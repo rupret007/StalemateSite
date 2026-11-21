@@ -2,8 +2,9 @@ const { randomUUID } = require('node:crypto');
 // Relay arrival order must survive native decryption and signature verification.
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/';
+const ROOT = `/r/${TEST_SLUG}/`;
 const KEY = 'local-preview-key-0001';
 const contexts = new Set(), pages = new Set();
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium covers native authority receive ordering');

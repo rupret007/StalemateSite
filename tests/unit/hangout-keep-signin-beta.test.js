@@ -6,7 +6,7 @@ import { betaFetch } from '../../hangout-worker/src/beta-entry.mjs';
 import { BetaSessions } from '../../hangout-worker/src/beta-sessions.mjs';
 import { createLobby } from '../../hangout-worker/src/lobby-core.mjs';
 import { accountId } from '../../hangout-worker/src/auth.mjs';
-import { keepRoomIntent, consumeKeepRoomIntent, KEEP_ROOM_INTENT_KEY } from '../../r/45662413410ed051/entry-sites.mjs';
+import { keepRoomIntent, consumeKeepRoomIntent, KEEP_ROOM_INTENT_KEY } from '#product-room/entry-sites.mjs';
 
 const origin = 'https://keep.fixture.test', team = 'keep-test.cloudflareaccess.com';
 const invite = 'keep-only-synthetic-invitation-'.repeat(2), preview = 'keep-only-synthetic-preview-'.repeat(2);

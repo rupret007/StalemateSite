@@ -1,11 +1,12 @@
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const KEY = 'local-preview-key-0001';
 let testOrigin;
 test.beforeAll(async ({ baseURL }) => { testOrigin = baseURL; });
-const roomUrl = () => `/r/45662413410ed051/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`;
+const roomUrl = () => `/r/${TEST_SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(testOrigin))}`;
 
 async function join(page, url, name) {
     await page.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());

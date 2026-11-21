@@ -5,7 +5,8 @@ const { writeFile } = require('node:fs/promises');
 const { setTimeout: delay } = require('node:timers/promises');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
-const ROOT = '/r/45662413410ed051/lobby/';
+const { TEST_SLUG } = require('./support/lobby-fixture');
+const ROOT = `/r/${TEST_SLUG}/lobby/`;
 
 // Safari's default keyboard navigation skips buttons with plain Tab. Exercise
 // its documented Option-Tab path on macOS, without changing user preferences.

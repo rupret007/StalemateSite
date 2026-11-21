@@ -4,14 +4,15 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs';
 
-const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
-const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
-const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
+import { productFile, productRoomName } from '../support/product-room.cjs';
+const html = readFileSync(productFile('lobby/index.html'), 'utf8');
+const client = readFileSync(productFile('lobby/lobby.js'), 'utf8');
+const discovery = readFileSync(productFile('lobby/discovery-core.js'), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 
 async function visitor(features = { messageResults: 1, privateMessageContext: 1, privateMessagePeers: 1 }) {
-    const dom = new JSDOM(html, { url: 'http://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay', runScripts: 'outside-only' });
+    const dom = new JSDOM(html, { url: `http://127.0.0.1:4320/r/${productRoomName}/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay`, runScripts: 'outside-only' });
     windows.push(dom);
     const { window } = dom, timers = new Map(), sockets = []; let timerId = 0;
     window.confirm = vi.fn(() => true);

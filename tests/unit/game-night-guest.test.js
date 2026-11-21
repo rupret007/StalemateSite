@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+import { productRoomName } from '../support/product-room.cjs';
 beforeEach(() => { vi.resetModules(); });
 
 afterEach(() => {
@@ -27,13 +28,13 @@ it('tells a returning guest to wait when reconnects are limited, then handles an
         ['gn:last-table', otherTable]
     ]);
     vi.stubGlobal('localStorage', { getItem: key => saved.get(key), removeItem: key => saved.delete(key) });
-    history.replaceState(null, '', '/r/45662413410ed051/lobby/?game-guest=1&table=' + tableId);
+    history.replaceState(null, '', `/r/${productRoomName}/lobby/?game-guest=1&table=` + tableId);
     const request = vi.fn()
         .mockResolvedValueOnce(Response.json({ error: 'Reconnect allowance reached. Try again in a minute.' }, { status: 429 }))
         .mockResolvedValueOnce(Response.json({}, { status: 410 }));
     vi.stubGlobal('fetch', request);
 
-    await import('../../r/45662413410ed051/lobby/game-night-guest.js');
+    await import('#product-room/lobby/game-night-guest.js');
 
     const status = document.querySelector('[data-guest-status]');
     const retry = document.querySelector('[data-guest-retry]');
@@ -76,7 +77,7 @@ it.each(['Royal Flush Chess', 'TurdSpades'])('moves focus to Join after retrying
     vi.stubGlobal('fetch', request);
     vi.stubGlobal('localStorage', { getItem: () => null });
 
-    await import('../../r/45662413410ed051/lobby/game-night-guest.js');
+    await import('#product-room/lobby/game-night-guest.js');
 
     const retry = document.querySelector('[data-guest-retry]');
     const join = document.querySelector('[data-guest-join]');
@@ -106,7 +107,7 @@ it('focuses retry when an invite check fails and moves focus to Join once recove
         .mockResolvedValueOnce(Response.json({}, { status: 503 }))
         .mockResolvedValueOnce(Response.json({ game: 'Turdanoid Brick Race', host: 'Test host' }));
     vi.stubGlobal('fetch', request);
-    await import('../../r/45662413410ed051/lobby/game-night-guest.js');
+    await import('#product-room/lobby/game-night-guest.js');
 
     const status = document.querySelector('[data-guest-status]');
     const retry = document.querySelector('[data-guest-retry]');
@@ -147,7 +148,7 @@ it.each([false, true])('lets a refreshed guest correct a rejected nickname (deta
     vi.stubGlobal('fetch', request);
     vi.stubGlobal('localStorage', { getItem: () => null });
 
-    await import('../../r/45662413410ed051/lobby/game-night-guest.js');
+    await import('#product-room/lobby/game-night-guest.js');
 
     const status = document.querySelector('[data-guest-status]');
     const form = document.querySelector('[data-guest-invite]');
@@ -207,7 +208,7 @@ it('submits the nickname form through the existing invitation attempt only once'
     vi.stubGlobal('fetch', request);
     vi.stubGlobal('localStorage', { getItem: () => null });
 
-    await import('../../r/45662413410ed051/lobby/game-night-guest.js');
+    await import('#product-room/lobby/game-night-guest.js');
 
     const name = document.querySelector('[data-guest-name]');
     const join = document.querySelector('[data-guest-join]');

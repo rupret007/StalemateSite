@@ -89,6 +89,14 @@ describe('test server media responses', { timeout: 30000 }, () => {
         expect((await response.arrayBuffer()).byteLength).toBe(0);
     });
 
+    it('serves the synthetic e2e lobby from the discovered product directory', async () => {
+        const { productFile, roomPath } = await import('../support/product-room.cjs');
+        const response = await fetch(`${origin}${roomPath('lobby/')}`);
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toContain('text/html');
+        expect(Buffer.from(await response.arrayBuffer())).toEqual(readFileSync(productFile('lobby/index.html')));
+    });
+
     it('keeps missing paths as a complete 404 response even with Range', async () => {
         const response = await fetch(`${origin}/missing-media.m4a`, { headers: { Range: 'bytes=0-1' } });
         const missing = readFileSync(new URL('../../404.html', import.meta.url));

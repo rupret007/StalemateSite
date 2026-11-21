@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { createEntrySharing } from '../../r/45662413410ed051/lobby/entry-sharing.mjs';
+import { createEntrySharing } from '#product-room/lobby/entry-sharing.mjs';
 
 describe('entry sharing during socket admission', () => {
     it('clears a source advertised by hello when the visitor opts out before welcome', () => {

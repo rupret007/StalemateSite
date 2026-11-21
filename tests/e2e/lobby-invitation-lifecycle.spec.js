@@ -4,6 +4,7 @@ const { test, expect } = require('@playwright/test');
 const { readFile } = require('node:fs/promises');
 const { join: joinPath } = require('node:path');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const FIRST = 'webjam://join?v=3&r=fixture&i=first_synthetic_capability';
 const SECOND = 'webjam://join?v=3&r=fixture&i=second_synthetic_capability';
@@ -29,7 +30,7 @@ async function community(browser, baseURL) {
         if (controls) {
             // Own-status HTTP is synthetic, as in lobby-webjam.spec.js. The
             // actual client handles Stop; this is not native consent proof.
-            await context.route(url => url.pathname === '/r/45662413410ed051/lobby/', async route => {
+            await context.route(url => url.pathname === `/r/${TEST_SLUG}/lobby/`, async route => {
                 const response = await route.fetch();
                 await route.fulfill({ response, body: (await response.text()).replace('<head>', '<head><script src="/beta/bootstrap.js"></script>') });
             });
@@ -55,7 +56,7 @@ async function community(browser, baseURL) {
             socket.onClose(() => { sockets.delete(identity.id); void engine.disconnect(identity.id); });
             engine.connect(identity);
         });
-        await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(hangoutRelayWsBase(baseURL, 'invitation-lifecycle'))}`);
+        await page.goto(`/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(hangoutRelayWsBase(baseURL, 'invitation-lifecycle'))}`);
         await page.fill('[data-nick]', nick); await page.click('[data-enter]');
         await expect(page.locator('[data-connection]')).toHaveText('Connected');
         return page;
@@ -543,7 +544,7 @@ for (const { viewport, submitFromNickname } of [
         const { betaFetch } = await import('../../hangout-worker/src/beta-entry.mjs');
         const origin = new URL(baseURL).origin;
         const guestPath = '/beta/game-night/guest';
-        const lobbyPath = '/r/45662413410ed051/lobby/';
+        const lobbyPath = `/r/${TEST_SLUG}/lobby/`;
         const tableId = '11111111-1111-4111-8111-111111111111';
         const reason = 'That nickname is taken. Choose another.';
         const requestBodies = [];
@@ -620,7 +621,7 @@ for (const { viewport, submitFromNickname } of [
 }
 
 const gameGuestPath = '/beta/game-night/guest';
-const gameLobbyPath = '/r/45662413410ed051/lobby/';
+const gameLobbyPath = `/r/${TEST_SLUG}/lobby/`;
 async function gameNightEntryFixture(context, origin) {
     const { betaFetch } = await import('../../hangout-worker/src/beta-entry.mjs');
     const sharedAssets = ['game-night.mjs', 'game-night-audio.mjs'].map(name => gameLobbyPath + name);

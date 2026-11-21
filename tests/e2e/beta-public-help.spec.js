@@ -4,8 +4,9 @@ const { createServer } = require('node:http');
 const { readFile } = require('node:fs/promises');
 const path = require('node:path');
 const { test, expect } = require('@playwright/test');
+const { productFile, productRoomPath } = require('./support/lobby-fixture');
 
-const TERMS = '/r/45662413410ed051/terms/';
+const TERMS = productRoomPath('terms/');
 let server, origin, betaFetch;
 const calls = [];
 test.beforeAll(async () => {
@@ -13,7 +14,7 @@ test.beforeAll(async () => {
     const env = { HANGOUT_MODERATION_CONTACT: 'moderator@example.test', ASSETS: { fetch: async request => {
         expect(request.url).toBe(`${origin}${TERMS}index.html`);
         expect(request.headers.get('Cookie')).toBeNull();
-        return new Response(await readFile(path.join(__dirname, '../../r/45662413410ed051/terms/index.html')), { headers: { 'Content-Type': 'text/html' } });
+        return new Response(await readFile(productFile('terms/index.html')), { headers: { 'Content-Type': 'text/html' } });
     } } };
     server = createServer(async (request, response) => {
         try {

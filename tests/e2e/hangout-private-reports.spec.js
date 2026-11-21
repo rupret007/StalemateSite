@@ -6,8 +6,9 @@ const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/';
+const ROOT = `/r/${TEST_SLUG}/`;
 const KEY = 'local-preview-key-0001';
 const SAVED = /^Saved for community staff review\./;
 const REPORT_KEYS = ['type', 'v', 'request', 'kind', 'target', 'claimedName', 'excerpt', 'reason', 'consent'].sort();

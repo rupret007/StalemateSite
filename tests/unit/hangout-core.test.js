@@ -3,9 +3,10 @@ import { webcrypto } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
+import { productFile } from '../support/product-room.cjs';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 const require = createRequire(import.meta.url);
-const H = require('../../r/45662413410ed051/sync-core.js');
+const H = require(productFile('sync-core.js'));
 
 describe('hangout sync core', () => {
     it('parses YouTube links and rejects everything else', () => {

@@ -3,10 +3,11 @@
 const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 test('a held brush gesture cannot follow keyboard navigation into another shared room', async ({ browser, baseURL }, testInfo) => {
     const relay = hangoutRelayWsBase(baseURL, `drawing-lifetime-${randomUUID()}`);
-    const url = `/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`;
+    const url = `/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`;
     const contexts = [], errors = [];
     async function visitor(nick) {
         const context = await browser.newContext({ viewport: { width: 1280, height: 900 } }); contexts.push(context);
@@ -54,7 +55,7 @@ test('a held brush gesture cannot follow keyboard navigation into another shared
 
 async function activityVisitors(browser, baseURL) {
     const relay = hangoutRelayWsBase(baseURL, `drawing-background-${randomUUID()}`);
-    const url = `/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`;
+    const url = `/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`;
     const contexts = [], errors = [], received = new Map(), providerRequests = new Map();
     async function visitor(nick, { fakeVideo = false } = {}) {
         const context = await browser.newContext({ viewport: { width: 1280, height: 900 } }); contexts.push(context);

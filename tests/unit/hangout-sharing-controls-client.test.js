@@ -4,15 +4,16 @@ import { JSDOM } from 'jsdom';
 import { readFileSync } from 'node:fs';
 import { createHangoutClientTestModules } from './hangout-lobby-client-stub.mjs';
 
-const html = readFileSync(new URL('../../r/45662413410ed051/lobby/index.html', import.meta.url), 'utf8');
-const client = readFileSync(new URL('../../r/45662413410ed051/lobby/lobby.js', import.meta.url), 'utf8');
-const discovery = readFileSync(new URL('../../r/45662413410ed051/lobby/discovery-core.js', import.meta.url), 'utf8');
-const activity = readFileSync(new URL('../../r/45662413410ed051/sync-core.js', import.meta.url), 'utf8');
+import { productFile, productRoomName } from '../support/product-room.cjs';
+const html = readFileSync(productFile('lobby/index.html'), 'utf8');
+const client = readFileSync(productFile('lobby/lobby.js'), 'utf8');
+const discovery = readFileSync(productFile('lobby/discovery-core.js'), 'utf8');
+const activity = readFileSync(productFile('sync-core.js'), 'utf8');
 const windows = [];
 afterEach(() => { for (const dom of windows.splice(0)) dom.window.close(); });
 
 async function visitor(via = 'stalemate', features = { entrySources: 1 }, { sharing = false, fetcher = async () => Response.json({ ok: true, state: 'unknown', available: false, purposes: [], revision: 0, canStop: false }) } = {}) {
-    const dom = new JSDOM(sharing ? html.replace('<head>', '<head><script src="/beta/bootstrap.js"></script>') : html, { url: `http://127.0.0.1:4320/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
+    const dom = new JSDOM(sharing ? html.replace('<head>', '<head><script src="/beta/bootstrap.js"></script>') : html, { url: `http://127.0.0.1:4320/r/${productRoomName}/lobby/?preview=local-preview-key-0001&relay=ws%3A%2F%2F127.0.0.1%3A4320%2Frelay&via=${encodeURIComponent(via)}`, runScripts: 'outside-only' });
     windows.push(dom);
     const { window } = dom; window.HangoutParticipationControls = sharing; window.fetch = vi.fn(fetcher);
     const timers = new Map(), sockets = []; let timerId = 0, elapsed = 0;

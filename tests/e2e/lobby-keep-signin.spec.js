@@ -4,8 +4,9 @@
 const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/lobby/';
+const ROOT = `/r/${TEST_SLUG}/lobby/`;
 const PREVIEW = 'local-preview-key-0001';
 const INTENT = 'hangout-return-room';
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium local identity composition');

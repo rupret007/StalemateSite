@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createGameNightMatchClient, matchUnavailableText } from '../../r/45662413410ed051/lobby/game-night-match-client.mjs';
+import { createGameNightMatchClient, matchUnavailableText } from '#product-room/lobby/game-night-match-client.mjs';
 
+import { productRoomName } from '../support/product-room.cjs';
 describe('Game Night phone wake and history recovery', () => {
     let client, sockets, issue, hidden, events;
     const restored = () => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
@@ -128,7 +129,7 @@ describe('Game Night phone wake and history recovery', () => {
     it.each(['arcade-chess', 'arcade-crapeights', 'arcade-turdrummy', 'arcade-turdspades', 'arcade-turdjack'])(
         'checks for a hidden game before the waiting-for-host copy in %s', async view => {
             const { readFileSync } = await import('node:fs');
-            const source = readFileSync(`r/45662413410ed051/lobby/${view}.mjs`, 'utf8');
+            const source = readFileSync(`r/${productRoomName}/lobby/${view}.mjs`, 'utf8');
             const unavailable = source.indexOf('!model && client.matchUnavailable()');
             const hidden = source.indexOf('} else if (!model && client.matchOpen()) {');
             const waiting = source.indexOf('Waiting for the host to open');

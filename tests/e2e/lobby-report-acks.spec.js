@@ -2,6 +2,7 @@
 // covered separately against the real engine and Durable Object adapter.
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'Report protocol fixture uses Chromium.');
 const LINE = { t: 'line', id: 'mreportfixture', ch: '#stalemate', from: 'OtherGuest', prefix: '',
@@ -28,7 +29,7 @@ async function openFixture(page, baseURL, { personActions = false } = {}) {
             ...(personActions ? { features: { personTargets: 1 } } : {}) }));
     });
     const relay = hangoutRelayWsBase(baseURL, 'report-ui-fixture');
-    await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
+    await page.goto(`/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}`);
     await page.fill('[data-nick]', 'Witness'); await page.click('[data-enter]');
     await expect(page.locator('[data-connection]')).toHaveText('Connected');
     return { reports, publish: (frame) => socket.send(JSON.stringify(frame)) };

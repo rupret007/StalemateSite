@@ -5,8 +5,9 @@ const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 const { createLobby } = require('../../hangout-worker/src/lobby-core.mjs');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const LOBBY = '/r/45662413410ed051/lobby/';
+const LOBBY = `/r/${TEST_SLUG}/lobby/`;
 
 test('a guest joins the invited Music session with one accept tap', async ({ browser, baseURL }) => {
     const relay = hangoutRelayWsBase(baseURL, `webjam-browser-one-tap-${randomUUID()}`);

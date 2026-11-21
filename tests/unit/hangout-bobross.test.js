@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
+import { productFile } from '../support/product-room.cjs';
 const require = createRequire(import.meta.url);
-const B = require('../../r/45662413410ed051/bob-ross.js');
-const H = require('../../r/45662413410ed051/sync-core.js');
+const B = require(productFile('bob-ross.js'));
+const H = require(productFile('sync-core.js'));
 
 describe('Bob Ross Paint-Along data', () => {
     it('offers four starter picks with Grandeur first without replacing the larger catalogue', () => {
@@ -46,7 +47,7 @@ describe('Bob Ross Paint-Along data', () => {
     });
 
     it('brush sizes stay inside the core clamp and the slider range', () => {
-        const html = readFileSync(new URL('../../r/45662413410ed051/index.html', import.meta.url), 'utf8');
+        const html = readFileSync(productFile('index.html'), 'utf8');
         const max = Number(/data-size/.test(html) && html.match(/max="(\d+)" value="\d+" data-size/)[1]);
         for (const br of B.BRUSHES) { expect(br.size).toBeGreaterThanOrEqual(2); expect(br.size).toBeLessThanOrEqual(max); }
         expect(max).toBeLessThanOrEqual(48);
@@ -54,7 +55,7 @@ describe('Bob Ross Paint-Along data', () => {
 
     it('copy stays punk: no ska wording anywhere in the room', () => {
         for (const f of ['index.html', 'room.js', 'bob-ross.js']) {
-            const text = readFileSync(new URL(`../../r/45662413410ed051/${f}`, import.meta.url), 'utf8');
+            const text = readFileSync(productFile(`${f}`), 'utf8');
             expect(text).not.toMatch(/\bska\b/i);
         }
     });

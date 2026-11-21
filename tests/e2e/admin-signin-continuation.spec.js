@@ -1,8 +1,9 @@
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/admin/';
+const ROOT = `/r/${TEST_SLUG}/admin/`;
 function url(baseURL, extra = {}) {
     const params = new URLSearchParams({
         preview: 'local-preview-key-0001',

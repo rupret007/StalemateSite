@@ -5,8 +5,9 @@ const { writeFile } = require('node:fs/promises');
 const { randomUUID, createHash } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 
-const ROOT = '/r/45662413410ed051/lobby/', PREVIEW = 'local-preview-key-0001';
+const ROOT = `/r/${TEST_SLUG}/lobby/`, PREVIEW = 'local-preview-key-0001';
 const diagnostic = process.env.HANGOUT_MEDIA_DIAGNOSTIC === '1';
 test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] } });
 test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium supplies the synthetic cameras');

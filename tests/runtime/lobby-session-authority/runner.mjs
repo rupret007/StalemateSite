@@ -10,6 +10,7 @@ import { join, dirname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
+import { productRoomName } from '../../support/product-room.cjs';
 const FILE = fileURLToPath(import.meta.url), HERE = dirname(FILE);
 const APP = fileURLToPath(new URL('../../../', import.meta.url));
 const TOOLS = fileURLToPath(new URL('../durable-records/', import.meta.url));
@@ -64,7 +65,7 @@ const sources = () => Object.fromEntries([
     ['fixture/runner.mjs', FILE], ['fixture/worker.mjs', join(HERE, 'worker.mjs')], ['fixture/README.md', join(HERE, 'README.md')],
     ['fixture/control-credit-observation.mjs', join(HERE, 'control-credit-observation.mjs')],
     ...readdirSync(join(APP, 'hangout-worker/src')).filter(name => name.endsWith('.mjs')).sort().map(name => [`application/src/${name}`, join(APP, 'hangout-worker/src', name)]),
-    ...['r/45662413410ed051/sync-core.js', 'r/45662413410ed051/entry-sites.mjs', 'r/45662413410ed051/lobby/game-night.mjs', 'package.json', 'package-lock.json', '.github/workflows/durable-record-runtime.yml', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
+    ...[`r/${productRoomName}/sync-core.js`, `r/${productRoomName}/entry-sites.mjs`, `r/${productRoomName}/lobby/game-night.mjs`, 'package.json', 'package-lock.json', '.github/workflows/durable-record-runtime.yml', 'hangout-worker/wrangler.beta.toml', 'node_modules/rolldown/package.json', 'node_modules/obscenity/package.json'].map(name => [`application/${name}`, join(APP, name)]),
     ...['package.json', 'package-lock.json'].map(name => [`tools/${name}`, join(TOOLS, name)])
 ].map(([name, path]) => [name, hash(path)]));
 function bindingPackage() {

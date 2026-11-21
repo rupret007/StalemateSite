@@ -24,6 +24,7 @@ import { validParticipationLedgerState } from '../../hangout-worker/src/particip
 import { PARTICIPATION_PURPOSES } from '../../hangout-worker/src/participation-policy.mjs';
 import { initializeLobbySessionAuthority, migrateLobbySessionAuthority, createLobbySessionAuthority,
     LOBBY_AUTHORITY_MARKER, LOBBY_AUTHORITY_COMMUNITY } from '../../hangout-worker/src/lobby-session-authority.mjs';
+import { productRoomName } from '../support/product-room.cjs';
 
 const NOW = 1800000000000, ALARM = '__test_native_alarm__', cleanups = [];
 const SESSION_INDEX = 'authority-session-index:v1', CONNECTION_INDEX = 'authority-connection-index:v1';
@@ -894,7 +895,7 @@ describe('private Music through signed beta admission, production lobby and SQLi
         try {
             const wa = await app.connect(host, 'PhoneHost'), wb = await app.connect(guest, 'PhoneGuest');
             const hostCookie = await cookie(host), guestCookie = await cookie(guest);
-            const lobbyPage = await call('/r/45662413410ed051/lobby/', hostCookie);
+            const lobbyPage = await call(`/r/${productRoomName}/lobby/`, hostCookie);
             expect(lobbyPage.status).toBe(200);
             expect(lobbyPage.headers.get('Content-Security-Policy')).toContain(`frame-src ${origin}/join/host/ ${origin}/join/guest/ `);
             expect(lobbyPage.headers.get('Content-Security-Policy')).toContain("frame-ancestors 'none'");

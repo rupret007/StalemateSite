@@ -1,6 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const { test, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { TEST_SLUG } = require('./support/lobby-fixture');
 test.use({ permissions: ['camera'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
 
 for (const cancellation of ['camera off', 'leave room']) {
@@ -20,7 +21,7 @@ for (const cancellation of ['camera off', 'leave room']) {
             };
         });
         const relay = hangoutRelayWsBase(baseURL, `turn-${randomUUID()}`);
-        await page.goto(`/r/45662413410ed051/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}&turn=/lobby-turn`);
+        await page.goto(`/r/${TEST_SLUG}/lobby/?preview=local-preview-key-0001&relay=${encodeURIComponent(relay)}&turn=/lobby-turn`);
         await page.fill('[data-nick]', 'CameraTester'); await page.click('[data-enter]');
         await expect(page.locator('[data-app]')).toBeVisible();
         await page.click('[data-start="art"]');

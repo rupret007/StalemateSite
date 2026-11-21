@@ -2,8 +2,9 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
+import { productFile } from '../support/product-room.cjs';
 const require = createRequire(import.meta.url);
-const V = require('../../r/45662413410ed051/video-core.js');
+const V = require(productFile('video-core.js'));
 
 describe('hangout video core', () => {
     it('sends the sharp feed only to people watching you big, thumbnails to everyone else', () => {

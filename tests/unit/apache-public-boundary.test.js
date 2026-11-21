@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { productRoomName } from '../support/product-room.cjs';
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const guard = await readFile(join(root, '.htaccess'), 'utf8');
 const directives = guard.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'));
@@ -40,7 +41,7 @@ describe('Apache repository-root public boundary', () => {
         '/dist/index.html', '/preview-dist/index.html', '/test-results/index.html',
         '/playwright-report/index.html', '/playwright.live.config.js',
         '/vitest.config.js', '/.gitignore', '/%70ackage.json',
-        '/r/45662413410ed051/TWO-HOUSE-TEST.md', '/r/45662413410ed051/%54WO-HOUSE-TEST.md'
+        `/r/${productRoomName}/TWO-HOUSE-TEST.md`, `/r/${productRoomName}/%54WO-HOUSE-TEST.md`
     ])('returns a missing response for source/config path %s at root and project paths', path => {
         expect(blocked(path), path).toBe(true);
         expect(blocked(`/StalemateSite${path}?source=fixture`), path).toBe(true);
@@ -77,7 +78,7 @@ describe('Apache repository-root public boundary', () => {
         '/play/stalemate/manic.m4a', '/assets/manic.mp4',
         '/.well-known/acme-challenge/fixture', '/scripts-night/', '/docs-show/',
         '/package.json-cover.png', '/events/stalemate-rockin-october-2026.ics',
-        '/r/45662413410ed051/fx/NOTICE.md'
+        `/r/${productRoomName}/fx/NOTICE.md`
     ])('keeps public media, licensing, aliases and neighboring names available: %s', path => {
         expect(blocked(path), path).toBe(false);
         expect(blocked(`/StalemateSite${path}`), path).toBe(false);
