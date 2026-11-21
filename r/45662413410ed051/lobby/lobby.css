@@ -27,6 +27,20 @@ body { margin: 0; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden
 .music-session-panel { flex: none; background: var(--surface); border-bottom: 1px solid var(--control-line); }
 .music-session-panel summary { min-height: 48px; padding: 12px 16px; color: var(--lime); }
 .music-session-panel iframe { display: block; width: 100%; height: min(48dvh, 25rem); border: 0; }
+
+@media (max-width: 480px) {
+  .music-session-panel[open] { position: relative; }
+  .music-session-panel[open] > summary { padding-inline-end: 7rem; }
+  .music-session-panel[open] > [data-music-session-close] {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 8px;
+    min-height: 48px;
+  }
+  .music-session-panel iframe[title="Join private Music"] {
+    height: min(69dvh, calc(100dvh - 12rem));
+  }
+}
 .music-session-notice { flex: none; margin: 0; padding: 0.5rem 1rem; background: var(--surface); }
 button, input, select, a, summary { -webkit-tap-highlight-color: transparent; }
 button, input, select { font: inherit; }
@@ -133,6 +147,17 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .room[data-state=full], .room[data-state=invite], .room[data-state=key] { border-left-color: var(--amber); }
 .room:hover:enabled { background: var(--raised); border-color: #667364; }
 .empty { padding: 12px; margin: 6px 0 0; color: var(--muted); font-size: 11px; line-height: 1.7; border: 1px dashed var(--line); border-radius: 4px; }
+.session-card [data-beta-return] { justify-self: start; display: inline-flex; align-items: center; min-height: 44px; }
+.rooms > .room-start-shortcut { display: none; }
+@media (max-width: 900px) and (max-height: 740px) {
+  .rooms > .room-start-shortcut {
+    display: flex;
+    width: 100%;
+    justify-content: flex-start;
+    min-height: 48px;
+    margin-top: 8px;
+  }
+}
 .rooms > .start-heading { border-top: 1px solid var(--line); padding-top: 22px; margin-top: 22px; }
 .creation-hint { font-size: 11px; margin: 0 0 12px; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -700,6 +725,7 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
    for the transcript. Inspired by mIRC and Halloy's single-pane workflow;
    the existing channel controls, focus model and received-session buffer stay. */
 @media (min-width: 901px) {
+  .act-paint > .act-tools { width: min(100%, 56dvh); margin-inline: auto; justify-content: space-between; }
   .game-guest .irc { grid-template-columns: minmax(0, 1fr) 210px; }
   .irc { width: 100%; grid-template-columns: 220px minmax(0, 1fr) 180px; }
   .titlebar { min-height: 48px; padding: 7px 14px; gap: 12px; }
@@ -866,6 +892,18 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   body:not(:has(.game-night:not([hidden]))) .flag { margin-block: 0; }
   /* Keep one full report target and a readable line without forcing chat below Send. */
   .channel-panel:not(:has(> .game-night:not([hidden]))) > .buffer { min-height: calc(max(1lh, 48px) + 20px); }
+
+  .paint-room > .buffer li:has(> .flag) {
+    position: relative;
+    min-block-size: 52px;
+    padding-inline-end: 52px;
+  }
+  .paint-room > .buffer li > .flag {
+    position: absolute;
+    inset-block-start: 2px;
+    inset-inline-end: 2px;
+    margin: 0;
+  }
   /* Let the drawing activity scroll so the conversation stays readable below the cameras. */
   .channel-panel:has(> .activity[open]:not([hidden]) [data-act-stage]:not([hidden]) [data-act-paint]:not([hidden])) > .buffer {
     min-height: 6rem;

@@ -1732,14 +1732,34 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         button.hidden = belowFold === 0;
         button.textContent = `${belowFold} new message${belowFold === 1 ? '' : 's'} ↓`;
     }
+    const chatBuffer = $('[data-buffer]');
+    let followChat = true;
+    let chatWidth = chatBuffer.clientWidth, chatHeight = chatBuffer.clientHeight;
     $('[data-new-messages]').addEventListener('click', () => {
-        const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
+        followChat = true;
+        chatBuffer.scrollTop = chatBuffer.scrollHeight;
         belowFold = 0; drawNewMessages();
     });
-    $('[data-buffer]').addEventListener('scroll', () => {
-        const buf = $('[data-buffer]');
-        if (buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60) { belowFold = 0; drawNewMessages(); }
+    chatBuffer.addEventListener('scroll', () => {
+        // Reflow can clamp scrollTop before the resize callback. Keep the
+        // reader's previous follow state until the new bounds are known.
+        if (chatBuffer.clientWidth !== chatWidth || chatBuffer.clientHeight !== chatHeight) return;
+        followChat = chatBuffer.scrollHeight - chatBuffer.scrollTop - chatHeight < 60;
+        if (followChat) { belowFold = 0; drawNewMessages(); }
     });
+    if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(() => {
+            const width = chatBuffer.clientWidth, height = chatBuffer.clientHeight;
+            if (width === chatWidth && height === chatHeight) return;
+            if (width !== chatWidth && width) revealActiveChannelTab();
+            chatWidth = width;
+            chatHeight = height;
+            if (!width || !height) return;
+            const focused = document.activeElement;
+            if (focused?.matches('.flag') && chatBuffer.contains(focused)) revealFocusedReport(focused);
+            else if (followChat) chatBuffer.scrollTop = chatBuffer.scrollHeight;
+        }).observe(chatBuffer);
+    }
 
     function switchTo(key, { freshJoin = false } = {}) {
         clearStartingArtRoom();
@@ -1758,8 +1778,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         drawTabs(); drawChan(); drawMessageRecovery();
         drawCommunity(); drawRooms();
         show('chat');
+        revealActiveChannelTab();
         if (prev !== key) $('[data-quick]').scrollLeft = 0;
-        const buf = $('[data-buffer]'); buf.scrollTop = buf.scrollHeight;
+        followChat = true;
+        chatBuffer.scrollTop = chatBuffer.scrollHeight;
         try {
             const r = room();
             if (r) {
@@ -1772,6 +1794,16 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             failActivitySetup();
             drawChan();
         }
+    }
+
+    function revealActiveChannelTab() {
+        const nav = $('[data-tabs]');
+        const active = $('[aria-selected="true"]', nav);
+        if (!active || nav.clientWidth === 0) return;
+        const tab = active.getBoundingClientRect();
+        const strip = nav.getBoundingClientRect();
+        if (tab.left < strip.left) nav.scrollLeft += tab.left - strip.left;
+        else if (tab.right > strip.right) nav.scrollLeft += tab.right - strip.right;
     }
 
     function drawTabs() {
@@ -2018,6 +2050,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const browserMusicStatus = $('[data-browser-music-status]');
     const browserMusicStop = $('[data-browser-music-stop]');
     const musicSessionPanel = $('[data-music-session-panel]');
+    const musicSessionSummary = $('summary', musicSessionPanel);
     const musicSessionContent = $('[data-music-session-content]');
     const musicStopStatus = $('[data-music-stop-status]');
     let musicStopSequence = 0;
@@ -2089,7 +2122,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
                 const { request, webjam, generation, proof } = attempt;
                 sessionStorage.setItem('private-music-host', JSON.stringify({ request, webjam, generation, proof, expires: frame.expires }));
                 attempt.frame = mountMusicFrame('Host private Music', '/join/host/');
-                showBrowserMusicStatus('Open Music controls to start your microphone.');
+                showBrowserMusicStatus('Confirm your headphones and start your microphone in Music controls.');
+                if (currentJam() === attempt.room && document.activeElement === $('[data-browser-music-host]')) {
+                    musicSessionSummary.focus();
+                }
             } catch {
                 try { sessionStorage.removeItem('private-music-host'); } catch { /* Storage can be unavailable. */ }
                 stopBrowserMusic('Music controls could not open. Start a fresh invitation.');
@@ -2566,6 +2602,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (frame.expires !== offer.expires || hrefOrigin !== offer.origin || musicInviteDeadline(frame.href, privateMusicProviderSupported ? offer.id : '') !== offer.expires
             || !privateMusicProviderSupported && (jam?.keepRef !== offer.instance || !jam.names?.some(n => n.nick === app.me) || jam.kind !== 'jam')
             || offer.expires <= Date.now() || (offer.browserHost ? !offer.pendingFrame : !offer.pendingWindow || offer.pendingWindow.closed)) return endMusicInvite();
+        const focusMusic = offer.browserHost && musicPanel.contains(document.activeElement);
         try {
             if (offer.browserHost) {
                 offer.pendingFrame = false;
@@ -2580,6 +2617,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         offer.state = 'accepted';
         if (jam && app.active !== jam.name) switchTo(jam.name);
         drawMusicInvite();
+        if (focusMusic) musicSessionSummary.focus();
     }
 
     function receiveMusicInvite(frame) {
@@ -2626,7 +2664,9 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const waiting = nextMusicInvite();
         const acceptedElsewhere = accepted && !inOfferRoom;
         const hadFocus = musicPanel.contains(document.activeElement);
-        musicPanel.hidden = !musicOffer || (accepted && (!readyForMusicOffer() || (acceptedElsewhere && !waiting)));
+        const embeddedMusicOpen = accepted && inOfferRoom && musicOffer.browserHost && !!musicOffer.frame;
+        musicPanel.hidden = !musicOffer || embeddedMusicOpen || (accepted && (!readyForMusicOffer() || (acceptedElsewhere && !waiting)));
+        if (embeddedMusicOpen && !amOp(jam) && !jam.jam?.web && !jam.jam?.desktop && !jam.jam?.invitation) $('[data-jam-actions]').hidden = true;
         const safeAccepted = accepted && musicOffer.safe === true;
         const message = musicPanel.hidden ? ''
             : ended ? (musicOffer.expires <= Date.now() ? 'This Music invitation expired. Ask the host for a new one.' : 'This Music invitation ended. Ask the host for a new one.')
@@ -2643,7 +2683,8 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             musicAnnouncement.textContent = message;
         }
         if (musicPanel.hidden) {
-            if (hadFocus) focusChannelTab(app.active, { preventScroll: false });
+            if (hadFocus && embeddedMusicOpen) musicSessionSummary.focus();
+            else if (hadFocus) focusChannelTab(app.active, { preventScroll: false });
             return;
         }
         if (accepted && inOfferRoom && !amOp(jam) && !jam.jam?.web && !jam.jam?.desktop && !jam.jam?.invitation) $('[data-jam-actions]').hidden = true;
@@ -2654,7 +2695,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         musicDismiss.hidden = accepted && musicOffer.browserHost;
         const actionUnavailable = ended || unconfirmed || acceptedElsewhere || accepted && privateMusicProviderSupported;
         if (actionUnavailable && document.activeElement === musicAction) {
-            if (musicDismiss.hidden) musicSessionPanel.querySelector('summary').focus();
+            if (musicDismiss.hidden) musicSessionSummary.focus();
             else musicDismiss.focus();
         }
         musicAction.hidden = actionUnavailable;
@@ -2808,6 +2849,15 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const deviceMusicAvailable = privateMusicProviderSupported && typeof window.BroadcastChannel === 'function' && !!navigator.mediaDevices?.getUserMedia;
         browserMusicButton.hidden = musicButton.hidden || !deviceMusicAvailable;
         browserMusicButton.setAttribute('aria-disabled', String(!!musicHandoff || !!browserMusic));
+        musicButton.classList.toggle('btn--ghost', !browserMusicButton.hidden);
+        if (sharingControls) {
+            $('[data-jam-browser-note]').textContent = deviceMusicAvailable
+                ? 'Use headphones for browser Music. You choose when to turn on your microphone.'
+                : 'Browser audio is unavailable under this community’s sharing policy. You can still chat here.';
+            $('[data-jam-wait]').textContent = deviceMusicAvailable
+                ? 'Your host’s Music invitation will appear here. Accept it to choose how to join.'
+                : 'Waiting for a desktop invitation from the host.';
+        }
         $('[data-jam-platform]').hidden = deviceMusicAvailable;
         $('[data-jam-device-platform]').hidden = !deviceMusicAvailable;
         $('[data-jam-device-help]').hidden = !deviceMusicAvailable;
@@ -2819,7 +2869,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (/^webjam:\/\//.test(next.desktop)) desktop.setAttribute('href', next.desktop);
         else desktop.removeAttribute('href');
         const shared = !!(next.invitation || next.webReady);
-        $('[data-jam-host-steps]').hidden = !next.host || shared;
+        $('[data-jam-host-steps]').hidden = !next.host || shared || !browserMusicButton.hidden;
         $('[data-jam-actions]').hidden = next.host && !shared;
         $('[data-jam-wait]').hidden = shared; $('[data-jam-copy]').hidden = !next.invitation;
         const browserLink = browserInviteLink(next);
@@ -3371,7 +3421,11 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             b.disabled = app.localMediaPaused || !r.canJoin || connectionState !== 'connected';
             const t = document.createElement('b'); t.textContent = `${KIND_ICON[r.kind]} ${r.title}`;
             const s = document.createElement('span'); s.textContent = `${r.name} · ${r.count}/${r.max} here · ${r.persistent ? 'Registered' : 'Temporary'} · ${r.hostPresent ? 'Host here' : 'Host away'}`;
-            const action = document.createElement('span'); action.className = 'room-action'; action.textContent = `${r.statusLabel} · ${r.actionLabel}`;
+            const activeRoom = r.name === app.active;
+            if (activeRoom) b.setAttribute('aria-current', 'true');
+            else b.removeAttribute('aria-current');
+            const status = r.joined && !activeRoom ? 'Joined' : r.statusLabel;
+            const action = document.createElement('span'); action.className = 'room-action'; action.textContent = `${status} · ${r.actionLabel}`;
             b.replaceChildren(t, s, action);
             b.onclick = () => {
                 const focused = document.activeElement === b;
@@ -4107,6 +4161,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (connectionState !== 'connected') return;
         const current = store(app.active);
         const host = amOp(current);
+        if (browserMusic?.frame && opener?.button.matches('[data-browser-music-host]') && opener.room === current) {
+            musicSessionSummary.focus();
+            return;
+        }
         const target = host && opener && opener.room === current && !opener.button.hidden
             ? opener.button : $(host ? '[data-roomtools]' : '[data-text]');
         target.focus({ preventScroll: true });
@@ -4329,10 +4387,15 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (pane === 'chat') focusChannelTab(app.active, { preventScroll: false });
         else $(pane === 'rooms' ? '[data-room-directory-title]' : '[data-people-title]').focus();
     }));
-    $('.startroom').addEventListener('click', () => {
+    function showActivityChoices() {
         show('rooms');
-        $('.start-heading').focus();
-    });
+        const heading = $('.start-heading');
+        heading.focus({ preventScroll: true });
+        heading.scrollIntoView({ block: 'start' });
+    }
+    $('.startroom').addEventListener('click', showActivityChoices);
+    $('[data-start-shortcut]').addEventListener('click', showActivityChoices);
+    $('[data-beta-return]').hidden = !betaShell || !!gameGuest;
     show('chat');
 
     let toastTimer, toastDuration = 4000;

@@ -540,6 +540,16 @@
                 });
                 ui.bobPicks.append(b);
             });
+            ui.paintLessons.addEventListener('toggle', () => {
+                if (!ui.paintLessons.open || state.kind !== 'bobross') return;
+                const scroller = ui.paintLessons.closest('.activity');
+                const firstLesson = ui.bobPicks.firstElementChild;
+                if (!scroller?.clientHeight || !firstLesson) return;
+                // Reveal the first choice inside the activity without moving focus or the page.
+                const bottom = scroller.getBoundingClientRect().top + scroller.clientTop + scroller.clientHeight;
+                const clipped = firstLesson.getBoundingClientRect().bottom - bottom;
+                if (clipped > 0) scroller.scrollTop += clipped + 4;
+            });
             ui.load.addEventListener('submit', (e) => {
                 e.preventDefault();
                 if (!isOp()) return;

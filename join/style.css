@@ -52,3 +52,15 @@ details p { margin: 6px 0; }
 @media (prefers-reduced-motion: reduce) {
   .mic-meter-fill { transition: none; }
 }
+
+@media (max-width: 480px) {
+  :root:has(meta[name="private-music"]):has(.join-card) {
+    body { padding: 8px 12px; }
+    h1 { margin-block: 4px 8px; font-size: 1.35rem; }
+    .join-card { padding: 10px 12px; }
+    #listen-actions .actions { margin-top: 8px; }
+    #listen-guidance { flex: 1 1 9rem; margin: 0; font-size: .875rem; }
+    #prejoin { margin-top: 8px; }
+    #prejoin-heading { margin-bottom: 4px; }
+  }
+}
