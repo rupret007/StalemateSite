@@ -266,7 +266,10 @@
                 ui.preview.after(ui.videoStatus, ui.tap);
                 ui.bobPicks.after(ui.load);
             } else {
-                ui.preview.before(ui.load, ui.videoStatus, ui.tap);
+                // Keep Retry immediately before the URL field. The player stays
+                // hidden until a source loads, so the empty room still opens
+                // on the chooser instead of a blank 16:9 box.
+                ui.preview.after(ui.videoStatus, ui.tap, ui.load);
             }
             ui.preview.hidden = !paintAlong;
             ui.video.classList.toggle('paint-along-player', paintAlong);
