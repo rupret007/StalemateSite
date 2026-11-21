@@ -41,13 +41,13 @@
         <div class="sheet-buttons" data-sheet-buttons></div>
         <button class="btn btn--ghost" type="button" data-sheet-close>Close</button>
     </dialog>
-    <dialog class="sheet" data-invite-dialog aria-labelledby="invite-dialog-title">
+    <dialog class="sheet" data-invite-dialog aria-labelledby="invite-dialog-title" aria-describedby="invite-dialog-intro">
         <h3 id="invite-dialog-title">Invite a guest</h3>
-        <p>Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
+        <p id="invite-dialog-intro">Invite someone to <b data-invite-room></b>. They choose whether to join.</p>
         <div data-invite-quick hidden>
             <div class="sheet-buttons invite-people" data-invite-people role="group" aria-label="Online guests"></div>
             <p data-invite-empty hidden>No one else is available to invite. Ask your bandmate to enter Hang Out, then open this list again.</p>
-            <p class="status" data-invite-quick-error role="status"></p>
+            <p class="status" data-invite-quick-error role="status" aria-atomic="true"></p>
             <button class="btn btn--ghost" type="button" data-invite-quick-cancel>Cancel</button>
         </div>
         <form data-invite-form>

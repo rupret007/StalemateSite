@@ -37,9 +37,9 @@ h1, h2, h3, p { margin-top: 0; }
 h2, h3 { font-weight: 650; }
 .small { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .eyebrow { margin: 0; color: var(--muted); font: 600 10px/1.5 var(--mono); letter-spacing: .1em; }
-.sr-only, .room-invite-status:empty { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.sr-only, .room-invite-status:empty, [data-invite-quick-error]:empty { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .status { color: var(--amber); font-size: 13px; margin: 0; }
-.status:empty { display: none; }
+.status:empty:not([data-invite-quick-error]) { display: none; }
 .btn { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--lime); background: var(--lime); color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 700; }
 .btn:hover:enabled { background: #e0ffa5; border-color: #e0ffa5; }
 .btn:active:enabled { transform: translateY(1px); }
@@ -357,7 +357,8 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
 .sheet-buttons .btn { font-size: 12px; }
 .invite-people { max-height: min(240px, 36dvh); overflow-y: auto; overscroll-behavior: contain; padding: 3px; }
 .invite-people .btn { min-width: 0; text-align: left; overflow-wrap: anywhere; white-space: normal; }
-.invite-people:empty, [data-invite-quick-error]:empty { display: none; }
+.invite-people .btn:focus-visible { outline-offset: -4px; }
+.invite-people:empty { display: none; }
 .channel-label { display: block; margin: 16px 0 8px; font-size: 12px; }
 [data-channel-name], [data-invite-nick] { width: 100%; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; }
@@ -568,6 +569,34 @@ input::placeholder, textarea::placeholder { color: #8b958f; opacity: 1; }
   .toast { padding: 4px 12px; }
   .phonetabs { min-height: 44px; }
   .phonetabs button { min-height: 44px; }
+}
+@media (max-height: 300px) {
+  /* Deep zoom leaves little height. Scroll the guest list before the dialog
+     itself needs to scroll, while keeping a full row and the Cancel target. */
+  [data-invite-dialog][open]:has([data-invite-quick]:not([hidden])) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: calc(100dvh - 8px);
+    padding: 6px 12px;
+  }
+  [data-invite-dialog]:has([data-invite-quick]:not([hidden])) h3 {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.2;
+  }
+  [data-invite-dialog] #invite-dialog-intro, [data-invite-quick] p {
+    margin: 0;
+    line-height: 1.3;
+  }
+  [data-invite-quick]:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 0;
+  }
+  .invite-people { min-height: 50px; margin: 0; }
+  [data-invite-quick-cancel] { align-self: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
