@@ -17,14 +17,20 @@ function store() {
     const enqueue = operation => { const task = tail.then(operation); tail = task.catch(() => {}); return task; };
     return {
         transaction: operation => enqueue(async () => {
-            const staged = clone(committed), metric = { reads: 0, puts: 0, deletes: 0, lists: 0, maxValue: 0 }; metrics.push(metric);
+            // Copy-on-write. Deep-cloning the whole map on every transaction made 96 enrollments quadratic and crossed the 5s cap.
+            const base = committed, staged = new Map(base), metric = { reads: 0, puts: 0, deletes: 0, lists: 0, maxValue: 0 }; metrics.push(metric);
+            const detach = key => {
+                const current = staged.get(key);
+                if (current !== undefined && current === base.get(key)) { const copied = clone(current); staged.set(key, copied); return copied; }
+                return current;
+            };
             const tx = { get: async key => { metric.reads++; return clone(staged.get(key)); },
                 put: async (key, value) => { metric.puts++; metric.maxValue = Math.max(metric.maxValue, size(value)); staged.set(key, clone(value)); afterPut?.(key); },
                 delete: async key => { metric.deletes++; staged.delete(key); },
                 list: async ({ prefix, startAfter = '', limit }) => {
                     metric.lists++; metric.limit = limit;
-                    const entries = [...staged].filter(([key]) => key.startsWith(prefix) && key > startAfter).sort(([a], [b]) => a.localeCompare(b));
-                    return new Map(entries.slice(0, badList ? limit + 1 : limit));
+                    const keys = [...staged.keys()].filter(key => key.startsWith(prefix) && key > startAfter).sort((a, b) => a.localeCompare(b));
+                    return new Map(keys.slice(0, badList ? limit + 1 : limit).map(key => [key, detach(key)]));
                 } };
             const result = await operation(tx); if (fail) { fail = false; throw Error('Synthetic failed commit'); }
             committed = staged; return clone(result);
