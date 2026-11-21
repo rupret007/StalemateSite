@@ -44,10 +44,17 @@
         let localSample = null;
         let live = null;
         let pendingPts = [];
-        // Cache only within this room generation. Authoritative snapshots and
-        // teardown must not reuse pixels from a previous retained drawing.
-        let canvasBase = null, canvasBaseChannel = null, canvasBaseLastId = null, canvasBaseCount = 0, canvasBasePrefix = '';
-        let canvasBaseGeneration = -1;
+        // Prefix cache stays inside this room generation. It is built only by
+        // stroke() calls. WebKit composites a later stroke differently after
+        // drawImage or putImageData, so a copied bitmap cannot be the underlay.
+        let paintPrefix = null, paintPrefixKey = '', paintPrefixLastId = null, paintPrefixChannel = null;
+        let paintPrefixGeneration = -1, paintPrefixWidth = 0, paintPrefixHeight = 0;
+        let paintPrefixTimer = 0, paintPrefixToken = 0;
+        // A long history keeps one copied prefix so extending the latest stroke
+        // does not repaint every earlier point. Short drawings do not use it:
+        // WebKit changes edge coverage after that copy.
+        let retainedPrefix = null, retainedKey = '', retainedLastId = null, retainedChannel = null;
+        let retainedGeneration = -1, retainedWidth = 0, retainedHeight = 0;
         let canvasRoomInstance;
         let flushTimer = 0;
         let roomGeneration = 0, captureVersion = 0, turnClient = null, turnInit = null;
@@ -195,9 +202,14 @@
         }
 
         function resetCanvasBase() {
-            if (canvasBase) { canvasBase.width = 0; canvasBase.height = 0; }
-            canvasBase = null; canvasBaseChannel = null; canvasBaseLastId = null;
-            canvasBaseCount = 0; canvasBasePrefix = ''; canvasBaseGeneration = -1;
+            paintPrefixToken += 1;
+            clearTimeout(paintPrefixTimer); paintPrefixTimer = 0;
+            if (paintPrefix) { paintPrefix.width = 0; paintPrefix.height = 0; }
+            paintPrefix = null; paintPrefixKey = ''; paintPrefixLastId = null; paintPrefixChannel = null;
+            paintPrefixGeneration = -1; paintPrefixWidth = 0; paintPrefixHeight = 0;
+            if (retainedPrefix) { retainedPrefix.width = 0; retainedPrefix.height = 0; }
+            retainedPrefix = null; retainedKey = ''; retainedLastId = null; retainedChannel = null;
+            retainedGeneration = -1; retainedWidth = 0; retainedHeight = 0;
         }
 
         function teardown() {
@@ -236,15 +248,17 @@
         }
 
         function onJoin(chan, act) {
-            // A current bitmap can be reused only after the incoming snapshot
-            // independently validates every vector that produced its prefix.
-            let previousPaint;
-            const previousStrokes = state.room.strokes;
-            if (act && chan?.kind === 'art' && state.kind === 'art' && state.ch === chan.name && canvasRoomInstance === chan.keepRef
-                && canvasBase && canvasBaseGeneration === roomGeneration && canvasBaseCount === previousStrokes.length
-                && canvasBaseLastId === previousStrokes.at(-1)?.id && canvasBasePrefix === strokesPrefixFingerprint(previousStrokes)) {
-                previousPaint = { bitmap: canvasBase, strokes: previousStrokes };
-                canvasBase = null;
+            // Reuse already-validated coordinates when the same art room accepts
+            // another authoritative snapshot. A long prefix bitmap can be carried
+            // across that snapshot; short drawings are repainted from strokes.
+            let previousStrokes, carriedPrefix;
+            const continuing = act && chan?.kind === 'art' && state.kind === 'art' && state.ch === chan.name && canvasRoomInstance === chan.keepRef;
+            if (continuing) previousStrokes = state.room.strokes;
+            if (continuing && retainedPrefix && retainedGeneration === roomGeneration
+                && retainedLastId === previousStrokes.at(-1)?.id && retainedKey === strokesPrefixFingerprint(previousStrokes)
+                && retainedWidth === ui.canvas.width && retainedHeight === ui.canvas.height) {
+                carriedPrefix = { bitmap: retainedPrefix, strokes: previousStrokes };
+                retainedPrefix = null;
             }
             teardown();
             if (!chan || !['art', 'bobross', 'watch'].includes(chan.kind)) return;
@@ -282,7 +296,7 @@
                 videoSyncTimer = setInterval(syncVideo, 2000);
                 videoSampleTimer = setInterval(sampleVideo, 250);
             }
-            if (act) ingestSnap(act, previousPaint);
+            if (act) ingestSnap(act, previousStrokes, carriedPrefix);
             syncNames(chan);
             drawWatchStart();
             if (video && chan.kind === 'bobross' && isOp() && !state.room.video) {
@@ -291,19 +305,33 @@
             }
         }
 
-        function ingestSnap(act, previousPaint) {
+        function samePaintPrefix(before, after) {
+            if (!before || !after || after.length < 2 || before.length !== after.length) return false;
+            for (let index = 0; index < after.length - 1; index += 1) {
+                const a = before[index], b = after[index];
+                if (a === b) continue;
+                if (!a || a.id !== b.id || a.color !== b.color || a.size !== b.size || a.pts.length !== b.pts.length) return false;
+                for (let point = 0; point < b.pts.length; point += 1) {
+                    if (a.pts[point][0] !== b.pts[point][0] || a.pts[point][1] !== b.pts[point][1]) return false;
+                }
+            }
+            return true;
+        }
+
+        function ingestSnap(act, previousStrokes, carriedPrefix) {
             if (!act) return;
             H.apply(state.room, { type: 'snapshot', state: { strokes: act.strokes || [], video: act.video } },
-                { previousSnapshotStrokes: previousPaint?.strokes });
+                { previousSnapshotStrokes: previousStrokes });
             const strokes = state.room.strokes;
-            if (previousPaint && previousPaint.bitmap.width === ui.canvas.width && previousPaint.bitmap.height === ui.canvas.height
-                && samePaintPrefix(previousPaint.strokes, strokes)) {
-                canvasBase = previousPaint.bitmap;
-                canvasBaseChannel = state.ch;
-                canvasBaseGeneration = roomGeneration;
-                canvasBaseLastId = strokes.at(-1).id;
-                canvasBaseCount = strokes.length;
-                canvasBasePrefix = strokesPrefixFingerprint(strokes);
+            if (carriedPrefix && carriedPrefix.bitmap.width === ui.canvas.width && carriedPrefix.bitmap.height === ui.canvas.height
+                && samePaintPrefix(carriedPrefix.strokes, strokes)) {
+                retainedPrefix = carriedPrefix.bitmap;
+                retainedKey = strokesPrefixFingerprint(strokes);
+                retainedLastId = strokes.at(-1).id;
+                retainedGeneration = roomGeneration;
+                retainedChannel = state.ch;
+                retainedWidth = retainedPrefix.width;
+                retainedHeight = retainedPrefix.height;
             }
             if (act.video) applyVideoMetadata(act.video);
             paintEpisodeTitle();
@@ -465,72 +493,163 @@
             redraw(live.id);
         }
 
-        function drawStroke(stroke, from = 0) {
-            if (!stroke || !stroke.pts.length) return;
-            const ctx = ui.canvas.getContext('2d');
-            const w = ui.canvas.width;
-            const h = ui.canvas.height;
+        function paintStroke(ctx, stroke, from = 0) {
+            if (!stroke || stroke.pts.length <= from) return;
+            const w = ctx.canvas.width;
+            const h = ctx.canvas.height;
             ctx.strokeStyle = stroke.color;
             ctx.lineWidth = stroke.size * (w / 1200);
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            const pts = stroke.pts;
             ctx.beginPath();
-            ctx.moveTo(pts[from][0] * w, pts[from][1] * h);
-            for (let i = from + 1; i < pts.length; i += 1) ctx.lineTo(pts[i][0] * w, pts[i][1] * h);
+            ctx.moveTo(stroke.pts[from][0] * w, stroke.pts[from][1] * h);
+            for (let i = from + 1; i < stroke.pts.length; i += 1) ctx.lineTo(stroke.pts[i][0] * w, stroke.pts[i][1] * h);
             ctx.stroke();
         }
 
-        function samePaintPrefix(before, after) {
-            if (after.length < 2 || before.length !== after.length) return false;
-            for (let index = 0; index < after.length - 1; index += 1) {
-                const a = before[index], b = after[index];
-                if (a === b) continue;
-                if (a.id !== b.id || a.color !== b.color || a.size !== b.size || a.pts.length !== b.pts.length) return false;
-                for (let point = 0; point < b.pts.length; point += 1) {
-                    if (a.pts[point][0] !== b.pts[point][0] || a.pts[point][1] !== b.pts[point][1]) return false;
-                }
-            }
-            return true;
+        function drawStroke(stroke, from = 0) {
+            paintStroke(ui.canvas.getContext('2d'), stroke, from);
         }
 
-        // Within one live generation strokes only gain points. Cached prefixes
-        // from another generation must first pass the full vector comparison.
+        // Within one live generation strokes only gain points. A cached prefix
+        // from another generation is discarded before any reuse.
         function strokesPrefixFingerprint(strokes) {
             let out = '';
             for (let i = 0; i < strokes.length - 1; i += 1) out += strokes[i].id + ':' + strokes[i].pts.length + '|';
             return out;
         }
 
-        function redraw(changedStrokeId) {
+        function blankCanvas() {
+            const canvas = document.createElement('canvas');
+            canvas.width = ui.canvas.width;
+            canvas.height = ui.canvas.height;
+            return canvas;
+        }
+
+        function rememberPrefix(strokes) {
+            paintPrefixToken += 1;
+            clearTimeout(paintPrefixTimer); paintPrefixTimer = 0;
+            const canvas = blankCanvas();
+            const ctx = canvas.getContext('2d');
+            for (const stroke of strokes.slice(0, -1)) paintStroke(ctx, stroke);
+            paintPrefix = canvas;
+            paintPrefixKey = strokesPrefixFingerprint(strokes);
+            paintPrefixLastId = strokes.at(-1).id;
+            paintPrefixGeneration = roomGeneration;
+            paintPrefixChannel = state.ch;
+            paintPrefixWidth = canvas.width;
+            paintPrefixHeight = canvas.height;
+        }
+
+        function schedulePrefix(strokes) {
+            const token = ++paintPrefixToken;
+            clearTimeout(paintPrefixTimer);
+            const generation = roomGeneration, channel = state.ch;
+            const width = ui.canvas.width, height = ui.canvas.height;
+            const lastId = strokes.at(-1).id, key = strokesPrefixFingerprint(strokes);
+            const prefix = strokes.slice(0, -1).map(stroke => ({
+                id: stroke.id, color: stroke.color, size: stroke.size,
+                pts: stroke.pts.map(point => [point[0], point[1]])
+            }));
+            paintPrefixTimer = window.setTimeout(() => {
+                paintPrefixTimer = 0;
+                if (token !== paintPrefixToken || generation !== roomGeneration || channel !== state.ch) return;
+                if (ui.canvas.width !== width || ui.canvas.height !== height) return;
+                const canvas = document.createElement('canvas');
+                canvas.width = width; canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                for (const stroke of prefix) paintStroke(ctx, stroke);
+                if (token !== paintPrefixToken || generation !== roomGeneration || channel !== state.ch) return;
+                paintPrefix = canvas;
+                paintPrefixKey = key;
+                paintPrefixLastId = lastId;
+                paintPrefixGeneration = generation;
+                paintPrefixChannel = channel;
+                paintPrefixWidth = width;
+                paintPrefixHeight = height;
+            }, 0);
+        }
+
+        function prefixReady(strokes, last) {
+            return !!(paintPrefix && last && paintPrefixLastId === last.id
+                && paintPrefixGeneration === roomGeneration && paintPrefixChannel === state.ch
+                && paintPrefixWidth === ui.canvas.width && paintPrefixHeight === ui.canvas.height
+                && paintPrefixKey === strokesPrefixFingerprint(strokes));
+        }
+
+        function redrawRetained(strokes, last, changedStrokeId, pendingFrom) {
+            paintPrefixToken += 1;
+            clearTimeout(paintPrefixTimer); paintPrefixTimer = 0;
+            if (paintPrefix) { paintPrefix.width = 0; paintPrefix.height = 0; }
+            paintPrefix = null; paintPrefixKey = ''; paintPrefixLastId = null; paintPrefixChannel = null;
+            paintPrefixGeneration = -1; paintPrefixWidth = 0; paintPrefixHeight = 0;
             const ctx = ui.canvas.getContext('2d');
             ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
+            const key = strokesPrefixFingerprint(strokes);
+            const reusable = retainedPrefix && retainedLastId === last.id
+                && retainedKey === key && retainedGeneration === roomGeneration && retainedChannel === state.ch
+                && retainedWidth === ui.canvas.width && retainedHeight === ui.canvas.height;
+            if (reusable) ctx.drawImage(retainedPrefix, 0, 0);
+            else {
+                for (const stroke of strokes.slice(0, -1)) paintStroke(ctx, stroke);
+                const copy = document.createElement('canvas');
+                copy.width = ui.canvas.width;
+                copy.height = ui.canvas.height;
+                copy.getContext('2d').drawImage(ui.canvas, 0, 0);
+                if (retainedPrefix) { retainedPrefix.width = 0; retainedPrefix.height = 0; }
+                retainedPrefix = copy;
+                retainedKey = key;
+                retainedLastId = last.id;
+                retainedGeneration = roomGeneration;
+                retainedChannel = state.ch;
+                retainedWidth = copy.width;
+                retainedHeight = copy.height;
+            }
+            paintStroke(ctx, last);
+            if (pendingFrom >= 0) paintStroke(ctx, live, pendingFrom);
+        }
+
+        function publishFrame(bitmap) {
+            const ctx = ui.canvas.getContext('2d');
+            ctx.clearRect(0, 0, ui.canvas.width, ui.canvas.height);
+            if (bitmap) ctx.drawImage(bitmap, 0, 0);
+        }
+
+        function redraw(changedStrokeId) {
             const strokes = state.room.strokes, last = strokes.at(-1);
-            if (!last) { resetCanvasBase(); return; }
-            const baseUsable = canvasBase && canvasBaseGeneration === roomGeneration
-                && canvasBaseChannel === state.ch && canvasBaseCount === strokes.length
-                && canvasBaseLastId === last.id && canvasBase.width === ui.canvas.width && canvasBase.height === ui.canvas.height;
-            // Reuse only an unchanged prefix within this generation. Reconnects
-            // and authoritative snapshots repaint from their newly ingested data.
-            if (baseUsable && (changedStrokeId === last.id || canvasBasePrefix === strokesPrefixFingerprint(strokes))) {
-                ctx.drawImage(canvasBase, 0, 0);
-            } else {
-                for (const stroke of strokes.slice(0, -1)) drawStroke(stroke);
-                canvasBase ||= document.createElement('canvas');
-                canvasBase.width = ui.canvas.width;
-                canvasBase.height = ui.canvas.height;
-                canvasBase.getContext('2d').drawImage(ui.canvas, 0, 0);
-                canvasBaseChannel = state.ch;
-                canvasBaseGeneration = roomGeneration;
-                canvasBaseLastId = last.id;
-                canvasBaseCount = strokes.length;
-                canvasBasePrefix = strokesPrefixFingerprint(strokes);
+            if (!last) { publishFrame(null); resetCanvasBase(); return; }
+            const pendingFrom = currentStroke() && pendingPts.length
+                ? Math.max(0, live.pts.length - pendingPts.length - 1) : -1;
+            let prefixPoints = 0;
+            for (let i = 0; i < strokes.length - 1; i += 1) prefixPoints += strokes[i].pts.length;
+            if (prefixPoints > 100000) {
+                redrawRetained(strokes, last, changedStrokeId, pendingFrom);
+                return;
             }
-            drawStroke(last);
-            // A remote commit can arrive between this gesture's paced flushes.
-            if (currentStroke() && pendingPts.length) {
-                drawStroke(live, Math.max(0, live.pts.length - pendingPts.length - 1));
+            if (retainedPrefix) {
+                retainedPrefix.width = 0; retainedPrefix.height = 0; retainedPrefix = null;
+                retainedKey = ''; retainedLastId = null; retainedChannel = null;
+                retainedGeneration = -1; retainedWidth = 0; retainedHeight = 0;
             }
+            // Extend only the current stroke over a prefix that was itself
+            // stroked, never copied. Copying and then stroking changes WebKit's
+            // edge coverage, so two viewers stop sharing one bitmap.
+            if (changedStrokeId === last.id && prefixReady(strokes, last)) {
+                const frame = paintPrefix;
+                paintPrefix = null;
+                const ctx = frame.getContext('2d');
+                paintStroke(ctx, last);
+                if (pendingFrom >= 0) paintStroke(ctx, live, pendingFrom);
+                publishFrame(frame);
+                schedulePrefix(strokes);
+                return;
+            }
+            const frame = blankCanvas();
+            const ctx = frame.getContext('2d');
+            for (const stroke of strokes) paintStroke(ctx, stroke);
+            if (pendingFrom >= 0) paintStroke(ctx, live, pendingFrom);
+            publishFrame(frame);
+            rememberPrefix(strokes);
         }
 
         /* ---- synced video ---- */
