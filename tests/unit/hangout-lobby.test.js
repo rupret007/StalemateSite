@@ -1180,9 +1180,28 @@ describe('open-room paint + synced video (act frames)', () => {
         cmd(bobHost, 'join', ['#bobross-sync']);
         cmd(bobGuest, 'join', ['#bobross-sync']);
         inbox.set(bobHost.id, []);
+        inbox.set(bobGuest.id, []);
         act(bobGuest, '#bobross-sync', { kind: 'video', source: { kind: 'yt', id: 'mT0RNrTDHkI' }, playing: false, pos: 120, rate: 1 });
+        expect(got(bobHost).some((m) => m.t === 'act' && m.kind === 'video')).toBe(false);
+        expect(notices(bobGuest)).toContain('Only @ drives the video in open rooms.');
+        expect(L._debug.channels.get('#bobross-sync').act.video).toBeNull();
+        act(bobHost, '#bobross-sync', { kind: 'video', source: { kind: 'yt', id: 'mT0RNrTDHkI' }, playing: true, pos: 0, rate: 1 });
+        expect(L._debug.channels.get('#bobross-sync').act.video).toMatchObject({
+            source: { kind: 'yt', id: 'mT0RNrTDHkI' }, playing: true, pos: 0, seq: 1, by: 'BobHost'
+        });
+        inbox.set(bobHost.id, []);
+        inbox.set(bobGuest.id, []);
+        act(bobGuest, '#bobross-sync', { kind: 'video', source: { kind: 'yt', id: 'mT0RNrTDHkI', extra: 'ignored' }, playing: false, pos: 120, rate: 1 });
         const shared = got(bobHost).find(m => m.t === 'act' && m.kind === 'video');
-        expect(shared?.video).toMatchObject({ playing: false, pos: 120, rate: 1, seq: 1, by: 'BobGuest', updatedAt: expect.any(Number) });
+        expect(shared?.video).toMatchObject({ playing: false, pos: 120, rate: 1, seq: 2, by: 'BobGuest', updatedAt: expect.any(Number) });
+        expect(shared?.video.source).toEqual({ kind: 'yt', id: 'mT0RNrTDHkI' });
+        inbox.set(bobHost.id, []);
+        act(bobGuest, '#bobross-sync', { kind: 'video', source: { kind: 'yt', id: 'oh5p5f5_-7A' }, playing: true, pos: 1, rate: 1 });
+        expect(got(bobHost).some((m) => m.t === 'act' && m.kind === 'video')).toBe(false);
+        expect(notices(bobGuest)).toContain('Only @ drives the video in open rooms.');
+        expect(L._debug.channels.get('#bobross-sync').act.video).toMatchObject({
+            source: { kind: 'yt', id: 'mT0RNrTDHkI' }, playing: false, pos: 120, rate: 1, seq: 2, by: 'BobGuest'
+        });
     });
 });
 

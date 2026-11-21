@@ -3,7 +3,7 @@
 // drive it, and unit tests drive it directly. Every permission is checked here, never in the browser.
 import { ROOM_TTL, LOG_TTL, OWNER_TRANSFER_TTL, roomRecord, validRoom, createRateLimits } from './community-state.mjs';
 import { checkNick, checkText, defaultLists, normalize } from './filter.mjs';
-import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, VIDEO_KINDS } from './lobby-act.mjs';
+import { actSnapshot, applyClear, applyStroke, applyVideo, cleanRtc, parseActFrame, PAINT_KINDS, sameVideoSource, VIDEO_KINDS } from './lobby-act.mjs';
 import { messageReceipt, receiptDigest, storedReceipts, RECEIPT_MAX, RECEIPT_STATE_BYTES } from './message-receipts.mjs';
 import { discordCallLink, gameNightInvite, gameNightLabels, gameNightRoomName, newGameNightRoomName, webJamRoomName } from '../../r/45662413410ed051/lobby/game-night.mjs';
 import { personRoomProjection } from './lobby-effect-records.mjs';
@@ -2990,7 +2990,7 @@ export function createLobby({ now = () => Date.now(), send: sendImpl = () => {},
         }
         if (f.kind === 'video') {
             if (!VIDEO_KINDS.has(chan.kind)) return undefined;
-            if (chan.kind !== 'bobross' && !isOp(c, chan)) return bot(c, 'Only @ drives the video in open rooms.', 'error');
+            if (!isOp(c, chan) && !(chan.kind === 'bobross' && sameVideoSource(chan.act.video?.source, f.source))) return bot(c, 'Only @ drives the video in open rooms.', 'error');
             requireParticipation(c, 'publicArtifact');
             requireParticipation(c, 'externalProvider');
             const previous = chan.act.video;

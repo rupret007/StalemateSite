@@ -795,7 +795,7 @@
         }
 
         function hostVideo(source, playing, pos) {
-            if (!canDriveVideo()) return;
+            if (!isOp()) return;
             actSend({ kind: 'video', source, playing, pos, rate: 1 }, () => {
                 H.apply(state.room, { type: 'video', source, playing, pos }, { t: state.clock.relayNow() });
                 paintEpisodeTitle();

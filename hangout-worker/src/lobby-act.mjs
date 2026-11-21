@@ -36,6 +36,12 @@ export function applyClear(chan) {
     return true;
 }
 
+export function sameVideoSource(current, requested) {
+    const next = H.cleanSource(requested);
+    const previous = H.cleanSource(current);
+    return !!(next && previous && next.kind === previous.kind && next.id === previous.id);
+}
+
 export function applyVideo(chan, body, relayNow, by = '') {
     if (!VIDEO_KINDS.has(chan.kind)) return null;
     const state = { strokes: [], chat: [], video: chan.act.video };
