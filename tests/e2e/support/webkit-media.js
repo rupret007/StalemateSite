@@ -2,7 +2,7 @@
 // is what turns off WPE's mDNS host-candidate substitution; those .local
 // names never resolve here, so the peer connection stays in checking.
 // The same call is also the only capture that reports a real video size.
-// If the machine has no camera, a canvas track is the stand-in. WPE's
+// If the machine has no camera (NotFoundError, or a stream with no live tracks), a canvas track is the stand-in. Permission, security, constraint, and unexpected getUserMedia errors are rethrown, not replaced with fake tracks. WPE's
 // LibWebRTC VP8 decoder crashes once canvas frames are sent, so video
 // negotiations prefer H.264, which decodes those frames.
 
@@ -47,7 +47,12 @@ function installWebKitMedia() {
             const audioOk = !wantsAudio || stream.getAudioTracks().some(track => track.readyState === 'live');
             if (videoOk && audioOk) return stream;
             stream.getTracks().forEach(track => track.stop());
-        } catch (error) { /* no camera device; the canvas below is the capture */ }
+            // A returned stream with no usable tracks is treated like a missing
+            // device. Any other failed capture must not be turned into success.
+        } catch (error) {
+            const name = String(error && error.name || '');
+            if (name !== 'NotFoundError' && name !== 'DevicesNotFoundError') throw error;
+        }
         const stream = new MediaStream();
         const kept = window.__webkitMedia || (window.__webkitMedia = []);
         if (wantsVideo) {
