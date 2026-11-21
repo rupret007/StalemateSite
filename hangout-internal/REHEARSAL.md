@@ -16,12 +16,12 @@ If foreground recovery is in the approved scope, verify Music resumes after a br
 
 ## Pick one desktop WebJam build for the presenter
 
-The desktop choice covers the Music and Art walkthrough. Both phones use the private Hangout website.
+The desktop choice covers the Music and Art walkthrough. Both phones use the private Hangout website. Take the exact build and package from the private receipt for the chosen platform. Do not copy those identifiers into this note.
 
-- **Intel Mac · Private Band Demo** — `23cfae6ac05c128e1caf8a6fd366751686304ba6`, macOS x64 artifact `13847713990`. The recorded Intel Desktop shortcut selects this checked archive. [Private packaging run](https://github.com/rupret007/webjam/actions/runs/42997398282)
-- **Apple Silicon · Existing Mini build** — `ae49c915070f2951db9ff441c23c7f0a9d90ce1b`, arm64 artifact `13798543646`. The Mini’s recorded selection passed idle startup and Quit. [Private packaging run](https://github.com/rupret007/webjam/actions/runs/42888556613)
-- **Apple Silicon · Replacement package** — `23cfae6ac05c128e1caf8a6fd366751686304ba6`, arm64 artifact `13846183965`. Use after confirming the package and starting it on the Mini. [Private packaging run](https://github.com/rupret007/webjam/actions/runs/42997398282)
-- **Matched source walkthrough** — `e8fd00c7fe9a64290be603f21affaaaa1de8309e`, run `.venv/bin/python webjam_qt_main.py` from that checkout for the local Music and Art walkthrough.
-- **Published desktop walkthrough** — WebJam `v0.29.0` at `7aa74be14446e907f1116b0da9a264667ae22937`, using the matching platform download for local desktop features. Current private native invitations require a private build. [Pinned release](https://github.com/rupret007/webjam/releases/tag/v0.29.0)
+- **Intel Mac · Private Band Demo** — the checked macOS x64 archive selected by the recorded Intel Desktop shortcut.
+- **Apple Silicon · Existing Mini build** — the arm64 archive whose recorded selection passed idle startup and Quit.
+- **Apple Silicon · Replacement package** — the newer arm64 archive. Use it after confirming the package and starting it on the Mini.
+- **Matched source walkthrough** — from the matched checkout, run `.venv/bin/python webjam_qt_main.py` for the local Music and Art walkthrough.
+- **Published desktop walkthrough** — WebJam `v0.29.0`, using the matching platform download for local desktop features. Current private native invitations require a private build.
 
 Record the selected platform, exact build ID and package SHA-256 from its receipt before rehearsing.
