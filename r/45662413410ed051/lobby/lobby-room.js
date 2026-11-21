@@ -24,7 +24,8 @@
             load: $('[data-act-load]'),
             url: $('[data-act-url]'),
             bobPicks: $('[data-bob-picks]'),
-            paintStart: $('[data-paint-start]'),
+            paintOptions: $('[data-paint-options]'),
+            paintLessons: $('[data-paint-lessons]'),
             tiles: $('[data-act-tiles]'), relayStatus: $('[data-act-relay-status]')
         };
         const state = {
@@ -222,11 +223,13 @@
             state.camOn = false;
             resetCameraPresentation();
             ui.stage.hidden = true;
+            paintEpisodeTitle();
             ui.paint.hidden = true;
             ui.video.hidden = true;
             youtube.cancel(); player.yt = null;
             player.key = ''; player.readyKey = ''; player.failedKey = ''; player.loading = null; player.autoplayBlocked = false;
             player.seenPlaying = false; player.playPending = false;
+            ui.cameraSwitch.hidden = true;
             ui.videoStatus.hidden = true; ui.videoStatus.textContent = '';
             ui.tap.hidden = true;
         }
@@ -255,14 +258,15 @@
             ui.canvas.hidden = chan.kind !== 'art';
             ui.video.hidden = !video;
             ui.load.hidden = !video;
-            ui.bobPicks.hidden = chan.kind !== 'bobross';
-            ui.paintStart.hidden = chan.kind !== 'bobross';
-            ui.bobPicks.classList.remove('op-only');
-            ui.load.classList.add('op-only');
-            ui.video.classList.toggle('paint-along-player', chan.kind === 'bobross');
-            $('[data-paint-canvas-hint]').hidden = chan.kind !== 'bobross';
-            ui.cameraSwitch.hidden = chan.kind !== 'bobross' || !phone;
-            ui.episodeTitle.hidden = chan.kind !== 'bobross';
+            const paintAlong = chan.kind === 'bobross';
+            ui.paintOptions.hidden = !paintAlong;
+            ui.paintLessons.open = false;
+            if (paintAlong) ui.bobPicks.after(ui.load);
+            else ui.paintOptions.before(ui.load);
+            ui.video.classList.toggle('paint-along-player', paintAlong);
+            $('[data-paint-canvas-hint]').hidden = !paintAlong;
+            ui.cameraSwitch.hidden = !paintAlong || !phone;
+            ui.episodeTitle.hidden = !paintAlong;
             if (paint) { canvasRoomInstance = chan.keepRef; setupCanvas(); }
             if (video) {
                 setupVideoUi();
@@ -525,9 +529,15 @@
             BOB.STARTER_EPISODES.forEach((ep) => {
                 const b = document.createElement('button');
                 b.type = 'button';
-                b.className = 'btn btn--small';
+                b.className = 'btn btn--small btn--ghost';
+                b.dataset.lessonId = ep.id;
+                b.setAttribute('aria-pressed', 'false');
                 b.textContent = `${BOB.label(ep)} · ${ep.title}`;
-                b.addEventListener('click', () => hostVideo({ kind: 'yt', id: ep.id }, true, 0));
+                b.addEventListener('click', () => {
+                    hostVideo({ kind: 'yt', id: ep.id }, true, 0);
+                    ui.paintLessons.open = false;
+                    ui.paintLessons.querySelector('summary').focus();
+                });
                 ui.bobPicks.append(b);
             });
             ui.load.addEventListener('submit', (e) => {
@@ -643,9 +653,11 @@
         }
 
         function paintEpisodeTitle() {
-            const source = state.room.video?.source;
-            if (!source || state.kind !== 'bobross') { ui.episodeTitle.textContent = ''; return; }
-            ui.episodeTitle.textContent = BOB.findEpisode(source.id)?.title || 'YouTube lesson';
+            const source = state.kind === 'bobross' ? state.room.video?.source : null;
+            ui.episodeTitle.textContent = source ? BOB.findEpisode(source.id)?.title || 'YouTube lesson' : '';
+            for (const button of ui.bobPicks.children) {
+                button.setAttribute('aria-pressed', String(button.dataset.lessonId === source?.id));
+            }
         }
 
         function onYtAutoplayBlocked() {

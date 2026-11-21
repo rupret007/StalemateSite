@@ -3272,8 +3272,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         drawMusicInvite();
         drawGameNight();
         const showAct = !app.sharingStopped && !app.localMediaPaused && room && ['bobross', 'watch', 'art'].includes(c.kind);
-        $('[data-activity]').hidden = !showAct;
-        $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'A little paint. A little Bob Ross.' : 'Watching together' : 'Shared activity';
+        const activity = $('[data-activity]');
+        activity.hidden = !showAct;
+        activity.closest('.channel-panel').classList.toggle('paint-room', Boolean(showAct && c.kind === 'bobross'));
+        $('[data-activity-title]').textContent = showAct ? c.kind === 'art' ? 'A canvas for everyone' : c.kind === 'bobross' ? 'Paint Along' : 'Watching together' : 'Shared activity';
         $('[data-act-stage]').hidden = !showAct || !roomApi;
         drawActivityRecovery();
         document.body.classList.toggle('am-op', !app.localMediaPaused && !!(c && amOp(c)));

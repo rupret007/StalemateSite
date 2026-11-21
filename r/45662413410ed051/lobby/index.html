@@ -238,9 +238,10 @@
                 </div>
                 </div>
             </section>
-            <div class="roombar" data-roombar hidden>
-                <span class="modes" data-modes></span>
+            <div class="roombar" data-roombar role="group" aria-label="Room actions" aria-describedby="room-modes" hidden>
+                <span id="room-modes" class="modes" data-modes></span>
                 <button class="btn btn--small btn--ghost" type="button" data-cam aria-pressed="false">📷 Camera (18+)</button>
+                <button class="btn btn--small btn--ghost" data-paint-camera-switch type="button" hidden>Switch camera</button>
                 <button class="btn btn--small btn--ghost op-only" type="button" data-roomtools>@ Host tools</button>
                 <select class="btn btn--small btn--ghost arcade-game-picker" data-arcade-game aria-label="Switch game" hidden>
                     <option value="">Games</option>
@@ -376,11 +377,10 @@
                     <div class="act-camera-strip" data-act-camera-strip hidden>
                         <p class="camera-heading"><b id="lobby-camera-count" data-act-camera-count>Cameras (0)</b><span class="camera-scroll-hint" data-act-camera-hint aria-hidden="true" hidden>Swipe / ← →</span></p>
                         <p class="sr-only" id="lobby-camera-scroll-help" hidden>More cameras: swipe or focus this row and use Left and Right arrows. Home and End reach either end.</p>
+                        <p class="paint-canvas-hint" data-paint-canvas-hint hidden>Point your camera at your canvas so everyone can paint along.</p>
                         <div class="act-cams" data-act-tiles role="region" aria-label="Room cameras" aria-describedby="lobby-camera-count" tabindex="-1"></div>
                     </div>
                     <div class="act-video" data-act-video hidden>
-                        <p class="paint-canvas-hint" data-paint-canvas-hint hidden>Point your camera at your canvas so everyone can paint along.</p>
-                        <button class="btn btn--small btn--ghost paint-camera-switch" data-paint-camera-switch type="button" hidden>Switch camera</button>
                         <h3 class="paint-episode-title" data-paint-episode-title hidden></h3>
                         <div class="yt-wrap"><div data-act-yt id="lobby-yt-player"></div></div>
                         <p class="small" data-act-video-status role="status" hidden></p>
@@ -389,13 +389,18 @@
                             <input data-act-url placeholder="Paste a YouTube link" aria-label="YouTube URL">
                             <button class="btn btn--small" type="submit">Load</button>
                         </form>
-                        <div class="bob-picks op-only" data-bob-picks></div>
-                        <details class="paint-start" data-paint-start hidden>
-                            <summary>Getting started · kit and materials</summary>
-                            <p>Start with <b>The Grandeur of Summer</b>. Watch, sketch, or paint with what you have.</p>
-                            <p>For Bob Ross’s oil-painting method, check the lesson’s materials. The kit is optional.</p>
-                            <p><a href="https://www.bobross.com/bob-ross-master-paint-set/" target="_blank" rel="noopener noreferrer">Official Master Paint Set and materials list ↗</a><br><a href="https://www.bobross.com/painting-supplies/" target="_blank" rel="noopener noreferrer">Paints, brushes and tools ↗</a></p>
-                        </details>
+                        <div class="paint-options" data-paint-options hidden>
+                            <details class="paint-lessons" data-paint-lessons>
+                                <summary>Choose lesson</summary>
+                                <div class="bob-picks" data-bob-picks></div>
+                            </details>
+                            <details class="paint-start" data-paint-start>
+                                <summary>Materials</summary>
+                                <p>Start with <b>The Grandeur of Summer</b>. Watch, sketch, or paint with what you have.</p>
+                                <p>For Bob Ross’s oil-painting method, check the lesson’s materials. The kit is optional.</p>
+                                <p><a href="https://www.bobross.com/bob-ross-master-paint-set/" target="_blank" rel="noopener noreferrer">Official Master Paint Set and materials list ↗</a><br><a href="https://www.bobross.com/painting-supplies/" target="_blank" rel="noopener noreferrer">Paints, brushes and tools ↗</a></p>
+                            </details>
+                        </div>
                     </div>
                     <div class="act-paint" data-act-paint hidden>
                         <canvas data-act-canvas width="600" height="360" aria-label="Shared paint canvas"></canvas>
