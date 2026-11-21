@@ -6,7 +6,7 @@ test.beforeEach(async ({ context }) => {
     await context.route('**/*goatcounter.com/**', route => route.abort());
 });
 
-test('Rummy plays, changes difficulty and skips coaching when storage access is denied', async ({ page, hasTouch }) => {
+test('Rummy plays and changes difficulty when browser storage is denied', async ({ page, hasTouch }) => {
     await rummyWithoutStorage(page, '/StalemateSite/play/turdrummy.html', hasTouch);
 });
 

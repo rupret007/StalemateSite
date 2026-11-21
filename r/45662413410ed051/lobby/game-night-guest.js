@@ -75,7 +75,12 @@ async function accept() {
     join.disabled = true;
     status.textContent = 'Joining the game…';
     try {
-        const { next } = await request('accept', { age13: true, attempt });
+        const confirm = () => request('accept', { age13: true, attempt });
+        const { next } = await confirm().catch(error => {
+            if (!['TypeError', 'SyntaxError', 'TimeoutError'].includes(error?.name)) throw error;
+            status.textContent = 'Reconnecting to confirm your seat…';
+            return confirm();
+        });
         if (next !== '/r/45662413410ed051/lobby/?game-guest=1') throw new Error('Unexpected destination');
         location.replace(next);
     } catch (error) {
