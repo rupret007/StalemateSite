@@ -370,7 +370,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         clearRoomInvites();
         clearGameLinks();
         clearJamInvitations();
-        if (roomApi) roomApi.onLeave();
+        if (activityJoined && roomApi) { activityJoined = false; roomApi.onLeave(); }
         $('[data-activity]').hidden = true; $('[data-jam]').hidden = true; $('[data-cam]').hidden = true;
         $('[data-quick]').hidden = true; $('[data-lobby-welcome]').hidden = true;
         $('[data-text]').disabled = true; $('[data-send]').disabled = true; $('[data-palette-open]').disabled = true;
@@ -523,7 +523,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     const announcements = createChatAnnouncements($('[data-buffer]'));
     $('[data-chat-announcements]').addEventListener('change', (event) => announcements.setEnabled(event.currentTarget.checked));
     let belowFold = 0;
-    let roomApi = null;
+    let roomApi = null, activityJoined = false;
     let jamContext = null;
     const jamManualShare = $('[data-jam-manual-share]');
     const jamManualSummary = $('summary', jamManualShare);
@@ -604,6 +604,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     }
     function failActivitySetup() {
         activityToolsNeedsRetry = true;
+        activityJoined = false;
         const failed = roomApi; roomApi = null;
         try { failed?.onLeave(); } catch { /* Keep chat and the explicit retry available. */ }
     }
@@ -625,7 +626,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (loaded && activityRoom(current) && typeof window.LobbyRoom?.attach === 'function') {
                 try {
                     const api = room(true);
-                    api?.onJoin(current, current.actSnap);
+                    if (api) { api.onJoin(current, current.actSnap); activityJoined = true; }
                 } catch {
                     // A failed room setup still needs the visitor's next tap;
                     // incoming activity must not silently attach it again.
@@ -927,7 +928,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             const networkDrop = opened && !timedOut && !savedMessages.size
                 && !removed && !app.kicked && ![1009, 4400, 4413, 4429, 4003, 4503, 4401, 1000].includes(e.code);
             setConnection(networkDrop ? 'reconnecting' : 'offline');
-            if (roomApi) roomApi.onLeave();
+            if (activityJoined && roomApi) { activityJoined = false; roomApi.onLeave(); }
             if (timedOut) {
                 const message = 'Hang Out took too long to respond. Try again.';
                 gateStatus(message);
@@ -1239,7 +1240,7 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             if (app.me) {
                 app.resetSession = true; setConnection('reconnecting');
                 drafts.set(app.active, $('[data-text]').value);
-                if (roomApi) roomApi.onLeave();
+                if (activityJoined && roomApi) { activityJoined = false; roomApi.onLeave(); }
                 // A rehearsal outlasts the return window. Restart it at the
                 // reconnect, not at the last time the room tab was opened.
                 const returning = app.chans.get(gameReturn?.room);
@@ -1782,11 +1783,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         if (prev !== key) $('[data-quick]').scrollLeft = 0;
         followChat = true;
         chatBuffer.scrollTop = chatBuffer.scrollHeight;
-        try {
+            try {
             const r = room();
             if (r) {
-                if (!activityRoom(c)) r.onLeave();
-                else if (prev !== key || freshJoin) r.onJoin(c, c.actSnap);
+                // Welcome preloads the renderer before any room exists. Tearing
+                // it down on the lobby join races the first activity setup.
+                if (!activityRoom(c)) {
+                    if (activityJoined) { activityJoined = false; r.onLeave(); }
+                } else if (prev !== key || freshJoin) {
+                    r.onJoin(c, c.actSnap);
+                    activityJoined = true;
+                }
             }
         } catch {
             // Optional activity setup must not abort the room's chat join or
