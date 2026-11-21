@@ -92,6 +92,13 @@ test('art room: strokes sync between two browsers; clear is host-only', async ({
 test('watch room: host loads YouTube and guest stays in sync', async ({ browser }) => {
     const host = await fan(browser, 'WatchHost');
     await host.click('[data-start="watch"]');
+    const desktop = host.viewportSize();
+    await host.setViewportSize({ width: 375, height: 667 });
+    await expect(host.locator('[data-act-video-status]')).toHaveText('Add a YouTube link to start watching.');
+    await expect(host.locator('[data-act-video] .yt-wrap')).toBeHidden();
+    await expect(host.getByRole('textbox', { name: 'YouTube URL' })).toBeInViewport({ ratio: 1 });
+    await expect(host.locator('[data-act-load]').getByRole('button', { name: 'Load', exact: true })).toBeInViewport({ ratio: 1 });
+    await host.setViewportSize(desktop);
     await host.fill('[data-act-url]', 'https://youtu.be/oh5p5f5_-7A');
     await host.press('[data-act-url]', 'Enter');
     const room = await host.evaluate(() => window.__lobby.active);

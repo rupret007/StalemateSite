@@ -16,6 +16,7 @@
             swatches: $('[data-act-swatches]'),
             clear: $('[data-act-clear]'),
             video: $('[data-act-video]'),
+            preview: $('[data-act-yt]').parentElement,
             yt: $('[data-act-yt]'),
             tap: $('[data-act-tap]'),
             videoStatus: $('[data-act-video-status]'),
@@ -261,8 +262,13 @@
             const paintAlong = chan.kind === 'bobross';
             ui.paintOptions.hidden = !paintAlong;
             ui.paintLessons.open = false;
-            if (paintAlong) ui.bobPicks.after(ui.load);
-            else ui.paintOptions.before(ui.load);
+            if (paintAlong) {
+                ui.preview.after(ui.videoStatus, ui.tap);
+                ui.bobPicks.after(ui.load);
+            } else {
+                ui.preview.before(ui.load, ui.videoStatus, ui.tap);
+            }
+            ui.preview.hidden = !paintAlong;
             ui.video.classList.toggle('paint-along-player', paintAlong);
             $('[data-paint-canvas-hint]').hidden = !paintAlong;
             ui.cameraSwitch.hidden = !paintAlong || !phone;
@@ -275,6 +281,7 @@
             }
             if (act) ingestSnap(act, previousPaint);
             syncNames(chan);
+            drawWatchStart();
             if (video && chan.kind === 'bobross' && isOp() && !state.room.video) {
                 const ep = BOB.DEFAULT_LESSON;
                 hostVideo({ kind: 'yt', id: ep.id }, true, 0);
@@ -318,6 +325,7 @@
         function onChan(chan) {
             if (!state.ch || chan.name !== state.ch) return;
             syncNames(chan);
+            drawWatchStart();
             const c = app.chans.get(state.ch);
             state.camOn = !!(c && c.myCam);
             refreshAv();
@@ -523,6 +531,13 @@
         }
 
         /* ---- synced video ---- */
+        function drawWatchStart() {
+            if (state.kind !== 'watch' || state.room.video) return;
+            const message = isOp() ? 'Add a YouTube link to start watching.' : 'Waiting for the host to choose a video.';
+            if (ui.videoStatus.textContent !== message) ui.videoStatus.textContent = message;
+            ui.videoStatus.hidden = false;
+        }
+
         function setupVideoUi() {
             if (ui.bobPicks.dataset.ready) return;
             ui.bobPicks.dataset.ready = '1';
@@ -587,6 +602,7 @@
 
         async function ensureSource(source, retry = false) {
             if (!state.ch || source.kind !== 'yt' || !/^[A-Za-z0-9_-]{11}$/.test(source.id || '')) return false;
+            ui.preview.hidden = false;
             const key = `${source.kind}:${source.id}`;
             if (player.key === key) {
                 if (player.failedKey === key && !retry) return false;

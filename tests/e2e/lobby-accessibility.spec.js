@@ -1553,6 +1553,20 @@ for (const width of [375, 390, 1440]) {
             await expect(publicRoom).toHaveCount(1);
             await expect(directoryEmpty).toBeHidden();
             await expect(searchStatus).toBeEmpty();
+
+            const directoryFilter = visitor.page.getByRole('combobox', { name: 'Room directory' });
+            await directoryFilter.selectOption('registered');
+            await expect(directoryEmpty).toHaveText('No registered rooms to show. Choose Active now to browse active rooms.');
+            await expect(searchStatus).toHaveText('No registered rooms to show. Choose Active now to browse active rooms.');
+            await directorySearch.fill('directory-room');
+            await expect(directoryEmpty).toHaveText('No registered rooms match this search. Choose Active now to search active rooms.');
+            await expect(searchStatus).toHaveText('No registered rooms match this search. Choose Active now to search active rooms.');
+            await directoryFilter.selectOption('active');
+            await expect(publicRoom).toHaveCount(1);
+            await expect(directorySearch).toHaveValue('directory-room');
+            await expect(searchStatus).toBeEmpty();
+            await directorySearch.clear();
+
             await tabTo(visitor.page, button);
             const original = await button.elementHandle();
             arrival = await guest(browser, baseURL, 'DirectoryArrival', viewport, relay);

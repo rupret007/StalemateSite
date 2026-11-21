@@ -3406,10 +3406,17 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
         const empty = $('[data-rooms-empty]');
         empty.hidden = rooms.length > 0;
         if (sessionEnded) empty.textContent = 'Join again to see rooms.';
+        else if (filter === 'registered') empty.textContent = query
+            ? 'No registered rooms match this search. Choose Active now to search active rooms.'
+            : 'No registered rooms to show. Choose Active now to browse active rooms.';
+        else if (filter === 'mine') empty.textContent = query
+            ? 'No matches in My rooms. Choose Active now to search other rooms.'
+            : 'No rooms to show in My rooms. Choose Active now to browse other rooms.';
         else if (query) empty.textContent = 'No rooms match that search. Clear it or try another name.';
         else empty.textContent = 'No rooms yet. Stay for a chat, or be the first to start one.';
         const searchStatus = $('[data-room-search-status]');
-        const statusText = !sessionEnded && query && !rooms.length ? empty.textContent : '';
+        const statusText = !sessionEnded && !rooms.length && (query || filter === 'registered' || filter === 'mine')
+            ? empty.textContent : '';
         if (searchStatus.textContent !== statusText) searchStatus.textContent = statusText;
         const rows = rooms.map(r => {
             const li = previous.get(r.name) || document.createElement('li');
