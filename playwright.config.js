@@ -3,9 +3,6 @@ const { defineConfig, devices } = require('@playwright/test');
 const { testBaseURL } = require('./scripts/lib/e2e-test-server.cjs');
 
 const baseURL = testBaseURL(process.env);
-// The whole-band journey is run separately from full G2 qualification.
-const fullGateIgnore = process.env.STALEMATE_FULL_GATE === '1'
-    ? ['**/whole-band-demo-journey.spec.js'] : [];
 
 const phoneProject = (name, use) => ({
     name,
@@ -15,7 +12,6 @@ const phoneProject = (name, use) => ({
 
 module.exports = defineConfig({
     testDir: './tests/e2e',
-    testIgnore: fullGateIgnore,
     // Both CommonJS and ESM specs load the same engine. Keep it native ESM so
     // the CommonJS transform cannot change its exports for the ESM fixtures.
     build: { external: ['**/hangout-worker/src/lobby-core.mjs'] },
@@ -43,14 +39,14 @@ module.exports = defineConfig({
     projects: [
         {
             name: 'chromium',
-            testIgnore: [/phones\.spec\.js/, ...fullGateIgnore],
+            testIgnore: [/phones\.spec\.js/],
             use: { browserName: 'chromium' }
         },
         {
             name: 'webkit-community',
             // Phone projects select a different file set. Exercise the shared
             // entrance and invitation/Stop journeys in WebKit explicitly.
-            testMatch: /(?:community-entry|community-moderation|lobby-webjam|lobby-invitation-lifecycle|webjam-join-play|band-demo-journey|lobby-workspace|lobby-idle-heartbeat|lobby-private-entry|lobby-accessibility|lobby-status-focus|ux-polish-screens|paint-along-focus|music-invite-journey|music-one-tap-participation|hangout-room-workspace)\.spec\.js$/,
+            testMatch: /(?:community-entry|community-moderation|lobby-webjam|lobby-invitation-lifecycle|webjam-join-play|band-demo-journey|whole-band-demo-journey|lobby-workspace|lobby-idle-heartbeat|lobby-private-entry|lobby-accessibility|lobby-status-focus|ux-polish-screens|paint-along-sync|paint-along-focus|music-invite-journey|music-one-tap-participation|hangout-room-workspace)\.spec\.js$/,
             use: { browserName: 'webkit' }
         },
         phoneProject('webkit-iphone-se', {

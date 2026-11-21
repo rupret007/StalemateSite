@@ -5,8 +5,18 @@
 // Screenshots: test-results/ux-screens/{phone-stage,phone-join-consent,phone-chat-drawer,desktop-webex,desktop-join-consent}.png
 const path = require('node:path');
 const fs = require('node:fs/promises');
-const { test, expect } = require('@playwright/test');
+const { test: base, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { chromiumMediaLaunch, installWebKitMedia } = require('./support/webkit-media');
+
+const test = base.extend({
+    launchOptions: [async ({ browserName, launchOptions }, use) => {
+        await use(chromiumMediaLaunch(browserName, launchOptions, [
+            '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
+            '--disable-features=WebRtcHideLocalIpsWithMdns'
+        ]));
+    }, { scope: 'worker' }]
+});
 
 const SLUG = '45662413410ed051';
 const KEY = 'local-preview-key-0001';
@@ -17,14 +27,14 @@ const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1440, height: 900 };
 const roomUrl = (origin) => `/r/${SLUG}/?preview=${KEY}&relay=${encodeURIComponent(hangoutRelayWsBase(origin))}`;
 
-test.skip(({ browserName }) => browserName !== 'chromium', 'Fake media two-person layout coverage runs in Chromium');
-test.use({ permissions: ['camera', 'microphone'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] } });
+test.use({ permissions: ['camera', 'microphone'] });
 
 const contexts = new Set();
 test.afterEach(async () => { await Promise.all([...contexts].map((c) => c.close())); contexts.clear(); });
 
 async function openPage(browser, viewport) {
     const context = await browser.newContext({ permissions: ['camera', 'microphone'], viewport });
+    if (browser.browserType().name() === 'webkit') await context.addInitScript(installWebKitMedia);
     contexts.add(context);
     await context.route(/youtube\.com|ytimg|googlevideo/, (route) => route.abort());
     await context.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));

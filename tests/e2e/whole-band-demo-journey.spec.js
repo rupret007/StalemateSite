@@ -5,6 +5,15 @@ const path = require('node:path');
 const { promisify } = require('node:util');
 const { devices, expect, test } = require('@playwright/test');
 
+// WPE's OpenAL backend probes a missing sound card while the Music frame
+// builds its capture. The null driver is silent and immediate; the test still
+// checks the live capture tracks.
+test.use({
+    launchOptions: {
+        env: { ...process.env, ALSOFT_DRIVERS: 'null' }
+    }
+});
+
 const lobbyPath = '/r/45662413410ed051/lobby/';
 const release = 'https://github.com/rupret007/webjam/releases/latest';
 const guestName = 'G3Guest';
@@ -215,6 +224,9 @@ async function preparePhone(context, role, bandOrigin, community, lab) {
         const protectedURL = community.origin + lobbyPath;
         expect((await context.request.get(protectedURL)).status()).toBe(401);
         await page.goto(community.origin + '/beta/?via=stalemate#invite=' + community.invitation);
+        // WPE sometimes finishes this navigation without the fragment. The
+        // portal redeems a fragment that arrives afterwards.
+        if (!new URL(page.url()).hash) await page.evaluate(code => { location.hash = 'invite=' + code; }, community.invitation);
         await page.getByRole('link', { name: /Choose a nickname and join/ }).click();
         expect((await context.request.get(protectedURL)).status()).toBe(200);
         const cookie = (await context.cookies(community.origin)).find(c => c.name === community.sessionCookieName);

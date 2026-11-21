@@ -150,9 +150,9 @@ function render(phase, message, identity) {
     $('#owner').hidden = !identity.emailConfigured || identity.kind === 'owner';
 }
 function begin(kind) {
-    // A queued logout can supersede an outstanding read. All duplicate actions
-    // and other overlaps stay disabled; the opaque attempt also fences late data.
-    if (operation && !(kind === 'logout' && operation === 'check')) return null;
+    // A late invitation fragment or a queued logout can supersede the signed-out
+    // read. Duplicate clicks and every other overlap stay fenced.
+    if (operation && !(operation === 'check' && (kind === 'logout' || kind === 'unlock'))) return null;
     const attempt = currentAttempt = {};
     operation = kind;
     render('loading', kind === 'logout' ? 'Leaving this beta…' : kind === 'unlock' ? 'Checking your invitation…' : 'Checking community access…');
@@ -240,9 +240,18 @@ $('#unlock').addEventListener('submit', event => { event.preventDefault(); unloc
 $('#logout').addEventListener('submit', event => { event.preventDefault(); leave(); });
 $('#retry').addEventListener('click', draw);
 $('#retry-leave').addEventListener('click', leave);
-const key = new URLSearchParams(location.hash.slice(1)).get('invite');
-if (location.hash || location.search) history.replaceState(null, '', location.pathname);
-if (key) unlock(key); else draw();`;
+function consumeInviteFragment() {
+    const key = new URLSearchParams(location.hash.slice(1)).get('invite');
+    if (location.hash || location.search) history.replaceState(null, '', location.pathname);
+    if (key) unlock(key);
+    return Boolean(key);
+}
+// WebKit can apply the invitation fragment after this deferred script has
+// already started the signed-out read. Redeem that fragment when it arrives.
+if (!consumeInviteFragment()) {
+    draw();
+    window.addEventListener('hashchange', () => { consumeInviteFragment(); });
+}`;
 
 async function disconnect(env, session) {
     let result;

@@ -2,14 +2,22 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
-const { test, expect } = require('@playwright/test');
+const { test: base, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
+const { chromiumMediaLaunch, installWebKitMedia } = require('./support/webkit-media');
+
+const test = base.extend({
+    launchOptions: [async ({ browserName, launchOptions }, use) => {
+        await use(chromiumMediaLaunch(browserName, launchOptions, [
+            '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'
+        ]));
+    }, { scope: 'worker' }]
+});
+test.use({ permissions: ['camera', 'microphone'] });
 
 const SLUG = '45662413410ed051';
 const KEY = 'local-preview-key-0001';
 const FAKE_YT = path.join(__dirname, 'support/fake-youtube.js');
-test.use({ permissions: ['camera', 'microphone'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } });
-test.skip(({ browserName }) => browserName !== 'chromium', 'Paint Along relay acceptance runs in Chromium');
 
 let relayWs;
 test.beforeEach(async ({ baseURL }) => { relayWs = hangoutRelayWsBase(baseURL, `paint-along-${randomUUID()}`); });
@@ -17,6 +25,7 @@ const lobbyUrl = () => `/r/${SLUG}/lobby/?preview=${KEY}&relay=${encodeURICompon
 
 async function participant(browser, nick, viewport) {
     const context = await browser.newContext({ permissions: ['camera', 'microphone'], viewport });
+    if (browser.browserType().name() === 'webkit') await context.addInitScript(installWebKitMedia);
     await context.route(/youtube\.com|ytimg|googlevideo/, route => route.abort());
     await context.route('https://www.youtube.com/iframe_api', route => route.fulfill({ path: FAKE_YT, contentType: 'text/javascript' }));
     const page = await context.newPage();

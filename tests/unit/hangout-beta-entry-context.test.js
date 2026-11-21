@@ -684,6 +684,29 @@ describe('explicit recovery and lifecycle fencing in the served invitation porta
     }
     const state = () => Response.json({ kind: 'guest', role: 'fan', emailConfigured: true, staffConfigured: true });
 
+    it('redeems an invitation fragment that arrives after the signed-out read', async () => {
+        let release;
+        const pending = new Promise(resolve => { release = resolve; });
+        let reads = 0;
+        const h = await portal(path => {
+            if (path === '/beta/state') {
+                reads += 1;
+                if (reads === 1) return pending;
+                return state();
+            }
+            expect(path).toBe('/beta/unlock');
+            return Response.json({ ok: true });
+        });
+        try {
+            const { window } = h.dom;
+            window.location.hash = '#invite=late-fragment';
+            await vi.waitFor(() => expect(h.calls.some(call => call.path === '/beta/unlock' && call.method === 'POST')).toBe(true));
+            release(Response.json({ error: 'Private invitation required.' }, { status: 401 }));
+            await vi.waitFor(() => expect(window.document.querySelector('#status').textContent).toBe('Invitation accepted.'));
+            expect(h.calls.filter(call => call.path === '/beta/state').length).toBe(2);
+        } finally { h.dom.window.close(); }
+    });
+
     for (const operation of ['state', 'unlock', 'logout']) for (const stalledAt of ['headers', 'body']) {
         it(`recovers explicitly from stalled ${operation} ${stalledAt} and ignores its late result`, async () => {
             let release, bodyRead = false, recovering = false, nextTimer = 0;
