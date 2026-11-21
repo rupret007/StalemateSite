@@ -495,8 +495,11 @@
 
         function paintStroke(ctx, stroke, from = 0) {
             if (!stroke || stroke.pts.length <= from) return;
-            const w = ctx.canvas.width;
-            const h = ctx.canvas.height;
+            // A real canvas context points back at its canvas. The unit DOM's
+            // context does not, and the room canvas has the same bitmap size.
+            const surface = ctx.canvas || ui.canvas;
+            const w = surface.width;
+            const h = surface.height;
             ctx.strokeStyle = stroke.color;
             ctx.lineWidth = stroke.size * (w / 1200);
             ctx.lineCap = 'round';
