@@ -327,6 +327,37 @@ describe('Game Night match transport', () => {
         expect(f.b.frames.at(-1).t).toBe('match-state');
     });
 
+    it('renews a watcher on the first visible match sync without counting repeats or keepalives', async () => {
+        const f = fixture('turdspades');
+        const north = f.connect('c' + '3'.repeat(32), 'seat-north');
+        const east = f.connect('c' + '4'.repeat(32), 'seat-east');
+        const watchActor = 'c' + '5'.repeat(32);
+        const watcher = f.connect(watchActor, 'seat-watch');
+        await f.send(f.a, 'open');
+        const { id, tableId } = f.board(f.a);
+        await f.send(f.b, 'join', { id, seat: 'west' });
+        await f.send(north, 'join', { id, seat: 'north' });
+        await f.send(east, 'join', { id, seat: 'east' });
+        const binding = f.actors.get(watchActor);
+        binding.gameGuest = { room, ref, host: sid, match: id, tableId, game: 'turdspades', watch: true };
+        await f.send(watcher, 'ping', { nonce: 1 });
+        expect(f.guestActivity).not.toHaveBeenCalled();
+        await f.send(watcher, undefined, { t: 'hello', lastSeq: 0 });
+        expect(f.board(watcher)).toMatchObject({ tableId, watchOnly: true, seat: null, match: { hand: [] } });
+        expect(f.guestActivity).toHaveBeenCalledExactlyOnceWith(binding);
+        await f.send(watcher, 'sync');
+        await f.send(watcher, 'ping', { nonce: 2 });
+        expect(f.guestActivity).toHaveBeenCalledTimes(1);
+
+        const hidden = f.connect(watchActor, 'seat-watch');
+        const hiddenBinding = f.actors.get(watchActor);
+        hiddenBinding.gameGuest = binding.gameGuest;
+        hiddenBinding.canSee = () => false;
+        await f.send(hidden, undefined, { t: 'hello', lastSeq: 0 });
+        expect(f.board(hidden)).toBeNull();
+        expect(f.guestActivity).toHaveBeenCalledTimes(1);
+    });
+
     it('clears the host and guest match views when a read reaches the deadline before the alarm', async () => {
         const f = fixture();
         const { id } = await f.start();

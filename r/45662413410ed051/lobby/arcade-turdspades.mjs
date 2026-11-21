@@ -211,6 +211,7 @@ export function mountArcadeTurdSpades(container, onMatch) {
             }
         } else if (model?.waiting) {
             message = `${occupied.length}/${people} seated${seat ? ` · You’re ${nameFor(seat)}` : ''} · ${teams.join(' vs ')}`;
+            if (model.watchOnly) message += ' · Stay here to watch when the next hand starts.';
             if (seat) { command = 'leave'; label = seat === 'south' ? 'Close table' : 'Release seat'; }
         } else if (match?.result) {
             message = `${teams[match.result.winner]} win${match.result.reason === 'resigned' ? ' by resignation' : ''}.`;
@@ -330,8 +331,10 @@ export function mountArcadeTurdSpades(container, onMatch) {
             $('[data-spades-confirm-yes]').textContent = control.textContent;
             $('#spades-confirm-title').textContent = action === 'resign' ? 'Resign for your team?' : 'Leave this table?';
             $('[data-spades-confirm-text]').textContent = action === 'resign'
-                ? 'The other partnership wins if you resign.' : model?.mode === 'partners'
-                    ? 'Leaving ends this match for both players.' : 'Leaving closes the table for all four players.';
+                ? 'The other partnership wins if you resign.'
+                : model?.seat !== 'south' ? (model.match?.result ? 'You’ll free your seat. The table stays open.'
+                    : 'Your seat stays held until the match ends.')
+                    : model?.mode === 'partners' ? 'Leaving ends this match for both players.' : 'Leaving closes the table for all four players.';
             confirm.showModal();
         }
     });

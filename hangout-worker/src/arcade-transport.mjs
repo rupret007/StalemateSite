@@ -363,6 +363,9 @@ export function createArcadeTransport({ state, current, active, guestActivity = 
             } else if (!record?.expired) publish(scope, game, resume ? null : socket, claims, seq);
             if (frame.action === 'sync' && !scope.synced) {
                 socket.serializeAttachment({ ...socket.deserializeAttachment(), synced: true });
+                if (binding.gameGuest?.watch && game?.openMatch) {
+                    try { await guestActivity(binding); } catch { /* Keep the existing idle deadline. */ }
+                }
             }
             if (error) send(socket, { t: 'match-error', reason: error });
         } catch {
