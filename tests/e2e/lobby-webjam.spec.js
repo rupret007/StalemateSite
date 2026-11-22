@@ -325,10 +325,12 @@ for (const width of [375, 390]) test(`copy invite link and QR encode the shared 
         const modules = 17 + 4 * decoded.version;
         expect(pixels.width % (modules + 8)).toBe(0);
         const quiet = 4 * pixels.width / (modules + 8);
+        let darkestQuietPixel = 255;
         for (let y = 0; y < pixels.height; y++) for (let x = 0; x < pixels.width; x++) {
             if (x >= quiet && y >= quiet && x < pixels.width - quiet && y < pixels.height - quiet) continue;
-            expect(pixels.data[(y * pixels.width + x) * 4]).toBeGreaterThan(200);
+            darkestQuietPixel = Math.min(darkestQuietPixel, pixels.data[(y * pixels.width + x) * 4]);
         }
+        expect(darkestQuietPixel, 'every pixel in the QR quiet zone must be light').toBeGreaterThan(200);
         await expect(canvas).not.toHaveAttribute('data-invite-url');
         expect(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await host.screenshot({ path: testInfo.outputPath(`qr-${width}.png`), fullPage: true });
