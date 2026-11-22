@@ -7,7 +7,7 @@ import { BETA_COOKIE, BETA_IDENTITY_COOKIE, BETA_TTL, betaSession, makeDemoInvit
 import { accountId } from '../src/auth.mjs';
 import { BetaSessions } from '../src/beta-sessions.mjs';
 
-import { productRoomName } from '../../tests/support/product-room.cjs';
+import { productFile, productRoomName } from '../../tests/support/product-room.cjs';
 const origin = 'https://beta.example';
 const invite = 'private-beta-test-invitation-'.repeat(2);
 const secret = 'private-beta-test-signature-'.repeat(2);
@@ -389,9 +389,16 @@ describe('beta product bootstrapping', () => {
         const config = readFileSync(new URL('../wrangler.beta.toml', import.meta.url), 'utf8');
         expect(config).toContain('name = "stalemate-hangout-beta"'); expect(config).toContain('main = "src/beta-entry.mjs"');
         expect(config).toContain('run_worker_first = true'); expect(config).toContain('HANGOUT_BETA_MODE = "protected"');
-        expect(config).toContain('HANGOUT_TURN_ENABLED = "0"'); expect(config).toContain('HANGOUT_AI_MODERATION = "off"');
+        expect(config).toContain('HANGOUT_TURN_ENABLED = "1"'); expect(config).toContain('HANGOUT_AI_MODERATION = "off"');
+        expect(config).toContain('HANGOUT_TURN_MONTHLY_GB = "800"');
         expect(config).not.toMatch(/^PILOT_MODE\s*=/m);
-        expect(config).not.toMatch(/^\s*(PILOT_OPERATOR_KEY|HANGOUT_BETA_INVITE_KEY|HANGOUT_HMAC_KEY|HANGOUT_PREVIEW_KEY|OPENAI_API_KEY)\s*=/m);
+        expect(config).not.toMatch(/^\s*(PILOT_OPERATOR_KEY|HANGOUT_BETA_INVITE_KEY|HANGOUT_HMAC_KEY|HANGOUT_PREVIEW_KEY|OPENAI_API_KEY|HANGOUT_TURN_KEY_ID|HANGOUT_TURN_API_TOKEN|HANGOUT_TURN_ANALYTICS_TOKEN|HANGOUT_TURN_USERNAME|HANGOUT_TURN_CREDENTIAL)\s*=/m);
+        const turnClient = readFileSync(productFile('turn-client.js'), 'utf8');
+        expect(turnClient).not.toContain('HANGOUT_TURN_KEY_ID');
+        expect(turnClient).not.toContain('HANGOUT_TURN_API_TOKEN');
+        expect(turnClient).not.toContain('HANGOUT_TURN_ANALYTICS_TOKEN');
+        expect(turnClient).not.toContain('rtc.live.cloudflare.com');
+        expect(turnClient).not.toContain('WEB_TURN_KEY');
     });
 });
 

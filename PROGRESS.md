@@ -139,3 +139,14 @@ Hosted run [43885398784](https://github.com/rupret007/StalemateSite/actions/runs
 - Done — Reduced-motion tile reparenting no longer forces layout to restart a disabled transition. Normal animation follows the existing path, and both game specs keep their existing assertions and deadlines.
 - Evidence — All six checks for the two original Arcade journeys passed across the iPhone SE, 15 and 15 Pro Max WebKit projects with one worker and no retries. A check of the actual render function confirmed the same final tile positions and the unchanged normal-motion transition setup. Karen passed `5a0d9a43`, but its full gate failed. Three of the five reported new Arcade keys map to the baseline's ordinary Turdomania test at its old line number. The remaining two were seeded free play on iPhone 15 and 15 Pro Max. All five failed unit filenames appear in saved baseline logs.
 - Next — Compare the shipped branch against `4ab24333` again via the full Bobserver gate and Karen review. The focused passes do not establish recovery under full-gate load.
+
+### Lane A TURN plan — 2026-11-21 19:42 CT
+
+- Done — Wrote `TURN-PLAN.md` before any production edit. Cloudflare STUN stays free and unlimited. Realtime TURN shares the 1,000 GB/month free egress allowance with SFU, then $0.05/GB. Credentials are minted server-side from the Hangout TURN key. The Music web key is a different issuer and is not used.
+- Next — Ship `HANGOUT_TURN_ENABLED=1` on the private beta toml only, then add official-inventory relay, expiry, and fallback tests. Playwright stays idle while the official lock is held.
+
+### Lane A TURN tests — 2026-11-21 19:53 CT
+
+- Done — Private beta `HANGOUT_TURN_ENABLED` is `1`. The TURN key stays a vault secret. Public and pilot tomls stay off. `deploy.test.js` still expects the public file to say disabled and passed (8). `beta.test.js` plus the loopback TURN fixture unit test passed together (33) on Node v22.23.5, Vitest 4.1.12, two workers, about 6.7s. Load stayed under 30.
+- Not run — Playwright. The official lock was held by gate `54d41e71` (unit phase, no receipt), so the new relay, Paint Along, expiry, and fallback browser tests were not started. They are in the Chromium inventory with no skip and the default 30s budget.
+- Next — After the lock is free and load is under 30, run only `tests/e2e/hangout-turn-relay.spec.js` on Chromium with one worker. Official fullgate and Karen stay with the integrator.

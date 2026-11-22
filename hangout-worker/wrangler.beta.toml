@@ -55,7 +55,7 @@ HANGOUT_BAND_EMAILS = ""
 HANGOUT_MODERATOR_EMAILS = ""
 HANGOUT_MODERATION_CONTACT = "jeffstory007@gmail.com"
 HANGOUT_TURNSTILE_SITEKEY = ""
-HANGOUT_TURN_ENABLED = "0"
+HANGOUT_TURN_ENABLED = "1"
 HANGOUT_TURN_MONTHLY_GB = "800"
 HANGOUT_CF_ACCOUNT_ID = ""
 HANGOUT_AI_MODERATION = "off"
@@ -64,8 +64,8 @@ WEBJAM_WEB_ORIGINS = ""
 
 # Required secrets: HANGOUT_BETA_INVITE_KEY (32+ chars), HANGOUT_HMAC_KEY, HANGOUT_PREVIEW_KEY.
 # Optional read-only monitoring secret: HANGOUT_BETA_OPS_KEY (32+ chars, separate from invitations).
-# Optional provider secrets only after readiness verification:
-# HANGOUT_TURNSTILE_SECRET, OPENAI_API_KEY,
-# HANGOUT_TURN_KEY_ID, HANGOUT_TURN_API_TOKEN, HANGOUT_TURN_ANALYTICS_TOKEN.
+# TURN is enabled. /turn mints short-lived iceServers. The key never goes in [vars] or the client.
+# Live relay needs these vault secrets: HANGOUT_TURN_KEY_ID, HANGOUT_TURN_API_TOKEN, HANGOUT_TURN_ANALYTICS_TOKEN.
+# Optional provider secrets: HANGOUT_TURNSTILE_SECRET, OPENAI_API_KEY.
 # Increment HANGOUT_BETA_INVITE_VERSION to invalidate current beta invitations/sessions,
 # then distribute a new private invite key. Existing sockets close on their next frame/wake.
