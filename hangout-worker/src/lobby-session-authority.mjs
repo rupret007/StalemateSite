@@ -26,6 +26,32 @@ const clone = value => structuredClone(value);
 // Repeated helper reads inside one resolve otherwise re-hash and re-encode the
 // whole session and connection indexes. The snapshot dies with the transaction.
 // Frozen plain JSON keeps one descriptor from mutating the row the next one reads.
+function cachedTx(tx) {
+    // Same-transaction memo only. Writes update the memo so a later get sees
+    // the committed descriptor, without re-reading or re-hashing the row.
+    // Unlike readSnapshot, values are not frozen: mutators still update then put.
+    const rows = new Map();
+    return {
+        get: async key => {
+            if (!rows.has(key)) rows.set(key, await tx.get(key));
+            return rows.get(key);
+        },
+        list: options => tx.list(options),
+        put: async (key, value) => {
+            const result = await tx.put(key, value);
+            rows.set(key, value);
+            return result;
+        },
+        delete: async key => {
+            const result = await tx.delete(key);
+            rows.set(key, undefined);
+            return result;
+        },
+        getAlarm: (...args) => tx.getAlarm(...args),
+        setAlarm: (...args) => tx.setAlarm(...args),
+        deleteAlarm: (...args) => tx.deleteAlarm(...args)
+    };
+}
 function readSnapshot(tx) {
     const rows = new Map();
     const freeze = value => {
@@ -259,8 +285,9 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
         await raw.setAlarm(Math.min(existing, at + INTERVAL, ...rows.entries.map(row => Math.max(at + 1, row.exp)), ...Object.values(budgets).map(row => Math.max(at + 1, row.until))));
     }
     const transact = operation => records.transaction(async (tx, raw) => {
-        await initialized(tx); ensure((await configuredMarker(tx)).inviteVersion === betaVersion(env));
-        const result = await operation(tx, raw); await configuredMarker(tx); return result;
+        const current = cachedTx(tx);
+        await initialized(current); ensure((await configuredMarker(current)).inviteVersion === betaVersion(env));
+        const result = await operation(current, raw); await configuredMarker(current); return result;
     });
     return Object.freeze({
         records,
@@ -350,8 +377,11 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
                 while (!ended) {
                     const batch = await records.transaction(async tx => {
                         const rows = []; let next = cursor, done = false;
-                        // Four pages of four logical items per native tx.
-                        for (let pageNumber = 0; pageNumber < 4; pageNumber++) {
+                        // Each list is still limited to four logical items.
+                        // Use more pages per read-only transaction so a 1000-session
+                        // recovery does not open a transaction every 16 rows. 256
+                        // pages stay under the 4096-call and 32 MiB ceilings.
+                        for (let pageNumber = 0; pageNumber < 256; pageNumber++) {
                             const page = await tx.list({ prefix, limit: 4, ...(next ? { startAfter: next } : {}) });
                             for (const [key, value] of page) { ensure(key > (next || '')); rows.push([key, value]); next = key; }
                             if (page.size < 4) { done = true; break; }
@@ -371,21 +401,32 @@ export function createLobbySessionAuthority({ storage, env, now = () => Date.now
                 const row = issued.get(item.sid); ensure(row.exp === item.exp && row.generation === before.marker.generation && row.version === before.marker.inviteVersion);
             }
             const savedBindings = await scan(CONNECTION, before.connections.ids, bindingValid, row => row.id);
-            // Domain validation is read-only and can traverse the full bounded
-            // room/log layout without packing every room into one native tx.
-            const reader = Object.freeze({
-                get: key => records.transaction(tx => tx.get(key)),
-                list: options => records.transaction(tx => tx.list(options)),
-                put: () => { throw Error('read-only-recovery'); }, delete: () => { throw Error('read-only-recovery'); }
+            // Domain validation stays read-only. One native transaction can
+            // traverse the bounded room/log layout, sharing already-verified
+            // records instead of opening a transaction for every get/list.
+            // List pages stay limited to four items; the 4096-call and 32 MiB
+            // ceilings still apply.
+            const state = await records.transaction(async tx => {
+                const reader = Object.freeze({
+                    get: key => tx.get(key),
+                    list: options => tx.list(options),
+                    put: () => { throw Error('read-only-recovery'); },
+                    delete: () => { throw Error('read-only-recovery'); }
+                });
+                ensure(await validPrivateReportState(await reader.get('private-reports-v1'), at));
+                return readLobbyState({ tx: reader, now: at, incidentSources });
             });
-            ensure(await validPrivateReportState(await reader.get('private-reports-v1'), at));
-            const state = await readLobbyState({ tx: reader, now: at, incidentSources }), bindings = [];
+            const bindings = [];
             const ids = [...savedBindings.keys()];
             for (let offset = 0; offset < ids.length; offset += BATCH) {
                 const batch = await records.transaction(async tx => {
+                    // Same shared frozen snapshot as the 200-binding preparation
+                    // path, so the session and connection indexes are not
+                    // re-hashed for every descriptor in the batch.
+                    const current = readSnapshot(tx);
                     const result = [];
                     for (const id of ids.slice(offset, offset + BATCH)) {
-                        const binding = savedBindings.get(id); result.push({ binding, active: await validateBinding(tx, binding) });
+                        const binding = savedBindings.get(id); result.push({ binding, active: await validateBinding(current, binding) });
                     }
                     return result;
                 });

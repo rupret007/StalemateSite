@@ -124,8 +124,15 @@ export function createDurableRecordStorage({ storage, namespace, maxRecordBytes 
                     if (await digest(bytes) !== meta.sha256) fail('storage-corrupt');
                     let value;
                     try { value = JSON.parse(dec.decode(bytes)); } catch { fail('storage-corrupt'); }
-                    try { if (await digest(encode(value, maxRecordBytes)) !== meta.sha256) fail('storage-corrupt'); }
-                    catch { fail('storage-corrupt'); }
+                    // Parsed JSON has no toJSON hook. A direct stringify
+                    // round-trip is enough to prove the stored bytes are
+                    // canonical; the defensive encode visitor remains on put
+                    // and as the fallback if stringify disagrees.
+                    try {
+                        const canonical = enc.encode(JSON.stringify(value));
+                        if (canonical.byteLength === bytes.byteLength && await digest(canonical) === meta.sha256) return value;
+                        if (await digest(encode(value, maxRecordBytes)) !== meta.sha256) fail('storage-corrupt');
+                    } catch { fail('storage-corrupt'); }
                     return value;
                 };
                 const run = task => {
