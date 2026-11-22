@@ -401,7 +401,11 @@ test('a bandmate reaches the jam room within three clicks of opening the copied 
             body: `<!doctype html><html><head><meta http-equiv="refresh" content="0;url=${lobbyEntry.replace(/"/g, '&quot;')}"></head><body></body></html>`
         }));
         await bandmate.evaluate(() => sessionStorage.setItem('hangout-count-invite-clicks', '1'));
-        await bandmate.goto(browserInvite, { waitUntil: 'networkidle' });
+        // WebKit can report the refresh document before it follows the lobby
+        // redirect. The nick gate is on that lobby page, so wait for it before
+        // deciding whether Let me in still has to be tapped.
+        await bandmate.goto(browserInvite, { waitUntil: 'commit' });
+        await bandmate.waitForURL(/\/r\/45662413410ed051\/lobby\//, { timeout: 5000 });
         if (await bandmate.locator('[data-gate]').isVisible()) {
             await bandmate.fill('[data-nick]', 'LinkBandmate');
             await bandmate.click('[data-enter]');
