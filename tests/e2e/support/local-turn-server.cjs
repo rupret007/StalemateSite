@@ -1,8 +1,13 @@
 'use strict';
 
-// Loopback TURN fixture for relay-only tests. One fixture user. Not a public relay.
+// Local TURN fixture for relay-only tests. One fixture user. Not a public relay.
+// Chrome and WebKit bind each TURN socket to a host NIC (SO_BINDTODEVICE). A
+// socket bound that way cannot deliver to 127.0.0.1, and the source address of
+// packets it can send is the NIC address, not loopback. Listening only on
+// 127.0.0.1 therefore never answers Allocate, and relay-only ICE never nominates.
 const crypto = require('node:crypto');
 const dgram = require('node:dgram');
+const os = require('node:os');
 const zlib = require('node:zlib');
 
 const MAGIC = 0x2112A442;
@@ -126,7 +131,7 @@ function verifyFingerprint(packet) {
     return ((zlib.crc32(copy) ^ 0x5354554e) >>> 0) === fp.value.readUInt32BE(0);
 }
 
-function build({ method, cls, tid, attrs = [], key = null }) {
+function build({ method, cls, tid, attrs = [], key = null, fingerprint = true }) {
     const id = tid || crypto.randomBytes(12);
     const body = attrs.length ? Buffer.concat(attrs) : Buffer.alloc(0);
     let packet = Buffer.alloc(20 + body.length);
@@ -145,6 +150,7 @@ function build({ method, cls, tid, attrs = [], key = null }) {
         mac.copy(next, packet.length + 4);
         packet = next;
     }
+    if (!fingerprint) return packet;
     const finger = Buffer.alloc(packet.length + 8);
     packet.copy(finger);
     finger.writeUInt16BE(packet.readUInt16BE(2) + 8, 2);
@@ -174,12 +180,54 @@ function normalize(address) {
     return mapped ? mapped[1] : address;
 }
 
-function bindUdp() {
+function listedIPv4() {
+    const found = [];
+    for (const list of Object.values(os.networkInterfaces())) {
+        for (const net of list || []) {
+            if (!net || (net.family !== 'IPv4' && net.family !== 4) || !net.address) continue;
+            if (!found.includes(net.address)) found.push(net.address);
+        }
+    }
+    if (!found.includes('127.0.0.1')) found.unshift('127.0.0.1');
+    return found;
+}
+
+function isHostIPv4(address) {
+    return listedIPv4().includes(address);
+}
+
+function preferredIPv4() {
+    const socket = dgram.createSocket('udp4');
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (address) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            try { socket.close(); } catch (_) { /* already closed */ }
+            const locals = listedIPv4();
+            if (address && locals.includes(address) && address !== '127.0.0.1') resolve(address);
+            else resolve(locals.find((ip) => ip !== '127.0.0.1') || '127.0.0.1');
+        };
+        const timer = setTimeout(() => finish(''), 500);
+        socket.on('error', () => finish(''));
+        // connect() only selects the default-route source. It does not transmit.
+        try {
+            socket.connect(9, '192.0.2.1', () => {
+                let address = '';
+                try { address = socket.address().address; } catch (_) { address = ''; }
+                finish(address);
+            });
+        } catch (_) { finish(''); }
+    });
+}
+
+function bindUdp(address) {
     const socket = dgram.createSocket('udp4');
     socket.on('error', () => {});
     return new Promise((resolve, reject) => {
         socket.once('error', reject);
-        socket.bind({ address: '127.0.0.1', port: 0 }, () => {
+        socket.bind({ address, port: 0 }, () => {
             socket.removeListener('error', reject);
             resolve(socket);
         });
@@ -191,7 +239,10 @@ async function startLocalTurn() {
     const key = longTermKey(USER, REALM, PASS);
     const allocations = new Map();
     const lanes = new Map();
-    const socket = await bindUdp();
+    const host = await preferredIPv4();
+    // 0.0.0.0 so a loopback unit client and a NIC-bound browser socket share one port.
+    // Replies keep the destination address the client used (loopback or the NIC).
+    const socket = await bindUdp('0.0.0.0');
     let closed = false;
 
     const send = (client, packet) => {
@@ -216,7 +267,7 @@ async function startLocalTurn() {
 
     function allocationSuccess(alloc, tid) {
         return success(METHOD.allocate, tid, [
-            attr(ATTR.xorRelayed, xorAddress(alloc.relayPort, '127.0.0.1')),
+            attr(ATTR.xorRelayed, xorAddress(alloc.relayPort, alloc.relayAddress)),
             u32(ATTR.lifetime, 600),
             attr(ATTR.xorMapped, xorAddress(alloc.client.port, alloc.client.address))
         ]);
@@ -224,10 +275,13 @@ async function startLocalTurn() {
 
     async function openAllocation(client) {
         if (allocations.size >= MAX_ALLOCATIONS) return null;
-        const relay = await bindUdp();
+        // Bind the relay on the client source so hairpin traffic stays on an
+        // address a device-bound browser socket is allowed to use.
+        const relay = await bindUdp(client.address);
         const alloc = {
             client,
             relay,
+            relayAddress: client.address,
             relayPort: relay.address().port,
             permissions: new Set(),
             channelsByNumber: new Map(),
@@ -367,7 +421,7 @@ async function startLocalTurn() {
 
     socket.on('message', (msg, rinfo) => {
         const address = normalize(rinfo.address);
-        if (address !== '127.0.0.1' || closed) return;
+        if (!isHostIPv4(address) || closed) return;
         const client = { address, port: rinfo.port };
         const id = `${address}:${rinfo.port}`;
         const prev = lanes.get(id) || Promise.resolve();
@@ -378,9 +432,10 @@ async function startLocalTurn() {
     const port = socket.address().port;
     return {
         port,
+        host,
         username: USER,
         credential: PASS,
-        url: `turn:127.0.0.1:${port}?transport=udp`,
+        url: `turn:${host}:${port}?transport=udp`,
         async close() {
             closed = true;
             for (const alloc of allocations.values()) alloc.relay.close();

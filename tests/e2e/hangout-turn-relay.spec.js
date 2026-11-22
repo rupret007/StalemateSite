@@ -1,17 +1,28 @@
 const { randomUUID } = require('node:crypto');
-const { test, expect } = require('@playwright/test');
+const { test: base, expect } = require('@playwright/test');
 const { hangoutRelayWsBase } = require('../../scripts/lib/e2e-test-server.cjs');
 const { expectOrdinaryMediaLabel } = require('./support/ordinary-media-labels');
 const { startLocalTurn } = require('./support/local-turn-server.cjs');
+const { chromiumMediaLaunch, installWebKitMedia } = require('./support/webkit-media');
 const { TEST_SLUG } = require('./support/lobby-fixture');
 
 const KEY = 'local-preview-key-0001';
 const DEVICE = `${'a'.repeat(22)}.${'b'.repeat(32)}`;
 
-test.use({
-    permissions: ['camera', 'microphone'],
-    launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns'] }
+// WebKit rejects Chromium's fake-device flags. installWebKitMedia keeps a
+// granted mock camera when WPE has one, and otherwise stands in with canvas
+// frames negotiated as H.264. Chromium still hides mDNS hostnames.
+const test = base.extend({
+    launchOptions: [async ({ browserName, launchOptions }, use) => {
+        await use(chromiumMediaLaunch(browserName, launchOptions, [
+            '--use-fake-device-for-media-stream',
+            '--use-fake-ui-for-media-stream',
+            '--disable-features=WebRtcHideLocalIpsWithMdns'
+        ]));
+    }, { scope: 'worker' }]
 });
+
+test.use({ permissions: ['camera', 'microphone'] });
 
 let turn;
 test.beforeAll(async () => { turn = await startLocalTurn(); });
@@ -56,6 +67,7 @@ function installRelayPolicy(context) {
 
 async function openContext(browser, { relay, payloads, mode }) {
     const context = await browser.newContext({ permissions: ['camera', 'microphone'] });
+    if (browser.browserType().name() === 'webkit') await context.addInitScript(installWebKitMedia);
     await context.addInitScript((device) => localStorage.setItem('hangout-dev', device), DEVICE);
     if (relay) await installRelayPolicy(context);
     let issued = 0;
