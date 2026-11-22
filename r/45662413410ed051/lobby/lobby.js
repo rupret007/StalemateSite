@@ -1376,9 +1376,10 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
     function revealFocusedReport(button) {
         if (document.activeElement !== button) return;
         requestAnimationFrame(() => {
-            if (document.activeElement === button && button.matches(':focus-visible')) {
-                button.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-            }
+            if (document.activeElement !== button) return;
+            const shortWorkspace = innerWidth <= 900 && innerHeight <= 450;
+            if (shortWorkspace || button.matches(':focus-visible'))
+                button.scrollIntoView({ block: shortWorkspace ? 'center' : 'nearest', inline: 'nearest', behavior: 'instant' });
         });
     }
     function finishReport(id, submitted) {
@@ -1447,11 +1448,16 @@ import { discordCallLink, gameInviteCode, GAME_NIGHT_LOBBY_ORDER, gameNightInvit
             }
             if (l.me) li.classList.add('act');
         }
-        const stick = buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
+        // The server sends the report notice separately from its acknowledgement.
+        // New lines must not scroll a focused report control out of the chat.
+        const active = document.activeElement;
+        const focusedReport = active?.matches('.flag') && buf.contains(active) ? active : null;
+        const stick = !focusedReport && buf.scrollHeight - buf.scrollTop - buf.clientHeight < 60;
         lines.append(li);
         while (lines.children.length > 300) lines.firstChild.remove();
         if (stick) buf.scrollTop = buf.scrollHeight;
         else if (!replaying && !l.event) { belowFold += 1; drawNewMessages(); }
+        if (focusedReport) revealFocusedReport(focusedReport);
     }
 
     function drawNewMessages() {

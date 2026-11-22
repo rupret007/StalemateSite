@@ -805,11 +805,11 @@ body:has(> [data-game-guest-connecting]:not([hidden])) > .titlebar { display: no
   .activity { min-height: 28px; }
   .activity-heading { padding-block: 8px; }
   .buffer { min-height: 0; padding-block: 1px; }
-  .buffer:has(:focus-visible) { min-height: 64px; flex-shrink: 0; }
+  .buffer:has(:is(:focus-visible, .flag:focus)) { min-height: 64px; flex-shrink: 0; }
   .buffer li { padding-block: 0; }
   .buffer .flag { scroll-margin-block: 4px; }
   .say { position: sticky; bottom: 0; z-index: 1; margin-block: 4px; }
-  .chat:has(.buffer :focus-visible) .say,
+  .chat:has(.buffer :is(:focus-visible, .flag:focus)) .say,
   .chat:has(> .game-night:not([hidden]) > :is(.arcade-card-table, .arcade-chess)[open]) .say { position: static; }
   .say input { min-height: 36px; padding-block: 8px; scroll-margin-bottom: 8px; }
   /* Send is shorter than its input. Leave room for the entire composer when
