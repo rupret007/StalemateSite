@@ -107,7 +107,8 @@ function transform(stage) {
             ].join('\n'), filename);
             html = html.replace(/\s*<details class="changelog">[\s\S]*?<\/details>/i, '')
                 .replace(/\s*\/\* -+ Changelog -+ \*\/[\s\S]*?\.changelog li \{[^}]*\}/i, '')
-                .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '');
+                .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '')
+                .replace('Nine games. Pick your next round.', 'Play solo, or choose 2 players in Royal Flush Chess to share one device.');
             if (/changelog/i.test(html)) throw new Error('Hub changelog strip failed');
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate-strip.css">', filename);
             html = html.replace(/<body\b[^>]*>/i, '$&\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="../#contact" class="sm-contact">Contact</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><button type="button" class="sm-listen" data-site-play="manic" data-site-play-label="Listen to Manic" aria-label="Play Manic here">Listen to Manic</button></nav>');

@@ -6,6 +6,11 @@ test('unknown paths render the 404 page with a way home', async ({ page }) => {
     await expect(page).toHaveTitle(/Page not found/);
     await expect(page.locator('h1')).toContainText('Wrong song.');
     await expect(page.locator('#about-link')).toHaveAttribute('href', './#about');
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/this-square-is-empty#main-content$/);
+    await expect(page.getByRole('main')).toBeFocused();
 });
 
 test('404 under the GitHub Pages prefix still loads styles from the project root', async ({ page }) => {
@@ -15,6 +20,8 @@ test('404 under the GitHub Pages prefix still loads styles from the project root
     const baseHref = await page.locator('base').getAttribute('href');
     expect(baseHref).toBe('/StalemateSite/');
     await expect(page.locator('link[rel="stylesheet"][href="styles.css"]')).toHaveCount(1);
+    await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'About' }).click();
+    await expect(page).toHaveURL(/\/StalemateSite\/#about$/);
 });
 
 test.describe('404 without JavaScript', () => {

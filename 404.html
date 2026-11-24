@@ -30,6 +30,9 @@
 </head>
 <body id="top" class="lost-page-body">
     <a class="skip-link" href="#main-content">Skip to main content</a>
+    <script>
+        document.querySelector('.skip-link').href = new URL('#main-content', location.href);
+    </script>
     <header class="site-header">
         <div class="site-header__inner page-shell">
             <a class="brand" href="./" aria-label="Stalemate home">
@@ -40,7 +43,7 @@
                 <button type="button" class="music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button>
             <nav class="site-nav" aria-label="Primary navigation">
                 <a href="./">Home</a>
-                <a href="#about-link">About</a>
+                <a href="./#about">About</a>
                 <a href="./#contact">Contact</a>
             </nav>
             <nav class="social-nav social-nav--icons" aria-label="Social">
@@ -60,15 +63,15 @@
             </div>
         </div>
     </header>
-    <main id="main-content" class="lost-page">
+    <main id="main-content" class="lost-page" tabindex="-1">
         <div class="page-shell">
             <p class="board-square">404</p>
             <h1>Wrong song.</h1>
-            <p>We don’t know this one. Head back home: the good stuff (and the Oct 24 countdown) is there.</p>
+            <p>Head home for music, games, and Hang Out.</p>
             <div class="checker-belt" aria-hidden="true"></div>
             <div class="button-row">
                 <a class="button button--hot" id="about-link" href="./#about">Meet the band</a>
-                <a class="button button--listen" href="https://rockinoctober.com" target="_blank" rel="noopener noreferrer">Show details</a>
+                <a class="button button--listen" href="./play/">Open Stalemate Arcade</a>
                 <a class="button button--ghost" href="./">Back home</a>
             </div>
         </div>
