@@ -78,6 +78,12 @@ npm run package:pages
 
 The importer records the full resolved upstream revision in `play/VENDORED.txt`, copies the shared playlist audio, applies site security/branding/analytics, and removes upstream test files. Chessground, chess.js, Stockfish and the Spatial artwork retain their separate notices and corresponding source under `play/assets/chess/`; see its `credits.html`. Repeating synchronization with the same committed source should preserve the generated result. Validate with the Node 24 runtime used by this site's CI; review the generated diff before committing.
 
+## Hang Out homepage entry
+
+The homepage Hang Out link takes visitors to the shared app with the Stalemate entry label. The Arcade remains available from the homepage and the Play solo link.
+
+Before publishing this entry, test the shared app build at the final destination. Open it from both band sites, check that each can return to its own site, and send a room link from one entry to a guest who arrived from the other. Confirm homepage copy matches the activities enabled there. Use the browser checks at both the domain root and the GitHub Pages project path.
+
 ## Local checks
 
 ```bash

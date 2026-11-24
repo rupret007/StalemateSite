@@ -1620,6 +1620,45 @@ textarea:focus-visible {
 }
 
 /* Games promo (homepage block, moved up under Listen) */
+.content-section.hangout-section {
+    padding-block: clamp(1.4rem, 4vw, 2.75rem) 0;
+}
+
+.hangout-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    padding: clamp(1rem, 3.5vw, 2rem);
+    border: 1px solid var(--line-strong);
+    border-inline-start: 4px solid var(--lime);
+    background: var(--surface);
+}
+
+.hangout-card__lede {
+    max-width: 52ch;
+    margin: 0.45rem 0 0;
+    color: var(--muted);
+}
+
+.hangout-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.hangout-card__actions .button {
+    text-align: center;
+}
+
+@media (max-width: 480px) {
+    .hangout-card__actions {
+        flex-direction: column;
+        width: 100%;
+    }
+}
+
 .games-section { position: relative; }
 .games-section::before {
     content: ""; display: block; height: var(--checker-band);
