@@ -34,12 +34,15 @@ Rad Dad’s palette (`#171410` ink, `#f4f0e6` cream, `#009ee8` listen, `#ed2765`
 
 ## Analytics
 
-Privacy-safe [GoatCounter](https://www.goatcounter.com/) events (account `stalemate`). No scores, names, or free text — only fixed event slugs.
+Sign in to the [Stalemate GoatCounter dashboard](https://stalemate.goatcounter.com/) to compare visits by date and review top pages, referring sites, devices, and the events below. Page reports use the public path and the referring site’s origin. Missing pages use one `/404.html` label. The tracker sends fixed event names and omits URL query strings, fragments, names, scores, and free text. [GoatCounter’s privacy policy](https://www.goatcounter.com/help/privacy) describes how it handles IP addresses.
+
+Look for `engagement-home-30s`, `engagement-home-120s`, and `engagement-home-300s` to see how many homepage visits reach each amount of foreground time. The `engagement-arcade-*` series measures the Arcade landing page. Each milestone can fire once per page load and the timer pauses in hidden tabs. A five-minute view reaches all three milestones.
 
 **Main site**
 
 - `music-apple`, `music-spotify`, `music-youtube`, `music-bandcamp` — streaming links in Listen (not social icons)
 - `manic-video-play` — Manic lyric video play
+- `hangout-open` — opening Hang Out from the homepage
 - `show-details` — Rockin’ October info links
 - `show-ticket-rockin-october` — the official Rockin’ October TicketSpice link
 - `show-cta-header`, `show-cta-hero`, `show-cta-under-video` — existing show-action placements, recorded alongside the ticket category; `show-cta-next-fallback` remains the evergreen follow action

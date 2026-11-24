@@ -75,4 +75,25 @@ test.describe('GoatCounter analytics', () => {
     const v = await page.evaluate(() => window.__cspViolations || []);
     expect(v).toEqual([]);
   });
+
+  test('keeps page reports useful without tracking raw query, fragment, or missing URL', async ({ page, baseURL }) => {
+    const hits = [];
+    await page.route(`**/*${GC_HOST}/**`, async (route) => {
+      hits.push(new URL(route.request().url()).searchParams);
+      await route.fulfill({ status: 204, body: '' });
+    });
+
+    const referer = new URL('/room/private-referral?key=private-query#private-fragment', baseURL).href;
+    await page.goto('/play/?name=private-value#private-hash', { referer });
+    await expect.poll(() => hits.some(hit => hit.get('p') === '/play/')).toBe(true);
+
+    const missing = await page.goto('/missing-private-path?person=private-value#private-hash', { referer });
+    expect(missing.status()).toBe(404);
+    await expect.poll(() => hits.some(hit => hit.get('p') === '/404.html')).toBe(true);
+    for (const hit of hits) {
+      expect(hit.get('r')).toBe(new URL(baseURL).origin);
+      expect(hit.has('q')).toBe(false);
+      expect(hit.toString()).not.toContain('private-');
+    }
+  });
 });

@@ -28,6 +28,7 @@ describe('js/track.js', () => {
   afterEach(() => {
     win.close();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('no-ops when goatcounter is missing', () => {
@@ -105,5 +106,43 @@ describe('js/track.js', () => {
     win.smOnce('scroll-home-25', spy);
     win.smOnce('scroll-home-25', spy);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['home', 'arcade'])('counts visible %s time once per milestone and pauses when the page is hidden', page => {
+    vi.useFakeTimers();
+    const start = Date.now();
+    vi.spyOn(win.performance, 'now').mockImplementation(() => Date.now() - start);
+    let visibility = 'hidden';
+    vi.spyOn(win.document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    const setVisibility = (state) => {
+      visibility = state;
+      win.document.dispatchEvent(new win.Event('visibilitychange'));
+    };
+    const count = vi.fn();
+    win.goatcounter = { count };
+    win.smTrackForeground(page);
+    win.smTrackForeground(page);
+    vi.advanceTimersByTime(60_000);
+    expect(count).not.toHaveBeenCalled();
+
+    setVisibility('visible');
+    vi.advanceTimersByTime(25_000);
+    setVisibility('hidden');
+    vi.advanceTimersByTime(60_000);
+    expect(count).not.toHaveBeenCalled();
+    setVisibility('visible');
+    vi.advanceTimersByTime(5000);
+    expect(count.mock.calls.map(([event]) => event.path)).toEqual([`engagement-${page}-30s`]);
+
+    win.dispatchEvent(new win.Event('pagehide'));
+    vi.advanceTimersByTime(300_000);
+    expect(count).toHaveBeenCalledTimes(1);
+    win.dispatchEvent(new win.Event('pageshow'));
+    vi.advanceTimersByTime(90_000);
+    expect(count).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(900_000);
+    expect(count.mock.calls.map(([event]) => event.path)).toEqual([
+      `engagement-${page}-30s`, `engagement-${page}-120s`, `engagement-${page}-300s`
+    ]);
   });
 });

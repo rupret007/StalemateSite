@@ -82,6 +82,7 @@
   /* --- Hub (index.html, hub.html): hub-open + hub-card-* --- */
   if (g === 'hub') {
     track('hub-open');
+    if (typeof window.smTrackForeground === 'function') window.smTrackForeground('arcade');
     document.addEventListener('click', function (e) {
       var card = e.target && e.target.closest ? e.target.closest('a.game-card[href]') : null;
       if (!card) return;

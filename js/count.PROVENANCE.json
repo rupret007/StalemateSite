@@ -6,9 +6,12 @@
   "source": "public/count.js",
   "sourceBlob": "3b5f6bc87a35c67875fd3efe52e75f8317949d85",
   "shipped": "js/count.js",
-  "sha256": "792b7abd26c1fb6ae62906833e09a301251e2641816e69e4f95aba518f3fe3f0",
-  "upstreamByteIdentical": true,
-  "modifications": [],
+  "sha256": "3665952ef20c1a020ad471871c67f2522cb3d7519fc0b7643d0abbe13b959a57",
+  "upstreamByteIdentical": false,
+  "modifications": [
+    "Preserve analytics opt-out when browser storage is unavailable.",
+    "Send only the page path and the referring site origin, with no URL query or fragment."
+  ],
   "license": "ISC",
   "copyright": "Copyright \u00a9 Martin Tournoij <martin@arp242.net>",
   "licenseSource": "https://github.com/arp242/goatcounter/blob/c031008a8d28c85b36708824f23b28957e7ed262/LICENSE",

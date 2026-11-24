@@ -5,6 +5,7 @@
   if (!track) return;
 
   var page = document.body.classList.contains('lost-page-body') ? '404' : 'home';
+  if (page === 'home' && typeof window.smTrackForeground === 'function') window.smTrackForeground('home');
 
   function host(href) {
     try { return new URL(href, location.href).hostname.replace(/^www\./, ''); } catch (e) { return ''; }

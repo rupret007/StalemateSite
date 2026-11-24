@@ -64,11 +64,43 @@
     if (typeof fn === 'function') fn();
   }
 
+  function trackForeground(page) {
+    if (page !== 'home' && page !== 'arcade') return;
+    once('engagement-' + page, function () {
+      var marks = [30, 120, 300];
+      var next = 0;
+      var elapsed = 0;
+      var visibleSince = null;
+      var pageHidden = false;
+      var timer;
+
+      function update() {
+        window.clearTimeout(timer);
+        var now = performance.now();
+        if (visibleSince !== null) elapsed += now - visibleSince;
+        while (next < marks.length && elapsed >= marks[next] * 1000) {
+          send('engagement-' + page + '-' + marks[next] + 's');
+          next++;
+        }
+        visibleSince = !pageHidden && document.visibilityState === 'visible' ? now : null;
+        if (visibleSince !== null && next < marks.length) {
+          timer = window.setTimeout(update, Math.ceil(marks[next] * 1000 - elapsed));
+        }
+      }
+
+      document.addEventListener('visibilitychange', update);
+      window.addEventListener('pagehide', function () { pageHidden = true; update(); });
+      window.addEventListener('pageshow', function () { pageHidden = false; update(); });
+      update();
+    });
+  }
+
   window.smTrack = send;
   window.smDurBucket = durBucket;
   window.smLevelCap = levelCap;
   window.smOnce = once;
   window.smTrackFlush = flush;
+  window.smTrackForeground = trackForeground;
 
   window.addEventListener('load', flush);
   var poll = setInterval(function () {

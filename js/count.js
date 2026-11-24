@@ -28,7 +28,6 @@
 			e: !!(vars.event || goatcounter.event),
 			s: window.screen.width,
 			b: is_bot(),
-			q: location.search,
 		}
 
 		var rcb, pcb, tcb  // Save callbacks to apply later.
@@ -44,7 +43,18 @@
 		if (rcb) data.r = rcb(data.r)
 		if (tcb) data.t = tcb(data.t)
 		if (pcb) data.p = pcb(data.p)
+		data.r = get_referrer_origin(data.r)
 		return data
+	}
+
+	// Keep referral source attribution without sending another page's path or parameters.
+	var get_referrer_origin = function(referrer) {
+		if (!referrer) return ''
+		try {
+			var url = new URL(referrer)
+			if (url.protocol === 'https:' || url.protocol === 'http:') return url.origin
+		} catch (err) { /* Empty or invalid referrer. */ }
+		return ''
 	}
 
 	// Check if a value is "empty" for the purpose of get_data().
@@ -97,7 +107,7 @@
 			if (a.hostname.replace(/^www\./, '') === location.hostname.replace(/^www\./, ''))
 				loc = a
 		}
-		return (loc.pathname + loc.search) || '/'
+		return loc.pathname || '/'
 	}
 
 	// Run function after DOM is loaded.
