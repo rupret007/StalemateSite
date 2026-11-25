@@ -108,11 +108,23 @@ describe('GitHub Pages package', () => {
         });
         try {
             expect(result.status, result.stderr).toBe(0);
-            const roomDir = join(repoRoot, 'dist/r/45662413410ed051');
+            const roomDir = join(repoRoot, 'dist', 'r', SLUG);
             expect(existsSync(join(roomDir, 'index.html'))).toBe(true);
             expect(existsSync(join(roomDir, 'room.js'))).toBe(true);
             expect(existsSync(join(roomDir, 'room.css'))).toBe(true);
             expect(existsSync(join(roomDir, 'TWO-HOUSE-TEST.md'))).toBe(false);
+            expect(existsSync(join(roomDir, 'lobby', 'index.html'))).toBe(false);
+            const packagedRoom = readFileSync(join(roomDir, 'index.html'), 'utf8');
+            const lobbyHref = packagedRoom.match(/<a class="show-link lobby-link" href="([^"]+)"/)?.[1];
+            expect(lobbyHref).toBeTruthy();
+            for (const publicBase of ['https://stalemate.band/', 'https://rupret007.github.io/StalemateSite/']) {
+                const roomUrl = new URL('r/' + SLUG + '/', publicBase);
+                expect(new URL(lobbyHref, roomUrl).href).toBe(
+                    'https://stalemate-hangout-demo.jeffstory007.workers.dev/?via=stalemate'
+                );
+            }
+            const sourceRoom = readFileSync(join(repoRoot, 'r', SLUG, 'index.html'), 'utf8');
+            expect(sourceRoom).toContain('class="show-link lobby-link" href="lobby/"');
             const packaged = readdirSync(roomDir);
             expect(packaged).not.toContain('TWO-HOUSE-TEST.md');
             expect(packaged.every((name) => !/\.md$/i.test(name))).toBe(true);
