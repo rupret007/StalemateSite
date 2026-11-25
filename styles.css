@@ -1767,6 +1767,14 @@ textarea:focus-visible {
 /* Real 44px tap chips with 8px gaps: no overlapping hit areas. */
 .games-card__list a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border: 2px solid currentColor; border-radius: 999px; font-weight: 700; text-decoration: none; }
 .games-card__list a:hover, .games-card__list a:focus-visible { background: var(--lime); color: #171410; border-color: var(--lime); }
+@media (max-width: 760px) {
+    .games-card__body h2.heading-natural { font-size: clamp(1.5rem, 4.5vw, 1.875rem); line-height: 1.05; letter-spacing: 0.015em; }
+    .games-card__lede { font-size: 1rem; line-height: 1.35; }
+    .games-card .games-card__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .games-card__list a { display: flex; justify-content: center; padding: 0.125rem 0.5rem; line-height: 1.2; text-align: center; }
+    .games-card__actions { display: grid; gap: 8px; }
+    .games-card__actions .button { justify-content: center; min-height: 44px; padding: 0.55rem 0.75rem; font-size: 1rem; line-height: 1.15; text-align: center; }
+}
 /* Band contact remains readable and tappable on small screens. */
 .booking-contact { overflow-wrap:anywhere; }
 .booking-contact a { display:inline-flex; align-items:center; min-height:44px; color:inherit; }
