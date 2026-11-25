@@ -1,15 +1,16 @@
 'use strict';
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { once } = require('node:events');
 
 const root = path.resolve(__dirname, '..');
 const port = process.env.STALEMATE_TEST_PORT || '4345';
 const origin = `http://127.0.0.1:${port}`;
-const server = spawn(process.execPath, ['scripts/serve-test.cjs'], { cwd: root,
-    env: { ...process.env, STALEMATE_TEST_PORT: port }, stdio: 'inherit' });
-
 async function main() {
+    const build = spawnSync(process.execPath, ['scripts/package-pages.cjs'], { cwd: root, stdio: 'inherit' });
+    if (build.status !== 0) throw Error('Could not package the site for local live verification.');
+    const server = spawn(process.execPath, ['scripts/serve-test.cjs'], { cwd: root,
+        env: { ...process.env, STALEMATE_TEST_PORT: port, STALEMATE_SERVE_PAGES_ARTIFACT: '1' }, stdio: 'inherit' });
     try {
         const deadline = Date.now() + 10000;
         while (true) {

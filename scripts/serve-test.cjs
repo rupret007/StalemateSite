@@ -5,7 +5,8 @@ const http = require('node:http');
 const path = require('node:path');
 const { resolveTestPort, parseHangoutRelayPath } = require('./lib/e2e-test-server.cjs');
 
-const ROOT = path.resolve(__dirname, '..');
+const SERVE_PAGES_ARTIFACT = process.env.STALEMATE_SERVE_PAGES_ARTIFACT === '1';
+const ROOT = path.resolve(__dirname, '..', SERVE_PAGES_ARTIFACT ? 'dist' : '.');
 const PORT = resolveTestPort(process.env);
 const PROJECT_PREFIX = '/StalemateSite';
 const MIME = {
@@ -120,7 +121,7 @@ async function main() {
         const url = new URL(request.url, origin);
         const urlPath = url.pathname;
 
-        const relayRoute = parseHangoutRelayPath(urlPath);
+        const relayRoute = SERVE_PAGES_ARTIFACT ? null : parseHangoutRelayPath(urlPath);
         if (relayRoute?.pathname === '/__test/modlog.json') {
             const body = JSON.stringify(relayFor(relayRoute.namespace).lobby.modlog);
             send(response, 200, request.method === 'HEAD' ? undefined : body, {
@@ -160,7 +161,7 @@ async function main() {
 
     server.on('upgrade', (req, socket, head) => {
         const url = new URL(req.url, origin);
-        const relayRoute = parseHangoutRelayPath(url.pathname);
+        const relayRoute = SERVE_PAGES_ARTIFACT ? null : parseHangoutRelayPath(url.pathname);
         if (!relayRoute) {
             socket.destroy();
             return;
