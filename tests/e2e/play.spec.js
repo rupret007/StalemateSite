@@ -284,6 +284,27 @@ test('shared music displays the actual track, confirmed links, mute and visibili
     expect(await page.evaluate(() => localStorage.getItem('stalemate.music'))).toBe('off');
 });
 
+test('Turdomania keeps the top-right tile and music control tappable at 320px', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'Exercises real phone taps.');
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto('/play/turdomania.html?level=normal&seed=1&reducedMotion=1');
+    await page.evaluate(() => document.fonts.ready);
+
+    const music = page.locator('#suite-music-toggle');
+    await expect(music).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Site music on or off' })).toBeHidden();
+
+    const tile = page.locator('.tile[data-col="7"][data-row="11"]');
+    await expect(tile).toBeVisible();
+    const box = await tile.boundingBox();
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await expect.poll(() => page.evaluate(() => window.__turdomania.state.moves)).toBe(1);
+    await expect(music).toHaveAttribute('aria-pressed', 'true');
+    await music.tap();
+    await expect(music).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('.suite-music-title')).toHaveText('Music off');
+});
+
 test('Turdomania first-play hint clears landscape controls and persists after a real pop', async ({ page, isMobile }) => {
     await page.goto('/play/turdomania.html?seed=42&reducedMotion=1');
     await expect(page.locator('#startHint')).toBeVisible();
