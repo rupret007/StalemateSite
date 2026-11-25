@@ -54,6 +54,59 @@ test('/play/ is discoverable and hosts same-origin games that remain noindex', a
     expect(errors).toEqual([]);
 });
 
+for (const [title, game] of [
+    ['Turdanoid', 'TurdAnoid.html'],
+    ['Spades', 'turdspades.html'],
+    ['Chess', 'chess.html'],
+    ['Turdtris', 'turdtris.html']
+]) {
+    test(title + ' keeps one full-size solo music control', async ({ page, isMobile }) => {
+        await page.goto('/play/' + game);
+        if (title === 'Spades') await page.locator('#closeGuide').click();
+
+        const music = page.locator('#suite-music-toggle');
+        await expect(music).toBeVisible();
+        await expect(page.locator('[data-music-toggle], #musicToggle')).toHaveCount(0);
+        const button = await music.boundingBox();
+        expect(button.width).toBeGreaterThanOrEqual(44);
+        expect(button.height).toBeGreaterThanOrEqual(44);
+        if (title === 'Turdanoid' && isMobile) {
+            const score = await page.locator('#hudScore').boundingBox();
+            expect(button.y + button.height).toBeLessThanOrEqual(score.y);
+        }
+    });
+}
+
+test('solo music preference stays in sync with the band site and Arcade hub', async ({ page, hasTouch }) => {
+    await page.goto('/play/chess.html');
+    const native = page.locator('#suite-music-toggle');
+    await expect(native).toHaveAttribute('aria-pressed', 'true');
+    if (hasTouch) await native.tap();
+    else await native.click();
+    await expect(native).toHaveAttribute('aria-pressed', 'false');
+    expect(await page.evaluate(() => localStorage.getItem('stalemate.music'))).toBe('off');
+
+    await page.goto('/play/');
+    const hub = page.locator('.stalemate-strip [data-music-toggle]');
+    await expect(hub).toHaveAttribute('aria-pressed', 'false');
+    if (hasTouch) await hub.tap();
+    else await hub.click();
+    await expect(hub).toHaveAttribute('aria-pressed', 'true');
+    await page.goto('/');
+    await expect(page.locator('header [data-music-toggle]')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('solo pages keep the site music fallback when Suite is unavailable', async ({ page }) => {
+    await page.route('**/assets/turdsuite.js*', route => route.abort());
+    await page.goto('/play/chess.html');
+    await expect(page.locator('#suite-music-toggle')).toHaveCount(0);
+    const fallback = page.getByRole('button', { name: 'Site music on or off' });
+    await expect(fallback).toHaveAttribute('aria-pressed', 'true');
+    await fallback.click();
+    await expect(fallback).toHaveAttribute('aria-pressed', 'false');
+    expect(await page.evaluate(() => localStorage.getItem('stalemate.music'))).toBe('off');
+});
+
 test('shared music advances once per track, persists preferences, and pauses in hidden tabs', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));

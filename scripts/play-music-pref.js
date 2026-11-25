@@ -5,6 +5,11 @@
     if (!pref) return;
 
     function ensureToggle() {
+        if (document.getElementById('suite-music-toggle')) {
+            var menuToggle = document.querySelector('body[data-arcade-game="turdtris"] #musicToggle');
+            if (menuToggle) menuToggle.remove();
+            return;
+        }
         if (document.querySelector('[data-music-toggle]')) return;
         var btn = document.createElement('button');
         btn.type = 'button';
@@ -16,9 +21,10 @@
         pref.bindToggles();
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', ensureToggle);
-    } else {
+    // The earlier Suite script mounts its own music control on DOMContentLoaded.
+    if (document.readyState === 'complete') {
         ensureToggle();
+    } else {
+        document.addEventListener('DOMContentLoaded', ensureToggle, { once: true });
     }
 }());
