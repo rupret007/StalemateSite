@@ -96,4 +96,25 @@ test.describe('GoatCounter analytics', () => {
       expect(hit.toString()).not.toContain('private-');
     }
   });
+
+  test('reports the homepage and Arcade foreground milestones to the correct site', async ({ page }) => {
+    const paths = [];
+    await page.route(`**/*${GC_HOST}/**`, async (route) => {
+      paths.push(...pathsFromUrl(route.request().url()));
+      await route.fulfill({ status: 204, body: '' });
+    });
+    await page.clock.install({ time: new Date('2026-11-24T16:00:00Z') });
+
+    for (const [path, section] of [['/', 'home'], ['/StalemateSite/play/', 'arcade']]) {
+      await page.goto(path);
+      await page.clock.fastForward(31_000);
+      await expect.poll(() => paths.filter(event => event === `engagement-${section}-30s`)).toHaveLength(1);
+      expect(paths).not.toContain(`engagement-${section}-120s`);
+      await page.clock.fastForward(269_000);
+      const sectionPaths = () => paths.filter(event => event.startsWith(`engagement-${section}-`)).sort();
+      await expect.poll(sectionPaths).toEqual([
+        `engagement-${section}-120s`, `engagement-${section}-300s`, `engagement-${section}-30s`
+      ]);
+    }
+  });
 });

@@ -9,6 +9,7 @@ const OURS = [
     /^https:\/\/www\.instagram\.com\/stalemate\.punk\/$/,
     /^https:\/\/www\.youtube\.com\/@stalemate\.punkband$/,
     /^https:\/\/www\.facebook\.com\/stalemate\.band\/$/,
+    /^https:\/\/stalemate-hangout-demo\.jeffstory007\.workers\.dev\/\?via=stalemate$/,
     /^https:\/\/rockinoctober\.com\/?$/,
     /^https:\/\/studio801\.ticketspice\.com\/rockin-october$/,
     /^https:\/\/music\.apple\.com\/us\/album\/(my-mom-says-were-cool\/1718884118|andrea\/1718463871\?i=1718463872|its-been-only-18\/1718464113\?i=1718464114)$/,

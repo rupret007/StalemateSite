@@ -1,13 +1,15 @@
 # Stalemate site
 
-Official site for **Stalemate** — a punk rock band with original songs. Featured lyric video: **Manic**. Named cuts: **Better Than Now** and **Manic**. Next date: **Rockin’ October**, Saturday, Oct 24, 2026, Los Amigo’s, Plano, TX. Set 4:45 PM Central.
+Official site for **Stalemate**, a punk rock band with original songs. The homepage features the **Manic** lyric video.
 
 ## Public surfaces
 
-- `/` — stage hero with the Manic lyric video paired to the Oct 24 countdown and next-show block, plus about. Socials: Instagram, YouTube, Facebook (from [linktr.ee/stalemateband](https://linktr.ee/stalemateband))
-- `404.html` — not-on-the-set page
+- `/` has the Manic lyric video, band information, Hang Out and Arcade links, and booking contact.
+- `/play/` has nine Arcade games.
+- `/qr/` and `/tap/` are entry points for printed links and NFC tags.
+- `/404.html` helps visitors get back to the band site or Arcade.
 
-No press kit, EPK, or QR landing. Those pages are not published.
+The band links to Instagram, YouTube, and Facebook. [Stalemate Linktree](https://linktr.ee/stalemateband)
 
 The public pages carry only confirmed facts. No empty shelves, dummy embeds or fill-in copy. The homepage contact form posts to [FormSubmit](https://formsubmit.co/) (`stalemate.punk@gmail.com`); the first real submission emails Jeff a one-time activation link he must click.
 
@@ -17,10 +19,9 @@ Do not publish guesses for any of these:
 
 - Stream / store URLs for Better Than Now and Manic
 - A public YouTube watch URL for the Manic lyric video (the band channel lists Andrea and It’s Only Been 18)
-- ICS for Rockin’ October
 - A genuine approved band photo
 - TikTok handle
-- Press kit / EPK / QR landing (do not publish until the band has them)
+- Press kit / EPK
 
 The homepage uses evergreen metadata. Its static show card keeps the confirmed date, set time, venue and direct Saturday ticket link usable when JavaScript is disabled or the countdown fails to load. Checkout guidance asks visitors to choose October 24, then select Stalemate; the full festival lineup stays linked separately. This dated fallback cannot expire without JavaScript and needs an HTML update after the show. When the countdown runs, the existing `2026-10-24T16:45:00-05:00` cutoff controls all dated promotions and show actions together; after it, the band/social links remain. This is a promotion cutoff, not a confirmed set end time. The Manic lyric video stays.
 
@@ -65,7 +66,7 @@ These events measure actual visits and actions. Retention improvements require u
 
 ## Arcade source and synchronization
 
-Reusable gameplay, shared art, and the playlist player live in [Turdanoid](https://github.com/rupret007/Turdanoid). The arcade offers eight games, including Royal Flush Chess against the computer or two players sharing this device, plus ordinary Turdomania with difficulty choices, new boards and undo. Site-specific branding and analytics live in `scripts/stalemate-overlay/`, `scripts/stalemate-strip.css`, and `scripts/play-track.js`. The generated `play/` files are replaced during synchronization; edit their source instead.
+The Arcade offers nine games, including Royal Flush Chess against the computer or two players sharing one device, Turd Rush, and Turdomania with difficulty choices, new boards, and undo. Site-specific branding and analytics live in `scripts/stalemate-overlay/`, `scripts/stalemate-strip.css`, and `scripts/play-track.js`. Edit the source files for changes to the generated `play/` directory. Reusable gameplay, shared art, and the playlist player live in the [Turdanoid repository](https://github.com/rupret007/Turdanoid).
 
 The default import pins the shared arcade polish release `e07511d991ea8cd40b313e45f7b6826b48ac27be`. Synchronize a reviewed branch, tag, or exact commit. A local repository avoids a network clone and imports committed files at the requested revision:
 
