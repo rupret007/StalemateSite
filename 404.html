@@ -18,15 +18,18 @@
             var tag = document.createElement('base');
             tag.href = base;
             document.head.insertBefore(tag, document.head.firstChild);
+            var stylesheet = document.createElement('link');
+            stylesheet.rel = 'stylesheet';
+            stylesheet.href = 'styles.css';
+            document.head.appendChild(stylesheet);
         }());
     </script>
     <noscript>
-        <link rel="stylesheet" href="/StalemateSite/styles.css">
+        <link rel="stylesheet" href="https://stalemate.band/styles.css">
     </noscript>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&amp;family=Source+Sans+3:wght@400;600;700&amp;display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
 </head>
 <body id="top" class="lost-page-body">
     <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -35,16 +38,16 @@
     </script>
     <header class="site-header">
         <div class="site-header__inner page-shell">
-            <a class="brand" href="./" aria-label="Stalemate home">
+            <a class="brand" href="https://stalemate.band/" aria-label="Stalemate home">
                 <img src="assets/mark.svg" alt="" class="brand__mark" id="logo" width="64" height="64">
                 <span class="brand__text"><strong>Stalemate</strong><small>Not on the setlist</small></span>
             </a>
             <div class="header-tools">
                 <button type="button" class="music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button>
             <nav class="site-nav" aria-label="Primary navigation">
-                <a href="./">Home</a>
-                <a href="./#about">About</a>
-                <a href="./#contact">Contact</a>
+                <a href="https://stalemate.band/">Home</a>
+                <a href="https://stalemate.band/#about">About</a>
+                <a href="https://stalemate.band/#contact">Contact</a>
             </nav>
             <nav class="social-nav social-nav--icons" aria-label="Social">
                 <a class="social-link" href="https://www.instagram.com/stalemate.punk/" target="_blank" rel="noopener noreferrer">
@@ -70,9 +73,9 @@
             <p>Head home for music, games, and Hang Out.</p>
             <div class="checker-belt" aria-hidden="true"></div>
             <div class="button-row">
-                <a class="button button--hot" id="about-link" href="./#about">Meet the band</a>
-                <a class="button button--listen" href="./play/">Open Stalemate Arcade</a>
-                <a class="button button--ghost" href="./">Back home</a>
+                <a class="button button--hot" id="about-link" href="https://stalemate.band/#about">Meet the band</a>
+                <a class="button button--listen" href="https://stalemate.band/play/">Open Stalemate Arcade</a>
+                <a class="button button--ghost" href="https://stalemate.band/">Back home</a>
             </div>
         </div>
     </main>
@@ -81,11 +84,16 @@
         <div class="page-shell footer-layout">
             <p class="footer-brand">Stalemate</p>
             <nav aria-label="Footer navigation">
-                <a href="./">Home</a>
-                <a href="./#contact">Contact</a>
+                <a href="https://stalemate.band/">Home</a>
+                <a href="https://stalemate.band/#contact">Contact</a>
             </nav>
         </div>
     </footer>
+    <script>
+        for (const link of document.querySelectorAll('a[href^="https://stalemate.band/"]')) {
+            link.setAttribute('href', './' + link.pathname.slice(1) + link.hash);
+        }
+    </script>
     <script src="site-base.js" defer></script>
     <script src="script.js" defer></script>
     <script data-goatcounter="https://stalemate.goatcounter.com/count" data-goatcounter-settings='{"path":"/404.html"}' async src="js/count.js"></script>

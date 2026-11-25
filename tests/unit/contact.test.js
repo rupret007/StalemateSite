@@ -9,7 +9,7 @@ const repoRoot = join(fileURLToPath(new URL('../..', import.meta.url)));
 
 const CONTACT_NAV_PAGES = [
     { file: 'index.html', contactHref: '#contact' },
-    { file: '404.html', contactHref: './#contact' },
+    { file: '404.html', contactHref: 'https://stalemate.band/#contact' },
     { file: 'qr/index.html', contactHref: '../#contact' },
     { file: 'play/index.html', contactHref: '../#contact' },
     { file: 'tap/index.html', contactHref: '../#contact' }

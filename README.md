@@ -98,7 +98,7 @@ npm test
 
 Run `npm run test:live:local` to validate the deployment checker at both local URL prefixes. See [audio diagnostics and live verification](docs/audio-live-verification.md) for manual live commands and the explicitly unverified physical-iPhone checklist.
 
-Unit tests use Vitest. Browser tests use Playwright against a local server on **4320** (override with `STALEMATE_TEST_PORT`). The server also mounts the site at `/StalemateSite/` so the GitHub Pages project path can be exercised. Navigation and song names work with JavaScript disabled.
+Unit tests use Vitest. Browser tests use Playwright against a local server on **4320** (override with `STALEMATE_TEST_PORT`). The server also mounts the site at `/StalemateSite/` so the GitHub Pages project path can be exercised. Navigation and song names work with JavaScript disabled. The missing-page links lead to the canonical site at [stalemate.band](https://stalemate.band/) when JavaScript is off, including from the GitHub Pages project path.
 
 ## GitHub Pages (temporary host)
 
