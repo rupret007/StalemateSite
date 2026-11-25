@@ -70,7 +70,9 @@ jobs:
           retention-days: 7
 
       - name: Verify deployment checks at local root and project paths
-        run: npm run test:live:local
+        run: |
+          npm run test:live:local
+          npm run test:unit -- tests/unit/hangout-hidden.test.js
 
       - name: Preserve Playwright evidence including first failures before retries
         if: always()

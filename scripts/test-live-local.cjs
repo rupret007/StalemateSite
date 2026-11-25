@@ -22,7 +22,7 @@ async function main() {
         for (const prefix of ['/', '/StalemateSite/']) {
             const child = spawn(process.execPath, ['scripts/verify-live.cjs'], { cwd: root, stdio: 'inherit', env: {
                 ...process.env, STALEMATE_ALLOW_LOCAL_LIVE: '1', STALEMATE_LIVE_BASE: origin + prefix,
-                STALEMATE_LIVE_OUT: path.join(root, 'live-results', prefix === '/' ? 'local-root' : 'local-project')
+                STALEMATE_LIVE_OUT: path.join(root, 'test-results', 'live', prefix === '/' ? 'local-root' : 'local-project')
             } });
             const [code] = await once(child, 'exit');
             if (code !== 0) throw Error(`Live verifier failed at local ${prefix}`);
