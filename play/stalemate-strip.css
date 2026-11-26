@@ -31,6 +31,17 @@ body.arcade[data-arcade-game="hub"] > .stalemate-strip :is(a, button) {
   min-height: 44px;
   justify-content: center;
 }
+body.arcade[data-arcade-game="hub"] .arcade-mode-shortcut {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  column-gap: 0.75rem;
+}
+body.arcade[data-arcade-game="hub"] .arcade-hangout-link {
+  color: #ffdbe7;
+  font-weight: 700;
+  text-underline-offset: 0.2em;
+}
 @media (max-width: 600px) {
   body.arcade[data-arcade-game="hub"] > .stalemate-strip {
     gap: 4px;

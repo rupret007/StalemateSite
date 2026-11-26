@@ -19,7 +19,7 @@ const TARGETS = new Set([
     'games/turdrush-core.js', 'games/turdrush.js', 'games/turdrush-renderer.js',
     'assets/turdrush.css', 'assets/turdrush-cover.svg',
     'assets/vendor/three/three.module.js', 'assets/vendor/three/three.core.js',
-    'stalemate/stalemate-overlay.js', 'stalemate-strip.css'
+    'stalemate/stalemate-overlay.js', 'stalemate/solo-play-finish.css', 'stalemate-strip.css'
 ]);
 function versionArcadeAssets(stage) {
     const targets = new Set(TARGETS);

@@ -9,6 +9,8 @@ const { versionArcadeAssets } = require('./arcade-asset-versions.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
 const PIN = 'f9604242ac9fd2cbd28e94a524570ddbc228bd5c';
+const SOLO_PAGES = new Set(['TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
+    'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html']);
 const FILES = [
     'index.html', 'TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
     'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html', 'neon-arkanoid.html',
@@ -108,12 +110,20 @@ function transform(stage) {
             html = html.replace(/\s*<details class="changelog">[\s\S]*?<\/details>/i, '')
                 .replace(/\s*\/\* -+ Changelog -+ \*\/[\s\S]*?\.changelog li \{[^}]*\}/i, '')
                 .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '')
-                .replace('Nine games. Pick your next round.', 'Play solo, or choose 2 players in Royal Flush Chess to share one device.');
+                .replace('Nine games. Pick your next round.', 'Play solo, or choose 2 players in Royal Flush Chess to share one device.')
+                .replace(/(<p class="arcade-mode-shortcut">.*?)(<\/p>)/,
+                    '$1 <a class="arcade-hangout-link" href="../#hang-out">Hang Out online →</a>$2');
             if (/changelog/i.test(html)) throw new Error('Hub changelog strip failed');
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate-strip.css">', filename);
             html = html.replace(/<body\b[^>]*>/i, '$&\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="../#contact" class="sm-contact">Contact</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><button type="button" class="sm-listen" data-site-play="manic" data-site-play-label="Listen to Manic" aria-label="Play Manic here">Listen to Manic</button></nav>');
+            html = html.replace(/<p class="footer-note">[^\r\n]+<\/p>/, `$&
+    <footer class="site-footer site-footer--play">
+      <nav aria-label="Footer navigation">
+        <a href="../">Band homepage</a>
+        <a href="../#contact">Contact</a>
+      </nav>
+    </footer>`);
         }
-        html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate/play-music-pref.css">\n<script src="../js/music-preference.js"></script>', filename);
         if (filename === 'TurdAnoid.html') {
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate/stalemate-overlay.css">', filename);
             html = insert(html, '</body>', '<script src="../countdown.js"></script>\n<script src="stalemate/stalemate-overlay.js"></script>', filename);
@@ -128,6 +138,12 @@ function transform(stage) {
                 '<meta name="twitter:card" content="summary_large_image">'
             ].join('\n'), filename);
         }
+        const musicHead = '<link rel="stylesheet" href="stalemate/play-music-pref.css">\n<script src="../js/music-preference.js"></script>';
+        const mobileFit = '<link rel="stylesheet" href="assets/mobile-fit.css">';
+        html = filename !== 'TurdAnoid.html' && html.includes(mobileFit)
+            ? insert(html, mobileFit, musicHead, filename)
+            : insert(html, '</head>', musicHead, filename);
+        if (SOLO_PAGES.has(filename)) html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate/solo-play-finish.css">', filename);
         const bodyScripts = '<script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>\n<script src="../js/track.js" defer></script>\n<script src="stalemate/play-track.js" defer></script>\n<script src="stalemate/play-music-pref.js" defer></script>';
         html = insert(html, '</body>', filename === 'index.html'
             ? '<script src="../site-base.js" defer></script>\n<script src="../js/site-player.js" defer></script>\n' + bodyScripts
@@ -152,6 +168,7 @@ function main() {
         // Carry the Turdtris focus fix while the branded build uses this upstream revision.
         if (sha === 'f9604242ac9fd2cbd28e94a524570ddbc228bd5c') {
             git(['apply', path.join(ROOT, 'scripts/turdtris-start-guide-focus.patch')], tmp);
+            git(['apply', path.join(ROOT, 'scripts/stalemate-arcade-music.patch')], tmp);
         }
         for (const name of FILES) fs.cpSync(path.join(tmp, name), path.join(stage, name), { recursive: true });
         transform(stage);

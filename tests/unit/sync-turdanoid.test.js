@@ -23,7 +23,7 @@ function fixture() {
         cpSync(join(sourceRoot, file), join(root, file));
     }
     for (const song of songs) writeFileSync(join(root, 'scripts/stalemate-overlay', song), song);
-    for (const file of ['stalemate-overlay.js', 'stalemate-overlay.css']) cpSync(join(sourceRoot, 'scripts/stalemate-overlay', file), join(root, 'scripts/stalemate-overlay', file));
+    for (const file of ['stalemate-overlay.js', 'stalemate-overlay.css', 'solo-play-finish.css']) cpSync(join(sourceRoot, 'scripts/stalemate-overlay', file), join(root, 'scripts/stalemate-overlay', file));
     mkdirSync(join(upstream, 'assets'), { recursive: true });
     mkdirSync(join(upstream, 'games'), { recursive: true });
     const html = '<!doctype html><html><head><meta name="robots" content="index"><meta http-equiv="Content-Security-Policy" content="default-src *"></head><body><h1>First revision</h1></body></html>';

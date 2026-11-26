@@ -39,6 +39,7 @@ const FILES = [
     'assets/mark.svg',
     'assets/og.png',
     'assets/og.svg',
+    'assets/table-art/felt-noise.svg',
     'assets/torn.svg'
 ];
 
