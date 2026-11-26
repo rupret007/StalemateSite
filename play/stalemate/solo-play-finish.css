@@ -60,6 +60,11 @@ body.arcade[data-arcade-game="turdomania"] .hud .stat {
 body.arcade[data-arcade-game="turdomania"] .hud .stat b { color: #fff5da; }
 
 /* The Turdtris well and control enclosure use different cabinet materials. */
+body.arcade[data-arcade-game="turdtris"].desktop-cabinet .main-stage {
+  grid-template-columns: clamp(108px, 13vw, 176px) max-content clamp(168px, 19vw, 248px);
+  justify-content: center;
+}
+
 body.arcade[data-arcade-game="turdtris"] .board-wrap {
   border-color: #73aca9;
   background: repeating-linear-gradient(125deg, #d2ffe60c 0 1px, transparent 1px 5px),
