@@ -1669,7 +1669,7 @@ textarea:focus-visible {
 
 @media (max-width: 680px) {
     .hangout-card { grid-template-columns: 1fr; }
-    .hangout-card__actions .button { padding-inline: 0.35rem; font-size: 0.88rem; letter-spacing: 0; }
+    .hangout-card__actions .button { min-height: 48px; padding: 0.35rem; font-size: 0.88rem; line-height: 1.15; letter-spacing: 0; }
 }
 
 .games-section { position: relative; }
