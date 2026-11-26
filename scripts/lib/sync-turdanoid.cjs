@@ -149,6 +149,10 @@ function main() {
         git(['fetch', '--quiet', '--depth=1', 'origin', ref], tmp);
         const sha = git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], tmp);
         git(['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', sha], tmp);
+        // Carry the Turdtris focus fix while the branded build uses this upstream revision.
+        if (sha === 'f9604242ac9fd2cbd28e94a524570ddbc228bd5c') {
+            git(['apply', path.join(ROOT, 'scripts/turdtris-start-guide-focus.patch')], tmp);
+        }
         for (const name of FILES) fs.cpSync(path.join(tmp, name), path.join(stage, name), { recursive: true });
         transform(stage);
         versionArcadeAssets(stage);

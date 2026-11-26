@@ -275,6 +275,23 @@ test('Turdtris Ultra shortcut opens the actual mode and Play honors a changed se
     await expect(page.locator('#attractModeSetting')).toHaveValue('classic');
 });
 
+test('Turdtris keeps keyboard focus in the start guide and moves it to the board when play starts', async ({ page }) => {
+    await page.goto('/play/turdtris.html');
+    const guide = page.getByRole('dialog', { name: 'Start Turdtris' });
+    const play = guide.getByRole('button', { name: 'Play', exact: true });
+    await expect(play).toBeEnabled();
+    await expect(guide).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(play).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(guide.locator('#attractModeSetting')).toBeFocused();
+    await play.focus();
+    await page.keyboard.press('Enter');
+    await expect(guide).toBeHidden();
+    await expect(page.locator('#game')).toBeFocused();
+    await expect(page.locator('.layout')).not.toHaveAttribute('inert');
+});
+
 test('hub records remain complete and accessible with mode and difficulty context', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.addInitScript(() => {

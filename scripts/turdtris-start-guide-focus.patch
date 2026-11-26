@@ -1,0 +1,53 @@
+diff --git a/turdtris.html b/turdtris.html
+index 52d48a0..ae6e443 100644
+--- a/turdtris.html
++++ b/turdtris.html
+@@ -16,6 +16,7 @@
+ <link rel="stylesheet" href="assets/arcade.css">
+ <link rel="stylesheet" href="assets/suite-progress.css">
+ <script src="games/table-continue-core.js"></script>
++<script src="games/suite-dialog-focus.js"></script>
+ <script src="assets/turdsuite.js"></script>
+ <title>Turdtris</title>
+ <style>
+@@ -1432,7 +1433,7 @@ body.desktop-cabinet .status {
+ <body class="suite-ambient suite-no-zoom board-focus arcade" data-arcade-game="turdtris">
+ <div id="statusLive" class="sr-live" aria-live="polite" aria-atomic="true"></div>
+ <div class="desktop-scene" id="desktopScene" aria-hidden="true"></div>
+-<div class="welcome-guide" id="welcomeGuide" role="region" aria-label="Start Turdtris">
++<div class="welcome-guide" id="welcomeGuide" role="dialog" aria-modal="true" aria-label="Start Turdtris" tabindex="-1">
+   <canvas class="attract-canvas" id="attractCanvas" aria-hidden="true" width="640" height="480"></canvas>
+   <div class="welcome-card attract-card">
+     <div class="attract-logo" aria-hidden="true">Turdtris</div>
+@@ -1517,7 +1518,7 @@ body.desktop-cabinet .status {
+     <div class="game-grid board-column">
+     <div class="board-wrap" data-motto="Stack clean. Panic dirty.">
+       <div class="well-caption"><span id="zoneName">01 / Porcelain Palace</span><span class="live-dot" id="modeBadge">● CLASSIC</span></div>
+-      <canvas width="320" height="640" id="game" role="img" aria-label="Turdtris playfield. Use arrow keys to move, X or Z to rotate, Space to drop, C to hold, P to pause."></canvas>
++      <canvas width="320" height="640" id="game" role="img" tabindex="0" aria-label="Turdtris playfield. Use arrow keys to move, X or Z to rotate, Space to drop, C to hold, P to pause."></canvas>
+
+       <div class="overlay" id="pauseOverlay">
+         <div class="overlay-card">
+@@ -1984,6 +1985,14 @@ function showWelcomeGuide() {
+     const overlayEl = document.getElementById('pauseOverlay');
+     if (overlayEl) overlayEl.style.display = 'none';
+   }
++  window.SuiteDialogFocus?.open(guide, {
++    initialFocus: guide,
++    fallbackFocus: '#game',
++    onEscape() {
++      if (hasStartedRun) hideWelcomeGuide();
++      else guide.querySelector('details').open = false;
++    }
++  });
+ }
+
+ function hideWelcomeGuide() {
+@@ -1991,6 +2000,7 @@ function hideWelcomeGuide() {
+   if (guide) {
+     guide.style.display = 'none';
+     guide.classList.remove('is-open');
++    window.SuiteDialogFocus?.close(guide);
+   }
+   if (window.__turdtrisStopAttract) window.__turdtrisStopAttract();
+   onboardingOpen = false;
