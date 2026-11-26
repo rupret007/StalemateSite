@@ -16,12 +16,19 @@ test.describe('site music toggle', () => {
     for (const path of paths) {
         test(`toggle is visible on ${path}`, async ({ page }) => {
             await page.goto(path);
-            const control = toggle(page);
+            const solo = path === '/play/TurdAnoid.html';
+            const control = solo ? page.locator('#suite-music-toggle') : toggle(page);
             await expect(control).toBeVisible();
             const box = await control.boundingBox();
             expect(box.height).toBeGreaterThanOrEqual(44);
             await expect(control).toHaveAttribute('aria-pressed', 'true');
-            await expect(control).toHaveText('Music on');
+            if (solo) {
+                expect(box.width).toBeGreaterThanOrEqual(44);
+                await expect(control).toHaveAccessibleName('Stalemate music on, tap to turn music off');
+                await expect(page.locator('[data-music-toggle]')).toHaveCount(0);
+            } else {
+                await expect(control).toHaveText('Music on');
+            }
         });
     }
 
