@@ -1988,6 +1988,12 @@ function showWelcomeGuide() {
     const overlayEl = document.getElementById('pauseOverlay');
     if (overlayEl) overlayEl.style.display = 'none';
   }
+  focusOpenWelcomeGuide(guide);
+}
+
+function focusOpenWelcomeGuide(guide) {
+  if (!guide?.classList.contains('is-open') || !window.TurdtrisModes ||
+      (window.SuiteLoading && window.SuiteLoading.state !== 'ready')) return;
   window.SuiteDialogFocus?.open(guide, {
     initialFocus: guide,
     fallbackFocus: '#game',
@@ -4226,6 +4232,7 @@ runMenu.addEventListener('toggle', () => {
 window.addEventListener('storage', updateMusic);
 document.getElementById('attractPlay').disabled = false;
 window.SuiteLoading?.ready();
+focusOpenWelcomeGuide(openGuide);
 </script>
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>

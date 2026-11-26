@@ -1,5 +1,5 @@
 diff --git a/turdtris.html b/turdtris.html
-index 52d48a0..ae6e443 100644
+index 52d48a0..3bc17bf 100644
 --- a/turdtris.html
 +++ b/turdtris.html
 @@ -16,6 +16,7 @@
@@ -28,10 +28,16 @@ index 52d48a0..ae6e443 100644
 
        <div class="overlay" id="pauseOverlay">
          <div class="overlay-card">
-@@ -1984,6 +1985,14 @@ function showWelcomeGuide() {
+@@ -1984,6 +1985,20 @@ function showWelcomeGuide() {
      const overlayEl = document.getElementById('pauseOverlay');
      if (overlayEl) overlayEl.style.display = 'none';
    }
++  focusOpenWelcomeGuide(guide);
++}
++
++function focusOpenWelcomeGuide(guide) {
++  if (!guide?.classList.contains('is-open') || !window.TurdtrisModes ||
++      (window.SuiteLoading && window.SuiteLoading.state !== 'ready')) return;
 +  window.SuiteDialogFocus?.open(guide, {
 +    initialFocus: guide,
 +    fallbackFocus: '#game',
@@ -43,7 +49,7 @@ index 52d48a0..ae6e443 100644
  }
 
  function hideWelcomeGuide() {
-@@ -1991,6 +2000,7 @@ function hideWelcomeGuide() {
+@@ -1991,6 +2006,7 @@ function hideWelcomeGuide() {
    if (guide) {
      guide.style.display = 'none';
      guide.classList.remove('is-open');
@@ -51,3 +57,11 @@ index 52d48a0..ae6e443 100644
    }
    if (window.__turdtrisStopAttract) window.__turdtrisStopAttract();
    onboardingOpen = false;
+@@ -4213,6 +4229,7 @@ runMenu.addEventListener('toggle', () => {
+ window.addEventListener('storage', updateMusic);
+ document.getElementById('attractPlay').disabled = false;
+ window.SuiteLoading?.ready();
++focusOpenWelcomeGuide(openGuide);
+ </script>
+ </body>
+ </html>
