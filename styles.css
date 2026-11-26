@@ -1663,13 +1663,21 @@ textarea:focus-visible {
 .hangout-card__actions .button {
     display: flex;
     justify-content: center;
-    min-height: 44px;
+    min-height: 48px;
+    padding: 0.5rem 0.7rem;
+    font-size: 1rem;
+    line-height: 1.15;
     text-align: center;
 }
 
 @media (max-width: 680px) {
     .hangout-card { grid-template-columns: 1fr; }
-    .hangout-card__actions .button { min-height: 48px; padding: 0.35rem; font-size: 0.88rem; line-height: 1.15; letter-spacing: 0; }
+}
+
+@media (max-width: 440px) {
+    .hangout-card__actions { grid-template-columns: 1fr; gap: 0.45rem; }
+    .hangout-card__choice { grid-template-columns: minmax(0, 1fr) minmax(7.6rem, 1fr); align-items: center; padding: 0.45rem; }
+    .hangout-card__actions .button { padding-inline: 0.35rem; font-size: 0.84rem; letter-spacing: 0; }
 }
 
 .games-section { position: relative; }
