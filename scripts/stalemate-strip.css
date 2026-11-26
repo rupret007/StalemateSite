@@ -4,3 +4,47 @@
 .stalemate-strip button.sm-listen:focus-visible{outline:3px solid #b5dc08;outline-offset:2px}
 .stalemate-strip a:focus-visible{outline:3px solid #b5dc08;outline-offset:2px}
 body{padding-bottom:calc(56px + env(safe-area-inset-bottom))!important}
+
+/* Branded Arcade: keep navigation in the page flow so it never covers a game. */
+body.arcade[data-arcade-game="hub"]:has(> .stalemate-strip) {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+}
+body.arcade[data-arcade-game="hub"] > .stalemate-strip {
+  position: static;
+  z-index: auto;
+  width: min(1180px, 100%);
+  flex-shrink: 0;
+  border: 1px solid #555347;
+  border-radius: 10px;
+  padding: 2px 10px;
+  letter-spacing: .03em;
+}
+body.arcade[data-arcade-game="hub"]:has(> .stalemate-strip) :is(#suite-music-toggle, #suite-listen-manic) {
+  display: none;
+}
+body.arcade[data-arcade-game="hub"]:has(> .stalemate-strip) .masthead { padding-top: 0; }
+body.arcade[data-arcade-game="hub"] > .stalemate-strip :is(a, button) {
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+}
+@media (max-width: 600px) {
+  body.arcade[data-arcade-game="hub"] > .stalemate-strip {
+    gap: 4px;
+    padding: 2px 4px;
+    font-size: 11px;
+  }
+  body.arcade[data-arcade-game="hub"] > .stalemate-strip .sm-home {
+    width: 44px;
+    gap: 0;
+    font-size: 0;
+    letter-spacing: 0;
+  }
+  body.arcade[data-arcade-game="hub"] > .stalemate-strip .stalemate-music-toggle {
+    padding-inline: 6px;
+    font-size: 11px;
+  }
+}

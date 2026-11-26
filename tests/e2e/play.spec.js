@@ -292,6 +292,59 @@ test('Turdtris keeps keyboard focus in the start guide and moves it to the board
     await expect(page.locator('.layout')).not.toHaveAttribute('inert');
 });
 
+test('the branded Arcade puts one music control row above the games without covering the grid', async ({ page }) => {
+    const touch = test.info().project.use.hasTouch;
+    const activate = control => touch ? control.tap() : control.click();
+    await page.setViewportSize(touch ? { width: 320, height: 568 } : { width: 1440, height: 900 });
+    await page.goto('/play/');
+    const strip = page.getByRole('navigation', { name: 'Stalemate', exact: true });
+    const home = strip.getByRole('link', { name: 'Stalemate Arcade', exact: true });
+    const contact = strip.getByRole('link', { name: 'Contact', exact: true });
+    const music = strip.getByRole('button', { name: 'Site music on or off', exact: true });
+    const manic = strip.getByRole('button', { name: 'Play Manic here', exact: true });
+    await expect(strip).toHaveCSS('position', 'static');
+    await expect(strip).toBeInViewport({ ratio: 1 });
+    const navBox = await strip.boundingBox();
+    const mainBox = await page.getByRole('main').boundingBox();
+    expect(navBox.y + navBox.height).toBeLessThanOrEqual(mainBox.y);
+    expect(navBox.height).toBeLessThanOrEqual(52);
+    for (const control of [home, contact, music, manic]) {
+        await expect(control).toBeInViewport({ ratio: 1 });
+        const { width, height } = await control.boundingBox();
+        expect(Math.min(width, height)).toBeGreaterThanOrEqual(44);
+    }
+    await expect(page.locator('#suite-music-toggle')).toHaveCount(1);
+    await expect(page.locator('#suite-music-toggle')).toBeHidden();
+    await expect(page.locator('#suite-listen-manic')).toHaveCount(1);
+    await expect(page.locator('#suite-listen-manic')).toBeHidden();
+    await home.focus();
+    await page.keyboard.press('Tab');
+    await expect(contact).toBeFocused();
+
+    await expect(music).toHaveAttribute('aria-pressed', 'true');
+    await activate(music);
+    await expect(music).toHaveAttribute('aria-pressed', 'false');
+    expect(await page.evaluate(() => localStorage.getItem('stalemate.music'))).toBe('off');
+    await page.reload();
+    await expect(music).toHaveAttribute('aria-pressed', 'false');
+    await activate(music);
+    await expect(music).toHaveAttribute('aria-pressed', 'true');
+    const effects = page.locator('#suite-hub-mute');
+    await activate(effects);
+    await expect(effects).toHaveAttribute('aria-pressed', 'true');
+    await activate(effects);
+    await expect(effects).toHaveAttribute('aria-pressed', 'false');
+
+    const songs = page.getByRole('button', { name: 'Songs', exact: true });
+    await activate(songs);
+    const picker = page.getByRole('dialog', { name: 'Choose a Stalemate song', exact: true });
+    await expect(picker.getByRole('combobox', { name: 'Choose a song' })).toBeFocused();
+    await expect(picker.getByRole('option', { name: 'Manic', exact: true })).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(picker).toBeHidden();
+    await expect(songs).toBeFocused();
+});
+
 test('hub records remain complete and accessible with mode and difficulty context', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.addInitScript(() => {
@@ -311,10 +364,15 @@ test('hub records remain complete and accessible with mode and difficulty contex
         await expect(card).toHaveAccessibleName(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
         const fits = await card.locator('.suite-hub-stat').evaluate((el) => ({ width: el.scrollWidth <= el.clientWidth + 1, height: el.scrollHeight <= el.clientHeight + 1, overflow: getComputedStyle(el).textOverflow }));
         expect(fits).toEqual({ width: true, height: true, overflow: 'clip' });
-        const badge = await card.locator('.suite-hub-stat').boundingBox();
-        const footer = await page.locator('.stalemate-strip').boundingBox();
-        expect(badge.y).toBeGreaterThanOrEqual(0);
-        expect(badge.y + badge.height).toBeLessThanOrEqual(footer.y);
+        const badge = card.locator('.suite-hub-stat');
+        await expect(badge).toBeInViewport({ ratio: 1 });
+        expect(await badge.evaluate(el => {
+            const { x, y, width, height } = el.getBoundingClientRect();
+            return el.closest('a').contains(document.elementFromPoint(x + width / 2, y + height / 2));
+        })).toBe(true);
+        await card.focus();
+        await expect(card).toBeFocused();
+        await expect(badge).toBeInViewport({ ratio: 1 });
     }
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('turdomania_best_v1')).best.normal)).toBe(123456);
 });
