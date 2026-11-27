@@ -1053,6 +1053,7 @@
             ui.name.closest('label').hidden = true;
             return;
         }
+        if (isLocal) $('.lobby-link')?.setAttribute('href', 'lobby/');
         if (invite) {
             ui.gateTitle.textContent = 'You’re invited';
             ui.gateCopy.textContent = 'Somebody wants to hang out. Pick a name (or don’t) and jump in.';

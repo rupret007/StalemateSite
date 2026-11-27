@@ -48,18 +48,13 @@ function emptyDir(dir) {
     fs.mkdirSync(dir, { recursive: true });
 }
 
-function copyFile(relativePath, transform) {
+function copyFile(relativePath) {
     const from = path.join(ROOT, relativePath);
     const to = path.join(DIST, relativePath);
     fs.mkdirSync(path.dirname(to), { recursive: true });
-    if (transform) {
-        fs.writeFileSync(to, transform(fs.readFileSync(from, 'utf8')));
-    } else {
-        fs.copyFileSync(from, to);
-    }
+    fs.copyFileSync(from, to);
 }
 
-const PUBLIC_HANGOUT_LOBBY = 'https://stalemate-hangout-demo.jeffstory007.workers.dev/?via=stalemate';
 const HANGOUT_RUNTIME = /\.(html|css|js|webp|png|jpe?g|gif|svg|woff2?|ttf|otf|ico)$/i;
 
 function copyHangoutRoomRuntime() {
@@ -70,11 +65,7 @@ function copyHangoutRoomRuntime() {
         const roomDir = path.join(rRoot, slug.name);
         for (const ent of fs.readdirSync(roomDir, { withFileTypes: true })) {
             if (!ent.isFile() || /\.md$/i.test(ent.name) || !HANGOUT_RUNTIME.test(ent.name)) continue;
-            // The Pages artifact does not ship the separate lobby runtime.
-            const lobbyLink = ent.name === 'index.html'
-                ? html => html.replace('href="lobby/"', 'href="' + PUBLIC_HANGOUT_LOBBY + '"')
-                : undefined;
-            copyFile(path.join('r', slug.name, ent.name), lobbyLink);
+            copyFile(path.join('r', slug.name, ent.name));
         }
     }
 }

@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -124,12 +124,31 @@ describe('GitHub Pages package', () => {
                 );
             }
             const sourceRoom = readFileSync(join(repoRoot, 'r', SLUG, 'index.html'), 'utf8');
-            expect(sourceRoom).toContain('class="show-link lobby-link" href="lobby/"');
+            expect(packagedRoom).toBe(sourceRoom);
             const packaged = readdirSync(roomDir);
             expect(packaged).not.toContain('TWO-HOUSE-TEST.md');
             expect(packaged.every((name) => !/\.md$/i.test(name))).toBe(true);
         } finally {
             rmSync(join(repoRoot, 'dist'), { recursive: true, force: true });
+        }
+    });
+
+    it.each(['pilot', 'beta'])('keeps the %s room lobby link on the protected Worker', (target) => {
+        const fixture = mkdtempSync(join(tmpdir(), 'stalemate-private-package-'));
+        try {
+            mkdirSync(join(fixture, 'scripts'));
+            mkdirSync(join(fixture, 'assets'));
+            mkdirSync(join(fixture, 'join'));
+            cpSync(join(repoRoot, 'r', SLUG), join(fixture, 'r', SLUG), { recursive: true });
+            const script = join(fixture, 'scripts', 'package-pilot.cjs');
+            cpSync(join(repoRoot, 'scripts', 'package-pilot.cjs'), script);
+            const result = spawnSync(process.execPath, [script, target], { cwd: fixture, encoding: 'utf8' });
+            expect(result.status, result.stderr).toBe(0);
+            const room = join(fixture, `.${target}-assets`, 'r', SLUG);
+            expect(readFileSync(join(room, 'index.html'), 'utf8')).toContain('class="show-link lobby-link" href="lobby/"');
+            expect(existsSync(join(room, 'lobby', 'index.html'))).toBe(true);
+        } finally {
+            rmSync(fixture, { recursive: true, force: true });
         }
     });
 });

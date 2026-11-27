@@ -30,6 +30,7 @@ const roomUrl = (extra = '') => `/r/${SLUG}/?preview=${KEY}&relay=${encodeURICom
 async function hostAndGuest(browser) {
     const host = await openBrowser(browser);
     await host.goto(roomUrl());
+    await expect(host.locator('.lobby-link')).toHaveAttribute('href', 'lobby/');
     await host.fill('[data-name]', 'Jeff');
     await host.click('[data-enter]');
     await expect(host.locator('[data-room]')).toBeVisible();
@@ -38,6 +39,7 @@ async function hostAndGuest(browser) {
     const guest = await openBrowser(browser);
     await guest.goto(invite);
     await expect(guest.locator('[data-gate-title]')).toHaveText('You’re invited');
+    await expect(guest.locator('.lobby-link')).toHaveAttribute('href', 'lobby/');
     await guest.fill('[data-name]', 'Karen');
     await guest.click('[data-enter]');
     await expect(guest.locator('[data-peers]')).toContainText('2 here');
