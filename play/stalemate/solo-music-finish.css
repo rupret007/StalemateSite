@@ -1,0 +1,2 @@
+/* Keep Stalemate music controls clear of the shared solo-game controls. */
+body.arcade:has(#suite-music-status):has(#suite-music-toggle) .stalemate-music-toggle[data-music-toggle] { display: none; }

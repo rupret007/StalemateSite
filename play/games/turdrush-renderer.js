@@ -5,9 +5,20 @@ import * as THREE from '../assets/vendor/three/three.module.js?v=ec93c99b7463aa7
 const COLORS = { mint: 0x72f4c3, teal: 0x188f89, navy: 0x123e4b, gold: 0xffd36b,
   pink: 0xff689d, orange: 0xff9957, paper: 0xfff5da, ink: 0x16303a, brown: 0x98512d };
 const materials = new Map();
+// Shared finishes keep every existing colour on its current material key.
+// Brass hardware catches the key light; stone and ink stay matte.
+const FINISH = new Map([
+  [0xffd36b, [0.34, 0.62]], [0xe7c27a, [0.36, 0.58]], [0xc4a574, [0.4, 0.48]],
+  [0xf6b961, [0.42, 0.26]], [0xefb750, [0.32, 0.64]], [0xd8c4a4, [0.45, 0.34]],
+  [0x8a7356, [0.5, 0.3]], [0xe7c9a0, [0.55, 0.12]], [0xffe3a8, [0.58, 0.08]],
+  [0xfff5da, [0.62, 0.04]], [0xf3e6c4, [0.7, 0.04]], [0xffffff, [0.45, 0.02]]
+]);
 function material(color, extra = {}) {
   const key = `${color}:${JSON.stringify(extra)}`;
-  if (!materials.has(key)) {materials.set(key, new THREE.MeshStandardMaterial({ color, roughness: 0.82, ...extra }));}
+  if (!materials.has(key)) {
+    const [roughness, metalness] = FINISH.get(color) || [0.9, 0.02];
+    materials.set(key, new THREE.MeshStandardMaterial({ color, roughness, metalness, ...extra }));
+  }
   return materials.get(key);
 }
 const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -31,36 +42,178 @@ function cylinder(parent, color, x, y, z, radius, height, extra) {
   const mesh = new THREE.Mesh(cylinderGeometry, material(color, extra));
   mesh.position.set(x, y, z); mesh.scale.set(radius, height, radius); parent.add(mesh); return mesh;
 }
-function labelTexture(text, color = '#fff5da', background = '#123e4b', w = 512, h = 128) {
-  const key = `${text}:${color}:${background}:${w}:${h}`;
+// Real turdrush-core.js rules: crates are cleared by a jump, low pipes (beams)
+// by a slide, and speaker stacks (barriers) only by changing lanes.
+export const RUSH_HAZARD_ACTIONS = Object.freeze({ crate: 'jump', beam: 'slide', barrier: 'dodge' });
+export const RUSH_CUE_COPY = Object.freeze({
+  jump: Object.freeze({ icon: '↑', noun: 'Crates', verb: 'Jump' }),
+  slide: Object.freeze({ icon: '↓', noun: 'Pipes', verb: 'Slide' }),
+  dodge: Object.freeze({ icon: '← →', noun: 'Speakers', verb: 'Change lanes' })
+});
+// Vector arrows, not font glyphs: the same shape on every device's canvas.
+export function drawRushActionIcon(ctx, action, cx, cy, size, color) {
+  const s = size, path = action === 'dodge'
+    ? [[-.55, 0], [-.18, -.34], [-.18, -.12], [.18, -.12], [.18, -.34], [.55, 0], [.18, .34], [.18, .12], [-.18, .12], [-.18, .34]]
+    : [[0, -.5], [.42, -.02], [.16, -.02], [.16, .5], [-.16, .5], [-.16, -.02], [-.42, -.02]];
+  if (action !== 'dodge' && action !== 'jump' && action !== 'slide') {return;}
+  const flip = action === 'slide' ? -1 : 1;
+  ctx.save(); ctx.fillStyle = color; ctx.beginPath();
+  path.forEach(([px, py], index) => ctx[index ? 'lineTo' : 'moveTo'](cx + px * s, cy + py * s * flip));
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+// Nearest hazard still ahead in the runner's target lane, within a short
+// reaction window. Uses only existing run state; never mutates it.
+export function rushHazardCue(run, near = 0.62) {
+  if (!run?.player || !Array.isArray(run.entities)) {return null;}
+  const lane = run.player.lane, speed = Number(run.speed) || 0, far = Math.max(22, speed * 1.1);
+  let best = null;
+  for (const entity of run.entities) {
+    const action = ['crate', 'beam', 'barrier'].includes(entity.kind) ? RUSH_HAZARD_ACTIONS[entity.kind] : null;
+    const gap = entity.at - run.distance;
+    if (!action || entity.lane !== lane || !(gap > near) || gap > far || (best && gap >= best.gap)) {continue;}
+    best = { action, kind: entity.kind, lane, gap };
+  }
+  if (best) {best.urgency = best.gap <= Math.max(6, speed * 0.45) ? 'now' : 'soon';}
+  return best;
+}
+export function rushHitText(kind, shielded) {
+  const copy = RUSH_CUE_COPY[RUSH_HAZARD_ACTIONS[kind]], lead = shielded ? 'Shield hit!' : 'Crash!';
+  return copy ? `${lead} ${copy.noun}: ${copy.verb}` : lead;
+}
+// Shared DOM cue painters. Each expects an element with two children: an
+// aria-hidden icon span and a text span. Writes only when the cue changes.
+const cueKeys = new WeakMap();
+export function paintRushHazardCue(node, cue) {
+  if (!node) {return;}
+  const key = cue ? `${cue.action}:${cue.kind}:${cue.urgency}` : '';
+  if (cueKeys.get(node) === key) {return;}
+  cueKeys.set(node, key);
+  if (!cue) {
+    node.hidden = true;
+    for (const name of ['action', 'kind', 'urgency']) {delete node.dataset[name];}
+    return;
+  }
+  const copy = RUSH_CUE_COPY[cue.action];
+  const text = `${copy.verb} ${cue.urgency}`;
+  node.dataset.action = cue.action; node.dataset.kind = cue.kind; node.dataset.urgency = cue.urgency;
+  if (node.children[0].textContent !== copy.icon) {node.children[0].textContent = copy.icon;}
+  if (node.children[1].textContent !== text) {node.children[1].textContent = text;}
+  node.hidden = false;
+}
+export function paintRushHitCue(node, hit) {
+  if (!node) {return;}
+  if (!hit) { node.hidden = true; return; }
+  node.dataset.kind = hit.kind; node.dataset.action = RUSH_HAZARD_ACTIONS[hit.kind] || '';
+  node.dataset.shielded = String(!!hit.shielded); node.dataset.hitCount = String(hit.count);
+  node.children[0].textContent = '!';
+  node.children[1].textContent = rushHitText(hit.kind, hit.shielded);
+  // Restart the brief pop for a second hit while the first is still shown.
+  node.hidden = true; node.getBoundingClientRect(); node.hidden = false;
+}
+function labelTexture(text, color = '#fff5da', background = '#123e4b', w = 512, h = 128, icon = null) {
+  const key = `${text}:${color}:${background}:${w}:${h}:${icon}`;
   if (signTextures.has(key)) {return signTextures.get(key);}
   const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d'); ctx.fillStyle = background; ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.strokeRect(8, 8, w - 16, h - 16);
+  // Dark outer frame, then a bold inner rule in the text colour: the plate
+  // separates from teal walls, orange wood and the bright fog alike.
+  ctx.strokeStyle = '#08141a'; ctx.lineWidth = 12; ctx.strokeRect(6, 6, w - 12, h - 12);
+  ctx.strokeStyle = color; ctx.lineWidth = 7; ctx.strokeRect(16, 16, w - 32, h - 32);
   ctx.fillStyle = color; ctx.font = `900 ${Math.floor(h * 0.56)}px sans-serif`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, w / 2, h / 2 + 2, w - 40);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (icon) {
+    // The action arrow reads without colour or language; the word follows it.
+    drawRushActionIcon(ctx, icon, h * 0.62, h / 2, h * 0.66, color);
+    ctx.fillText(text, (h * 1.1 + w) / 2, h / 2 + 2, w - h * 1.1 - 26);
+  } else {ctx.fillText(text, w / 2, h / 2 + 2, w - 40);}
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; signTextures.set(key, texture); return texture;
 }
-function sign(parent, text, x, y, z, width, color, background) {
-  const map = labelTexture(text, color, background);
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width / 4), new THREE.MeshBasicMaterial({ map }));
+function sign(parent, text, x, y, z, width, color, background, icon) {
+  const map = labelTexture(text, color, background, 512, 128, icon);
+  // Signs keep their authored colours: ACES at 1.25 exposure washed the
+  // yellow/cream plates toward white and flattened the arrow contrast.
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width / 4), new THREE.MeshBasicMaterial({ map, toneMapped: false }));
   mesh.position.set(x, y, z); parent.add(mesh); return mesh;
 }
 function floorTexture() {
   const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
-  const ctx = canvas.getContext('2d'); ctx.fillStyle = '#18555c'; ctx.fillRect(0, 0, 256, 256);
+  const ctx = canvas.getContext('2d'); ctx.fillStyle = '#0e1218'; ctx.fillRect(0, 0, 256, 256);
+  // One repeat is a lane. The centre tread stays even — that is the jump, slide
+  // and lane-change — while rivets, bevels and drainage sit on the shoulders.
+  // Fine hardware reads beside the runner and compresses to tone down the tunnel.
   for (let y = 0; y < 4; y++) {for (let x = 0; x < 4; x++) {
-    ctx.fillStyle = ['#278e8b', '#2a9790', '#25827f', '#329c95'][(x + y * 3) % 4];
-    ctx.fillRect(x * 64 + 2, y * 64 + 2, 60, 60);
-    ctx.fillStyle = 'rgba(137,255,221,.12)'; ctx.fillRect(x * 64 + 4, y * 64 + 4, 55, 2);
+    const px = x * 64, py = y * 64;
+    ctx.fillStyle = '#161c24'; ctx.fillRect(px + 2, py + 2, 60, 60);
+    ctx.fillStyle = '#3a424a'; ctx.fillRect(px + 16, py + 4, 32, 56);
+    ctx.fillStyle = '#232a32'; ctx.fillRect(px + 4, py + 4, 12, 56);
+    ctx.fillStyle = '#232a32'; ctx.fillRect(px + 48, py + 4, 12, 56);
+    ctx.fillStyle = 'rgba(255,236,210,.16)'; ctx.fillRect(px + 4, py + 3, 56, 2);
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(px + 4, py + 58, 56, 3);
+    ctx.fillStyle = 'rgba(232,214,180,.12)'; ctx.fillRect(px + 26, py + 5, 12, 54);
+    ctx.fillStyle = 'rgba(8,10,14,.55)';
+    ctx.fillRect(px + 6, py + 8, 5, 48); ctx.fillRect(px + 53, py + 8, 5, 48);
+    ctx.fillStyle = 'rgba(196,176,140,.16)';
+    ctx.fillRect(px + 6, py + 8, 1, 48); ctx.fillRect(px + 53, py + 8, 1, 48);
+    if ((x + y) % 2 === 0) {
+      ctx.fillStyle = 'rgba(12,10,8,.35)';
+      ctx.beginPath(); ctx.ellipse(px + 11, py + 42, 5, 9, 0.3, 0, Math.PI * 2); ctx.fill();
+    }
+    for (const [rx, ry] of [[9, 12], [9, 32], [9, 52], [55, 12], [55, 32], [55, 52]]) {
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.beginPath(); ctx.arc(px + rx, py + ry + 1, 2.3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#c4a574'; ctx.beginPath(); ctx.arc(px + rx, py + ry, 1.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff1d0'; ctx.fillRect(px + rx - 0.5, py + ry - 0.7, 1, 0.7);
+    }
   }}
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(3, 48); return texture;
 }
+
+function vaultTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  // U runs springing, crown, springing. Wide voussoirs and the soot crown read
+  // at the vanishing point; courses and rivets read on the arch overhead.
+  ctx.fillStyle = '#1a1612'; ctx.fillRect(0, 0, 256, 128);
+  for (const [x, w, color] of [[0, 32, '#3a3228'], [32, 28, '#2a241c'], [60, 40, '#4a4036'], [100, 22, '#241e18'], [122, 12, '#100e0c'], [134, 22, '#241e18'], [156, 40, '#4a4036'], [196, 28, '#2a241c'], [224, 32, '#3a3228']]) {
+    ctx.fillStyle = color; ctx.fillRect(x, 0, w, 128);
+    ctx.fillStyle = 'rgba(255,228,190,.08)'; ctx.fillRect(x, 0, 2, 128);
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x + w - 3, 0, 3, 128);
+  }
+  ctx.fillStyle = 'rgba(0,0,0,.32)'; ctx.fillRect(108, 0, 40, 128);
+  ctx.fillStyle = '#100e0c'; ctx.fillRect(0, 0, 256, 7);
+  ctx.fillStyle = '#8a7356'; ctx.fillRect(0, 7, 256, 3);
+  ctx.fillStyle = '#e7c27a'; ctx.fillRect(0, 8, 256, 1);
+  for (let y = 18; y < 124; y += 16) {
+    ctx.fillStyle = 'rgba(0,0,0,.42)'; ctx.fillRect(0, y, 256, 2);
+    ctx.fillStyle = 'rgba(255,232,196,.07)'; ctx.fillRect(0, y + 2, 256, 1);
+  }
+  for (const x of [16, 44, 78, 178, 212, 240]) {
+    ctx.fillStyle = '#14110e'; ctx.fillRect(x, 14, 3, 108);
+    ctx.fillStyle = '#e7c27a'; ctx.fillRect(x, 18, 3, 2); ctx.fillRect(x, 112, 3, 2);
+  }
+  for (const x of [48, 208]) {
+    ctx.fillStyle = 'rgba(255,210,140,.1)'; ctx.fillRect(x - 18, 22, 36, 86);
+    ctx.fillStyle = '#1a120c'; ctx.fillRect(x - 7, 34, 14, 52);
+    ctx.fillStyle = '#c47a3a'; ctx.fillRect(x - 3, 40, 6, 40);
+    ctx.fillStyle = '#ffe6b0'; ctx.fillRect(x - 1, 44, 2, 28);
+    ctx.fillStyle = '#3a2a1c'; ctx.fillRect(x - 9, 32, 18, 3); ctx.fillRect(x - 9, 84, 18, 3);
+  }
+  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(1, 12); return texture;
+}
+
 function checkerTexture() {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
-  const ctx = canvas.getContext('2d'); ctx.fillStyle = '#f1e9c9'; ctx.fillRect(0, 0, 64, 64);
-  ctx.fillStyle = '#173b45'; ctx.fillRect(0, 0, 32, 32); ctx.fillRect(32, 32, 32, 32);
+  const ctx = canvas.getContext('2d'); ctx.fillStyle = '#12100e'; ctx.fillRect(0, 0, 64, 64);
+  const tile = (x, y, fill, light) => {
+    ctx.fillStyle = fill; ctx.fillRect(x, y, 30, 30);
+    ctx.fillStyle = light; ctx.fillRect(x, y, 30, 2);
+    ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x, y + 28, 30, 2);
+  };
+  tile(1, 1, '#f3e6c8', 'rgba(255,250,236,.7)');
+  tile(33, 33, '#f3e6c8', 'rgba(255,250,236,.7)');
+  tile(33, 1, '#1c1814', 'rgba(255,236,210,.14)');
+  tile(1, 33, '#1c1814', 'rgba(255,236,210,.14)');
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(1, 25); return texture;
 }
@@ -87,10 +240,14 @@ function instanceStatic(group) {
 function mascot() {
   const group = new THREE.Group(), body = new THREE.Group(); group.add(body);
   // Warm soft-serve silhouette, with a hand-shaped curl and small glossy highlights.
-  ball(body, COLORS.brown, 0, 0.81, 0, 0.73, 0.51, 0.61);
-  ball(body, 0xa95d35, -0.02, 1.18, 0, 0.59, 0.4, 0.5);
-  ball(body, 0xb56a3d, 0.04, 1.49, 0, 0.43, 0.34, 0.37);
-  tube(body, 0xb56a3d, [[0, 1.56, 0], [-0.12, 1.78, 0], [0.08, 1.97, 0], [0.2, 1.99, 0]], 0.16);
+  // Lower roughness gives the tiers a glazed sheen that catches the key light
+  // and separates them from the matte tunnel; same meshes, same draws.
+  const glaze = { roughness: 0.42, metalness: 0.06 };
+  // Offset tiers make an S in profile so the runner stays a cutout at speed.
+  ball(body, 0x6a381c, 0.07, 0.8, 0, 0.78, 0.52, 0.66, glaze);
+  ball(body, 0xb56a3a, -0.08, 1.16, 0.02, 0.58, 0.4, 0.5, glaze);
+  ball(body, 0xe4b47e, 0.1, 1.46, 0.04, 0.4, 0.3, 0.34, glaze);
+  tube(body, 0xc4844e, [[0.12, 1.56, 0.02], [0.02, 1.76, 0.04], [0.18, 1.94, 0.02], [0.3, 1.9, -0.02]], 0.15, glaze);
   tube(body, 0xc77c48, [[-0.43, 1.31, 0.23], [-0.15, 1.43, 0.38], [0.13, 1.44, 0.36]], 0.035);
   // Face glances back at the player. No emoji/third-party sprite assets.
   for (const x of [-0.23, 0.23]) {
@@ -103,10 +260,10 @@ function mascot() {
   tube(body, 0x4e3025, [[0.09, 1.57, 0.46], [0.23, 1.6, 0.48], [0.37, 1.54, 0.43]], 0.035);
   tube(body, 0x4b2c26, [[-0.22, 0.98, 0.54], [0, 0.9, 0.61], [0.23, 0.99, 0.53]], 0.042);
   box(body, COLORS.paper, 0, 0.95, 0.613, 0.18, 0.065, 0.025);
-  const bandana = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.09, 7, 28), material(COLORS.mint));
+  const bandana = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.09, 7, 28), material(0xffe3a8));
   bandana.rotation.x = Math.PI / 2; bandana.scale.set(1.15, 0.9, 1); bandana.position.y = 0.76; body.add(bandana);
-  ball(body, COLORS.mint, 0.66, 0.78, 0, 0.13);
-  const tail = box(body, COLORS.mint, 0.8, 0.71, -0.1, 0.35, 0.13, 0.08); tail.rotation.z = -0.4;
+  ball(body, 0xffe3a8, 0.66, 0.78, 0, 0.13);
+  const tail = box(body, 0xffe3a8, 0.8, 0.71, -0.1, 0.35, 0.13, 0.08); tail.rotation.z = -0.4;
   const arms = [], feet = [];
   for (const side of [-1, 1]) {
     const arm = new THREE.Group(); arm.position.set(side * 0.67, 0.93, 0); body.add(arm);
@@ -123,40 +280,58 @@ function mascot() {
 
 function hazard(kind) {
   const group = new THREE.Group();
+  // Each hazard keeps its previous count of colour x geometry buckets, so the
+  // instanced draw-call budget is unchanged. Silhouettes separate by height
+  // and openness at phone size: crate = low solid block with a bumpy top,
+  // pipe = open striped gate, speaker = tall closed tower with two rings.
   if (kind === 'barrier') {
     // A tall wheeled speaker stack: dodge it, don't try to jump it.
-    box(group, COLORS.ink, 0, 1.19, 0, 1.7, 2.34, 0.9);
-    box(group, 0x5c416d, 0, 1.22, 0.47, 1.55, 2.16, 0.08);
+    box(group, COLORS.ink, 0, 1.19, 0, 1.48, 2.34, 0.9);
+    box(group, COLORS.ink, 0, 2.4, 0, 1.86, 0.14, 1.0);
+    box(group, COLORS.ink, 0, 0.08, 0, 1.86, 0.12, 1.0);
+    box(group, 0x7a2f55, 0, 1.22, 0.47, 1.32, 2.16, 0.08);
     for (const y of [0.69, 1.63]) {
-      const rim = cylinder(group, 0x242b40, 0, y, 0.54, 0.48, 0.09); rim.rotation.x = Math.PI / 2;
-      const cone = cylinder(group, 0x423a55, 0, y, 0.6, 0.36, 0.08); cone.rotation.x = Math.PI / 2;
-      ball(group, 0x161e2d, 0, y, 0.66, 0.13, 0.13, 0.06);
+      // Bright surrounds make two big rings the speaker's unmistakable mark.
+      const rim = cylinder(group, 0xee7f9d, 0, y, 0.55, 0.62, 0.1, {
+        emissive: 0x5a1830, emissiveIntensity: 0.72,
+      });
+      rim.rotation.x = Math.PI / 2;
+      const cone = cylinder(group, 0x2a2233, 0, y, 0.6, 0.44, 0.08);
+      cone.rotation.x = Math.PI / 2;
+      ball(group, 0x161e2d, 0, y, 0.67, 0.16, 0.16, 0.06);
     }
-    for (const x of [-0.69, 0.69]) { box(group, COLORS.gold, x, 1.2, 0.535, 0.07, 2.1, 0.04); ball(group, COLORS.ink, x, 0.12, 0, 0.17); }
-    sign(group, 'DODGE', 0, 2.59, 0.12, 1.85, '#ffe1a0', '#243443');
+    for (const x of [-0.58, 0.58]) { box(group, COLORS.gold, x, 1.2, 0.535, 0.07, 2.1, 0.04); ball(group, COLORS.ink, x, 0.12, 0, 0.17); }
+    box(group, COLORS.gold, 0, 2.24, 0.535, 1.2, 0.06, 0.04);
+    sign(group, 'DODGE', 0, 2.72, 0.12, 1.85, '#ffe1a0', '#3a1c34', 'dodge');
   } else if (kind === 'crate') {
     box(group, 0xd4743c, 0, 0.43, 0, 1.6, 0.8, 1.05);
-    for (const x of [-0.62, 0.62]) {box(group, COLORS.gold, x, 0.44, 0.54, 0.11, 0.78, 0.055);}
+    // Dark hardwood frame: corner posts and rails outline a squat box.
+    for (const x of [-0.76, 0.76]) {box(group, 0x3b2414, x, 0.43, 0.5, 0.12, 0.84, 0.1);}
+    for (const y of [0.08, 0.76]) {box(group, 0x3b2414, 0, y, 0.5, 1.6, 0.1, 0.1);}
+    for (const x of [-0.76, 0.76]) {box(group, 0x3b2414, x, 0.43, -0.5, 0.12, 0.84, 0.1);}
     box(group, 0xf6b961, 0, 0.83, 0, 1.69, 0.1, 1.12);
     for (let i = 0; i < 3; i++) {
-      const roll = cylinder(group, COLORS.paper, (i - 1) * 0.44, 0.98, 0, 0.19, 0.24);
-      cylinder(group, 0x9e7454, roll.position.x, 1.105, 0, 0.065, 0.01);
+      const roll = cylinder(group, COLORS.paper, (i - 1) * 0.44, 0.98, 0, 0.23, 0.28);
+      cylinder(group, 0x9e7454, roll.position.x, 1.17, 0, 0.08, 0.012);
     }
-    sign(group, 'JUMP', 0, 0.45, 0.572, 1.05, '#24343b', '#ffd36b');
+    sign(group, 'JUMP', 0, 0.43, 0.572, 1.24, '#24343b', '#ffd36b', 'jump');
   } else if (kind === 'beam') {
     for (const x of [-0.88, 0.88]) {
-      cylinder(group, 0x607b85, x, 1.0, 0, 0.1, 2);
-      cylinder(group, COLORS.ink, x, 0.11, 0, 0.22, 0.16);
+      cylinder(group, 0x6d6254, x, 1.0, 0, 0.13, 2);
+      cylinder(group, COLORS.ink, x, 0.11, 0, 0.24, 0.16);
+      // Clamp collars where the pipe meets each post.
+      cylinder(group, COLORS.ink, x, 1.53, 0, 0.19, 0.42);
     }
-    const pipe = cylinder(group, 0xefb750, 0, 1.53, 0, 0.23, 1.95); pipe.rotation.z = Math.PI / 2;
-    for (const x of [-0.6, 0, 0.6]) { const ring = cylinder(group, COLORS.ink, x, 1.53, 0, 0.24, 0.14); ring.rotation.z = Math.PI / 2; }
-    sign(group, 'SLIDE', 0, 1.92, 0.12, 1.7, '#fff5da', '#763b55');
+    const pipe = cylinder(group, 0xefb750, 0, 1.53, 0, 0.25, 1.95); pipe.rotation.z = Math.PI / 2;
+    // Dense hazard banding: a striped bar with open floor beneath it.
+    for (const x of [-0.56, -0.28, 0, 0.28, 0.56]) { const ring = cylinder(group, COLORS.ink, x, 1.53, 0, 0.31, 0.13); ring.rotation.z = Math.PI / 2; }
+    sign(group, 'SLIDE', 0, 1.96, 0.12, 1.7, '#fff5da', '#763b55', 'slide');
   } else if (kind === 'pick') {
     const shape = new THREE.Shape(); shape.moveTo(0, -0.36);
     shape.bezierCurveTo(-0.1, -0.31, -0.42, 0.12, -0.36, 0.31);
     shape.bezierCurveTo(-0.28, 0.47, 0.28, 0.47, 0.36, 0.31);
     shape.bezierCurveTo(0.42, 0.12, 0.1, -0.31, 0, -0.36);
-    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.03, bevelSegments: 2, steps: 1 }), material(COLORS.gold, { metalness: 0.32, emissive: 0x6b3b09, emissiveIntensity: 0.24 }));
+    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.03, bevelSegments: 2, steps: 1 }), material(COLORS.gold, { metalness: 0.32, roughness: 0.42, emissive: 0x6b3b09, emissiveIntensity: 0.42 }));
     group.add(mesh); ball(group, 0xfff3a7, -0.1, 0.2, 0.09, 0.065, 0.1, 0.025);
   } else if (kind === 'shield') {
     ball(group, COLORS.mint, 0, 0, 0, 0.45, 0.55, 0.16, { emissive: 0x226c60, emissiveIntensity: 0.5 });
@@ -175,66 +350,68 @@ export class TurdRushRenderer {
     const context = canvas.getContext('webgl2', { alpha: false, antialias: true, powerPreference: 'high-performance' });
     if (!context) {throw new Error('WebGL 2 is unavailable');}
     this.renderer = new THREE.WebGLRenderer({ canvas, context, alpha: false, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.setClearColor(0x7ccfcb);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace; this.renderer.setClearColor(0x7f8c9e);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.25;
-    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x7ccfcb); this.scene.fog = new THREE.Fog(0x7ccfcb, 35, 112);
+    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x7f8c9e); this.scene.fog = new THREE.Fog(0x7f8c9e, 35, 112);
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.1, 140);
-    this.scene.add(new THREE.HemisphereLight(0xbffff1, 0x345557, 2.7));
-    const sun = new THREE.DirectionalLight(0xffe6bf, 3.3); sun.position.set(-8, 14, 8); this.scene.add(sun);
-    const rim = new THREE.DirectionalLight(0xa8ffff, 1.8); rim.position.set(8, 5, -16); this.scene.add(rim);
+    this.scene.add(new THREE.HemisphereLight(0xffe6c4, 0x1c2430, 2.4));
+    const sun = new THREE.DirectionalLight(0xfff0d4, 2.8); sun.position.set(-8, 14, 8); this.scene.add(sun);
+    const rim = new THREE.DirectionalLight(0xb7c6dc, 1.5); rim.position.set(8, 5, -16); this.scene.add(rim);
     this.floorMap = floorTexture(); this.checkerMap = checkerTexture();
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(9.8, 170), new THREE.MeshStandardMaterial({ map: this.floorMap, roughness: 0.83 }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(9.8, 170), new THREE.MeshStandardMaterial({ map: this.floorMap, roughness: 0.76, metalness: 0.08 }));
     this.floorMaterial = floor.material;
     floor.rotation.x = -Math.PI / 2; floor.position.set(0, -0.02, -66); this.scene.add(floor);
     for (const x of [-4.45, 4.45]) {
-      box(this.scene, 0x245b62, x, 0.11, -66, 0.35, 0.24, 170);
-      box(this.scene, 0x58d8bf, x, 0.245, -66, 0.08, 0.035, 170, { emissive: 0x328f7d, emissiveIntensity: 0.4 });
+      box(this.scene, 0x3a3228, x, 0.11, -66, 0.35, 0.24, 170);
+      box(this.scene, 0xe7c27a, x, 0.245, -66, 0.08, 0.035, 170, { emissive: 0x8a5a28, emissiveIntensity: 0.35 });
       const strip = new THREE.Mesh(new THREE.PlaneGeometry(0.37, 170), new THREE.MeshStandardMaterial({ map: this.checkerMap, roughness: 1 }));
       strip.rotation.x = -Math.PI / 2; strip.position.set(x * 0.88, 0, -66); this.scene.add(strip);
     }
-    // A continuous vaulted ceiling fills the upper view with real depth rather
-    // than empty sky. Supports and light fixtures repeat below this shell.
-    const roofPositions = [], roofNormals = [];
+    // A stone vault closes the culvert. Supports and paper lanterns repeat under it.
+    const roofPositions = [], roofUvs = [];
     for (let i = 0; i < 24; i++) {
       const a = i * Math.PI / 24, b = (i + 1) * Math.PI / 24;
       const point = (angle, z) => [Math.cos(angle) * 5.65, 0.25 + Math.sin(angle) * 5.65, z];
       for (const [angle, z] of [[a, 18], [b, -150], [a, -150], [a, 18], [b, 18], [b, -150]]) {
-        roofPositions.push(...point(angle, z)); roofNormals.push(-Math.cos(angle), -Math.sin(angle), 0);
+        roofPositions.push(...point(angle, z));
+        roofUvs.push(angle / Math.PI, (18 - z) / 168);
       }
     }
     const roofGeometry = new THREE.BufferGeometry();
     roofGeometry.setAttribute('position', new THREE.Float32BufferAttribute(roofPositions, 3));
-    roofGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(roofNormals, 3));
-    this.scene.add(new THREE.Mesh(roofGeometry, material(0x4b9894, { side: THREE.DoubleSide, emissive: 0x28796f, emissiveIntensity: 0.75 })));
+    roofGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(roofUvs, 2));
+    this.roofMap = vaultTexture();
+    this.roofMaterial = new THREE.MeshBasicMaterial({ map: this.roofMap, side: THREE.DoubleSide, toneMapped: false });
+    this.scene.add(new THREE.Mesh(roofGeometry, this.roofMaterial));
     this.scenery = []; this.sceneryRoot = new THREE.Group(); this.scene.add(this.sceneryRoot);
     const archGeometry = new THREE.TorusGeometry(5.45, 0.18, 7, 28, Math.PI);
     for (let i = 0; i < 10; i++) {
       const group = new THREE.Group(); this.sceneryRoot.add(group); group.position.z = 12 - i * 16; this.scenery.push(group);
       for (const side of [-1, 1]) {
-        box(group, i % 2 ? 0x23767b : 0x2e8589, side * 5.7, 1.85, -5, 1.25, 3.7, 15.6);
-        box(group, 0x225565, side * 5.03, 0.32, -5, 0.14, 0.64, 15.6);
-        const pipe = cylinder(group, 0x4e9b98, side * 4.97, 2.8, -5, 0.14, 16); pipe.rotation.x = Math.PI / 2;
+        box(group, i % 2 ? 0x3a322c : 0x4a3a32, side * 5.7, 1.85, -5, 1.25, 3.7, 15.6);
+        box(group, 0x241c16, side * 5.03, 0.32, -5, 0.14, 0.64, 15.6);
+        const pipe = cylinder(group, 0x8a7356, side * 4.97, 2.8, -5, 0.14, 16); pipe.rotation.x = Math.PI / 2;
         for (const z of [-10, -2]) {
-          const flange = cylinder(group, 0xadc6ae, side * 4.97, 2.8, z, 0.2, 0.12); flange.rotation.x = Math.PI / 2;
-          box(group, 0x274d5d, side * 4.85, 2.1, z, 0.32, 0.52, 0.56);
-          box(group, COLORS.gold, side * 4.64, 2.1, z, 0.09, 0.28, 0.38, { emissive: COLORS.gold, emissiveIntensity: 0.8 });
+          const flange = cylinder(group, 0xd8c4a4, side * 4.97, 2.8, z, 0.2, 0.12); flange.rotation.x = Math.PI / 2;
+          box(group, 0x2a241c, side * 4.85, 2.1, z, 0.32, 0.52, 0.56);
+          box(group, COLORS.gold, side * 4.64, 2.1, z, 0.09, 0.28, 0.38, { emissive: COLORS.gold, emissiveIntensity: 0.55 });
         }
-        // Backstage cases, drum silhouettes and playful wall posters.
+        // Road cases and wall posters sit in the same bays as before.
         if (i % 2 === 0) {
-          box(group, 0x3b465c, side * 5, 0.64, -8, 0.58, 1.2, 1.4);
-          box(group, COLORS.pink, side * 4.69, 0.62, -8, 0.035, 0.78, 0.1);
+          box(group, 0x2c2824, side * 5, 0.64, -8, 0.58, 1.2, 1.4);
+          box(group, 0xe7c9a0, side * 4.69, 0.62, -8, 0.035, 0.78, 0.1);
           const poster = sign(group, i % 4 ? 'LOUD!' : 'ENCORE', side * 4.98, 1.65, -4.5, 1.9, '#ffe3a2', '#344458');
           poster.rotation.y = -side * Math.PI / 2;
         }
       }
-      const arch = new THREE.Mesh(archGeometry, material(0x77b4ac));
+      const arch = new THREE.Mesh(archGeometry, material(0xc4a574));
       arch.position.set(0, 0.25, -12); group.add(arch);
-      for (const side of [-1, 1]) {box(group, 0x8bbdb1, side * 5.45, 0.3, -12, 0.38, 0.6, 0.38);}
+      for (const side of [-1, 1]) {box(group, 0x8a7356, side * 5.45, 0.3, -12, 0.38, 0.6, 0.38);}
     }
     instanceStatic(this.sceneryRoot);
     this.dashes = []; this.dashRoot = new THREE.Group(); this.scene.add(this.dashRoot);
     for (let i = 0; i < 32; i++) {for (const x of [-1.2, 1.2]) {
-      const dash = box(this.dashRoot, 0xabe1c6, x, 0.005, 8 - i * 4, 0.055, 0.008, 1.2); this.dashes.push({ dash, at: i * 4 });
+      const dash = box(this.dashRoot, 0xf3e6c4, x, 0.005, 8 - i * 4, 0.055, 0.008, 1.2); this.dashes.push({ dash, at: i * 4 });
     }}
     instanceStatic(this.dashRoot);
     this.runner = mascot(); this.scene.add(this.runner.group);
@@ -253,6 +430,7 @@ export class TurdRushRenderer {
     this.pool = new Map(); this.elapsed = 0; this.pixelRatio = Math.min(globalThis.devicePixelRatio || 1, 1.65); this.slowSeconds = 0; this.slowSamples = 0; this.renderedFrames = 0;
     this.contextLost = event => { event.preventDefault(); this.onLost(); };
     canvas.addEventListener('webglcontextlost', this.contextLost);
+    this.calmApplied = false;
     this.resize();
   }
   resize() {
@@ -286,7 +464,21 @@ export class TurdRushRenderer {
   }
   render(state, dt = 0, events = []) {
     this.elapsed += Math.min(dt, 0.1);
-    if (this.floorMaterial.map !== (this.highContrast ? null : this.floorMap)) { this.floorMaterial.map = this.highContrast ? null : this.floorMap; this.floorMaterial.color.setHex(this.highContrast ? 0x296a76 : 0xffffff); this.floorMaterial.needsUpdate = true; }
+    // High contrast drops the plates and lanterns for one flat slate field.
+    const calm = !!this.highContrast;
+    if (this.calmApplied !== calm) {
+      this.calmApplied = calm;
+      this.floorMaterial.map = calm ? null : this.floorMap;
+      this.floorMaterial.color.setHex(calm ? 0x343c46 : 0xffffff);
+      this.floorMaterial.needsUpdate = true;
+      this.roofMaterial.map = calm ? null : this.roofMap;
+      this.roofMaterial.color.setHex(calm ? 0x2c343c : 0xffffff);
+      this.roofMaterial.needsUpdate = true;
+      const fog = calm ? 0x3a424c : 0x7f8c9e;
+      this.scene.background.setHex(fog);
+      this.scene.fog.color.setHex(fog);
+      this.renderer.setClearColor(fog);
+    }
     // Sample elapsed slow time, not100 frames: at2fps a frame-count gate
     // takes50s to help. Three slow samples ignore a lone shader warm-up spike.
     if (state.phase === 'running' && dt > 0.028) {
@@ -317,6 +509,7 @@ export class TurdRushRenderer {
     this.sparkMesh.count = sparkCount; this.sparkMesh.instanceMatrix.needsUpdate = true; this.sparkMesh.frustumCulled = false;
     this.floorMap.offset.y = distance / 3.54;
     this.checkerMap.offset.y = distance / 6.8;
+    this.roofMap.offset.y = distance / 14;
     this.sceneryRoot.position.z = distance % 16;
     this.dashRoot.position.z = distance % 4;
     const counts = {};
@@ -367,7 +560,7 @@ export class TurdRushRenderer {
   }
   dispose() {
     this.canvas.removeEventListener('webglcontextlost', this.contextLost);
-    const geometries = new Set(), textures = new Set(), mats = new Set();
+    const geometries = new Set(), textures = new Set([this.floorMap, this.roofMap]), mats = new Set();
     this.scene.traverse(object => { if (object.geometry) {geometries.add(object.geometry);} if (object.material) {for (const mat of Array.isArray(object.material) ? object.material : [object.material]) { mats.add(mat); if (mat.map) {textures.add(mat.map);} }} });
     geometries.forEach(g => g.dispose()); textures.forEach(t => t.dispose()); mats.forEach(m => m.dispose()); this.renderer.dispose();
   }

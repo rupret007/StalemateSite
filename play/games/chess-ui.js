@@ -3,7 +3,7 @@ import { Chess, createGame, playMove, claimDraw, claimReason, intendedClaims, un
   loadGame, saveGame, recordResult, readResults, exportPgn, LEVELS, colorName, pieceName } from './chess-core.js?v=99a08f6ff639de1d';
 import { ChessEngine } from './chess-engine.js?v=278c2488721a0324';
 import { pieceSvg, PIECE_GUIDE, loadPieceArtwork } from './chess-pieces.js';
-import { ChessBoard, MOVE_ANIMATION_MS } from './chess-board.js?v=9a72af72421e8d82';
+import { ChessBoard, MOVE_ANIMATION_MS } from './chess-board.js?v=9ede3ecb6bb4b1d2';
 
 // The game is not ready with missing pieces or board styling. Keep the existing
 // deliberate loading/retry UI and saved position until every visual asset loads.

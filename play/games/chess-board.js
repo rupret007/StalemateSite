@@ -98,6 +98,11 @@ export class ChessBoard {
     if (hint) {
       for (const square of [hint.slice(0, 2), hint.slice(2, 4)]) { custom.set(square, `${custom.get(square) || ''} hinted`.trim()); }
     }
+    if (last) {
+      for (const [square, marker] of [[last.from, 'last-from'], [last.to, 'last-to']]) {
+        custom.set(square, `${custom.get(square) || ''} ${marker}`.trim());
+      }
+    }
     const config = {
       orientation: flipped ? 'black' : 'white',
       turnColor: chess.turn() === 'w' ? 'white' : 'black',

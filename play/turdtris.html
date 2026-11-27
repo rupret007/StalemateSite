@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#120d0a">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/turdsuite.css?v=ed33f4ac3050c248">
 <link rel="stylesheet" href="assets/arcade.css">
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
@@ -1423,6 +1423,160 @@ body.desktop-cabinet .status {
   .overlay-kicker { font-size: .6rem; margin-bottom: 3px; }
   .record-seal { font-size: .56rem; margin-bottom: 4px; }
 }
+@media (min-width: 320px) and (max-width: 430px) and (min-height: 480px) and (max-height: 720px) and (orientation: portrait) {
+  html[data-mobile-game="turdtris"] body.board-focus.arcade {
+    padding-bottom: calc(122px + env(safe-area-inset-bottom) + var(--mobile-footer, 0px)) !important;
+  }
+  html[data-mobile-game="turdtris"]:has(#suite-arcade-a11y-toggle) body.board-focus .topbar > div:first-child:has(h1) {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+  html[data-mobile-game="turdtris"] body.board-focus .main-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 62%) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 4px;
+  }
+  body.board-focus .main-stage .cabinet-rail { display: contents; }
+  body.board-focus .main-stage #hudRail { grid-column: 1 / -1; }
+  body.board-focus .main-stage .game-grid { grid-area: 2 / 2; }
+  html[data-mobile-game="turdtris"] body.board-focus .main-stage :is(.cabinet-hold, .next-queue) {
+    display: block;
+    grid-row: 2;
+    align-self: start;
+    min-width: 0;
+    margin-top: 8px;
+    padding: 5px 3px 3px;
+    border: 1px solid #628681;
+    border-radius: 8px;
+    background: #182529;
+    text-align: center;
+  }
+  body.board-focus .main-stage .cabinet-hold { grid-column: 1; }
+  body.board-focus .main-stage .next-queue { grid-column: 3; }
+  body.board-focus .main-stage :is(.cabinet-hold, .next-queue) h2 {
+    margin: 0 0 3px;
+    font-size: .62rem;
+  }
+  body.board-focus:has(#mobileHoldBox.is-used) .cabinet-hold h2 { text-decoration: line-through; }
+  body.board-focus .main-stage .next-queue .queue-slot:not(:first-child) { display: none; }
+  body.board-focus .mobile-controls #mobilePieceQueue { display: none; }
+  html[data-mobile-game="turdtris"] body.board-focus .mobile-run-strip {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body.board-focus .mobile-level-progress {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  body.board-focus .mobile-level-progress > span { grid-column: auto; }
+}
+@media (min-width: 540px) and (max-width: 980px) and (max-height: 420px) and (orientation: landscape) {
+  /* Put the score and menu beside the well so the full-height board fits above the music player. */
+  html[data-mobile-game="turdtris"] body.board-focus.arcade .layout {
+    display: grid;
+    grid-template-columns: clamp(124px, 23vw, 178px) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: 6px;
+  }
+  html[data-mobile-game="turdtris"] body.board-focus .topbar {
+    grid-area: 1 / 1;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-rows: 44px auto;
+    padding: 0 !important;
+  }
+  html[data-mobile-game="turdtris"]:has(#suite-arcade-a11y-toggle, #suite-music-toggle) body.board-focus .topbar {
+    padding-right: 0 !important;
+  }
+  html[data-mobile-game="turdtris"] body.board-focus .topbar > div:first-child {
+    grid-column: 2;
+  }
+  body.board-focus .topbar .mobile-menu {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  body.board-focus .topbar .mobile-menu summary {
+    min-height: 44px;
+    justify-content: center;
+  }
+  body.board-focus .topbar .mobile-menu details[open] {
+    position: relative;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  html[data-mobile-game="turdtris"] .topbar .mobile-menu-actions {
+    top: calc(104px + env(safe-area-inset-top)) !important;
+    max-height: calc(100dvh - 112px - var(--mobile-footer, 0px));
+  }
+  html[data-mobile-game="turdtris"] body.board-focus .main-stage {
+    display: contents;
+  }
+  body.board-focus .main-stage .cabinet-rail {
+    grid-area: 2 / 1;
+    min-width: 0;
+  }
+  body.board-focus .main-stage #hudRail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  body.board-focus .main-stage .game-grid {
+    grid-area: 1 / 2 / -1;
+  }
+}
+@media (max-width: 980px) and (orientation: landscape) {
+  html[data-mobile-game="turdtris"] #pauseOverlay {
+    position: fixed;
+    inset: calc(56px + env(safe-area-inset-top)) max(4px, env(safe-area-inset-right))
+      calc(4px + env(safe-area-inset-bottom) + var(--mobile-footer, 0px)) max(4px, env(safe-area-inset-left));
+    z-index: 10000;
+    padding: 8px;
+    grid-template-rows: minmax(0, 1fr);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  html[data-mobile-game="turdtris"] #pauseOverlay .overlay-card {
+    max-height: 100%;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    animation: none;
+  }
+}
+@media (max-width: 980px) and (max-height: 400px) and (orientation: landscape) {
+  html[data-mobile-game="turdtris"] #endOverlayCard {
+    width: min(420px, 100%);
+    padding: 8px 12px;
+  }
+  #endOverlayCard .result-kickers {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  #endOverlayCard .result-kickers > div { margin-bottom: 0; }
+  #endOverlayCard .overlay-kicker { padding: 2px 8px; }
+  #endOverlayCard .overlay-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    margin: 6px 0;
+  }
+  #endOverlayCard .overlay-stat {
+    padding: 3px 4px;
+  }
+  #endOverlayCard .result-replay {
+    position: sticky;
+    bottom: -8px;
+    z-index: 1;
+    margin-inline: -12px;
+    padding: 4px 12px;
+    background: #1a2228;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .control-btn:active, .control-btn.is-pressed { transform: none; }
@@ -1430,9 +1584,10 @@ body.desktop-cabinet .status {
 </style>
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
-<link rel="stylesheet" href="assets/mobile-fit.css">
-<script src="assets/mobile-fit.js" defer></script>
-<link rel="stylesheet" href="stalemate/solo-play-finish.css?v=d0d4699c6f6c04e8">
+<link rel="stylesheet" href="assets/mobile-fit.css?v=9cb9e921908f6401">
+<script src="assets/mobile-fit.js?v=dc1d1c7f8ebcfef2" defer></script>
+<link rel="stylesheet" href="assets/solo-play-finish.css?v=6f348c3aeb3a7882">
+<link rel="stylesheet" href="stalemate/solo-music-finish.css?v=727f82d06bafd79f">
 </head>
 <body class="suite-ambient suite-no-zoom board-focus arcade" data-arcade-game="turdtris">
 <div id="statusLive" class="sr-live" aria-live="polite" aria-atomic="true"></div>
@@ -1524,10 +1679,10 @@ body.desktop-cabinet .status {
       <div class="well-caption"><span id="zoneName">01 / Porcelain Palace</span><span class="live-dot" id="modeBadge">● CLASSIC</span></div>
       <canvas width="320" height="640" id="game" role="img" tabindex="0" aria-label="Turdtris playfield. Use arrow keys to move, X or Z to rotate, Space to drop, C to hold, P to pause."></canvas>
 
-      <div class="overlay" id="pauseOverlay">
+      <div class="overlay" id="pauseOverlay" role="dialog" aria-labelledby="pauseTitle">
         <div class="overlay-card">
           <div class="overlay-kicker">Breather Break</div>
-          <h2>Paused</h2>
+          <h2 id="pauseTitle">Paused</h2>
           <p>Press P or Space to resume.</p>
           <button class="btn" onclick="togglePause()">Resume</button>
         </div>
@@ -1535,8 +1690,10 @@ body.desktop-cabinet .status {
 
       <div class="overlay" id="gameOverOverlay">
         <div class="overlay-card" id="endOverlayCard" data-tone="gameover">
-          <div class="record-seal">✦ PERSONAL BEST ✦</div>
-          <div class="overlay-kicker" id="endKicker">Pipe Jam</div>
+          <div class="result-kickers">
+            <div class="record-seal">✦ PERSONAL BEST ✦</div>
+            <div class="overlay-kicker" id="endKicker">Pipe Jam</div>
+          </div>
           <h2 id="endTitle">Game Over</h2>
           <p class="overlay-flavor" id="endFlavor">The stack fought back.</p>
           <div class="overlay-stats">
@@ -1549,7 +1706,7 @@ body.desktop-cabinet .status {
           </div>
           <p class="overlay-flavor">Space or Enter runs it back.</p>
           <p class="suite-progress-result" id="progressResult" role="status" hidden></p>
-          <button class="btn" onclick="restartGame()">Play Again</button>
+          <div class="result-replay"><button class="btn" onclick="restartGame()">Play Again</button></div>
         </div>
       </div>
     </div>
@@ -3465,7 +3622,7 @@ function showGameOver(won) {
   updateScore();
 }
 
-function togglePause() {
+function togglePause({ showDialog = true } = {}) {
   if (gameOver) return;
   if (syncChallengeClock()) return;
   paused = !paused;
@@ -3477,7 +3634,7 @@ function togglePause() {
   playSfx('pause');
 
   const overlayEl = document.getElementById('pauseOverlay');
-  if (overlayEl) overlayEl.style.display = paused ? 'grid' : 'none';
+  if (overlayEl) overlayEl.style.display = paused && showDialog ? 'grid' : 'none';
 
   if (paused) {
     clearHeldInput();
@@ -4098,7 +4255,7 @@ window.turdtrisRuntime = {
 import * as TurdtrisFx from './games/turdtris-fx.js';
 import * as TurdtrisPresentation from './games/turdtris-presentation.js';
 import * as TurdtrisModes from './games/turdtris-modes.js';
-import { createTurdtrisArt, themeForLevel } from './games/turdtris-art.js';
+import { createTurdtrisArt, themeForLevel } from './games/turdtris-art.js?v=4cc3e64157ad25bf';
 import { createTurdtrisAudioPlayer, playTurdtrisSfx } from './games/turdtris-audio.js?v=48556fe58f015741';
 import { shouldUseBoardFocusLayout, boardCanvasCssWidth } from './games/turdtris-layout.js';
 import * as TurdtrisQueue from './games/turdtris-queue.js';
@@ -4224,7 +4381,7 @@ let menuPausedRun = false;
 runMenu.addEventListener('toggle', () => {
   if (runMenu.open) {
     menuPausedRun = !paused && !gameOver && !onboardingOpen;
-    if (menuPausedRun) togglePause();
+    if (menuPausedRun) togglePause({ showDialog: false });
   } else if (menuPausedRun) {
     menuPausedRun = false;
     if (paused && !gameOver && !onboardingOpen) togglePause();

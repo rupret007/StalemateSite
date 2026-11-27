@@ -12,7 +12,7 @@
 <meta name="description" content="Turdomania: a free click-to-pop puzzle in the Turdanoid suite. Pop matching piles of 2 or more, bigger piles score more, flush the whole board for a bonus.">
 <meta name="theme-color" content="#1a120c">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/turdsuite.css?v=ed33f4ac3050c248">
 <link rel="stylesheet" href="assets/arcade.css">
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
@@ -121,8 +121,8 @@ body.tm-hint-space .tm-start-hint[hidden] { display:block!important; visibility:
 </style>
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
-<link rel="stylesheet" href="assets/mobile-fit.css">
-<script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/mobile-fit.css?v=9cb9e921908f6401">
+<script src="assets/mobile-fit.js?v=dc1d1c7f8ebcfef2" defer></script>
 <style>
 @media(max-width:980px) {
   html[data-mobile-game="turdomania"] header.hud { height:56px; flex-wrap:nowrap; }
@@ -166,7 +166,8 @@ body.tm-hint-space .tm-start-hint[hidden] { display:block!important; visibility:
   body.turdomania .help { grid-area:help; margin:0; font-size:14px; line-height:1.5; }
 }
 </style>
-<link rel="stylesheet" href="stalemate/solo-play-finish.css?v=d0d4699c6f6c04e8">
+<link rel="stylesheet" href="assets/solo-play-finish.css?v=6f348c3aeb3a7882">
+<link rel="stylesheet" href="stalemate/solo-music-finish.css?v=727f82d06bafd79f">
 </head>
 <body class="suite-ambient turdomania arcade" data-arcade-game="turdomania">
 <header class="hud">
@@ -404,7 +405,7 @@ function render() {
       art.setAttribute('viewBox', '0 0 64 64');
       art.setAttribute('aria-hidden', 'true');
       const icon = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-      icon.setAttribute('href', './assets/turdomania-tiles.svg#' + ['swirl', 'corn', 'splat', 'paper', 'bean', 'cheese'][t.kind]);
+      icon.setAttribute('href', './assets/turdomania-tiles.svg?v=28a178bc7173c7e3#' + ['swirl', 'corn', 'splat', 'paper', 'bean', 'cheese'][t.kind]);
       art.appendChild(icon);
       el.appendChild(art);
       el.dataset.kind = String(t.kind);

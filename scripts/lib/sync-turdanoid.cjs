@@ -8,7 +8,8 @@ const { versionArcadeAssets } = require('./arcade-asset-versions.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
-const PIN = 'f9604242ac9fd2cbd28e94a524570ddbc228bd5c';
+const PIN = '4745b3337eb2888b38dd8175498569cf01d8debc';
+const LEGACY_FOCUS_PIN = 'f9604242ac9fd2cbd28e94a524570ddbc228bd5c';
 const SOLO_PAGES = new Set(['TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
     'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html']);
 const FILES = [
@@ -21,10 +22,12 @@ const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 's
 
 function options(args) {
     let source = UPSTREAM;
+    let local = false;
     let ref;
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--source') {
             if (!args[i + 1] || args[i + 1].startsWith('-')) throw new Error('--source requires a local repository path');
+            local = true;
             source = fs.realpathSync(path.resolve(args[++i]));
             if (!fs.statSync(source).isDirectory()) throw new Error('--source must be a local repository directory');
         } else if (args[i].startsWith('-') || ref) {
@@ -33,7 +36,7 @@ function options(args) {
             ref = args[i];
         }
     }
-    return { source, ref: ref || PIN };
+    return { source, local, ref: ref || PIN };
 }
 
 function git(args, cwd) {
@@ -60,7 +63,12 @@ function stripTests(dir) {
 
 function transform(stage) {
     const overlaySource = path.join(ROOT, 'scripts/stalemate-overlay');
-    fs.cpSync(overlaySource, path.join(stage, 'stalemate'), { recursive: true });
+    const sharedFinish = fs.existsSync(path.join(stage, 'assets/solo-play-finish.css'));
+    const unusedFinish = sharedFinish ? 'solo-play-finish.css' : 'solo-music-finish.css';
+    fs.cpSync(overlaySource, path.join(stage, 'stalemate'), {
+        recursive: true,
+        filter: file => path.basename(file) !== unusedFinish
+    });
     fs.copyFileSync(path.join(ROOT, 'scripts/play-track.js'), path.join(stage, 'stalemate/play-track.js'));
     fs.copyFileSync(path.join(ROOT, 'scripts/play-music-pref.js'), path.join(stage, 'stalemate/play-music-pref.js'));
     fs.copyFileSync(path.join(ROOT, 'scripts/play-music-pref.css'), path.join(stage, 'stalemate/play-music-pref.css'));
@@ -110,9 +118,13 @@ function transform(stage) {
             html = html.replace(/\s*<details class="changelog">[\s\S]*?<\/details>/i, '')
                 .replace(/\s*\/\* -+ Changelog -+ \*\/[\s\S]*?\.changelog li \{[^}]*\}/i, '')
                 .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '')
-                .replace('Nine games. Pick your next round.', 'Play solo, or choose 2 players in Royal Flush Chess to share one device.')
-                .replace(/(<p class="arcade-mode-shortcut">.*?)(<\/p>)/,
-                    '$1 <a class="arcade-hangout-link" href="../#hang-out">Hang Out online →</a>$2');
+                .replace('Nine games. Pick your next round.', 'Nine games for solo play. Royal Flush Chess also supports two players on one device.');
+            const hangout = '<a class="arcade-hangout-link" href="../#hang-out">Hang Out online →</a>';
+            if (html.includes('<div class="arcade-hub-actions">')) {
+                html = insert(html, '<div id="suite-progress-hub">', hangout, filename);
+            } else {
+                html = html.replace(/(<p class="arcade-mode-shortcut">.*?)(<\/p>)/, '$1 ' + hangout + '$2');
+            }
             if (/changelog/i.test(html)) throw new Error('Hub changelog strip failed');
             html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate-strip.css">', filename);
             html = html.replace(/<body\b[^>]*>/i, '$&\n<nav class="stalemate-strip" aria-label="Stalemate"><a href="../" class="sm-home"><img src="../assets/mark.svg" alt="" width="22" height="22">Stalemate Arcade</a><a href="../#contact" class="sm-contact">Contact</a><button type="button" class="stalemate-music-toggle" data-music-toggle aria-label="Site music on or off">Music on</button><button type="button" class="sm-listen" data-site-play="manic" data-site-play-label="Listen to Manic" aria-label="Play Manic here">Listen to Manic</button></nav>');
@@ -143,7 +155,10 @@ function transform(stage) {
         html = filename !== 'TurdAnoid.html' && html.includes(mobileFit)
             ? insert(html, mobileFit, musicHead, filename)
             : insert(html, '</head>', musicHead, filename);
-        if (SOLO_PAGES.has(filename)) html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate/solo-play-finish.css">', filename);
+        if (SOLO_PAGES.has(filename)) {
+            const stylesheet = sharedFinish ? 'solo-music-finish.css' : 'solo-play-finish.css';
+            html = insert(html, '</head>', '<link rel="stylesheet" href="stalemate/' + stylesheet + '">', filename);
+        }
         const bodyScripts = '<script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>\n<script src="../js/track.js" defer></script>\n<script src="stalemate/play-track.js" defer></script>\n<script src="stalemate/play-music-pref.js" defer></script>';
         html = insert(html, '</body>', filename === 'index.html'
             ? '<script src="../site-base.js" defer></script>\n<script src="../js/site-player.js" defer></script>\n' + bodyScripts
@@ -153,21 +168,30 @@ function transform(stage) {
 }
 
 function main() {
-    const { source, ref } = options(process.argv.slice(2));
+    const { source, local, ref } = options(process.argv.slice(2));
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stalemate-upstream-'));
     const stage = fs.mkdtempSync(path.join(ROOT, '.play-sync-'));
     const dest = path.join(ROOT, 'play');
     const backup = `${stage}-previous`;
     try {
-        git(['init', '--quiet', tmp], ROOT);
-        git(['remote', 'add', 'origin', source], tmp);
-        // fetch accepts branch, tag and arbitrary reachable commit SHA; --branch clone does not.
-        git(['fetch', '--quiet', '--depth=1', 'origin', ref], tmp);
-        const sha = git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], tmp);
-        git(['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', sha], tmp);
-        // Carry the Turdtris focus fix while the branded build uses this upstream revision.
-        if (sha === 'f9604242ac9fd2cbd28e94a524570ddbc228bd5c') {
+        let sha;
+        if (local) {
+            sha = git(['rev-parse', '--verify', '--end-of-options', ref + '^{commit}'], source);
+            // Extract only the committed public files, including when the source is a worktree.
+            const archive = execFileSync('git', ['archive', sha, ...FILES], { cwd: source, maxBuffer: 50 * 1024 * 1024 });
+            execFileSync('tar', ['-xf', '-', '-C', tmp], { input: archive });
+        } else {
+            git(['init', '--quiet', tmp], ROOT);
+            git(['remote', 'add', 'origin', source], tmp);
+            // fetch accepts branch, tag and arbitrary reachable commit SHA.
+            git(['fetch', '--quiet', '--depth=1', 'origin', ref], tmp);
+            sha = git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], tmp);
+            git(['-c', 'advice.detachedHead=false', 'checkout', '--quiet', '--detach', sha], tmp);
+        }
+        if (sha === LEGACY_FOCUS_PIN) {
             git(['apply', path.join(ROOT, 'scripts/turdtris-start-guide-focus.patch')], tmp);
+        }
+        if (sha === LEGACY_FOCUS_PIN || fs.existsSync(path.join(tmp, 'assets/solo-play-finish.css'))) {
             git(['apply', path.join(ROOT, 'scripts/stalemate-arcade-music.patch')], tmp);
         }
         for (const name of FILES) fs.cpSync(path.join(tmp, name), path.join(stage, name), { recursive: true });

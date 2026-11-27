@@ -1,5 +1,5 @@
 import './turdanoid-theme.js';
-import './turdanoid-sprites.js?v=9e62bb6f36812772';
+import './turdanoid-sprites.js?v=8e01f21d1609c859';
 import './turdanoid-brick-sprite-core.js';
 
 const api = globalThis.TurdanoidBrickSprite;

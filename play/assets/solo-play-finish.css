@@ -1,0 +1,889 @@
+/* Game art and controls keep their own sizing and state. */
+body.arcade[data-arcade-game] {
+  --solo-trim: var(--arc-sig, #78ffd5);
+  --solo-frame-edge: color-mix(in srgb, var(--solo-trim) 46%, #192723);
+  --solo-dock-edge: max(8px, env(safe-area-inset-right));
+}
+
+body.arcade[data-arcade-game="crapjack"] { --solo-trim: #ebc179; }
+body.arcade[data-arcade-game="turdrummy"] { --solo-trim: #9bd9e5; }
+body.arcade[data-arcade-game="turdspades"] { --solo-trim: #e1c499; }
+body.arcade[data-arcade-game="crapeights"] { --solo-trim: #c4a5f6; }
+body.arcade[data-arcade-game="turdomania"] { --solo-trim: #e3b585; }
+body.arcade[data-arcade-game="turdtris"] { --solo-trim: #75d2d7; }
+body.arcade[data-arcade-game="chess"] { --solo-trim: #dcba87; }
+body.arcade[data-arcade-game="turdrush"] { --solo-trim: #8cf8d7; }
+
+body.arcade :is(#playShell, #boardWrap, .board-wrap, #rush-arena, #playTable, .chess-board):not(:focus-visible),
+body.arcade:is([data-arcade-game="crapjack"], [data-arcade-game="turdrummy"], [data-arcade-game="turdspades"]) .table:not(:focus-visible) {
+  outline: 1px solid var(--solo-frame-edge);
+  outline-offset: -1px;
+}
+
+body.arcade :is(.hud, .rush-hud, .chess-game) { font-variant-numeric: tabular-nums; }
+
+/* Turdanoid cabinet. Keep the in-canvas art clear and detail the readouts around it.
+   The bezel follows the canvas corners: steel edge, dark gasket, steel lip. */
+body.arcade[data-arcade-game="turdanoid"] #playShell {
+  border-radius: 18px;
+  box-shadow: 0 0 0 1px #86aba3, 0 0 0 3px #13232a, 0 0 0 4px #4f6f69, 0 14px 38px #000a;
+}
+/* Side gutters become riveted, brushed-steel cabinet plates. */
+body.arcade[data-arcade-game="turdanoid"] .side-art {
+  border-color: #5d8079;
+  background:
+    radial-gradient(circle at 10px 10px, #b9d6cc 0 1.5px, #22353a 2px, transparent 3px),
+    radial-gradient(circle at calc(100% - 10px) 10px, #b9d6cc 0 1.5px, #22353a 2px, transparent 3px),
+    radial-gradient(circle at 10px calc(100% - 10px), #b9d6cc 0 1.5px, #22353a 2px, transparent 3px),
+    radial-gradient(circle at calc(100% - 10px) calc(100% - 10px), #b9d6cc 0 1.5px, #22353a 2px, transparent 3px),
+    repeating-linear-gradient(90deg, #ffffff06 0 1px, transparent 1px 4px),
+    linear-gradient(165deg, #2b4144, #15242a 55%, #111c21);
+  box-shadow: inset 0 1px 0 #c6eadb40, inset 0 -3px 0 #0b161b, 0 16px 40px #0007;
+}
+body.arcade[data-arcade-game="turdanoid"] .side-title { color: #bcd6cb; }
+/* The launch pill is the single brass action: a dark keyline and a bright
+   outer lip separate it from the paddle and bricks. Its pulse is unchanged. */
+body.arcade[data-arcade-game="turdanoid"] #mobileLaunch {
+  box-shadow: 0 0 0 2px #3a1d00, 0 0 0 4px #ffe39a, 0 10px 24px #000a,
+              inset 0 1px 0 #ffffffb3, inset 0 -3px 0 #a8641a66;
+}
+/* Results read as stamped gauge plates rather than glass. */
+body.arcade[data-arcade-game="turdanoid"] .overlay .stat {
+  border-color: #6f958d;
+  background: linear-gradient(160deg, #26403f, #13232a 62%, #101c22);
+  box-shadow: inset 0 1px 0 #b3ecda40, inset 0 -3px 0 #0b171c, 0 8px 20px #0007;
+}
+body.arcade[data-arcade-game="turdanoid"] .overlay .stat .l { color: #c3dbd1; }
+body.arcade[data-arcade-game="turdanoid"] .hud .col:not(.critical) {
+  border-color: #699b91;
+  background: linear-gradient(158deg, #25444a 0%, #13282f 50%, #142228 100%);
+  box-shadow: inset 0 1px 0 #b3ecda50, inset 0 -3px 0 #0d1c22, 0 4px 14px #020b0eb3;
+}
+body.arcade[data-arcade-game="turdanoid"] .hud .col.center {
+  border-color: #987f5b;
+  background: linear-gradient(158deg, #47372b, #211f1e 75%);
+}
+body.arcade[data-arcade-game="turdanoid"] .hud .col:not(.critical) .lbl { color: #d0e5d9; }
+
+/* Turdomania plays on warm ceramic with a bright raised edge around each tile. */
+body.arcade[data-arcade-game="turdomania"] #boardWrap {
+  border-color: #8a633f;
+  background: repeating-linear-gradient(115deg, #ffffff07 0 1px, transparent 1px 5px),
+              linear-gradient(140deg, #795338, #422b20 38%, #241b19 70%, #674833);
+  box-shadow: inset 0 1px 1px #eab77b7a, 0 8px 24px #100806a6;
+}
+/* The tray floor stays put when the board takes keyboard focus; only the
+   inner shadow yields to the authored focus ring. */
+body.arcade[data-arcade-game="turdomania"] #board {
+  background: radial-gradient(ellipse at 50% 26%, #302520, #1b1412 75%);
+}
+body.arcade[data-arcade-game="turdomania"] #board:not(:focus-visible) {
+  box-shadow: inset 0 0 0 1px #e7bc7733, inset 0 4px 12px #0009;
+}
+/* Glaze only in the standard palette; the colourblind palette keeps its
+   own patterned tiles and inner ring. */
+html:not(.suite-colorblind) body.arcade[data-arcade-game="turdomania"] .tile:not(.hot) {
+  box-shadow: inset 0 1px 0 #ffffffb3, inset 1px 0 0 #ffffff43,
+              inset 0 -3px 0 #28180c52, 0 2px 3px #160d10b8;
+}
+/* A pile you can pop: a white inner rim plus a dark outer keyline, so the
+   selection reads on cream paper, gold corn and green tiles alike. The
+   keyboard cursor keeps its separate mint outline. */
+body.arcade[data-arcade-game="turdomania"] .tile.hot {
+  box-shadow: inset 0 0 0 2px #fffdf3, inset 0 -3px 0 #28180c52,
+              0 0 0 2px #241410, 0 3px 6px #000a;
+}
+body.arcade[data-arcade-game="turdomania"] .hud .stat {
+  background: linear-gradient(150deg, #4b3428, #271b17 72%);
+  border-color: #9a7450;
+  color: #f6d9bb;
+}
+body.arcade[data-arcade-game="turdomania"] .hud .stat b { color: #fff5da; }
+/* Tiles left is the goal readout: a mint-glazed gauge with a top bar. */
+body.arcade[data-arcade-game="turdomania"] .hud .stat:has(#left) {
+  border-color: #8ee8c7;
+  background: linear-gradient(150deg, #24453d, #172723 72%);
+  box-shadow: inset 0 2px 0 #8ee8c7;
+  color: #d3fff0;
+}
+/* Glazed dock buttons; the authored mint focus outline is unchanged. */
+body.arcade[data-arcade-game="turdomania"] .dock > button {
+  border-color: #9a7450;
+  background: linear-gradient(160deg, #4b3428, #271b17 70%);
+  box-shadow: inset 0 1px 0 #eab77b40, 0 2px 0 #120b08;
+}
+/* Result card: a solid ceramic panel. The spread ring pads it visually
+   without changing the overlay's measured layout. */
+body.arcade[data-arcade-game="turdomania"] #overlay > div {
+  border-radius: 4px;
+  background: #2a1d17;
+  box-shadow: 0 0 0 11px #2a1d17, 0 0 0 12px #9a7450, 0 14px 30px #000a;
+}
+
+/* The Turdtris well and control enclosure use different cabinet materials. */
+body.arcade[data-arcade-game="turdtris"].desktop-cabinet .main-stage {
+  grid-template-columns: clamp(108px, 13vw, 176px) max-content clamp(168px, 19vw, 248px);
+  justify-content: center;
+}
+
+/* Keep the contrast button beside Pause in the landscape controls, below Next. */
+@media (max-width: 980px) and (max-height: 520px) and (orientation: landscape) {
+  html[data-mobile-game="turdtris"] #suite-arcade-a11y-mount,
+  html[data-mobile-game="turdtris"] body > #suite-arcade-a11y-toggle {
+    top: auto;
+    right: calc(max(4px, env(safe-area-inset-right)) + 8px);
+    bottom: calc(max(4px, env(safe-area-inset-bottom)) + var(--mobile-footer, 0px) + 6px);
+  }
+}
+
+/* The well is a lit neon tube: a solid cyan ring outside a dark gasket,
+   with a static soft bloom. Nothing is drawn over the playfield canvas. */
+body.arcade[data-arcade-game="turdtris"] .board-wrap {
+  border-color: #7fd8d4;
+  background: repeating-linear-gradient(125deg, #d2ffe60c 0 1px, transparent 1px 5px),
+              linear-gradient(140deg, #43625e, #182d35 34%, #111e28 66%, #2d5552);
+  box-shadow: inset 0 1px 2px #b4dfd568, inset 0 0 0 1px #0d171c,
+              0 0 0 3px #0d161a, 0 0 0 4px #75d2d7, 0 0 20px #4fd0d040, 0 12px 34px #0008;
+}
+body.arcade[data-arcade-game="turdtris"] .well-caption { color: #b7ece0; }
+body.arcade[data-arcade-game="turdtris"] #game:focus-visible { outline: 3px solid #93ffe0; outline-offset: -3px; }
+body.arcade[data-arcade-game="turdtris"] .hud .card {
+  border-color: #646b58;
+  background: linear-gradient(155deg, #333a31, #201d1c 60%);
+}
+body.arcade[data-arcade-game="turdtris"] .hud .card .k { color: #e2d6b6; opacity: 1; }
+/* Hold and Next are lit display windows matching the well; the first
+   Next slot carries a solid mint frame as the piece coming in. */
+body.arcade[data-arcade-game="turdtris"] .cabinet-hold {
+  border-color: #5f9e9b;
+  background: linear-gradient(160deg, #22393c, #121d23 70%);
+  box-shadow: inset 0 1px 0 #b4f0e040, 0 0 0 1px #0d161a, 0 12px 26px #0007;
+}
+body.arcade[data-arcade-game="turdtris"] :is(.cabinet-hold, .next-queue) h2 { color: #a6f3e2; }
+body.arcade[data-arcade-game="turdtris"] :is(.cabinet-hold canvas, .next-queue-slots canvas) {
+  background: #0c171c;
+  box-shadow: inset 0 0 0 1px #75d2d74d, inset 0 6px 14px #0008;
+}
+body.arcade[data-arcade-game="turdtris"] .next-queue-slots canvas:first-child {
+  box-shadow: inset 0 0 0 2px #8ee8c7, 0 0 12px #8ee8c733;
+}
+body.arcade[data-arcade-game="turdtris"] .mobile-preview-box:not(.is-used) {
+  border-color: #5b878a;
+  background: linear-gradient(145deg, #294344, #17292c 70%);
+}
+body.arcade[data-arcade-game="turdtris"] .mobile-preview-box span { color: #bff7ea; }
+body.arcade[data-arcade-game="turdtris"] .control-btn[data-action="hold"] { border-color: #75d2d7; }
+/* Run results: cabinet plates with bright, tabular values. */
+body.arcade[data-arcade-game="turdtris"] .overlay-stat {
+  border-color: #5f8f8a;
+  background: linear-gradient(160deg, #20303a, #141b21 70%);
+}
+body.arcade[data-arcade-game="turdtris"] .overlay-stat .k { color: #cfe2db; }
+body.arcade[data-arcade-game="turdtris"] .overlay-stat .v { color: #fff1d6; font-variant-numeric: tabular-nums; }
+
+/* Turd Rush's panels sit over the runway without altering the canvas or contrast mode. */
+body.arcade[data-arcade-game="turdrush"] .rush-arena:not(:focus-within) {
+  border-color: #a0dcce;
+  box-shadow: 0 0 0 2px #102f3b, 0 5px 0 #0c2634;
+}
+/* Stats sit on a dark trackside rail with a mint lead bar. */
+body.arcade[data-arcade-game="turdrush"] .rush-hud > div {
+  border-color: #7aafa9;
+  background: linear-gradient(155deg, #23495a, #112837 66%);
+  box-shadow: inset 3px 0 0 #72f4c3, inset 0 -2px 0 #0b1f2a;
+}
+body.arcade[data-arcade-game="turdrush"] .rush-hud span { color: #dcedde; }
+/* Each pad button wears its on-track cue: Jump a gold top edge, Slide a
+   pink bottom edge, Left/Right a mint edge on the side you move toward. */
+body.arcade[data-arcade-game="turdrush"] .rush-pad button:not(:active) {
+  background: linear-gradient(160deg, #376475, #224755 46%, #142f3e);
+  box-shadow: inset 0 1px 0 #c7f7ee45, 0 3px 0 #082b38;
+}
+body.arcade[data-arcade-game="turdrush"] .rush-pad :is([data-rush-action="left"], [data-rush-action="right"]) { border-color: #8ff4cfa6; color: #dcfff1; }
+body.arcade[data-arcade-game="turdrush"] .rush-pad [data-rush-action="left"]:not(:active) { box-shadow: inset 3px 0 0 #8ff4cf, inset 0 1px 0 #c7f7ee45, 0 3px 0 #082b38; }
+body.arcade[data-arcade-game="turdrush"] .rush-pad [data-rush-action="right"]:not(:active) { box-shadow: inset -3px 0 0 #8ff4cf, inset 0 1px 0 #c7f7ee45, 0 3px 0 #082b38; }
+body.arcade[data-arcade-game="turdrush"] .rush-pad [data-rush-action="jump"]:not(:active) { box-shadow: inset 0 3px 0 #ffd36b, 0 3px 0 #082b38; }
+body.arcade[data-arcade-game="turdrush"] .rush-pad [data-rush-action="slide"]:not(:active) { box-shadow: inset 0 -3px 0 #ffa9c6, inset 0 1px 0 #c7f7ee45, 0 3px 0 #082b38; }
+/* While a cue is up, the button that answers it lights with a solid
+   outline in the cue's colour (white in the runner's high-contrast mode).
+   Keyboard focus keeps its own authored ring. */
+body.arcade[data-arcade-game="turdrush"]:has(#rush-hazard-cue[data-action="jump"]:not([hidden])) .rush-pad [data-rush-action="jump"]:not(:disabled):not(:focus-visible),
+body.arcade[data-arcade-game="turdrush"]:has(#rush-hazard-cue[data-action="slide"]:not([hidden])) .rush-pad [data-rush-action="slide"]:not(:disabled):not(:focus-visible),
+body.arcade[data-arcade-game="turdrush"]:has(#rush-hazard-cue[data-action="dodge"]:not([hidden])) .rush-pad :is([data-rush-action="left"], [data-rush-action="right"]):not(:disabled):not(:focus-visible) {
+  background: linear-gradient(160deg, #437f8c, #2a5d6b 46%, #1a3f4d);
+  outline: 2px solid #8ff4cf;
+  outline-offset: 1px;
+}
+body.arcade[data-arcade-game="turdrush"]:has(#rush-hazard-cue[data-action="jump"]:not([hidden])) .rush-pad [data-rush-action="jump"]:not(:disabled):not(:focus-visible) { outline-color: #ffd36b; }
+body.arcade[data-arcade-game="turdrush"]:has(#rush-hazard-cue[data-action="slide"]:not([hidden])) .rush-pad [data-rush-action="slide"]:not(:disabled):not(:focus-visible) { outline-color: #ffa9c6; }
+body.arcade[data-arcade-game="turdrush"][data-rush-contrast="on"]:has(#rush-hazard-cue[data-action]:not([hidden])) .rush-pad [data-rush-action]:not(:disabled):not(:focus-visible) { outline-color: #fff; }
+
+/* Each solo card game has its own felt. Shared paper retains the game's suit and state cues. */
+body.arcade[data-arcade-game="crapjack"] .table {
+  background: radial-gradient(ellipse at 49% 4%, #ddb06d29, transparent 64%),
+              url("./table-art/felt-noise.svg"),
+              linear-gradient(154deg, #52302e, #381c28 54%, #241820);
+}
+body.arcade[data-arcade-game="crapjack"] .felt-inlay { border-color: #d9a7675c; }
+/* Crapjack 21: oxblood felt inside a walnut rail with a brass bead. */
+body.arcade[data-arcade-game="crapjack"] .table {
+  box-shadow: inset 0 0 0 2px #2b1518, inset 0 0 0 3px #c9955a80, inset 0 0 48px #0008,
+              0 0 0 2px #3a1f1c, 0 0 0 3px #8a5e3a, 0 12px 30px #0009;
+}
+/* The hand being played carries a brass bar on its leading edge as well
+   as the warm border, so it reads without relying on the glow. */
+body.arcade[data-arcade-game="crapjack"] .hand.active-hand {
+  border-color: #f0c870;
+  box-shadow: inset 4px 0 0 #f0c870, inset 0 0 0 1px #f0c87033, 0 0 18px #f0b45a29;
+}
+body.arcade[data-arcade-game="crapjack"] .hand.active-hand .hand-title strong { color: #ffe7b0; }
+/* A split hand waiting its turn steps back behind the brass-barred hand.
+   Only the cards dim; both totals stay at full strength for comparison. */
+body.arcade[data-arcade-game="crapjack"] .table-stage:has(> .hand.active-hand):has(> #splitHandWrap:not([hidden])) > :is(#playerHandWrap, #splitHandWrap):not(.active-hand) .cards {
+  filter: saturate(.7) brightness(.84);
+}
+/* Between rounds the settled cards stay on the felt as a record. They step
+   back so the receipt and the next stake lead; totals stay crisp. */
+body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .table-stage > .hand .cards {
+  filter: saturate(.75) brightness(.86);
+}
+/* Hand totals: dark lacquer chips with cream numerals; bust and made keep
+   their authored colours and soft/hard labels. */
+body.arcade[data-arcade-game="crapjack"] .total-badge {
+  background: linear-gradient(160deg, #2c1619, #170c0f);
+  box-shadow: inset 0 1px 0 #ffe7b02e, 0 6px 16px #0008;
+}
+body.arcade[data-arcade-game="crapjack"] .total-badge:not(.mode-bust):not(.mode-made) {
+  border-color: #e3c08a99;
+  color: #fff4dc;
+}
+body.arcade[data-arcade-game="crapjack"] .card-stat:not(.hot) { border-color: #d9a76747; }
+body.arcade[data-arcade-game="crapjack"] :is(.btn, .chip-btn, summary):focus-visible {
+  outline: 3px solid #ffe7a8;
+  outline-offset: 2px;
+}
+
+/* The house and your seat read apart at a glance: the dealer plays from a
+   dark lacquer tray under a brass rule, your hands sit in a box printed on
+   the felt in pale chalk. */
+body.arcade[data-arcade-game="crapjack"] .hand.zone-dealer {
+  border-color: #c9955a59;
+  background: linear-gradient(180deg, #160a0de6, #2a1418c7);
+  box-shadow: inset 0 2px 0 #e3c08a66, inset 0 -12px 18px #0006, 0 4px 10px #0005;
+}
+body.arcade[data-arcade-game="crapjack"] .hand.zone-dealer .hand-title strong { color: #f0d6a4; }
+body.arcade[data-arcade-game="crapjack"] :is(#playerHandWrap, #splitHandWrap) {
+  border-color: #f3e1bd29;
+  background: radial-gradient(ellipse 80% 90% at 50% 100%, #ffe7b00f, transparent 70%);
+  outline: 1.5px solid #f3e1bd59;
+  outline-offset: -6px;
+}
+/* Stake ring and chip rack: a ring printed on the felt with a fine inner
+   line, a walnut tray for the chips, and a leather armrest for the round
+   actions. A placed bet turns the ring brass; the Deal button keeps the
+   strong accent as the next action. */
+body.arcade[data-arcade-game="crapjack"] .bet-circle {
+  border-color: #e3c08a73;
+  background: radial-gradient(circle closest-side, transparent 0 84%, #e3c08a4d 84.5% 86.5%, transparent 87%),
+              radial-gradient(circle at 50% 42%, #ffd76a14, transparent 62%),
+              radial-gradient(circle, #0000002e 0 68%, transparent 69%);
+}
+body.arcade[data-arcade-game="crapjack"] .bet-circle.has-bet {
+  border-color: #f0c870;
+  box-shadow: inset 0 0 24px #f0c87017, 0 0 0 1px #3a1f1c, 0 0 14px #f0b45a29;
+}
+body.arcade[data-arcade-game="crapjack"] :is(.chip-rack, .mobile-felt-chip-rack) {
+  border-radius: 10px;
+  background: linear-gradient(180deg, #3a1f1ccc, #241214cc);
+  box-shadow: inset 0 2px 5px #000b, inset 0 -1px 0 #c9955a40, 0 1px 0 #e3c08a33;
+}
+body.arcade[data-arcade-game="crapjack"] :is(.table-pit-rail, .mobile-pit) {
+  border-color: #c9955a66;
+  background: linear-gradient(180deg, #3b2022f2, #22111ae6);
+  box-shadow: inset 0 1px 0 #ffe7b02e, inset 0 -2px 0 #0007, 0 4px 10px #0006;
+}
+/* Settlement prints a receipt in the status slot: cream paper with ruled
+   lines and a dashed lower edge, dark ink for the amounts, and the
+   outcome badge as a rubber stamp. Live table talk keeps the glass bar. */
+body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .status:is([data-tone="win"], [data-tone="loss"], [data-tone="push"]) {
+  --tone: #8a6414;
+  border-color: #e3d3b0;
+  border-block-end-style: dashed;
+  background: repeating-linear-gradient(180deg, transparent 0 17px, #5a4a3a14 17px 18px),
+              linear-gradient(180deg, #fbf5e6, #eee2c8);
+  color: #2b1d14;
+  font-family: ui-monospace, "Cascadia Mono", "Courier New", monospace;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .status[data-tone="loss"] { --tone: #a3122b; }
+body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .status[data-tone="push"] { --tone: #7a5214; }
+body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .status:is([data-tone="win"], [data-tone="loss"], [data-tone="push"])::before { box-shadow: none; }
+body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .status:is([data-tone="win"], [data-tone="loss"], [data-tone="push"])::after {
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  text-shadow: none;
+  transform: translateY(0) rotate(-5deg);
+}
+body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .status[data-tone="win"]::after { color: #1f6b3a; }
+body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .status[data-tone="loss"]::after { color: #a3122b; }
+body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .status[data-tone="push"]::after { color: #7a5214; }
+
+/* TurdRummy: deep teal baize, dark rail and a pale jade bead. */
+body.arcade[data-arcade-game="turdrummy"] .table {
+  background: radial-gradient(ellipse at 47% 22%, #6ddcc322, transparent 64%),
+              url("./table-art/felt-noise.svg"),
+              linear-gradient(154deg, #266458, #173e3c 49%, #102928);
+  box-shadow: inset 0 0 0 2px #0f2624, inset 0 0 0 3px #b5e1ca59, inset 0 18px 40px #0006,
+              0 0 0 2px #163633, 0 0 0 3px #6fa99566, 0 12px 30px #0009;
+}
+body.arcade[data-arcade-game="turdrummy"] .table::before { border-color: #b5e1ca5c; }
+body.arcade[data-arcade-game="turdrummy"] .pile-body .card::before { border-color: #4771656b; }
+/* Your turn: cards only become buttons when you may act, so the hand band
+   gains a mint top edge and a brighter title. The pile you may draw from
+   gets a gold ring; while the bot plays, the authored dimmed hand shows it. */
+body.arcade[data-arcade-game="turdrummy"] .zone--hand:has(.card-button) {
+  box-shadow: inset 0 3px 0 #9be7d6, inset 0 1px 0 #ffffff0d;
+}
+body.arcade[data-arcade-game="turdrummy"] .zone--hand:has(.card-button) .zone-title { color: #c9fff0; }
+body.arcade[data-arcade-game="turdrummy"] .app:has(#drawStockBtn:not(:disabled)) #stockWell,
+body.arcade[data-arcade-game="turdrummy"] .app:has(#drawDiscardBtn:not(:disabled)) #discardWell {
+  background: #ffd76a14;
+  box-shadow: inset 0 0 0 2px #ffd76acc;
+}
+
+/* Pile wells: stock and discard sit in recessed felt with a paper tab
+   naming each pile. The discard well becomes a dashed drop slot while
+   you choose a discard and the stock goes quiet. */
+body.arcade[data-arcade-game="turdrummy"] :is(#stockWell, #discardWell) {
+  background: radial-gradient(ellipse at 50% 28%, transparent 38%, #03100f40), #0a1f1e5c;
+  box-shadow: inset 0 2px 7px #000a, inset 0 0 0 1px #b5e1ca2e;
+}
+body.arcade[data-arcade-game="turdrummy"] .app:has(#drawStockBtn:not(:disabled)) #stockWell,
+body.arcade[data-arcade-game="turdrummy"] .app:has(#drawDiscardBtn:not(:disabled)) #discardWell {
+  background: radial-gradient(ellipse at 50% 28%, #ffd76a14 38%, #03100f40), #0a1f1e5c;
+  box-shadow: inset 0 2px 7px #000a, inset 0 0 0 2px #ffd76acc;
+}
+body.arcade[data-arcade-game="turdrummy"] :is(#stockWell, #discardWell) h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border-radius: 3px;
+  line-height: 1.35;
+  background: linear-gradient(180deg, #f6efdc, #e4d9bd);
+  color: #24342d;
+  text-shadow: none;
+  box-shadow: 0 1px 0 #0006, inset 0 -1px 0 #5a4a2a1f;
+}
+body.arcade[data-arcade-game="turdrummy"] .table[data-stage="discard"] #discardWell {
+  box-shadow: inset 0 2px 7px #000a, inset 0 0 0 1px #9be7d659;
+  outline: 2px dashed #9be7d6b3;
+  outline-offset: -6px;
+}
+/* Once the selected card may go, the slot takes the selection's gold:
+   the ringed card in hand is the one that lands here. */
+body.arcade[data-arcade-game="turdrummy"] .app:has(#discardBtn:not(:disabled)) .table[data-stage="discard"] #discardWell {
+  outline: 3px dashed #ffd76a;
+}
+body.arcade[data-arcade-game="turdrummy"] .table:is([data-stage="discard"], [data-stage="wait"]) #stockPile .stock-stack {
+  filter: saturate(.55) brightness(.78);
+}
+/* The card taken from the discard cannot go straight back: a pink dashed
+   inner edge matches its HELD tag, distinct from the gold selection ring. */
+body.arcade[data-arcade-game="turdrummy"] #playerHand .card[data-drawn="discard"]:not(:focus-visible) {
+  outline: 2px dashed #ff7ab6;
+  outline-offset: -5px;
+}
+/* Narrow touch hand: meld tiles keep their solid bar and Set/Run caption,
+   while each deadwood tile trades the repeated word for a short dashed rule.
+   The same dash leads the "Your deadwood" total as its legend. The word stays
+   in the tree at zero size; borders keep the dash shape in forced colours.
+   The rule sits above the HELD tag's dashed frame (3-5px from the edge). */
+@media (pointer: coarse) and (max-width: 360px) and (orientation: portrait) {
+  body.arcade[data-arcade-game="turdrummy"] #playerHand .hand-group--deadwood .card::after {
+    inset: auto 0 7px;
+    width: 18px;
+    height: 0;
+    margin: 0 auto;
+    overflow: hidden;
+    border-bottom: 2px dashed #5b7366;
+    color: transparent;
+    font-size: 0;
+  }
+  body.arcade[data-arcade-game="turdrummy"] .zone--hand .tr-deadwood .label::before {
+    content: "";
+    display: inline-block;
+    width: 18px;
+    margin-right: 4px;
+    border-bottom: 2px dashed currentColor;
+    vertical-align: middle;
+  }
+}
+
+body.arcade[data-arcade-game="turdspades"] .table.table-arena {
+  background: radial-gradient(ellipse at 50% 38%, #8fbfdc2e, transparent 60%),
+              url("./table-art/felt-noise.svg"),
+              linear-gradient(145deg, #284957, #1b3547 56%, #172534);
+}
+body.arcade[data-arcade-game="turdspades"] .trick {
+  border-color: #91bcc455;
+  background: radial-gradient(ellipse at 50% 20%, #4c72913d, transparent 70%), #0c1c28aa;
+}
+/* The open trick lies on its own mat: pale slate leather with a stitched
+   edge, lighter than the navy felt, so the four cards read as one live
+   group. Only the mat is drawn here; the seat slots keep their geometry. */
+body.arcade[data-arcade-game="turdspades"] .trick::before {
+  background: radial-gradient(ellipse at 50% 36%, #5b879e, #3d677e 58%, #2b4e63);
+  border: 1.5px dashed #e3eef2a6;
+  box-shadow: 0 0 0 3px #2b4e63, 0 0 0 4px #9fc0cf59, inset 0 2px 10px #0007;
+  opacity: 1;
+}
+body.arcade[data-arcade-game="turdspades"] .trick > :is(.head, .table-caption) { position: relative; }
+@media (max-width: 980px) {
+  body.arcade[data-arcade-game="turdspades"] .trick::before { inset: 18px 2px 18px; }
+}
+/* A square tab identifies the lead; the winning card keeps its crown and ring. */
+body.arcade[data-arcade-game="turdspades"] .entry.lead strong {
+  border-radius: 2px;
+  box-shadow: 0 0 0 1.5px #0d1b26, 0 3px 8px #0006;
+}
+body.arcade[data-arcade-game="turdspades"] .entry.lead.winning strong {
+  box-shadow: 0 0 0 1.5px #0d1b26, 0 0 0 3px #ffd76a, 0 3px 8px #0006;
+}
+/* Team colours run from the score line to the seats: mint for You + North,
+   coral for West + East, on the same gunmetal as the table rail. */
+body.arcade[data-arcade-game="turdspades"] .ts-score-strip {
+  border-bottom-color: #8ca9b855;
+  background: linear-gradient(180deg, #1d313f, #132330);
+  box-shadow: inset 0 1px 0 #a9c3cf33, inset 0 -1px 0 #0a141c;
+}
+body.arcade[data-arcade-game="turdspades"] .ts-score-strip .us { padding-left: 8px; box-shadow: inset 3px 0 0 #9effc8; }
+body.arcade[data-arcade-game="turdspades"] .ts-score-strip .them { padding-right: 8px; box-shadow: inset -3px 0 0 #ff9d74; }
+body.arcade[data-arcade-game="turdspades"] .seat-north .seat-count { border-color: #9effc8a6; }
+body.arcade[data-arcade-game="turdspades"] :is(.seat-west, .seat-east) .seat-count { border-color: #ff9d74a6; }
+body.arcade[data-arcade-game="turdspades"] :is(.seat-west, .seat-east) .name { color: #ffc2a8; }
+/* Won tricks stay on each seat as a count chip in its team colour; gold
+   stays with the turn ring and the card winning the trick. */
+body.arcade[data-arcade-game="turdspades"] .ts-trick-stack {
+  background: #0c1c28;
+  color: #9effc8;
+  box-shadow: inset 0 0 0 1.5px #9effc8, 0 2px 6px #06121d99;
+}
+body.arcade[data-arcade-game="turdspades"] :is(.seat-west, .seat-east) .ts-trick-stack {
+  color: #ffc2a8;
+  box-shadow: inset 0 0 0 1.5px #ff9d74, 0 2px 6px #06121d99;
+}
+@media (max-width: 980px) and (orientation: portrait),
+       (max-width: 980px) and (max-height: 400px) and (orientation: landscape) {
+  /* Each seat stays in view above the trick. The cards sit in stable slots
+     so a new play never moves or covers the other faces or their tags. */
+  body.arcade[data-arcade-game="turdspades"] .table.table-arena {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  body.arcade[data-arcade-game="turdspades"] .table :is(.seat-west, .seat-north, .seat-east) {
+    grid-row: 1;
+    display: flex;
+    width: 100%;
+    align-self: center;
+    align-items: center;
+    gap: 3px;
+  }
+  body.arcade[data-arcade-game="turdspades"] .table :is(.seat-west, .seat-north, .seat-east) .seat-head {
+    flex-direction: row;
+    gap: 4px;
+  }
+  body.arcade[data-arcade-game="turdspades"] .table :is(.seat-west, .seat-north, .seat-east) .ts-avatar {
+    width: 23px;
+    height: 23px;
+  }
+  body.arcade[data-arcade-game="turdspades"] .seat-north .seat-count {
+    position: static;
+    transform: none;
+  }
+  body.arcade[data-arcade-game="turdspades"] .seat-north .backs { display: none; }
+  body.arcade[data-arcade-game="turdspades"] .trick { grid-column: 1 / -1; }
+  body.arcade[data-arcade-game="turdspades"] .trick-pile.layout-seat {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+    justify-items: center;
+    width: min(100%, 320px);
+  }
+  body.arcade[data-arcade-game="turdspades"] .trick-pile.layout-seat .entry[data-seat] {
+    position: relative;
+    inset: auto;
+    translate: none;
+    grid-row: 1;
+    width: 44px;
+    height: clamp(48px, 8.6vh, 61px);
+  }
+  body.arcade[data-arcade-game="turdspades"] .trick-pile.layout-seat .entry[data-seat="West"] { grid-column: 1; }
+  body.arcade[data-arcade-game="turdspades"] .trick-pile.layout-seat .entry[data-seat="North"] { grid-column: 2; }
+  body.arcade[data-arcade-game="turdspades"] .trick-pile.layout-seat .entry[data-seat="East"] { grid-column: 3; }
+  body.arcade[data-arcade-game="turdspades"] .trick-pile.layout-seat .entry[data-seat="You"] { grid-column: 4; }
+}
+@media (max-width: 980px) and (max-height: 400px) and (orientation: landscape) {
+  html[data-mobile-game="turdspades"] body.arcade .app .table.table-arena {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) 344px;
+    grid-template-rows: 42px minmax(0, 1fr);
+  }
+  body.arcade[data-arcade-game="turdspades"] .table :is(.seat-west, .seat-north, .seat-east) .name {
+    font-size: .56rem;
+  }
+  body.arcade[data-arcade-game="turdspades"] .table .seat-north .name small { display: none; }
+  body.arcade[data-arcade-game="turdspades"] .table .seat-count { display: inline-block; }
+  body.arcade[data-arcade-game="turdspades"] .trick { grid-column: 1 / 4; }
+  body.arcade[data-arcade-game="turdspades"] .trick-pile.layout-seat .entry[data-seat] {
+    width: min(100%, 41px);
+    height: 52px;
+  }
+}
+body.arcade[data-arcade-game="turdspades"] .ts-avatar {
+  box-shadow: 0 0 0 1px #b5cace, 0 3px 8px #06121d99;
+}
+/* TurdSpades: midnight-navy club felt inside a gunmetal rail with a steel bead. */
+body.arcade[data-arcade-game="turdspades"] .table.table-arena {
+  box-shadow: inset 0 0 0 2px #0f1d29, inset 0 0 0 3px #a9c3cf55, inset 0 0 70px #0007,
+              0 0 0 2px #1a2a36, 0 0 0 3px #8ca9b866, 0 12px 30px #0009;
+}
+/* Whose turn: the acting bot's avatar takes a heavy gold ring (thicker,
+   not only brighter); on your turn or bid, "Your Hand" becomes a solid
+   mint tab. The spread ring pads the tab without moving the row. */
+body.arcade[data-arcade-game="turdspades"][data-turn="west"] .seat-west .ts-avatar,
+body.arcade[data-arcade-game="turdspades"][data-turn="north"] .seat-north .ts-avatar,
+body.arcade[data-arcade-game="turdspades"][data-turn="east"] .seat-east .ts-avatar {
+  box-shadow: 0 0 0 3px #ffd76a, 0 0 0 5px #0c1c28, 0 3px 8px #06121d99;
+}
+body.arcade[data-arcade-game="turdspades"]:is([data-turn="you"], [data-turn="bid"]) .seat-you .name {
+  border-radius: 3px;
+  background: #9effc8;
+  box-shadow: 0 0 0 3px #9effc8;
+  color: #06281c;
+}
+/* On your turn the legal-card glow replaced the shared focus ring; give
+   keyboard focus a cream outline that the glow cannot cover, and lift the
+   focused card above its fan neighbours (phones stack cards with inline
+   z-index, hence the scoped !important; stacking only, no geometry). */
+body.arcade[data-arcade-game="turdspades"] #youCards .card:focus-visible {
+  outline: 3px solid #fff2b8;
+  outline-offset: 2px;
+  z-index: 31 !important;
+}
+
+body.arcade[data-arcade-game="crapeights"] #playTable {
+  background: var(--ce-felt-inlay) center 45% / 560px 300px no-repeat,
+              radial-gradient(ellipse at 45% 26%, #c2a0ff2b, transparent 58%),
+              url("./table-art/felt-noise.svg"),
+              linear-gradient(154deg, #443263, #2d234a 49%, #221b37);
+}
+body.arcade[data-arcade-game="crapeights"] .opp-card:not(.active) { border-color: #d5c0ed59; }
+body.arcade[data-arcade-game="crapeights"] .hud-card:not(.hot):not([data-turn="you"]) { border-color: #c2a8e258; }
+/* Crappy Eights: aubergine felt in a plum-lacquer rail with a lilac bead. */
+body.arcade[data-arcade-game="crapeights"] #playTable {
+  border-color: #33264f;
+  box-shadow: inset 0 0 0 2px #c4a5f64d, inset 0 0 65px #110a22aa, 0 18px 40px #0005;
+}
+/* Your move: the hand rail gains a mint top edge and a brighter title,
+   matching the mint ring on playable cards. */
+body.arcade[data-arcade-game="crapeights"]:has(.hud-card[data-turn="you"]) .hand-wrap {
+  border-top-color: #a3e5c0;
+  box-shadow: inset 0 2px 0 #a3e5c0;
+}
+body.arcade[data-arcade-game="crapeights"]:has(.hud-card[data-turn="you"]) .hand-head strong { color: #c8ffe2; }
+
+/* The licensed Chess pieces stay untouched. Keep the alternate high-contrast board. */
+html:not(.suite-colorblind) body.arcade.chess-page {
+  --board-light: #eedbb8;
+  --board-dark: #785944;
+  --board-selection: #d0df91;
+}
+/* Walnut banding around a holly string, as on an inlaid games table.
+   The spread stays inside .chess-table padding. */
+body.arcade.chess-page #board {
+  background: #382820;
+  box-shadow: 0 0 0 1px #24160f, 0 0 0 2px #e6c995, 0 0 0 4px #4a2f21, 0 6px 16px #0007;
+}
+@media (min-width: 520px) and (max-height: 520px) and (orientation: landscape) {
+  body.arcade.chess-page #board { box-shadow: 0 0 0 1px #24160f, 0 0 0 2px #e6c995, 0 0 0 3px #4a2f21, 0 8px 18px #0008; }
+}
+/* The game is untimed, so the player strips act as the clock plates:
+   walnut nameplates with cream type above and below the board. */
+body.arcade.chess-page .player-strip {
+  border-radius: 6px;
+  background: linear-gradient(90deg, #2c211c, #1e1a19 70%);
+  box-shadow: inset 0 0 0 1px #a7835a66, inset 0 1px 0 #efcfad22;
+}
+body.arcade.chess-page .player-strip > span:first-child { color: #fff1d6; }
+body.arcade.chess-page .player-strip .captured { color: #e2d2bb; }
+/* The side to move lights its plate like a running clock: a brass leading
+   edge and frame. It follows the live board label, so review and finished
+   games leave both plates at rest. Paint only; the strip height is measured. */
+body.arcade.chess-page .chess-table:has(> #board[aria-label*=" White to move."]) > .player-strip:has(> [data-color="w"]),
+body.arcade.chess-page .chess-table:has(> #board[aria-label*=" Black to move."]) > .player-strip:has(> [data-color="b"]) {
+  background: linear-gradient(90deg, #4a3423, #2a211d 72%);
+  box-shadow: inset 4px 0 0 #e0b877, inset 0 0 0 1px #e0b877b3, inset 0 1px 0 #ffe7b833;
+}
+/* History marks the position on the board with the same brass edge. */
+body.arcade.chess-page .chess-moves button[aria-current="true"] {
+  box-shadow: inset 3px 0 0 #e0b877;
+  color: #fff1d6;
+}
+/* Inlay: a maple field and walnut squares share one near-vertical grain.
+   Dark streaks only read on maple and pale figure only on walnut, so the
+   grain runs through the board without blurring the alternating squares.
+   A fine seam marks every square edge. */
+html:not(.suite-colorblind) body.arcade.chess-page #board cg-board {
+  background-image: radial-gradient(ellipse at 24% 7%, #ffe8c62e, transparent 72%),
+                    linear-gradient(90deg, #2a170c33 1px, transparent 0),
+                    linear-gradient(#2a170c33 1px, transparent 0),
+                    repeating-linear-gradient(93deg, transparent 0 5px, #f7d3a41c 6px 7px, transparent 8px 15px),
+                    repeating-linear-gradient(91deg, transparent 0 2px, #6b3e2416 3px, transparent 4px 9px),
+                    conic-gradient(var(--board-dark) 25%, var(--board-light) 0 50%, var(--board-dark) 0 75%, var(--board-light) 0);
+  background-size: 100% 100%, 12.5% 100%, 100% 12.5%, 100% 100%, 100% 100%, 25% 25%;
+}
+/* Coordinates use the inlay's own inks: walnut on maple, maple on walnut.
+   The selection fill is pale on either square, so it keeps the dark ink.
+   cg-board opts out of forced colours, so these inks must stay out too. */
+@media not all and (forced-colors: active) {
+  html:not(.suite-colorblind) body.arcade.chess-page #board .square .coord { color: #3d2617; }
+  html:not(.suite-colorblind) body.arcade.chess-page #board .square.dark:not(.selected) .coord { color: #fbead0; }
+}
+/* The move lands: the destination keeps a solid frame and gains a contact
+   shadow under the arriving piece; the origin is a pale, dashed vacancy. */
+html:not(.suite-colorblind) body.arcade.chess-page #board square.last-move:not(.selected, .check, .hinted) {
+  background: radial-gradient(ellipse 40% 26% at 50% 70%, #24120a52, transparent), #ecbd782e;
+  box-shadow: inset 0 0 0 1px #2c201c;
+}
+html:not(.suite-colorblind) body.arcade.chess-page #board square.last-from:not(.selected, .check, .hinted) {
+  background: #fff3d81f;
+  box-shadow: none;
+}
+html:not(.suite-colorblind) body.arcade.chess-page #board square.last-move:not(.selected, .check, .hinted)::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px solid #ffe2a8;
+  box-shadow: 0 0 0 1px #2c201c, inset 0 0 0 1px #2c201c;
+  pointer-events: none;
+}
+html:not(.suite-colorblind) body.arcade.chess-page #board square.last-from:not(.selected, .check, .hinted)::before {
+  inset: 3px;
+  border-style: dashed;
+  box-shadow: none;
+}
+@media not all and (forced-colors: active) {
+  html:not(.suite-colorblind) body.arcade.chess-page #board square.last-from:not(.selected, .check, .hinted)::before {
+    border-color: #3d2617;
+    outline: 1px dashed #fbead0;
+  }
+}
+body.arcade.chess-page .turn-card {
+  border-color: #a7835a;
+  background: linear-gradient(150deg, #3b2d28, #272929 75%);
+  box-shadow: inset 0 1px 0 #efcfad44, 0 7px 18px #0003;
+}
+body.arcade.chess-page .turn-card { border-top-color: #e0b877; }
+body.arcade.chess-page .turn-card #turn { color: #fff1d6; }
+body.arcade.chess-page .turn-card .chess-kicker,
+body.arcade.chess-page .chess-header h1 span { color: #f2c68f; }
+
+@media (forced-colors: active) {
+  /* Forced colors discard CSS gradients by default. Keep the checkerboard
+     only within the board, using the same system tones as shared Chess. */
+  html body.arcade.chess-page[data-arcade-game="chess"] #board cg-board {
+    --chess-board-light: color-mix(in srgb, Canvas 78%, CanvasText);
+    --chess-board-dark: color-mix(in srgb, Canvas 57%, CanvasText);
+    forced-color-adjust: none;
+    background: conic-gradient(var(--chess-board-dark) 25%, var(--chess-board-light) 0 50%,
+      var(--chess-board-dark) 0 75%, var(--chess-board-light) 0) 0 0 / 25% 25% Canvas;
+  }
+  html body.arcade.chess-page[data-arcade-game="chess"] #board cg-board::before { content: none; }
+  body.arcade.chess-page #board .square .coord { color: CanvasText; }
+  body.arcade.chess-page #board .square:focus-visible { outline-color: Highlight; }
+  body.arcade.chess-page #board .check-label { background: CanvasText; color: Canvas; }
+  html body.arcade.chess-page[data-arcade-game="chess"] #board square.last-move:not(.selected, .check, .hinted) {
+    background: transparent;
+    box-shadow: none;
+  }
+  html body.arcade.chess-page[data-arcade-game="chess"] #board square.last-move:not(.selected, .check, .hinted)::before {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border: 2px solid CanvasText;
+    box-shadow: 0 0 0 1px Canvas;
+    pointer-events: none;
+  }
+  html body.arcade.chess-page[data-arcade-game="chess"] #board square.last-from:not(.selected, .check, .hinted)::before {
+    inset: 3px;
+    border-style: dashed;
+    box-shadow: none;
+  }
+  html body.arcade.chess-page[data-arcade-game="chess"] #board square.selected {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px Canvas, inset 0 0 0 5px Highlight;
+  }
+  html body.arcade.chess-page[data-arcade-game="chess"] #board square.check {
+    background: transparent;
+    outline: 4px double CanvasText;
+    outline-offset: -4px;
+    box-shadow: inset 0 0 0 4px Canvas;
+  }
+  html body.arcade.chess-page[data-arcade-game="chess"] #board square.move-dest:not(.oc)::after {
+    background: CanvasText;
+    box-shadow: 0 0 0 2px Canvas;
+  }
+  html body.arcade.chess-page[data-arcade-game="chess"] #board square.move-dest.oc::after {
+    background: transparent;
+    border-color: CanvasText;
+    border-radius: 35%;
+    box-shadow: inset 0 0 0 2px Canvas;
+    -webkit-mask: none;
+    mask: none;
+  }
+  body.arcade.chess-page .chess-table:has(> #board[aria-label*=" White to move."]) > .player-strip:has(> [data-color="w"]),
+  body.arcade.chess-page .chess-table:has(> #board[aria-label*=" Black to move."]) > .player-strip:has(> [data-color="b"]),
+  body.arcade.chess-page .chess-moves button[aria-current="true"]:not(:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+body.arcade:has(#suite-music-toggle) .suite-music-status {
+  border-top-color: var(--solo-frame-edge);
+  background: #141c1b;
+}
+body.arcade:not(.chess-page):has(> #suite-music-toggle) .suite-music-status {
+  padding-right: calc(var(--solo-dock-edge) + 50px);
+}
+
+/* Reserve space only for floating buttons. Games with an inline slot keep it. */
+body.arcade:not(.chess-page):has(#suite-music-status) > #suite-music-toggle {
+  position: fixed !important;
+  top: auto !important;
+  right: var(--solo-dock-edge) !important;
+  bottom: max(1px, env(safe-area-inset-bottom)) !important;
+  left: auto !important;
+  z-index: 9999;
+  margin: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border-color: var(--solo-frame-edge);
+  box-shadow: none;
+  font-size: 1rem;
+}
+
+body.arcade:not(.chess-page):has(#suite-music-status) > #suite-music-toggle[aria-pressed="true"] {
+  background: #203530;
+  border-color: #8ee8c7;
+}
+
+/* Turdanoid first run: the launch pill (or the canvas prompt with no pill) is the
+   one launch action. The decorative coach chip only teaches dragging, holds still,
+   and steps back so the pulsing pill leads. */
+body.arcade[data-arcade-game="turdanoid"] #arcHint {
+  padding: 7px 14px;
+  border-width: 1px;
+  box-shadow: none;
+  font-size: 0;
+  letter-spacing: 0;
+  animation: none;
+}
+body.arcade[data-arcade-game="turdanoid"] #arcHint::before {
+  content: "\2194\FE0E  Drag to move";
+  font-size: 14px;
+  letter-spacing: .08em;
+}
+
+/* Crappy Eights: cards you cannot play keep readable ranks and say so with a
+   dashed inner edge, not only a darker tint. */
+body.arcade[data-arcade-game="crapeights"] #playerHand .card-btn:not(.playable) {
+  filter: saturate(.7) brightness(.93);
+  outline: 2px dashed #34433cb3;
+  outline-offset: -6px;
+}
+body.arcade[data-arcade-game="crapeights"] #playerHand .card-btn:not(.playable):focus-visible {
+  outline: 3px solid #eeca79;
+  outline-offset: 2px;
+}
+/* Desktop: side seats rise when the felt is short, so their card fans end above
+   the YOUR HAND header instead of covering it. */
+@media (min-width: 761px) {
+  body.arcade[data-arcade-game="crapeights"] :is(#oppCard1, #oppCard3) { top: clamp(0px, calc(100% - 188px), 22%); }
+}
+/* Short desktop felt: stack the suit chips beside the discard pile so they no
+   longer sit on the pile counts. */
+@media (min-width: 761px) and (max-height: 860px) {
+  body.arcade[data-arcade-game="crapeights"] .suit-row {
+    left: calc(50% + 112px);
+    bottom: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    transform: none;
+  }
+}
+
+/* TurdSpades desktop: each bot seat already shows "13 cards | bid 2 | tricks 0";
+   drop the second "13 cards · 2" badge that repeated it. Phones hide that line
+   and keep the badge. */
+@media (min-width: 981px) {
+  body.arcade[data-arcade-game="turdspades"] .seat-count { display: none; }
+}
+
+/* Turd Rummy: the stock stack is as wide as the back card it holds, so the
+   count chip sits beside the deck instead of over it. */
+body.arcade[data-arcade-game="turdrummy"] #stockPile .stock-stack { width: auto; height: auto; }
+
+/* Turdtris phone dock: the run strip is 36px tall, so each preview carries its
+   label beside the piece instead of above it. Hold and Next stay inside their
+   row, clear of Left/Rotate, and the pieces keep their 3:2 canvas shape. */
+@media (max-width: 980px) {
+  html[data-mobile-game="turdtris"] .mobile-piece-queue { grid-template-columns: auto auto; gap: 4px; align-self: center; }
+  html[data-mobile-game="turdtris"] .mobile-preview-box {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: auto 42px;
+    align-items: center;
+    gap: 3px;
+    height: 34px;
+    padding: 2px 3px 2px 5px;
+  }
+  html[data-mobile-game="turdtris"] .mobile-preview-box span { font-size: .55rem; line-height: 1; letter-spacing: .06em; }
+  html[data-mobile-game="turdtris"] .mobile-preview-box canvas { width: 42px; height: 28px; }
+  /* Hold already used this piece: dim and strike the label, not just the color. */
+  html[data-mobile-game="turdtris"] .mobile-preview-box.is-used span { text-decoration: line-through; }
+}
+@media (max-width: 980px) and (orientation: landscape) {
+  html[data-mobile-game="turdtris"] .mobile-run-strip { height: auto; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+
+/* Forced colours drop box-shadows, so the turn and selection cues above
+   fall back to system-colour outlines. */
+@media (forced-colors: active) {
+  body.arcade[data-arcade-game="turdspades"] .trick-pile::before { content: none; }
+  body.arcade[data-arcade-game="turdrummy"] .table[data-stage="discard"] #discardWell { outline-color: CanvasText; }
+  body.arcade[data-arcade-game="turdrummy"] .app:has(#discardBtn:not(:disabled)) .table[data-stage="discard"] #discardWell { outline-color: Highlight; }
+  body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .status:is([data-tone="win"], [data-tone="loss"], [data-tone="push"]) { border-color: CanvasText; }
+  body.arcade[data-arcade-game="crapjack"] .table-stage:has(> .hand.active-hand):has(> #splitHandWrap:not([hidden])) > :is(#playerHandWrap, #splitHandWrap):not(.active-hand) .cards,
+  body.arcade[data-arcade-game="crapjack"] .table[data-phase="betting"] .table-stage > .hand .cards { filter: none; }
+  body.arcade[data-arcade-game="crapjack"] .hand.active-hand,
+  body.arcade[data-arcade-game="turdrummy"] .zone--hand:has(.card-button),
+  body.arcade[data-arcade-game="turdrummy"] .app:has(#drawStockBtn:not(:disabled)) #stockWell,
+  body.arcade[data-arcade-game="turdrummy"] .app:has(#drawDiscardBtn:not(:disabled)) #discardWell,
+  body.arcade[data-arcade-game="crapeights"]:has(.hud-card[data-turn="you"]) .hand-wrap,
+  body.arcade[data-arcade-game="turdomania"] .tile.hot:not(.cursor) {
+    outline: 3px solid Highlight;
+    outline-offset: -3px;
+  }
+  body.arcade[data-arcade-game="turdspades"]:is([data-turn="you"], [data-turn="bid"]) .seat-you .name,
+  body.arcade[data-arcade-game="turdspades"][data-turn="west"] .seat-west .ts-avatar,
+  body.arcade[data-arcade-game="turdspades"][data-turn="north"] .seat-north .ts-avatar,
+  body.arcade[data-arcade-game="turdspades"][data-turn="east"] .seat-east .ts-avatar {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+}

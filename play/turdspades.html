@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#102016">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="assets/turdsuite.css">
+  <link rel="stylesheet" href="assets/turdsuite.css?v=ed33f4ac3050c248">
 <link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
   <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
@@ -275,7 +275,7 @@
       border: 1px solid rgba(255,255,255,.07);
       background:
         var(--suite-felt-light),
-        var(--suite-felt-noise),
+        url("assets/table-art/felt-noise.svg"),
         radial-gradient(ellipse 80% 60% at 50% 35%, var(--felt-1), var(--felt-2) 55%, var(--felt-3) 100%);
       box-shadow: var(--suite-rail), inset 0 0 0 1px rgba(255,214,150,.14), inset 0 0 70px rgba(0,0,0,.35);
     }
@@ -401,7 +401,7 @@
       border-radius: 5px;
       background:
         radial-gradient(circle at 50% 30%, rgba(255,255,255,.14), transparent 45%),
-        var(--suite-card-back-weave) var(--suite-card-back-base);
+        url("assets/table-art/card-back-weave.svg") var(--suite-card-back-base);
       box-shadow: inset 0 0 0 2px #f4f1e6, inset 0 0 0 3px rgba(0,0,0,.2), -2px 4px 10px rgba(0,0,0,.42), 0 1px 0 rgba(255,255,255,.06);
       position: relative;
       overflow: hidden;
@@ -424,7 +424,7 @@
       border-radius: 9px;
       border: 0;
       padding: 0;
-      background: var(--paper-sheen), var(--suite-paper);
+      background: var(--paper-sheen), url("assets/table-art/paper-texture.svg"), var(--suite-paper);
       color: var(--suite-card-black);
       display: grid;
       grid-template-rows: auto 1fr auto;
@@ -496,7 +496,7 @@
       background:
         var(--paper-sheen),
         linear-gradient(160deg, rgba(60,75,95,.18), rgba(120,135,155,.06) 40%, rgba(30,40,55,.22) 100%),
-        var(--suite-paper);
+        url("assets/table-art/paper-texture.svg"), var(--suite-paper);
     }
     body.spades-broken .card[data-suit="S"]::before, body.spades-broken .entry[data-suit="S"]::before { border-color: rgba(55,70,90,.45); }
     body.spades-broken .card[data-suit="S"] .s, body.spades-broken .entry[data-suit="S"] .ec {
@@ -514,7 +514,7 @@
       border-color: rgba(255,215,106,.28);
       background:
         radial-gradient(ellipse 70% 60% at 50% 45%, rgba(0,0,0,.06), rgba(0,0,0,.42)),
-        var(--suite-felt-noise),
+        url("assets/table-art/felt-noise.svg"),
         linear-gradient(180deg, #0f3d30, #0a2c23);
       box-shadow: inset 0 8px 22px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.35), inset 0 -1px 0 rgba(255,255,255,.05), 0 1px 0 rgba(255,255,255,.07);
       display: grid;
@@ -557,7 +557,7 @@
       border: 0;
       border-radius: 9px;
       padding: 0;
-      background: var(--paper-sheen), var(--suite-paper);
+      background: var(--paper-sheen), url("assets/table-art/paper-texture.svg"), var(--suite-paper);
       color: var(--suite-card-black);
       box-shadow: var(--suite-card-shadow), var(--suite-paper-edge);
       display: grid;
@@ -585,7 +585,6 @@
       box-shadow: 0 3px 8px rgba(0,0,0,.38);
       white-space: nowrap; z-index: 1;
     }
-    .entry[data-seat="You"] strong { background: linear-gradient(180deg, #ffe9b5, #ffc857); }
     .entry[data-seat="West"] strong, .entry[data-seat="East"] strong { background: linear-gradient(180deg, #ffd6c4, #ff9d74); }
     .entry[data-seat] br { display: none; }
     .entry .ec { display: grid; justify-items: center; line-height: 1; font-weight: 900; font-size: clamp(1.1rem,2.6vw,1.45rem); padding-top: 6px; }
@@ -593,7 +592,7 @@
     .entry.pop-in { animation: suitePop .34s cubic-bezier(.2,1.4,.4,1) backwards; }
     .entry.winning {
       transform: translateY(-4px) scale(1.04);
-      box-shadow: 0 0 0 2px var(--gold), 0 0 22px rgba(255,215,106,.55), var(--suite-card-shadow-lift), var(--suite-paper-edge);
+      box-shadow: 0 0 0 2px var(--gold), var(--suite-card-shadow-lift), var(--suite-paper-edge);
     }
     .entry.winning::before { border-color: rgba(201,150,40,.5); }
     .entry.winning strong { box-shadow: 0 0 0 1px var(--gold), 0 3px 8px rgba(0,0,0,.38); }
@@ -1119,10 +1118,11 @@
   </style>
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
-<link rel="stylesheet" href="assets/mobile-fit.css">
-<script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/mobile-fit.css?v=9cb9e921908f6401">
+<script src="assets/mobile-fit.js?v=dc1d1c7f8ebcfef2" defer></script>
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
-<link rel="stylesheet" href="stalemate/solo-play-finish.css?v=d0d4699c6f6c04e8">
+<link rel="stylesheet" href="assets/solo-play-finish.css?v=6f348c3aeb3a7882">
+<link rel="stylesheet" href="stalemate/solo-music-finish.css?v=727f82d06bafd79f">
 </head>
 <body class="suite-ambient suite-no-zoom arcade" data-arcade-game="turdspades" data-suite-no-difficulty="1">
   <div class="guide" id="guide" role="dialog" aria-modal="true" aria-label="Spades rules">
@@ -1838,11 +1838,12 @@
       }
       el.trickMeta.textContent = `${state.trick.length}/4 cards`;
       const best = winnerEntry(state.trick); // cosmetic read-only: highlight the card currently winning the trick
-      el.trickPile.innerHTML = state.trick.map((e) => {
+      el.trickPile.innerHTML = state.trick.map((e, i) => {
         const red = (e.card.suit === 'H' || e.card.suit === 'D') ? 'red' : '';
         const winning = best && best.card.id === e.card.id ? 'winning' : '';
+        const led = i === 0 ? 'lead' : '';
         const pop = dealAnimClass(`${state.round}:trick:${e.card.id}`, 'pop-in');
-        return `<div class="entry ${red} ${winning} ${pop}" data-seat="${NAMES[e.player]}" data-suit="${e.card.suit}" data-rank="${rankLabel(e.card.rank)}"><strong>${NAMES[e.player]}</strong><br><b class="ec">${rankLabel(e.card.rank)}<i>${SUIT_SYMBOL[e.card.suit]}</i></b></div>`;
+        return `<div class="entry ${red} ${winning} ${led} ${pop}" data-seat="${NAMES[e.player]}" data-suit="${e.card.suit}" data-rank="${rankLabel(e.card.rank)}"><strong>${NAMES[e.player]}</strong><br><b class="ec">${rankLabel(e.card.rank)}<i>${SUIT_SYMBOL[e.card.suit]}</i></b></div>`;
       }).join('');
     }
 

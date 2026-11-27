@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0f1914">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="assets/turdsuite.css">
+  <link rel="stylesheet" href="assets/turdsuite.css?v=ed33f4ac3050c248">
 <link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
   <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
@@ -413,6 +413,7 @@
       justify-content: space-between;
       gap: 8px;
       margin-bottom: 4px;
+      padding-right: calc(44px + 8px + env(safe-area-inset-right, 0px));
     }
 
     body.jack-table-first .topbar > div:first-child {
@@ -607,7 +608,7 @@
       margin: 0;
       background:
         var(--suite-felt-light),
-        var(--suite-felt-noise),
+        url("assets/table-art/felt-noise.svg"),
         radial-gradient(ellipse 80% 60% at 50% 10%, rgba(120, 235, 170, 0.14), transparent 70%),
         linear-gradient(165deg, #1b5643 0%, var(--felt) 42%, var(--felt-2) 100%);
       min-height: min(72vh, 640px);
@@ -1541,7 +1542,7 @@
       border-radius: 9px;
       background:
         linear-gradient(140deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 46%),
-        var(--suite-paper);
+        url("assets/table-art/paper-texture.svg"), var(--suite-paper);
       border: 0;
       color: var(--suite-card-black);
       box-shadow: var(--suite-card-shadow), var(--suite-paper-edge);
@@ -1687,7 +1688,7 @@
 
     /* card back: shared weave + white margin + Toilet Boss motif */
     .playing-card.back {
-      background: var(--suite-card-back-weave) var(--suite-card-back-base);
+      background: url("assets/table-art/card-back-weave.svg") var(--suite-card-back-base);
       background-size: 18px 18px;
       color: #d9ffe9;
       box-shadow:
@@ -2784,10 +2785,11 @@
   </style>
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
-<link rel="stylesheet" href="assets/mobile-fit.css">
-<script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/mobile-fit.css?v=9cb9e921908f6401">
+<script src="assets/mobile-fit.js?v=dc1d1c7f8ebcfef2" defer></script>
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
-<link rel="stylesheet" href="stalemate/solo-play-finish.css?v=d0d4699c6f6c04e8">
+<link rel="stylesheet" href="assets/solo-play-finish.css?v=6f348c3aeb3a7882">
+<link rel="stylesheet" href="stalemate/solo-music-finish.css?v=727f82d06bafd79f">
 </head>
 <body class="suite-ambient suite-no-zoom arcade" data-arcade-game="crapjack">
   <div id="jackLiveRegion" class="sr-live" aria-live="polite" aria-atomic="true"></div>
@@ -3264,6 +3266,9 @@
         );
       }
       if (document.body.classList.contains('jack-table-first')) syncJackStatMirrors();
+      if (window.SuiteArcadeA11y?.syncArcadeA11yMount) {
+        window.SuiteArcadeA11y.syncArcadeA11yMount(document);
+      }
     }
 
     function schedulePlayTableFocus() {
@@ -3440,6 +3445,15 @@
     function statusBadgeAndTone(text) {
       const note = String(text || '').toLowerCase();
       if (!note) return { tone: 'neutral', badge: '' };
+      if (note.includes('round live.') || note.startsWith('choose whether')) {
+        return { tone: 'neutral', badge: 'TABLE TALK' };
+      }
+      if (note.startsWith('dealer blackjack')) {
+        return { tone: 'loss', badge: 'DEALER 21' };
+      }
+      if (note.startsWith('double blackjack')) {
+        return { tone: 'push', badge: 'PUSH' };
+      }
       if (note.includes('blackjack') || note.includes('paid') || note.includes('wins') || note.includes('beats dealer') || note.includes('even money')) {
         return { tone: 'win', badge: 'PAYOUT' };
       }
@@ -3449,7 +3463,7 @@
       if (note.includes('surrender')) {
         return { tone: 'loss', badge: 'RETREAT' };
       }
-      if (note.includes('bust') || note.includes('dealer blackjack') || note.includes('flushed') || note.includes('loses to dealer')) {
+      if (note.includes('bust') || note.includes('flushed') || note.includes('loses to dealer')) {
         return { tone: 'loss', badge: 'BUSTED' };
       }
       if (note.includes('deal') || note.includes('bet') || note.includes('insurance') || note.includes('shuffle') || note.includes('shoe')) {

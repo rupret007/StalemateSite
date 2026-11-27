@@ -14,7 +14,7 @@
 <meta name="theme-color" content="#061018">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <title>Turdanoid — Bricks. Busted.</title>
-<link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/turdsuite.css?v=ed33f4ac3050c248">
 <link rel="stylesheet" href="assets/arcade.css">
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 <style>
@@ -40,7 +40,7 @@
   #stage{position:relative;width:100%;height:100%;display:flex;align-items:stretch;justify-content:center;gap:0}
   #playShell{position:relative;width:100%;height:100%;flex:0 0 auto;max-width:100%;max-height:100%}
   #stage.layout-wide #playShell{box-shadow:0 28px 70px rgba(0,0,0,.55),0 0 0 1px var(--panel-border)}
-  canvas{display:block;width:100%;height:100%;border-radius:18px;box-shadow:0 22px 60px rgba(0,0,0,.55), 0 0 0 1px var(--panel-border), inset 0 0 0 1px rgba(255,255,255,.04);background:linear-gradient(180deg,var(--ta-ink-deep,#061018) 0%,var(--ta-ink,#0a1820) 50%,var(--ta-ink-mid,#123040) 100%);touch-action:pinch-zoom}
+  canvas{display:block;width:100%;height:100%;border-radius:18px;box-shadow:0 22px 60px rgba(0,0,0,.55), 0 0 0 1px var(--panel-border), inset 0 0 0 1px rgba(255,255,255,.04);background:linear-gradient(180deg,#100e0c 0%,#1a1612 48%,#2a2218 100%);touch-action:pinch-zoom}
   .side-gutter{flex:1 1 0;min-width:0;max-width:min(420px,22vw);display:none;pointer-events:none;padding:max(12px,var(--safe-top)) 10px max(12px,var(--safe-bot));align-self:stretch}
   #stage.layout-wide .side-gutter{display:flex;flex-direction:column;justify-content:center}
   .side-art{padding:16px 14px;border-radius:16px;border:1px solid var(--panel-border);background:linear-gradient(165deg,rgba(232,244,239,.08),rgba(6,16,24,.72));box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 0 1px rgba(232,197,106,.14),0 16px 40px rgba(0,0,0,.35)}
@@ -56,8 +56,8 @@
   #stage.layout-wide #powers .chip{font-size:10px;min-width:0;width:100%}
 
   /* HUD — glass chips so the numbers read over any wall */
-  .hud{position:absolute;left:10px;right:10px;top:max(10px,calc(var(--safe-top) + 6px));display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:clamp(11px,2.6vw,14px);text-shadow:0 2px 8px rgba(0,0,0,.75);gap:8px}
-  .hud .col{display:flex;flex-direction:column;gap:1px;padding:7px 12px 8px;border-radius:14px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.16),0 10px 24px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-width:74px}
+  .hud{position:absolute;left:10px;right:10px;top:max(10px,calc(var(--safe-top) + 6px));z-index:4;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;font-weight:700;letter-spacing:.02em;text-transform:uppercase;font-size:clamp(11px,2.6vw,14px);text-shadow:0 2px 8px rgba(0,0,0,.75);gap:8px}
+  .hud .col{display:flex;flex-direction:column;gap:1px;padding:7px 12px 8px;border-radius:14px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.16),0 10px 24px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-width:74px;pointer-events:auto}
   .hud .lbl{font-size:.72em;color:var(--ta-muted,#9ab4aa);opacity:1;letter-spacing:.08em}
   .hud .val{font-size:1.45em;color:var(--accent);text-shadow:0 0 16px rgba(62,207,154,.4),0 2px 6px rgba(0,0,0,.75);font-variant-numeric:tabular-nums}
   .hud .right{text-align:right;margin-right:0}
@@ -201,6 +201,9 @@
   body.arcade #mobileLaunch{width:max-content;max-width:calc(100% - 24px);white-space:nowrap;font-size:clamp(14px,4vw,18px)}
   /* Keep both the caught ball/paddle and the first-play hint unobstructed. */
   #arcHint{bottom:max(156px,calc(var(--safe-bot) + 150px))}
+  @media (orientation:portrait) and (max-width:680px) and (min-height:480px){
+    #playShell:has(#arcHint:not([hidden])) #hype{top:auto;bottom:max(196px,calc(var(--safe-bot) + 190px))}
+  }
   #playShell:has(#mobileLaunch.show){--powers-bottom:max(152px,calc(var(--safe-bot) + 146px))}
   @keyframes pulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(1.06)}}
 
@@ -213,7 +216,7 @@
     .hud .col{padding:4px 9px 5px;min-width:0}
   }
   @media (max-width:520px){
-    .hud{left:max(10px, calc(env(safe-area-inset-left, 0px) + 68px));right:max(10px,calc(env(safe-area-inset-right, 0px) + 4px));padding:4px 2px 5px;border-radius:16px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.26),0 10px 22px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);gap:0;align-items:stretch}
+    .hud{left:max(10px, calc(env(safe-area-inset-left, 0px) + 68px));right:max(10px,calc(env(safe-area-inset-right, 0px) + 98px));padding:4px 2px 5px;border-radius:16px;background:linear-gradient(180deg,rgba(255,248,220,.12),rgba(255,255,255,.02)),var(--panel);border:1px solid var(--panel-border);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 0 0 1px rgba(232,197,106,.26),0 10px 22px rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);gap:0;align-items:stretch}
     .hud .right{margin-right:0px;text-align:center}
     .hud .center{margin-right:0px;text-align:center}
     .hud .col{padding:3px 7px 4px;min-width:0;flex:1 1 0;align-items:center;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0}
@@ -255,8 +258,9 @@
   #coachCard button{padding:12px 28px;font-size:15px;font-weight:800}
   #coachStep{font-size:12px;letter-spacing:.2em;text-transform:uppercase;opacity:.65;margin-bottom:6px}
 </style>
-<link rel="stylesheet" href="assets/mobile-fit.css">
-<script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/mobile-fit.css?v=9cb9e921908f6401">
+<script src="assets/mobile-fit.js?v=dc1d1c7f8ebcfef2" defer></script>
+<link rel="stylesheet" href="assets/solo-play-finish.css?v=6f348c3aeb3a7882">
 <link rel="stylesheet" href="stalemate/stalemate-overlay.css">
 <meta property="og:title" content="Stalemate Arcade">
 <meta property="og:description" content="Nine free browser games, including chess. Music by Stalemate.">
@@ -266,7 +270,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
-<link rel="stylesheet" href="stalemate/solo-play-finish.css?v=d0d4699c6f6c04e8">
+<link rel="stylesheet" href="stalemate/solo-music-finish.css?v=727f82d06bafd79f">
 </head>
 <body class="arcade" data-arcade-game="turdanoid" data-suite-no-bg="1">
 <div id="app" role="main">
@@ -409,8 +413,9 @@
 <script src="games/turdanoid-brick-core.js"></script>
 <script src="games/turdanoid-audio-core.js"></script>
 <script src="games/turdanoid-levels-core.js"></script>
+<script src="games/turdanoid-physics-core.js"></script>
 <script src="games/turdanoid-worlds-core.js"></script>
-<script src="games/turdanoid-sprites-core.js?v=291cbfad320c500d"></script>
+<script src="games/turdanoid-sprites-core.js?v=f8b606f1d148edf4"></script>
 <script src="games/turdanoid-brick-sprite-core.js"></script>
 <script src="games/turdanoid-shards-core.js"></script>
 <script src="games/turdanoid-boss-core.js"></script>
@@ -690,7 +695,6 @@ let fxParticles = [];     // smoke puffs and other pure-cosmetic particles, adva
 let wallPattern = null;   // pre-rendered sewer brick wall (rebuilt on resize)
 let bgDrips = [];         // slime drips hanging from the top edge
 let lastRenderTime = 0;
-let levelIntro = 0;
 let clearParty = null;
 let shards = [];
 let impactRings = [];
@@ -711,6 +715,7 @@ const TBOSS = typeof TurdanoidBoss !== 'undefined' ? TurdanoidBoss : null;
 const TCOACH = typeof TurdanoidCoach !== 'undefined' ? TurdanoidCoach : null;
 const TAUDIO = typeof TurdanoidAudio !== 'undefined' ? TurdanoidAudio : null;
 const TLEVELS = typeof TurdanoidLevels !== 'undefined' ? TurdanoidLevels : null;
+const TPHYSICS = globalThis.TurdanoidPhysics;
 const TPERF = typeof TurdanoidPerf !== 'undefined' ? TurdanoidPerf : null;
 const TTALLY = typeof TurdanoidTally !== 'undefined' ? TurdanoidTally : null;
 let titleDemoBall = { x: 0, y: 0, vx: 2.2, vy: -1.8, r: 9 };
@@ -990,24 +995,87 @@ function buildStars(){
   for(let i=0;i<n;i++) bgStars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.4+0.2,a:Math.random()*0.4+0.2,t:Math.random()*Math.PI*2});
 }
 
-// Faint checker for the play field, cached per size so it costs one blit a frame.
+// The gameplay court is composed offscreen once per size and world. The well
+// stays dark; the cabinet returns and the floor joints carry the depth.
 let cleanFieldCache = null;
-function paintCleanField(W, H){
-  const key = W + 'x' + H;
+function paintCleanField(W, H, world){
+  const key = W + 'x' + H + ':' + (world?.id || '');
   if(!cleanFieldCache || cleanFieldCache.key !== key){
-    const off = document.createElement('canvas');
-    off.width = 32; off.height = 32;
+    const off = cleanFieldCache?.canvas || document.createElement('canvas');
+    off.width = W; off.height = H;
     const o = off.getContext('2d');
-    o.fillStyle = 'rgba(255,255,255,.035)';
-    o.fillRect(0, 0, 16, 16); o.fillRect(16, 16, 16, 16);
-    cleanFieldCache = { key, pattern: ctx.createPattern(off, 'repeat') };
+    const id = world?.id || 'bathroom';
+    const cab = id === 'throne' ? ['#14110c', '#3a2c18', '#24180e', 'rgba(214,176,96,.2)']
+      : id === 'candy' ? ['#140e14', '#3a2230', '#24141c', 'rgba(214,150,180,.18)']
+      : id === 'toxic' ? ['#10140f', '#243228', '#141c14', 'rgba(160,186,140,.16)']
+      : id === 'sewer' ? ['#101418', '#2a3430', '#161c18', 'rgba(196,180,150,.16)']
+      : ['#10161c', '#2a3c44', '#152028', 'rgba(190,204,198,.16)'];
+    o.fillStyle = cab[0];
+    o.fillRect(0, 0, W, H);
+    o.fillStyle = cab[1];
+    o.fillRect(0, 0, W, H * .38);
+    o.fillStyle = 'rgba(0,0,0,.3)';
+    o.fillRect(0, H * .32, W, H * .08);
+    const lip = Math.max(10, H * .026);
+    o.fillStyle = '#07080c';
+    o.fillRect(0, 0, W, lip);
+    o.fillStyle = cab[3];
+    o.fillRect(0, lip, W, 2);
+    const floor = o.createLinearGradient(0, H * .38, 0, H);
+    floor.addColorStop(0, '#14181e');
+    floor.addColorStop(.4, '#0c1014');
+    floor.addColorStop(1, '#07090c');
+    o.fillStyle = floor;
+    o.fillRect(0, H * .38, W, H * .62);
+    // Joints stay in the side thirds. The centre lane is a flat tread so the ball reads.
+    o.strokeStyle = 'rgba(255,236,210,.14)';
+    o.lineWidth = 1;
+    o.beginPath();
+    for(const lane of [-.42, -.28, .28, .42]){
+      o.moveTo(W * (.5 + lane * .35), H * .5);
+      o.lineTo(W * (.5 + lane * .92), H);
+    }
+    for(const joint of [.8, .92]){
+      o.moveTo(W * .08, H * joint);
+      o.lineTo(W * .92, H * joint);
+    }
+    o.stroke();
+    for(const side of [0, 1]){
+      const x = side ? W - 5 : 0;
+      o.fillStyle = '#050608';
+      o.fillRect(x, 0, 5, H);
+      o.fillStyle = '#3a2c1c';
+      o.fillRect(x + 1, 0, 3, H);
+      o.fillStyle = '#c4a574';
+      o.fillRect(side ? x + 2.4 : 1, 0, 1.5, H);
+      o.fillStyle = 'rgba(255,244,220,.8)';
+      o.fillRect(side ? x + 0.4 : 3.2, 0, 1, H);
+      o.fillStyle = '#000';
+      o.fillRect(side ? x : 4.2, 0, 0.8, H);
+      o.fillStyle = '#e7c98a';
+      for(const height of [.18, .42, .66, .88]) o.fillRect(side ? x + 2.2 : 1.2, H * height, 1.6, 1.6);
+    }
+    if(id === 'sewer' && TSPRITE?.paintSewerPumpworks){
+      o.globalAlpha = .72;
+      TSPRITE.paintSewerPumpworks(o, W, H * .62);
+      o.globalAlpha = 1;
+    } else if(id === 'throne'){
+      o.strokeStyle = 'rgba(214,176,96,.4)';
+      o.lineWidth = 2;
+      o.beginPath();
+      o.moveTo(W * .5 - 16, H * .1);
+      o.lineTo(W * .5, H * .065);
+      o.lineTo(W * .5 + 16, H * .1);
+      o.stroke();
+    } else if(id === 'candy'){
+      o.fillStyle = 'rgba(214,150,180,.22)';
+      o.beginPath();
+      o.arc(W * .5, H * .09, 8, 0, 6.283);
+      o.fill();
+    }
+    cleanFieldCache = { key, canvas: off };
   }
-  ctx.fillStyle = 'rgba(4,10,14,.55)';
-  ctx.fillRect(0, 0, W, H);
-  if(cleanFieldCache.pattern){
-    ctx.fillStyle = cleanFieldCache.pattern;
-    ctx.fillRect(0, 0, W, H);
-  }
+  ctx.drawImage(cleanFieldCache.canvas, 0, 0, W, H);
 }
 
 // Parallax sewer layers: far pipes drift slowly, near sludge blobs drift faster.
@@ -1068,7 +1136,7 @@ function buildWallPattern(){
     const pc = c.getContext('2d');
     if(!pc) return;
     pc.setTransform(scale,0,0,scale,0,0);
-    pc.fillStyle = '#061714';
+    pc.fillStyle = '#12161a';
     pc.fillRect(0,0,tw,th);
     // Running bond: two rows, second offset by half a brick, tile wraps exactly.
     const rows = [[0,0],[-(bw+gap)/2, bh+gap]];
@@ -1077,8 +1145,8 @@ function buildWallPattern(){
         const k = (((x + 200)*7 + oy*13) % 17)/17;   // deterministic per-brick tint
         const shade = 0.82 + k*0.34;
         const g = pc.createLinearGradient(x, oy, x, oy+bh);
-        g.addColorStop(0, `rgb(${Math.round(34*shade)},${Math.round(78*shade)},${Math.round(66*shade)})`);
-        g.addColorStop(1, `rgb(${Math.round(18*shade)},${Math.round(50*shade)},${Math.round(44*shade)})`);
+        g.addColorStop(0, `rgb(${Math.round(78*shade)},${Math.round(70*shade)},${Math.round(58*shade)})`);
+        g.addColorStop(1, `rgb(${Math.round(42*shade)},${Math.round(38*shade)},${Math.round(32*shade)})`);
         pc.fillStyle = g;
         roundRect(pc, x, oy, bw, bh, 3); pc.fill();
         pc.fillStyle = 'rgba(255,255,255,.07)';
@@ -1087,8 +1155,8 @@ function buildWallPattern(){
         pc.fillRect(x+2, oy+bh-2, bw-4, 1.5);
         if(k > 0.7){
           const sg = pc.createRadialGradient(x+bw*0.62, oy+bh*0.62, 1, x+bw*0.62, oy+bh*0.62, bh*0.9);
-          sg.addColorStop(0,'rgba(70,110,50,.4)');
-          sg.addColorStop(1,'rgba(70,110,50,0)');
+          sg.addColorStop(0,'rgba(120,96,60,.35)');
+          sg.addColorStop(1,'rgba(120,96,60,0)');
           pc.fillStyle = sg; pc.fillRect(x, oy, bw, bh);
         }
       }
@@ -1402,7 +1470,6 @@ function newLevel(){
     balls = [ newBall(true) ];
     waitingLaunch = true;
     btnLaunch.classList.add('show');
-    levelIntro = 1;
     return;
   }
 
@@ -1470,7 +1537,6 @@ function newLevel(){
   balls = [ newBall(true) ];
   waitingLaunch = true;
   btnLaunch.classList.add('show');
-  levelIntro = 1;
   const introPat = campaign ? campaign.name : pat;
   const introMsg = TWORLDS ? TWORLDS.levelIntroLine(level, introPat) : `Level ${level}, ${introPat}`;
   setHype(introMsg, 90);
@@ -2501,10 +2567,8 @@ function step(dt){
     if(b.y < b.r){ b.y = b.r; b.vy = Math.abs(b.vy); b.squash = Math.min(1,(b.squash||0)+0.5); b.squashAng = Math.PI/2; clampMinBallSpeed(b); sfx.bounce(); spawnImpactRing(b.x,b.y,wallFx); spawnHitSpark(b.x,b.y,wallFx); }
 
     if(b.vy>0 && b.y+b.r >= paddle.y && b.y - b.r <= paddle.y + paddle.h && Math.abs(b.x - paddle.x) < paddle.w/2 + b.r){
-      const rel = (b.x - paddle.x)/(paddle.w/2);
-      const ang = -Math.PI/2 + Math.max(-1, Math.min(1, rel)) * FEEL_PADDLE_ENGLISH;
-      const sp = Math.hypot(b.vx,b.vy);
-      b.vx = Math.cos(ang)*sp; b.vy = Math.sin(ang)*sp;
+      const rebound = TPHYSICS.paddleVelocity(b, paddle, FEEL_PADDLE_ENGLISH);
+      b.vx = rebound.vx; b.vy = rebound.vy;
       clampMinBallSpeed(b);
       b.y = paddle.y - b.r - 1;
       b.squash = 1; b.squashAng = Math.PI/2;
@@ -2520,10 +2584,9 @@ function step(dt){
     if(b.ghost && b.ghost>0) b.ghost -= ts;
     for(let i=bricks.length-1;i>=0;i--){
       const br = bricks[i];
-      if(b.x + b.r > br.x && b.x - b.r < br.x + br.w && b.y + b.r > br.y && b.y - b.r < br.y + br.h){
-        const dx = b.x - (br.x + br.w/2), dy = b.y - (br.y + br.h/2);
-        const px = br.w/2 + b.r - Math.abs(dx);
-        const py = br.h/2 + b.r - Math.abs(dy);
+      const contact = TPHYSICS.brickContact(b, br);
+      if(contact){
+        const {dx,dy,px,py} = contact;
         let scoreEvent = true;
         if(steel(br)){
           if(b.ghost>0){
@@ -2871,7 +2934,7 @@ function render(){
   // poster. During play in every round the field stays clean.
   const introDecor = state === 'title';
   const bgT = nowMs * 0.06 * parallaxMul;
-  if(!introDecor) paintCleanField(W, H);
+  if(!introDecor) paintCleanField(W, H, world);
   if(introDecor){
   // Sewer brick wall behind everything, faded in the middle so the play
   // area stays readable, with the light falling off toward the sides.
@@ -3089,6 +3152,21 @@ function render(){
   }
   drawPaddle();
   for(const b of balls) drawBall(b);
+  if(waitingLaunch && state === 'playing'){
+    ctx.save();
+    ctx.lineCap = 'round';
+    for(const b of balls){
+      if(!b.stuck) continue;
+      const ring = b.r * BALL_VISUAL_SCALE + 4;
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = '#061018';
+      ctx.beginPath(); ctx.arc(b.x, b.y, ring, 0, 6.283); ctx.stroke();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#fff6e4';
+      ctx.beginPath(); ctx.arc(b.x, b.y, ring, 0, 6.283); ctx.stroke();
+    }
+    ctx.restore();
+  }
   for(const ring of impactRings){
     ring.life -= rts;
     ring.r += 1.8 * rts;
@@ -3213,31 +3291,6 @@ function render(){
     }
   }
 
-  if(levelIntro > 0.02 && state === 'playing'){
-    levelIntro = Math.max(0, levelIntro - 0.018 * rts);
-    const a = levelIntro * 0.85;
-    const t = (typeof TurdanoidTheme !== 'undefined' && TurdanoidTheme.TOKENS) || {};
-    ctx.save();
-    ctx.globalAlpha = a;
-    ctx.font = `bold 22px ${t.font || '"Segoe UI", system-ui, sans-serif'}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = t.glass || 'rgba(6,16,22,.78)';
-    const banner = `LEVEL ${level}`;
-    const tw = ctx.measureText(banner).width + 48;
-    roundRect(ctx, W/2 - tw/2, 88, tw, 36, 14); ctx.fill();
-    ctx.strokeStyle = t.glassBorder || 'rgba(232,197,106,.32)'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = t.slime || '#3ecf9a';
-    ctx.shadowColor = t.slime || '#3ecf9a'; ctx.shadowBlur = reducedMotion && reducedMotion.matches ? 0 : 16;
-    ctx.fillText(banner, W/2, 102);
-    if(world){
-      ctx.font = `bold 12px ${t.font || '"Segoe UI", system-ui, sans-serif'}`;
-      ctx.fillStyle = t.brass || '#e8c56a';
-      ctx.fillText(world.name, W/2, 122);
-    }
-    ctx.shadowBlur = 0;
-    ctx.restore();
-  }
-
   if(state === 'title'){
     const poster = document.createElement('canvas');
     poster.width = cv.width;
@@ -3319,6 +3372,31 @@ function drawBrick(b){
   const spr = getBrickSpriteCanvas(b);
   if(spr){
     ctx.drawImage(spr, px, py, pw, ph);
+    if(b.indestructible){
+      ctx.fillStyle = '#e8f0f6';
+      ctx.fillRect(px + 5, py + ph * 0.42, pw - 10, 1.5);
+      ctx.beginPath();
+      ctx.arc(px + 7, py + ph * 0.46, 1.5, 0, 6.283);
+      ctx.arc(px + pw - 7, py + ph * 0.46, 1.5, 0, 6.283);
+      ctx.fill();
+    } else if(b.maxHp > 1 && b.hp >= b.maxHp){
+      ctx.strokeStyle = 'rgba(255,246,224,.9)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(px + pw * 0.38, py + 5.2);
+      ctx.lineTo(px + pw * 0.5, py + 3.1);
+      ctx.lineTo(px + pw * 0.62, py + 5.2);
+      ctx.stroke();
+    } else if(b.hp < b.maxHp){
+      const chip = 1 - b.hp / b.maxHp;
+      ctx.fillStyle = '#061018';
+      ctx.beginPath();
+      ctx.moveTo(px + pw - 1.5, py + 1.5);
+      ctx.lineTo(px + pw - 1.5, py + 1.5 + chip * ph * 0.42);
+      ctx.lineTo(px + pw - 1.5 - chip * pw * 0.28, py + 1.5);
+      ctx.closePath();
+      ctx.fill();
+    }
     paintCbHeavyBrickMark(ctx, b, px, py, pw, ph);
     if(TSPRITE){ TSPRITE.paintHpPips(ctx, b); }
     if(b.hitFlash > 0){

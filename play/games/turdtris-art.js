@@ -112,96 +112,141 @@ function resolvePiece(value) {
 }
 
 function drawFace(ctx, name) {
-  const index = PIECE_NAMES.indexOf(name);
+  ctx.save();
   ctx.lineCap = 'round';
-  ctx.lineWidth = 2.2;
-  ctx.strokeStyle = '#18333c';
-  // The face is deliberately subtle: the color silhouette still leads.
-  ctx.globalAlpha = 0.77;
-  if (name === 'J' || name === 'T') {
-    ctx.beginPath();
-    ctx.moveTo(21, 35); ctx.lineTo(26, 34);
-    ctx.stroke();
-  } else {
-    ctx.fillStyle = '#18333c';
-    ctx.fillRect(22, 32, 3, 5);
-  }
-  ctx.fillStyle = '#18333c';
-  ctx.fillRect(37, 32, 3, 5);
-  ctx.beginPath();
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#102830';
+  ctx.fillStyle = '#102830';
+  ctx.lineWidth = 2.4;
+  ctx.globalAlpha = 0.86;
+  const eye = (x, y, wink) => {
+    if (wink) {
+      ctx.beginPath();
+      ctx.moveTo(x - 4, y);
+      ctx.quadraticCurveTo(x, y + 2.6, x + 4, y);
+      ctx.stroke();
+    } else {
+      ctx.fillRect(x - 2.1, y - 3.4, 4.2, 6.6);
+    }
+  };
   if (name === 'O') {
-    ctx.arc(31, 42, 3.2, 0, TAU);
+    eye(23, 31); eye(41, 31);
+    ctx.beginPath(); ctx.arc(32, 43, 3.2, 0, TAU); ctx.stroke();
+  } else if (name === 'I') {
+    eye(23, 32); eye(41, 32);
+    ctx.beginPath(); ctx.moveTo(26, 43); ctx.lineTo(38, 43); ctx.stroke();
+  } else if (name === 'J') {
+    ctx.beginPath(); ctx.moveTo(19, 27); ctx.quadraticCurveTo(24, 24, 29, 28); ctx.stroke();
+    eye(23, 33); eye(41, 32);
+    ctx.beginPath(); ctx.moveTo(26, 43); ctx.quadraticCurveTo(33, 47, 40, 41); ctx.stroke();
+  } else if (name === 'T') {
+    eye(23, 32, true); eye(41, 32);
+    ctx.beginPath(); ctx.moveTo(26, 43); ctx.quadraticCurveTo(32, 46, 39, 42); ctx.stroke();
   } else if (name === 'Z') {
-    ctx.moveTo(27, 41); ctx.lineTo(34, 41); ctx.lineTo(36, 39);
+    eye(23, 32); eye(41, 32, true);
+    ctx.beginPath(); ctx.moveTo(25, 42); ctx.lineTo(32, 45); ctx.lineTo(40, 41); ctx.stroke();
+  } else if (name === 'S') {
+    eye(23, 33, true); eye(41, 33, true);
+    ctx.beginPath(); ctx.moveTo(26, 44); ctx.quadraticCurveTo(32, 40, 39, 44); ctx.stroke();
   } else {
-    ctx.arc(31, 38, 6, 0.2, Math.PI - 0.2);
+    eye(23, 31); eye(41, 31);
+    ctx.beginPath(); ctx.moveTo(25, 41); ctx.quadraticCurveTo(32, 48, 41, 41); ctx.stroke();
   }
-  ctx.stroke();
-  if (index % 2 === 0) {
-    circle(ctx, 18, 40, 2.5, 'rgba(255,130,137,0.5)');
-    circle(ctx, 44, 40, 2.5, 'rgba(255,130,137,0.5)');
-  }
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
-function paintSprite(ctx, name, ghost) {
+// A small value mark in the upper panel. It stays off the foot and the ring,
+// so locked, active and ghost still separate by structure at 8 CSS pixels.
+function paintMaterialMark(ctx, name) {
+  ctx.save();
+  ctx.globalAlpha = 0.34;
+  ctx.fillStyle = '#1a100c';
+  ctx.strokeStyle = '#fff8ee';
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  if (name === 'I') {
+    ctx.fillRect(30, 15, 3, 16);
+  } else if (name === 'O') {
+    ctx.beginPath(); ctx.arc(32, 24, 5.5, 0, TAU); ctx.stroke();
+  } else if (name === 'T') {
+    ctx.fillRect(22, 15, 20, 2.6);
+    ctx.fillRect(30.5, 15, 3, 10);
+  } else if (name === 'J') {
+    ctx.fillRect(20, 15, 4, 12);
+  } else if (name === 'L') {
+    ctx.fillRect(40, 15, 4, 12);
+  } else if (name === 'S' || name === 'Z') {
+    ctx.beginPath();
+    ctx.moveTo(22, 16); ctx.lineTo(42, 16); ctx.lineTo(42, 21); ctx.lineTo(22, 27); ctx.lineTo(22, 22);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Three cached variants tell piece states apart by structure, not hue, so
+// they still separate under any colour-vision deficiency and at 8 CSS pixels:
+//   ghost   - dark hollow: almost no fill, dashed colour, long light corner ticks
+//   settled - solid enamel with a heavy dark foot and no bright outline
+//   active  - the same slab plus a thick light ring, and no dark foot
+function paintSprite(ctx, name, variant) {
   const color = PIECES[name];
-  if (ghost) {
-    roundPath(ctx, 4, 4, 56, 56, 12);
+  ctx.lineJoin = 'round';
+  if (variant === 'ghost') {
+    roundPath(ctx, 4, 4, 56, 56, 10);
     ctx.fillStyle = color;
-    ctx.globalAlpha = 0.12; ctx.fill(); ctx.globalAlpha = 0.95;
-    // A 4px cached stroke remains ~1 CSS pixel on the smallest phone board.
-    ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.setLineDash([7, 5]); ctx.stroke();
-    ctx.setLineDash([]); ctx.globalAlpha = 0.25;
-    ctx.strokeRect(27, 30, 10, 4);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.04; ctx.fill();
+    // The hollow frame is most of the cell. Thick strokes survive an 8px blit.
+    ctx.globalAlpha = 0.94; ctx.strokeStyle = '#02121a'; ctx.lineWidth = 10; ctx.stroke();
+    ctx.globalAlpha = 1; ctx.strokeStyle = color; ctx.lineWidth = 5; ctx.setLineDash([8, 5]); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,252,246,0.98)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(10, 28); ctx.lineTo(10, 10); ctx.lineTo(28, 10);
+    ctx.moveTo(36, 10); ctx.lineTo(54, 10); ctx.lineTo(54, 28);
+    ctx.moveTo(54, 36); ctx.lineTo(54, 54); ctx.lineTo(36, 54);
+    ctx.moveTo(28, 54); ctx.lineTo(10, 54); ctx.lineTo(10, 36);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
     return;
   }
-  ctx.fillStyle = '#020b11';
-  roundPath(ctx, 2, 3, 60, 60, 13); ctx.fill();
-  const body = ctx.createLinearGradient(4, 3, 54, 62);
-  body.addColorStop(0, shade(color, 36));
-  body.addColorStop(0.35, color);
-  body.addColorStop(0.78, shade(color, -29));
-  body.addColorStop(1, shade(color, -78));
+  const active = variant === 'active';
+  ctx.fillStyle = '#140e0c';
+  roundPath(ctx, 1, 2, 62, 62, 12); ctx.fill();
+  const body = ctx.createLinearGradient(6, 4, 40, 60);
+  body.addColorStop(0, shade(color, active ? 28 : 12));
+  body.addColorStop(0.58, color);
+  body.addColorStop(1, shade(color, -68));
   ctx.fillStyle = body;
-  roundPath(ctx, 3, 2, 58, 58, 12); ctx.fill();
-  ctx.strokeStyle = shade(color, -44); ctx.lineWidth = 2; ctx.stroke();
-
-  // Inner jelly reservoir with a darker submerged lower edge.
-  const inner = ctx.createLinearGradient(8, 10, 8, 57);
-  inner.addColorStop(0, 'rgba(255,255,255,0.33)');
-  inner.addColorStop(0.48, 'rgba(255,255,255,0.025)');
-  inner.addColorStop(1, 'rgba(0,25,41,0.28)');
-  ctx.fillStyle = inner;
-  roundPath(ctx, 8, 8, 48, 44, 9); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.24)'; ctx.lineWidth = 1.2; ctx.stroke();
-
-  // A broad curved reflection, rim light, and a tiny porcelain specular.
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.beginPath(); ctx.moveTo(12, 11); ctx.quadraticCurveTo(31, 5, 50, 12);
-  ctx.quadraticCurveTo(45, 23, 11, 25); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(245,255,255,0.73)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(7, 23); ctx.quadraticCurveTo(6, 7, 20, 6);
-  ctx.lineTo(45, 6); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,0.26)';
-  ctx.beginPath(); ctx.moveTo(19, 55); ctx.lineTo(45, 55); ctx.quadraticCurveTo(56, 55, 57, 43); ctx.stroke();
-  circle(ctx, 15, 14, 3.4, 'rgba(255,255,255,0.82)');
-  circle(ctx, 20, 12, 1.4, 'rgba(255,255,255,0.8)');
-
-  // Deterministic, very low contrast stipple; made once, never per frame.
-  const seed = PIECE_NAMES.indexOf(name) + 1;
-  for (let i = 0; i < 18; i++) {
-    const x = 11 + ((i * 19 + seed * 7) % 43);
-    const y = 22 + ((i * 13 + seed * 5) % 27);
-    circle(ctx, x, y, i % 3 === 0 ? 1.3 : 0.65, 'rgba(255,255,255,0.13)');
+  roundPath(ctx, 3, 2, 58, 58, 11); ctx.fill();
+  // One flat enamel panel. The old glass blob is gone; value does the work.
+  const panel = ctx.createLinearGradient(10, 10, 10, 48);
+  panel.addColorStop(0, 'rgba(255,248,236,0.3)');
+  panel.addColorStop(0.2, 'rgba(255,248,236,0.04)');
+  panel.addColorStop(1, 'rgba(20,10,8,0.16)');
+  ctx.fillStyle = panel;
+  roundPath(ctx, 11, 11, 42, 36, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,248,236,0.62)';
+  ctx.fillRect(14, 13, 26, 3);
+  ctx.strokeStyle = '#1a100c';
+  ctx.lineWidth = active ? 4 : 5;
+  roundPath(ctx, 3, 2, 58, 58, 11); ctx.stroke();
+  if (active) {
+    roundPath(ctx, 6, 5, 52, 52, 10);
+    ctx.strokeStyle = 'rgba(255,252,246,0.98)'; ctx.lineWidth = 8; ctx.stroke();
+    roundPath(ctx, 13, 12, 38, 38, 7);
+    ctx.strokeStyle = 'rgba(12,8,6,0.9)'; ctx.lineWidth = 3; ctx.stroke();
+  } else {
+    ctx.fillStyle = 'rgba(8,6,4,0.66)';
+    roundPath(ctx, 5, 46, 54, 14, 6); ctx.fill();
+    ctx.fillStyle = 'rgba(255,244,220,0.22)';
+    ctx.fillRect(12, 47, 22, 2);
   }
   if (name === 'G') {
-    ctx.strokeStyle = '#3b3930'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(22, 12); ctx.lineTo(28, 28); ctx.lineTo(19, 38);
-    ctx.lineTo(29, 53); ctx.moveTo(28, 28); ctx.lineTo(46, 32); ctx.stroke();
-    circle(ctx, 47, 48, 8, 'rgba(129,191,89,0.25)');
+    ctx.strokeStyle = '#2a241c'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(20, 16); ctx.lineTo(30, 30); ctx.lineTo(22, 46);
+    ctx.moveTo(30, 30); ctx.lineTo(46, 34); ctx.stroke();
   } else {
+    paintMaterialMark(ctx, name);
     drawFace(ctx, name);
   }
 }
@@ -217,76 +262,175 @@ function drawToilet(ctx, x, y, size, color) {
   ctx.restore();
 }
 
+function paintLagoonJelly(ctx, x, y, size) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size, size);
+  const glow = ctx.createRadialGradient(0, 4, 4, 0, 4, 66);
+  glow.addColorStop(0, '#5ec7c744'); glow.addColorStop(1, '#5ec7c700');
+  ctx.fillStyle = glow; ctx.fillRect(-66, -62, 132, 132);
+  ctx.beginPath(); ctx.moveTo(-37, 9);
+  ctx.bezierCurveTo(-35, -32, 34, -39, 38, 9);
+  ctx.bezierCurveTo(25, 24, -24, 24, -37, 9); ctx.closePath();
+  const cap = ctx.createLinearGradient(0, -24, 0, 18);
+  cap.addColorStop(0, '#407c97'); cap.addColorStop(1, '#195164');
+  ctx.fillStyle = cap; ctx.fill();
+  ctx.strokeStyle = '#60aec1'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = '#5ba6aa'; ctx.lineWidth = 1.6;
+  for (const offset of [-22, -11, 0, 11, 22]) {
+    ctx.beginPath(); ctx.moveTo(offset, 16);
+    ctx.bezierCurveTo(offset - 16, 36, offset + 15, 49, offset - 6, 67 + Math.abs(offset / 3));
+    ctx.stroke();
+  }
+  for (const [dx, dy] of [[-18, 6], [-7, -4], [6, -5], [19, 1], [27, 8]]) circle(ctx, dx, dy, 2, '#83c6c7');
+  ctx.restore();
+}
+
+function paintSewerValve(ctx, x, y) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.strokeStyle = '#263827'; ctx.lineWidth = 12;
+  ctx.beginPath(); ctx.arc(0, 0, 27, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = '#aa7d49'; ctx.lineWidth = 4; ctx.stroke();
+  ctx.strokeStyle = '#715e3e'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-23, 0); ctx.lineTo(23, 0);
+  ctx.moveTo(0, -23); ctx.lineTo(0, 23); ctx.stroke();
+  circle(ctx, 0, 0, 7, '#ac905f'); circle(ctx, 0, 0, 3, '#493f2b');
+  ctx.restore();
+}
+
 function paintBackground(ctx, theme) {
   const width = 320, height = 640;
   const bg = ctx.createLinearGradient(0, 0, width, height);
   bg.addColorStop(0, theme.ink); bg.addColorStop(1, '#030c13');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+  // Each room keeps its focal shapes in the outer columns and the top and
+  // bottom margins. The centre, where pieces fall, stays the dim tray.
   if (theme.id === 'bathroom') {
-    for (let r = 0; r < 10; r++) {
-      for (let c = 0; c < 5; c++) {
-        ctx.fillStyle = (r + c) % 2 ? '#10343b' : '#113b42';
-        roundPath(ctx, c * 64 + 2, r * 64 + 2, 60, 60, 5); ctx.fill();
-        ctx.strokeStyle = 'rgba(128,247,223,0.075)'; ctx.lineWidth = 1; ctx.stroke();
-      }
-    }
-    ctx.globalAlpha = 0.28; drawToilet(ctx, 210, 51, 84, '#8cefdc'); ctx.globalAlpha = 1;
-    ctx.strokeStyle = '#52837c'; ctx.lineWidth = 8;
-    ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(14, 113); ctx.quadraticCurveTo(14, 128, 29, 128);
-    ctx.lineTo(51, 128); ctx.stroke();
-    ctx.strokeStyle = '#a6d2ba'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#102830';
+    roundPath(ctx, 6, 36, 52, 168, 8); ctx.fill();
+    ctx.fillStyle = '#183848';
+    roundPath(ctx, 12, 48, 40, 64, 4); ctx.fill();
+    roundPath(ctx, 12, 122, 40, 66, 4); ctx.fill();
+    ctx.fillStyle = '#d7ebe4';
+    roundPath(ctx, 16, 56, 10, 22, 3); ctx.fill();
+    roundPath(ctx, 32, 62, 8, 16, 3); ctx.fill();
+    ctx.fillStyle = '#8eaea6';
+    ctx.fillRect(29, 96, 7, 7);
+    ctx.fillRect(29, 148, 7, 7);
+    ctx.fillStyle = '#0c242c';
+    roundPath(ctx, 262, 40, 50, 40, 5); ctx.fill();
+    ctx.fillStyle = '#16343c';
+    ctx.beginPath(); ctx.ellipse(286, 118, 26, 18, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#0e2830';
+    ctx.beginPath(); ctx.ellipse(286, 114, 13, 8, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#c5ddd6'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.ellipse(286, 104, 22, 9, 0, Math.PI, TAU); ctx.stroke();
+    ctx.fillStyle = '#efe4d0';
+    roundPath(ctx, 8, 548, 46, 22, 3); ctx.fill();
+    ctx.fillStyle = '#d9c8ae';
+    ctx.fillRect(12, 554, 38, 3); ctx.fillRect(12, 562, 38, 3);
+    ctx.fillStyle = '#c4b496';
+    roundPath(ctx, 8, 568, 46, 12, 3); ctx.fill();
+    ctx.fillStyle = '#6e5434';
+    ctx.fillRect(268, 520, 6, 70);
+    ctx.fillStyle = '#8eaea6';
+    ctx.beginPath(); ctx.ellipse(271, 592, 16, 10, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#16343c';
+    ctx.beginPath(); ctx.ellipse(271, 592, 8, 5, 0, 0, TAU); ctx.fill();
   } else if (theme.id === 'sewer') {
-    for (let r = 0; r < 22; r++) {
-      for (let c = -1; c < 6; c++) {
-        ctx.fillStyle = (r + c) % 3 ? '#203329' : '#25382a';
-        roundPath(ctx, c * 72 + (r % 2) * 36 + 2, r * 31 + 2, 68, 27, 3); ctx.fill();
-      }
+    ctx.fillStyle = '#101610';
+    ctx.fillRect(0, 0, width, 26);
+    ctx.fillStyle = '#141c16';
+    ctx.fillRect(0, 0, 40, height);
+    ctx.fillRect(width - 40, 0, 40, height);
+    for (let y = 26; y < height; y += 22) {
+      ctx.fillStyle = y % 44 ? '#1e2a22' : '#28342c';
+      ctx.fillRect(0, y, 40, 16);
+      ctx.fillRect(width - 40, y, 40, 16);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(0, y + 14, 40, 4);
+      ctx.fillRect(width - 40, y + 14, 40, 4);
     }
-    ctx.strokeStyle = '#426445'; ctx.lineWidth = 19;
-    ctx.beginPath(); ctx.moveTo(21, height); ctx.lineTo(21, 141);
-    ctx.bezierCurveTo(21, 0, 299, 0, 299, 141); ctx.lineTo(299, height); ctx.stroke();
-    ctx.strokeStyle = '#7c9e68'; ctx.lineWidth = 2; ctx.stroke();
-    for (const y of [150, 270, 390, 510]) {
-      ctx.fillStyle = '#4c6540'; ctx.fillRect(7, y, 28, 10); ctx.fillRect(285, y, 28, 10);
-      circle(ctx, 13, y + 5, 2, '#a1b587'); circle(ctx, 307, y + 5, 2, '#a1b587');
-    }
-    ctx.fillStyle = '#325336'; ctx.fillRect(0, 603, width, 37);
+    paintSewerValve(ctx, 20, 188);
+    paintSewerValve(ctx, 300, 456);
+    ctx.fillStyle = '#c4b48a';
+    for (const [x, y] of [[6, 96], [6, 320], [308, 140], [308, 560]]) ctx.fillRect(x, y, 6, 6);
+    ctx.fillStyle = '#101610';
+    ctx.fillRect(0, 604, width, 36);
   } else if (theme.id === 'lagoon') {
-    const glow = ctx.createRadialGradient(239, 91, 2, 239, 91, 133);
-    glow.addColorStop(0, '#1f6271'); glow.addColorStop(1, '#0a182b');
-    ctx.fillStyle = glow; ctx.fillRect(0, 0, width, 240);
-    circle(ctx, 240, 88, 30, '#477d89'); circle(ctx, 251, 79, 26, '#153e53');
-    for (let i = 0; i < 22; i++) {
-      const x = (i * 73) % width;
-      ctx.strokeStyle = i % 2 ? '#255b5b' : '#234454'; ctx.lineWidth = 2 + (i % 3);
-      ctx.beginPath(); ctx.moveTo(x, 640); ctx.quadraticCurveTo(x + (i % 2 ? 30 : -30), 562, x - 8, 520 + i * 3); ctx.stroke();
-      circle(ctx, x - 8, 520 + i * 3, 3 + i % 3, '#327e80');
+    ctx.fillStyle = '#0c2030';
+    ctx.beginPath();
+    ctx.moveTo(248, 0); ctx.quadraticCurveTo(286, 48, 320, 16);
+    ctx.lineTo(320, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#163848';
+    ctx.beginPath(); ctx.ellipse(292, 34, 20, 14, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#0a1824';
+    ctx.beginPath(); ctx.ellipse(298, 32, 9, 6, 0, 0, TAU); ctx.fill();
+    for (const [top, spread, alpha] of [[16, 14, 0.08], [304, 14, 0.07]]) {
+      const shaft = ctx.createLinearGradient(0, 0, 0, 360);
+      shaft.addColorStop(0, `rgba(186,220,214,${alpha})`); shaft.addColorStop(1, 'rgba(186,220,214,0)');
+      ctx.fillStyle = shaft;
+      ctx.beginPath();
+      ctx.moveTo(top - 5, 0); ctx.lineTo(top + 5, 0);
+      ctx.lineTo(top + spread, 360); ctx.lineTo(top - spread, 360); ctx.closePath(); ctx.fill();
     }
-    ctx.fillStyle = '#103c49';
-    ctx.beginPath(); ctx.moveTo(0, 605); ctx.bezierCurveTo(98, 573, 224, 626, 320, 599);
-    ctx.lineTo(320, 640); ctx.lineTo(0, 640); ctx.fill();
+    paintLagoonJelly(ctx, 28, 156, 0.78);
+    paintLagoonJelly(ctx, 294, 348, 0.52);
+    ctx.strokeStyle = '#1c4450'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    for (const x of [14, 36, 284, 306]) {
+      const lean = x < 160 ? 12 : -12;
+      ctx.beginPath(); ctx.moveTo(x, 640); ctx.quadraticCurveTo(x + lean, 604, x, 572); ctx.stroke();
+      circle(ctx, x, 570, 4, '#3a8890');
+    }
+    ctx.fillStyle = '#0c2834';
+    ctx.beginPath();
+    ctx.moveTo(0, 612); ctx.lineTo(0, 640); ctx.lineTo(108, 640);
+    ctx.bezierCurveTo(70, 590, 24, 624, 0, 612); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(320, 608); ctx.lineTo(320, 640); ctx.lineTo(212, 640);
+    ctx.bezierCurveTo(260, 586, 300, 620, 320, 608); ctx.fill();
   } else {
-    for (let i = 0; i < 98; i++) {
-      const x = (i * 137 + 31) % width, y = (i * 89 + 51) % height;
-      circle(ctx, x, y, i % 7 === 0 ? 1.4 : 0.65, i % 3 ? '#6c5f9e' : '#b7a2c8');
+    for (let i = 0; i < 18; i++) {
+      const x = (i * 97 + 20) % width, y = (i * 131 + 24) % height;
+      if (x > 56 && x < 264 && y > 36 && y < 584) continue;
+      circle(ctx, x, y, i % 3 === 0 ? 2.4 : 1.3, i % 2 ? '#6a5c86' : '#d8cce8');
     }
-    const planet = ctx.createRadialGradient(265, 114, 4, 275, 134, 64);
-    planet.addColorStop(0, '#675989'); planet.addColorStop(1, '#251d48');
-    circle(ctx, 278, 133, 61, planet);
-    ctx.strokeStyle = '#504170'; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.ellipse(276, 133, 90, 20, -0.45, 0, TAU); ctx.stroke();
-    ctx.globalAlpha = 0.52; drawToilet(ctx, 34, 493, 68, '#bb94cc'); ctx.globalAlpha = 1;
+    const planet = ctx.createRadialGradient(268, 70, 5, 276, 92, 52);
+    planet.addColorStop(0, '#7a6e98'); planet.addColorStop(1, '#161228');
+    circle(ctx, 276, 88, 44, planet);
+    ctx.strokeStyle = '#241c40'; ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.ellipse(276, 90, 68, 11, -0.42, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = '#ddd0f0'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(276, 90, 76, 15, -0.42, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = '#d4c6e4'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(26, 500, 16, Math.PI * 1.08, Math.PI * 1.95); ctx.stroke();
+    ctx.fillStyle = '#d4c6e4';
+    ctx.fillRect(24, 500, 4, 26);
+    ctx.fillRect(16, 524, 20, 3);
+    ctx.globalAlpha = 0.9; drawToilet(ctx, 6, 548, 50, '#e4d8f4'); ctx.globalAlpha = 1;
   }
   // Center dimming preserves stack/ghost contrast while the scene edges show.
   const veil = ctx.createLinearGradient(0, 0, width, 0);
   veil.addColorStop(0, 'rgba(2,8,14,0.1)'); veil.addColorStop(0.3, 'rgba(2,8,14,0.5)');
   veil.addColorStop(0.7, 'rgba(2,8,14,0.5)'); veil.addColorStop(1, 'rgba(2,8,14,0.1)');
   ctx.fillStyle = veil; ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = 'rgba(185,245,240,0.055)'; ctx.lineWidth = 1;
+  // Recessed cell wells: each 32px slot (one board cell after scaling) gets a
+  // shaded floor and a faint lit lip, so the playfield reads as a tray with
+  // depth instead of a flat painting behind thin lines.
+  for (let y = 0; y < height; y += 32) {
+    for (let x = 0; x < width; x += 32) {
+      ctx.fillStyle = 'rgba(0,8,14,0.14)'; ctx.fillRect(x + 2, y + 2, 28, 28);
+      ctx.fillStyle = 'rgba(0,4,8,0.14)'; ctx.fillRect(x + 2, y + 2, 28, 3);
+      ctx.fillStyle = 'rgba(255,236,210,0.06)'; ctx.fillRect(x + 2, y + 28.5, 28, 1.5);
+    }
+  }
+  // Solid (never dashed) grid lines: a dark groove plus a pale hairline,
+  // thick enough to survive the 0.375x rival-board downscale.
   ctx.beginPath();
-  for (let x = 32; x < width; x += 32) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, height); }
-  for (let y = 32; y < height; y += 32) { ctx.moveTo(0, y + 0.5); ctx.lineTo(width, y + 0.5); }
-  ctx.stroke();
+  for (let x = 32; x < width; x += 32) { ctx.moveTo(x, 0); ctx.lineTo(x, height); }
+  for (let y = 32; y < height; y += 32) { ctx.moveTo(0, y); ctx.lineTo(width, y); }
+  ctx.strokeStyle = 'rgba(0,6,12,0.5)'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,236,210,0.16)'; ctx.lineWidth = 1; ctx.stroke();
+  // Side walls frame the tray at the board edges.
+  ctx.fillStyle = 'rgba(255,236,210,0.08)'; ctx.fillRect(0, 0, 1.5, height); ctx.fillRect(width - 1.5, 0, 1.5, height);
   // Sewer drain is a persistent destination for the row-flush animation.
   ctx.strokeStyle = theme.accent; ctx.globalAlpha = 0.2; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.ellipse(160, 630, 34, 8, 0, 0, TAU); ctx.stroke();
@@ -309,8 +453,15 @@ export function createTurdtrisArt(canvasFactory = () => document.createElement('
   // Fixed resolution assets are warmed once. Resizing only changes drawImage
   // destination sizes; a scene change or the first hard drop never rasterizes art.
   for (const name of PIECE_NAMES) {
-    sprites[name] = makeCanvas(SPRITE_SIZE, SPRITE_SIZE, (ctx) => paintSprite(ctx, name, false));
-    ghosts[name] = makeCanvas(SPRITE_SIZE, SPRITE_SIZE, (ctx) => paintSprite(ctx, name, true));
+    // Pair the solid states on one canvas at native resolution.
+    sprites[name] = makeCanvas(2 * SPRITE_SIZE, SPRITE_SIZE, (ctx) => {
+      ctx.save();
+      paintSprite(ctx, name, 'settled');
+      ctx.restore();
+      ctx.translate(SPRITE_SIZE, 0);
+      paintSprite(ctx, name, 'active');
+    });
+    ghosts[name] = makeCanvas(SPRITE_SIZE, SPRITE_SIZE, (ctx) => paintSprite(ctx, name, 'ghost'));
     trails[name] = makeCanvas(8, 256, (ctx) => {
       const streak = ctx.createLinearGradient(0, 0, 0, 256);
       streak.addColorStop(0, 'rgba(255,255,255,0)');
@@ -337,7 +488,13 @@ export function createTurdtrisArt(canvasFactory = () => document.createElement('
     ctx.save(); ctx.globalAlpha *= clamp(alpha);
     ctx.translate(x + size / 2, y + size / 2 + envelope.offsetY * size);
     ctx.scale(envelope.scaleX, envelope.scaleY);
-    ctx.drawImage(opts.ghost ? ghosts[name] : sprites[name], -size / 2, -size / 2, size, size);
+    if (opts.ghost) {
+      ctx.drawImage(ghosts[name], -size / 2, -size / 2, size, size);
+    } else {
+      const active = opts.active || opts.spawnProgress !== undefined;
+      const sourceX = active ? SPRITE_SIZE : 0;
+      ctx.drawImage(sprites[name], sourceX, 0, SPRITE_SIZE, SPRITE_SIZE, -size / 2, -size / 2, size, size);
+    }
     if (opts.ghost && moving) {
       const p = (((Number(opts.time) || 0) + y * 8) % 1600) / 1600;
       ctx.globalAlpha *= Math.sin(p * Math.PI) * 0.32;

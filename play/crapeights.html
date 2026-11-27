@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#121a11">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="assets/turdsuite.css">
+  <link rel="stylesheet" href="assets/turdsuite.css?v=ed33f4ac3050c248">
 <link rel="stylesheet" href="assets/arcade.css">
   <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
   <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
@@ -141,7 +141,7 @@
       background:
         var(--suite-felt-light,radial-gradient(circle at 50% 0%,rgba(255,255,255,.12),transparent 44%)),
         var(--ce-felt-inlay) center 45% / 560px 300px no-repeat,
-        var(--suite-felt-noise,none),
+        url("assets/table-art/felt-noise.svg"),
         radial-gradient(ellipse 80% 60% at 50% 40%,#1a5a44,transparent 100%),
         linear-gradient(160deg,#154536,#0f3c30 60%,#0b3227);
       box-shadow:inset 0 0 0 1px rgba(255,215,106,.12),inset 0 0 60px rgba(0,0,0,.28),var(--suite-rail,0 0 0 5px #4a2f18,0 0 0 9px #2b1a0c);
@@ -191,7 +191,7 @@
     .opp-cards{margin-top:7px;display:flex;justify-content:center;padding-left:6px}
     .mini-back{
       width:20px;height:28px;border-radius:4px;border:1px solid rgba(20,40,30,.55);margin-left:-6px;
-      background:var(--suite-card-back-weave,linear-gradient(135deg,#1b5c45,#0f3f31)) var(--suite-card-back-base,#0f3f31);background-size:9px 9px;
+      background:url("assets/table-art/card-back-weave.svg") var(--suite-card-back-base,#0f3f31);background-size:9px 9px;
       position:relative;overflow:hidden;box-shadow:inset 0 0 0 1px #f4f1e6,inset 0 0 0 2px rgba(0,0,0,.3),0 3px 6px rgba(0,0,0,.35);
     }
     .mini-back::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.14),transparent 55%);pointer-events:none}
@@ -214,13 +214,13 @@
     .pile-stack::before,.pile-stack::after{content:"";position:absolute;inset:0;border-radius:11px;pointer-events:none}
     .pile-stack > *{position:relative;z-index:2}
     .discard-stack::before,.discard-stack::after{
-      background:var(--suite-paper,linear-gradient(165deg,#fff,#dfe6e1));border:1px solid #cfd6cf;
+      background:url("assets/table-art/paper-texture.svg"),var(--suite-paper,linear-gradient(165deg,#fff,#dfe6e1));border:1px solid #cfd6cf;
       box-shadow:var(--suite-card-shadow,0 10px 18px rgba(0,0,0,.36)),var(--suite-paper-edge,inset 0 0 0 1px rgba(20,40,30,.14));
     }
     .discard-stack::before{transform:translate(7px,4px) rotate(5deg);z-index:0;filter:brightness(.9)}
     .discard-stack::after{transform:translate(-5px,3px) rotate(-4deg);z-index:1;filter:brightness(.95)}
     .draw-stack::before,.draw-stack::after{
-      background:var(--suite-card-back-weave,linear-gradient(135deg,#1b5c45,#0f3f31)) var(--suite-card-back-base,#0f3f31);border:1px solid #d9d4c4;
+      background:url("assets/table-art/card-back-weave.svg") var(--suite-card-back-base,#0f3f31);border:1px solid #d9d4c4;
       box-shadow:inset 0 0 0 3px #f4f1e6,inset 0 0 0 4px rgba(0,0,0,.25),0 6px 12px rgba(0,0,0,.35);
     }
     .draw-stack::before{transform:translate(7px,7px);z-index:0}
@@ -230,7 +230,7 @@
     }
     .draw-back{
       display:grid;place-items:center;border:1px solid #d9d4c4;color:#fff;font-size:1.9rem;line-height:1;cursor:pointer;
-      background:var(--suite-card-back-weave,linear-gradient(135deg,#1b5c45,#0f3f31)) var(--suite-card-back-base,#0f3f31);
+      background:url("assets/table-art/card-back-weave.svg") var(--suite-card-back-base,#0f3f31);
       box-shadow:inset 0 0 0 3px #f4f1e6,inset 0 0 0 4px rgba(0,0,0,.25),var(--suite-card-shadow,0 10px 18px rgba(0,0,0,.36));
       transition:transform .18s ease,box-shadow .2s ease,filter .2s ease;font-family:inherit;
       text-shadow:0 3px 8px rgba(0,0,0,.45);
@@ -257,7 +257,7 @@
     /* ---------- card faces (hand + discard) ---------- */
     .pile-card,.card-btn{
       display:block;padding:0;position:relative;overflow:hidden;
-      background:var(--suite-paper,linear-gradient(165deg,var(--cardA),var(--cardB)));color:var(--card-black);
+      background:url("assets/table-art/paper-texture.svg"),var(--suite-paper,linear-gradient(165deg,var(--cardA),var(--cardB)));color:var(--card-black);
       border:1px solid #cfd6cf;border-radius:11px;font-weight:800;
       box-shadow:var(--suite-card-shadow,0 8px 16px rgba(0,0,0,.36)),var(--suite-paper-edge,inset 0 0 0 1px rgba(20,40,30,.14));
     }
@@ -309,7 +309,7 @@
     /* the wild 8: four-colour foil frame + glow */
     .pile-card[data-face="wild"],.card-btn[data-face="wild"]{
       border:2px solid transparent;
-      background:var(--suite-paper,linear-gradient(165deg,var(--cardA),var(--cardB))) padding-box,var(--ce-wild-frame) border-box;
+      background:url("assets/table-art/paper-texture.svg") padding-box,var(--suite-paper,linear-gradient(165deg,var(--cardA),var(--cardB))) padding-box,var(--ce-wild-frame) border-box;
       box-shadow:0 0 0 1px rgba(255,255,255,.35),0 0 16px rgba(178,144,255,.5),0 0 4px rgba(255,122,182,.35),var(--suite-card-shadow,0 8px 18px rgba(0,0,0,.3));
     }
     .pile-card[data-face="wild"]::before,.card-btn[data-face="wild"]::before{inset:3px;border-color:rgba(178,144,255,.45);box-shadow:inset 0 0 0 2px rgba(255,255,255,.8),inset 0 0 0 3px rgba(255,122,182,.25)}
@@ -447,7 +447,7 @@
     .suit-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
     .suit-btn{
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:92px;padding:8px 4px;cursor:pointer;
-      border:1px solid #d3dad3;border-radius:12px;background:var(--suite-paper,linear-gradient(165deg,var(--cardA),var(--cardB)));color:var(--card-black);
+      border:1px solid #d3dad3;border-radius:12px;background:url("assets/table-art/paper-texture.svg"),var(--suite-paper,linear-gradient(165deg,var(--cardA),var(--cardB)));color:var(--card-black);
       box-shadow:var(--suite-card-shadow,0 10px 18px rgba(0,0,0,.36)),var(--suite-paper-edge,inset 0 0 0 1px rgba(20,40,30,.14));
       font-weight:900;font-family:inherit;transition:transform .16s ease,border-color .16s ease,box-shadow .2s ease;position:relative;overflow:hidden;
     }
@@ -467,7 +467,7 @@
         background:
           var(--suite-felt-light,radial-gradient(circle at 50% 0%,rgba(255,255,255,.12),transparent 44%)),
           var(--ce-felt-inlay) center 44% / 360px 193px no-repeat,
-          var(--suite-felt-noise,none),
+          url("assets/table-art/felt-noise.svg"),
           radial-gradient(ellipse 80% 60% at 50% 40%,#1a5a44,transparent 100%),
           linear-gradient(160deg,#154536,#0f3c30 60%,#0b3227);
       }
@@ -624,13 +624,62 @@
       html[data-mobile-game="crapeights"] .table .pile-row { top: 44px !important; }
       html[data-mobile-game="crapeights"] .table .pile-stack { --pile-w: 46px; --pile-h: 64px; }
     }
+
+    /* The call. Both piles sit in recessed felt trays. A solid ring marks the
+       pile to act on (brass discard when you can match, mint deck when you
+       must draw); dashed rings mean the pile is spent or someone else is up.
+       Each tray's name plate and count chip sit on top of its ring, so the
+       ring never strikes through their text, and take the ring's colour when
+       that pile is the call. The suit seal pins the suit in force to the
+       discard on every layout. */
+    #playTable .pile-stack{border-radius:14px;box-shadow:0 0 0 8px #04161266;outline:1px solid #eeca7938;outline-offset:8px}
+    #playTable .discard-stack:has(#discardCard[data-badge="Draw 2"]){box-shadow:0 0 0 8px #4a1d1270}
+    #playTable .discard-stack:has(#discardCard[data-face="wild"]){box-shadow:0 0 0 8px #2c1f5a80}
+    #playTable[data-table-mode="match"] .discard-stack{outline:2px solid #eeca79}
+    #playTable[data-table-mode="draw"] .draw-stack{outline:2px solid #a3e5c0}
+    #playTable[data-table-mode="draw"] .discard-stack,#playTable[data-table-mode="pass"] .draw-stack,
+    #playTable[data-table-mode="wait"] .pile-stack{outline-style:dashed;outline-color:#eeca7966}
+    #playTable[data-table-mode="wild"] .discard-stack{outline:2px dashed #c4a5f6}
+    #playTable[data-table-mode="pass"] #passBtn:not(:disabled){border-color:#a3e5c0;box-shadow:inset 0 0 0 1px #a3e5c0,0 0 0 2px #0c2a22}
+    #playTable .pile h2,#playTable .pile-meta{position:relative;z-index:3;background:#231a36;box-shadow:0 0 0 1px #eeca7940}
+    #playTable .pile h2{padding:1px 6px;border-radius:3px;line-height:1}
+    #playTable[data-table-mode="match"] .pile:has(> .discard-stack) :is(h2,.pile-meta){box-shadow:0 0 0 1px #eeca79}
+    #playTable[data-table-mode="draw"] .pile:has(> .draw-stack) :is(h2,.pile-meta){box-shadow:0 0 0 1px #a3e5c0}
+    /* Draw is the bright call only when nothing in hand matches. On a match
+       turn it joins the secondary buttons, so the lit cards and discard lead. */
+    #playTable[data-table-mode="match"] #drawBtn:not(:disabled){border-color:rgba(150,255,197,.5);color:var(--accent);text-shadow:none;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,0)),rgba(10,26,18,.72);box-shadow:none}
+    #playTable[data-table-mode="match"] #drawBtn:not(:disabled):hover{border-color:rgba(150,255,197,.75);background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,0)),rgba(24,50,36,.86);box-shadow:0 0 0 1px rgba(150,255,197,.22),0 10px 20px rgba(0,0,0,.3)}
+    /* While others play, the hand rests. Playable rings and "cannot play"
+       edges are measured against a discard that will change before your turn,
+       so they return with the turn. Selection and focus keep their marks. */
+    #playTable[data-table-mode="wait"] #playerHand .card-btn:not(.selected):not(:focus-visible){filter:saturate(.8) brightness(.88);outline:0;box-shadow:0 8px 10px #001b1980}
+    /* Phone tiles never overlap, so the top index alone names the card and the
+       lower corner stays clear for the action badge. A selected tile keeps its
+       gold edge even when its card cannot play. */
+    html[data-mobile-game="crapeights"] #playerHand.mobile-hand .card-btn .small{display:none}
+    html[data-mobile-game="crapeights"] #playerHand.mobile-hand .card-btn.selected:not(:focus-visible){outline:3px solid #ffe199;outline-offset:-3px}
+    .discard-stack .suit-seal{
+      --seal:clamp(24px,calc(var(--pile-w) * .4),36px);
+      position:absolute;z-index:4;top:calc(var(--seal) * -.18);right:calc(var(--seal) * -.42);width:var(--seal);height:var(--seal);box-sizing:border-box;
+      display:grid;place-items:center;border:2px solid #2d2142;border-radius:50%;pointer-events:none;
+      font-size:calc(var(--seal) * .6);font-weight:900;line-height:1;color:var(--card-black);
+      background:radial-gradient(circle at 36% 30%,#fffdf6,#f6eedc 72%);box-shadow:0 0 0 2px #e9dcff,0 5px 10px #0008
+    }
+    .discard-stack .suit-seal:empty{display:none}
+    .discard-stack .suit-seal:is([data-suit="H"],[data-suit="D"]){color:color-mix(in srgb,var(--card-red) 78%,#000)}
+    .discard-stack .suit-seal[data-wild]{border-color:transparent;background:radial-gradient(circle at 36% 30%,#fffdf6,#f6eedc 72%) padding-box,var(--ce-wild-frame) border-box;box-shadow:0 0 0 2px #2d2142,0 0 12px #b290ff8c,0 5px 10px #0008}
+    @media (forced-colors: active){
+      .discard-stack .suit-seal{forced-color-adjust:none;border-color:CanvasText;background:Canvas;color:CanvasText;box-shadow:none}
+      #playTable[data-table-mode="wait"] #playerHand .card-btn:not(.selected):not(:focus-visible){filter:none}
+    }
   </style>
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
-<link rel="stylesheet" href="assets/mobile-fit.css">
-<script src="assets/mobile-fit.js" defer></script>
+<link rel="stylesheet" href="assets/mobile-fit.css?v=9cb9e921908f6401">
+<script src="assets/mobile-fit.js?v=dc1d1c7f8ebcfef2" defer></script>
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
-<link rel="stylesheet" href="stalemate/solo-play-finish.css?v=d0d4699c6f6c04e8">
+<link rel="stylesheet" href="assets/solo-play-finish.css?v=6f348c3aeb3a7882">
+<link rel="stylesheet" href="stalemate/solo-music-finish.css?v=727f82d06bafd79f">
 </head>
 <body class="suite-ambient arcade" data-arcade-game="crapeights">
   <a class="ce-skip" href="#playTable">Skip to card table</a>
@@ -742,7 +791,7 @@
         </div>
         <div class="pile-row">
           <div class="pile"><h2>Draw Pile</h2><div class="pile-stack draw-stack"><button class="draw-back" id="drawPileBtn" title="Draw" aria-label="Draw one card">&#x1F4A9;</button></div><div class="pile-meta" id="drawMeta">0 cards</div></div>
-          <div class="pile"><h2>Discard Pile</h2><div class="pile-stack discard-stack"><div class="pile-card" id="discardCard"><div>A</div><div class="center">&#9827;</div><div class="small">A<br>&#9827;</div></div></div><div class="pile-meta" id="discardMeta">Top card</div></div>
+          <div class="pile"><h2>Discard Pile</h2><div class="pile-stack discard-stack"><div class="pile-card" id="discardCard"><div>A</div><div class="center">&#9827;</div><div class="small">A<br>&#9827;</div></div><span class="suit-seal" id="suitSeal" aria-hidden="true"></span></div><div class="pile-meta" id="discardMeta">Top card</div></div>
         </div>
         <div class="suit-row" id="suitRow">
           <div class="suit-chip" data-suit-chip="S">Spades &#9824;</div>
@@ -786,6 +835,7 @@
     </div>
   </div>
 
+  <script src="games/crapeights-rules.js?v=a053e73c5338e669"></script>
   <script src="games/crapeights-ai.js"></script>
   <script src="games/crapeights-presentation.js?v=7243470350b7a5dc"></script>
   <script src="games/crapeights-table.js"></script>
@@ -807,11 +857,9 @@
       fanLayout: () => [], focusIndex: (index,key,count) => (index + 1) % count,
       turnHint: ({ human, name }) => ({ title: human ? 'Your move' : `${name} is thinking`, detail: 'Match suit or rank. Eights are wild.' })
     };
-    const MATCH_TARGET = 200;
-    const STARTING_HAND = 7;
+    const { suits: SUITS, ranks: RANKS, target: MATCH_TARGET, handSize: STARTING_HAND,
+      cardPoints, canPlay, cardEffect } = window.CrapeightsRules;
     const STORAGE = { stats: 'crapeightsStats', sound: 'crapeightsSoundOn_v1' };
-    const SUITS = ['S', 'H', 'D', 'C'];
-    const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
     const BOT_FIRST_NAMES = [
       'Alex', 'Casey', 'Jordan', 'Taylor', 'Riley', 'Parker', 'Logan', 'Morgan',
       'Avery', 'Quinn', 'Blake', 'Cameron', 'Drew', 'Hayden', 'Reese', 'Rowan',
@@ -819,6 +867,8 @@
     ];
 
     const ui = {
+      playTable: document.getElementById('playTable'),
+      suitSeal: document.getElementById('suitSeal'),
       statusText: document.getElementById('statusText'),
       roundText: document.getElementById('roundText'),
       turnText: document.getElementById('turnText'),
@@ -1000,7 +1050,6 @@
     function suitGlyph(suit) { return suit === 'S' ? '\u2660' : suit === 'H' ? '\u2665' : suit === 'D' ? '\u2666' : '\u2663'; }
     function suitName(suit) { return suit === 'S' ? 'Spades' : suit === 'H' ? 'Hearts' : suit === 'D' ? 'Diamonds' : 'Clubs'; }
     function isRedSuit(suit) { return suit === 'H' || suit === 'D'; }
-    function cardPoints(card) { if (!card) return 0; if (card.rank === '8') return 50; if (card.rank === 'A') return 1; if (['10', 'J', 'Q', 'K'].includes(card.rank)) return 10; return parseInt(card.rank, 10); }
     function cardStyleMeta(card) {
       if (!card) return { face: '', badge: '' };
       if (card.rank === '8') return { face: 'wild', badge: 'Wild' };
@@ -1069,7 +1118,7 @@
     }
 
     function topCard() { return discard.length ? discard[discard.length - 1] : null; }
-    function isPlayable(card) { const top = topCard(); return !!(card && top && (card.rank === '8' || card.suit === activeSuit || card.rank === top.rank)); }
+    function isPlayable(card) { return canPlay(card, topCard(), activeSuit); }
     function getPlayableCards(hand) { return hand.filter((card) => isPlayable(card)); }
     function isHumanTurn() { return roundActive && players[currentPlayer] && players[currentPlayer].human; }
     function getNextPlayerIndex(fromIndex) { return (fromIndex + direction + players.length) % players.length; }
@@ -1121,7 +1170,10 @@
       ui.discardCard.dataset.face = styleMeta.face;
       ui.discardCard.dataset.badge = styleMeta.badge;
       ui.discardCard.innerHTML = `<div>${top.rank}</div><div class="center">${suitGlyph(top.suit)}</div><div class="small">${top.rank}<br>${suitGlyph(top.suit)}</div>`;
-      if (ui.discardMeta) ui.discardMeta.textContent = top.rank === '8' ? `Wild -> ${suitName(activeSuit)}` : `Top: ${top.rank}${suitGlyph(top.suit)}`;
+      if (ui.discardMeta) ui.discardMeta.textContent = top.rank === '8' ? `Wild · ${suitGlyph(activeSuit)} ${suitName(activeSuit)}` : `Match ${suitGlyph(activeSuit)} or ${top.rank}`;
+      ui.suitSeal.textContent = suitGlyph(activeSuit);
+      ui.suitSeal.dataset.suit = activeSuit;
+      ui.suitSeal.toggleAttribute('data-wild', top.rank === '8');
     }
 
     function seatPortrait(index) {
@@ -1232,6 +1284,8 @@
       if (ui.drawBtn) ui.drawBtn.disabled = !humanTurn || hasDrawnThisTurn || !!pendingWildCard;
       if (ui.passBtn) ui.passBtn.disabled = !humanTurn || !hasDrawnThisTurn || !!pendingWildCard;
       if (ui.smartBtn) ui.smartBtn.disabled = !humanTurn || !!pendingWildCard;
+      ui.playTable.dataset.tableMode = !roundActive ? 'over' : !humanTurn ? 'wait' : pendingWildCard ? 'wild'
+        : hasDrawnThisTurn ? 'pass' : getPlayableCards(hand).length ? 'match' : 'draw';
     }
 
     const dealtCardIds = new Set(); // cosmetic: which hand cards have already played their deal-in animation
@@ -1763,9 +1817,10 @@
       if (card.rank === '8') { activeSuit = forcedSuit || chooseBestSuit(player.hand, card.id); playSfx('wild'); } else activeSuit = card.suit;
 
       let detail = `${player.name} played ${card.rank}${suitGlyph(card.suit)}.`;
-      if (card.rank === '2') { pendingDrawCards += 2; detail += ' Draw Two triggered.'; playSfx('penalty'); }
-      else if (card.rank === 'J') { pendingSkips += 1; detail += ' Skip triggered.'; playSfx('skip'); }
-      else if (card.rank === 'Q') { direction *= -1; detail += ' Reverse direction.'; playSfx('reverse'); }
+      const effect = cardEffect(card);
+      if (effect === 'draw-two') { pendingDrawCards += 2; detail += ' Draw Two triggered.'; playSfx('penalty'); }
+      else if (effect === 'skip') { pendingSkips += 1; detail += ' Skip triggered.'; playSfx('skip'); }
+      else if (effect === 'reverse') { direction *= -1; detail += ' Reverse direction.'; playSfx('reverse'); }
       else if (card.rank !== '8') playSfx('play');
       if (card.rank === '8') detail += ` Suit is now ${suitName(activeSuit)}.`;
       if (player.hand.length === 1) detail += ` ${player.name} has one card left.`;

@@ -68,10 +68,10 @@ These events measure actual visits and actions. Retention improvements require u
 
 The Arcade offers nine games, including Royal Flush Chess against the computer or two players sharing one device, Turd Rush, and Turdomania with difficulty choices, new boards, and undo. Site-specific branding and analytics live in `scripts/stalemate-overlay/`, `scripts/stalemate-strip.css`, and `scripts/play-track.js`. Edit the source files for changes to the generated `play/` directory. Reusable gameplay, shared art, and the playlist player live in the [Turdanoid repository](https://github.com/rupret007/Turdanoid).
 
-The default import pins the shared arcade polish release `e07511d991ea8cd40b313e45f7b6826b48ac27be`. Synchronize a reviewed branch, tag, or exact commit. A local repository avoids a network clone and imports committed files at the requested revision:
+The default import uses Turdanoid `4745b3337eb2888b38dd8175498569cf01d8debc`, as recorded in `play/VENDORED.txt`. This revision is available in the local canonical Turdanoid repository until its source branch is published. Import the committed revision from that repository:
 
 ```bash
-scripts/sync-turdanoid.sh --source ../Turdanoid <full-upstream-commit-SHA>
+bash scripts/sync-turdanoid.sh --source ../Turdanoid 4745b3337eb2888b38dd8175498569cf01d8debc
 # Or fetch a reviewed remote branch, tag, or SHA:
 scripts/sync-turdanoid.sh <branch-tag-or-SHA>
 cat play/VENDORED.txt
@@ -100,11 +100,9 @@ Run `npm run test:live:local` to validate the deployment checker at both local U
 
 Unit tests use Vitest. Browser tests use Playwright against a local server on **4320** (override with `STALEMATE_TEST_PORT`). The server also mounts the site at `/StalemateSite/` so the GitHub Pages project path can be exercised. Navigation and song names work with JavaScript disabled. The missing-page links lead to the canonical site at [stalemate.band](https://stalemate.band/) when JavaScript is off, including from the GitHub Pages project path.
 
-## GitHub Pages (temporary host)
+## GitHub Pages and the band domain
 
-Intended URL until a custom domain exists:
-
-`https://rupret007.github.io/StalemateSite/`
+The published-site workflow checks the [band domain](https://stalemate.band/) and the [GitHub Pages project site](https://rupret007.github.io/StalemateSite/).
 
 The workflow in `.github/workflows/ci.yml` runs Vitest + Playwright on every push and pull request. After those checks pass, a **deploy-pages** job runs on **push to `main` only**. The separate `Verify published site` workflow then checks both public hosts against that exact revision, with Chromium/WebKit gameplay and real audio checks. Readiness waits for the independently refreshed band domain; browser failures are not retried. Reports and first-failure diagnostics are retained as Actions artifacts.
 
@@ -113,22 +111,7 @@ When you are ready to publish:
 1. Repo **Settings → Pages → Source: GitHub Actions**.
 2. Merge to `main`. The deploy job uploads the `dist/` package produced by `npm run package:pages`.
 
-Asset links on the homepage are **relative**, so they work at `/StalemateSite/` and later at a domain root. `404.html` detects `/StalemateSite/` vs `/` and sets `<base>` so a nested missing path still finds `styles.css`. The project prefix lives in `site-base.js` as `PROJECT_BASE`.
-
-### Adding a custom domain later
-
-1. Buy the domain and point DNS at GitHub Pages (A / ALIAS / CNAME per [GitHub’s docs](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site)).
-2. Add a `CNAME` file at the repo root containing only the host, for example:
-
-   ```
-   stalemateband.com
-   ```
-
-3. Set `PROJECT_BASE` in `site-base.js` to `'/'`.
-4. Replace `https://rupret007.github.io/StalemateSite/` in canonical, Open Graph and share URLs with the live host.
-5. In Pages settings, add the custom domain and wait for HTTPS.
-
-Do not invent a domain name here. Check availability before buying.
+Asset links on the homepage are **relative**, so they work at `/StalemateSite/` and at the band domain root. `404.html` detects the mount and sets `<base>` so a nested missing path still finds `styles.css`. The project prefix lives in `site-base.js` as `PROJECT_BASE`.
 
 ## What this repo does not include
 

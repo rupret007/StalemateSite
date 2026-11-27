@@ -10,18 +10,19 @@
 <meta name="description" content="A little punk. A big hurry. Dash through a bright backstage sewer, dodge speakers and collect guitar picks in this original three-lane runner.">
 <link rel="icon" href="favicon.svg">
 <script src="assets/suite-loading.js"></script>
-<link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/turdsuite.css?v=ed33f4ac3050c248">
 <link rel="stylesheet" href="assets/arcade.css">
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
-<link rel="stylesheet" href="assets/turdrush.css?v=b47de4aa923e506d" data-game-required>
+<link rel="stylesheet" href="assets/turdrush.css?v=3eaae72832bb8737" data-game-required>
 <script src="assets/turdsuite.js?v=3f5836f4ca55e4c2"></script>
 <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
 <script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
 <script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
-<script type="module" src="games/turdrush.js?v=a32384f0edefc8a0" data-game-required></script>
+<script type="module" src="games/turdrush.js?v=8463e31cd116bf6e" data-game-required></script>
+<link rel="stylesheet" href="assets/solo-play-finish.css?v=6f348c3aeb3a7882">
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
-<link rel="stylesheet" href="stalemate/solo-play-finish.css?v=d0d4699c6f6c04e8">
+<link rel="stylesheet" href="stalemate/solo-music-finish.css?v=727f82d06bafd79f">
 </head>
 <body class="arcade runner-page" data-arcade-game="turdrush" data-suite-no-back="1" data-suite-no-difficulty="1" data-suite-no-bg="1">
 <a class="rush-skip" href="#rush-canvas">Skip to game</a>
@@ -39,6 +40,7 @@
 <div class="rush-scene-label" aria-hidden="true"><span>BACKSTAGE SEWERS</span><i></i><span>ENDLESS RUN</span></div>
 <p id="rush-lesson" class="rush-lesson" aria-live="polite">A little punk. A big hurry.</p>
 <div id="rush-powers" class="rush-powers" aria-live="polite"></div>
+<div class="rush-cues"><p id="rush-hazard-cue" class="rush-cue" data-rush-hazard-cue hidden><span class="rush-cue-icon" aria-hidden="true"></span><span class="rush-cue-text"></span></p><p id="rush-hit-cue" class="rush-cue rush-hit-cue" data-rush-hit-cue hidden><span class="rush-cue-icon" aria-hidden="true">!</span><span class="rush-cue-text"></span></p></div>
 <section id="rush-intro" class="rush-panel rush-intro" aria-labelledby="rush-intro-title">
 <p class="rush-eyebrow">YOU'RE ON IN FIVE.</p><h2 id="rush-intro-title">Make a <br><em>clean getaway.</em></h2>
 <p>Dodge the gear. Grab the picks.<br>Keep the encore going.</p>
@@ -52,7 +54,7 @@
 </section>
 <footer class="rush-controls"><p id="rush-control-hint">SWIPE THE TRACK <span>or use these buttons</span></p><div class="rush-pad" role="group" aria-label="Runner controls"><button type="button" data-rush-action="left" aria-label="Dodge left" disabled><span aria-hidden="true">←</span><b>LEFT</b></button><button type="button" data-rush-action="right" aria-label="Dodge right" disabled><span aria-hidden="true">→</span><b>RIGHT</b></button><button type="button" data-rush-action="jump" aria-label="Jump" disabled><span aria-hidden="true">↑</span><b>JUMP</b></button><button type="button" data-rush-action="slide" aria-label="Slide" disabled><span aria-hidden="true">↓</span><b>SLIDE</b></button></div></footer>
 </main>
-<dialog id="rush-guide" aria-labelledby="rush-guide-title"><div class="rush-guide-header"><h2 id="rush-guide-title">Find your flow.</h2><button type="button" id="rush-close-help" aria-label="Close how to play">Close</button></div><p>Run through three lanes. Swipe left/right to dodge, up to jump and down to slide. You can switch lanes in the air. The first few seconds give you room to learn.</p><dl class="rush-guide-list"><dt>Speakers</dt><dd>Tall stacks: switch lanes.</dd><dt>Paper crates</dt><dd>Jump them or take another lane.</dd><dt>Low pipes</dt><dd>Slide underneath or dodge.</dd><dt>Golden picks</dt><dd>Collect for bonus points. Distance also scores.</dd><dt>Mint shield</dt><dd>Absorbs one crash while its timer lasts.</dd><dt>Pink magnet</dt><dd>Draws nearby picks toward you while active.</dd></dl><p><button type="button" id="rush-contrast" aria-pressed="false" disabled>High contrast off</button></p><p>Obstacle shapes and their DODGE / JUMP / SLIDE labels always identify the action. High contrast adds bright hazard frames and a simpler lane surface.</p><p><strong>Keyboard:</strong> arrows or WASD; Up/W jumps, Down/S slides. Space jumps. P or Escape pauses. Buttons work with Tab and Enter.</p><p>The course gets faster gradually. Follow open lanes between speakers. When crates fill all three lanes, jump; when a low pipe spans the track, slide. Pause any time; returning from another app or rotating your phone waits for your explicit Resume.</p><p>Best scores and earned goals live on this device when browser storage is available. Runs stay on this page; a refresh starts a fresh run.</p><p class="rush-credits">Original game and procedural character/scenery artwork. Rendered with Three.js 0.186.1 · <a href="assets/vendor/three/LICENSE">MIT license</a>.</p></dialog>
+<dialog id="rush-guide" aria-labelledby="rush-guide-title"><div class="rush-guide-header"><h2 id="rush-guide-title">Find your flow.</h2><button type="button" id="rush-close-help" aria-label="Close how to play">Close</button></div><p>Run through three lanes. Swipe left/right to dodge, up to jump and down to slide. You can switch lanes in the air. The first few seconds give you room to learn.</p><dl class="rush-guide-list"><dt>Speakers</dt><dd>Tall stacks: switch lanes.</dd><dt>Paper crates</dt><dd>Jump them or take another lane.</dd><dt>Low pipes</dt><dd>Slide underneath or dodge.</dd><dt>Golden picks</dt><dd>Collect for bonus points. Distance also scores.</dd><dt>Mint shield</dt><dd>Absorbs one crash while its timer lasts.</dd><dt>Pink magnet</dt><dd>Draws nearby picks toward you while active.</dd></dl><p><button type="button" id="rush-contrast" aria-pressed="false" disabled>High contrast off</button></p><p>Obstacle shapes, arrow icons and their DODGE / JUMP / SLIDE labels always identify the action. A cue near the top of the track names the move for the next obstacle in your lane. High contrast adds bright hazard frames and a simpler lane surface.</p><p><strong>Keyboard:</strong> arrows or WASD; Up/W jumps, Down/S slides. Space jumps. P or Escape pauses. Buttons work with Tab and Enter.</p><p>The course gets faster gradually. Follow open lanes between speakers. When crates fill all three lanes, jump; when a low pipe spans the track, slide. Pause any time; returning from another app or rotating your phone waits for your explicit Resume.</p><p>Best scores and earned goals live on this device when browser storage is available. Runs stay on this page; a refresh starts a fresh run.</p><p class="rush-credits">Original game and procedural character/scenery artwork. Rendered with Three.js 0.186.1 · <a href="assets/vendor/three/LICENSE">MIT license</a>.</p></dialog>
 <script data-goatcounter="https://stalemate.goatcounter.com/count" async src="../js/count.js"></script>
 <script src="../js/track.js" defer></script>
 <script src="stalemate/play-track.js" defer></script>

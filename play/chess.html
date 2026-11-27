@@ -10,21 +10,22 @@
 <meta name="description" content="Take the throne. Free untimed chess against the computer or a friend on this device.">
 <link rel="icon" href="favicon.svg">
 <script src="assets/suite-loading.js"></script>
-<link rel="stylesheet" href="assets/turdsuite.css">
+<link rel="stylesheet" href="assets/turdsuite.css?v=ed33f4ac3050c248">
 <link rel="stylesheet" href="assets/arcade.css">
-<link rel="stylesheet" href="assets/chess/chess.css">
+<link rel="stylesheet" href="assets/chess/chess.css?v=b99686ff9aba8745">
 <link rel="stylesheet" href="assets/chess/chessground.base.css" data-game-required>
-<link rel="stylesheet" href="assets/chess/chess-board.css?v=46d744938ede3695" data-game-required>
+<link rel="stylesheet" href="assets/chess/chess-board.css?v=bde008f81124968f" data-game-required>
 <script src="games/table-continue-core.js?v=bc5fab705a134ab5"></script>
 <script src="assets/turdsuite.js?v=3f5836f4ca55e4c2"></script>
 <link rel="stylesheet" href="assets/suite-progress.css?v=90d3f1fc3aa82512">
 <script src="games/suite-progress-core.js?v=3c92de426327c7d1"></script>
 <script src="assets/suite-progress.js?v=cf46f758fae8dff1"></script>
 <script src="assets/suite-share.js?v=ad4aecc45730b022"></script>
-<script type="module" src="games/chess-ui.js?v=c67bce5a3ada7b99" data-game-required></script>
+<script type="module" src="games/chess-ui.js?v=1361d62cf23ed9f0" data-game-required></script>
+<link rel="stylesheet" href="assets/solo-play-finish.css?v=6f348c3aeb3a7882">
 <link rel="stylesheet" href="stalemate/play-music-pref.css">
 <script src="../js/music-preference.js"></script>
-<link rel="stylesheet" href="stalemate/solo-play-finish.css?v=d0d4699c6f6c04e8">
+<link rel="stylesheet" href="stalemate/solo-music-finish.css?v=727f82d06bafd79f">
 </head>
 <!-- New chess page and source modules: GPL-3.0-or-later. See assets/chess/credits.html. -->
 <body class="arcade chess-page" data-arcade-game="chess" data-suite-no-difficulty="1" data-suite-no-back="1" data-suite-no-bg="1">
@@ -33,7 +34,7 @@
 <noscript><p>Chess needs JavaScript to play on your device. <a href="./">Return to the arcade</a>.</p></noscript>
 <header class="chess-header">
 <a class="chess-hub" href="./" aria-label="Back to arcade">← Arcade</a>
-<div><p class="chess-kicker">TAKE THE THRONE</p><h1>Royal Flush <span>Chess</span></h1></div>
+<div class="chess-title"><p class="chess-kicker">TAKE THE THRONE</p><h1>Royal Flush <span>Chess</span></h1></div>
 <div class="chess-audio-controls"><span data-suite-music-slot></span><button id="mute" type="button" aria-pressed="false">Sound on</button></div>
 </header>
 <section id="setup" class="chess-card chess-setup" aria-labelledby="setup-title">

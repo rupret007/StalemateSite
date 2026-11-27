@@ -85,6 +85,10 @@
   html[data-mobile-game="turdrummy"] .title-group { min-height:44px; padding-left:50px; }
   html[data-mobile-game="turdrummy"] .top-links { display:flex; width:auto; gap:4px; margin-left:auto; }
   html[data-mobile-game="turdrummy"] .top-links>* { min-width:44px; min-height:44px; font-size:10px; padding:2px; transform:none; }
+  /* .btn:active scales to 0.97 and beats the rule above. A stuck press from the
+     previous touch then measures 42.68px and fails the 44px phone target. */
+  html[data-mobile-game="turdrummy"] .btn:active:not(:disabled),
+  html[data-mobile-game="turdrummy"] .top-links a:active { transform:none; }
   html[data-mobile-game="turdrummy"] .mobile-settings-panel .top-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; margin:0; }
   html[data-mobile-game="turdrummy"] .topbar:has(.mobile-settings[open]) { position:relative; z-index:1000; }
   html[data-mobile-game="turdrummy"] .mobile-settings-panel:has(.suite-difficulty-seg) #difficultyBtn { display:none!important; }

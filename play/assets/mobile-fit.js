@@ -4,6 +4,7 @@
   const root = document.documentElement;
   const game = root.dataset.mobileGame;
   const phone = matchMedia('(max-width: 980px)');
+  const landscape = matchMedia('(orientation: landscape)');
   const pagers = [];
   const placements = new Map();
   const neonCanvasStyles = new WeakMap();
@@ -125,6 +126,18 @@
     pagers.push(update);
   }
   function placeSettings() {
+    if (game === 'turdtris') {
+      const pause = document.getElementById('pauseOverlay');
+      const focused = pause?.contains(document.activeElement) ? document.activeElement : null;
+      // In landscape the pause sheet needs to clear the playfield's isolated stacking layer.
+      if (phone.matches && landscape.matches) move(pause, document.body);
+      else if (placements.has(pause)) {
+        const place = placements.get(pause);
+        place.parent.insertBefore(pause, place.next?.parentNode === place.parent ? place.next : null);
+        placements.delete(pause);
+      }
+      if (focused && document.activeElement !== focused) focused.focus({ preventScroll: true });
+    }
     if (!phone.matches) {
       [...placements.entries()].reverse().forEach(([element, place]) => place.parent.insertBefore(element, place.next?.parentNode === place.parent ? place.next : null));
       placements.clear();

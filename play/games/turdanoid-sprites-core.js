@@ -106,6 +106,25 @@
     ctx.lineTo(fx + fw - 1.8, fy + 5.6);
     ctx.closePath();
     ctx.fill();
+    // Phone-scale depth (painted once into each cached brick): a hard lit lip
+    // across the top, a glaze pool along the lower face, a reflected rim just
+    // above it, and a bright catch where the face meets the extruded side.
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    ctx.fillRect(fx + 3, fy + 0.6, Math.max(1, fw - 7), 1.3);
+    ctx.fillStyle = 'rgba(0,10,18,.2)';
+    ctx.fillRect(fx + 1.4, fy + fh * 0.64, fw - 2.8, fh * 0.3);
+    ctx.fillStyle = 'rgba(255,255,255,.2)';
+    ctx.fillRect(fx + 3.4, fy + fh - 2.4, Math.max(1, fw - 8), 0.9);
+    ctx.strokeStyle = 'rgba(255,255,255,.34)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(fx + fw - 0.2, fy + 1.4);
+    ctx.lineTo(w - 0.6, fy + depth * 0.7 + 0.4);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillRect(1.6, h - 1.2, w - 2.6, 0.9);
+    ctx.fillStyle = 'rgba(255,244,220,.4)';
+    ctx.fillRect(fx + 2.4, fy + fh - 3.1, Math.min(12, fw * 0.28), 1.1);
     ctx.restore();
     return { extruded: true, depth: depth, inset: true, glaze: true, fx: fx, fy: fy, fw: fw, fh: fh };
   }
@@ -173,21 +192,35 @@
       return 0;
     }
     const pips = Math.max(1, Math.min(5, Math.ceil(brick.hp)));
-    const px = brick.x;
-    const py = brick.y;
-    const pw = brick.w;
-    const ph = brick.h;
-    for (let i = 0; i < pips; i += 1) {
-      const cx = px + pw - 6 - i * 5;
-      const cy = py + ph - 5;
-      ctx.fillStyle = 'rgba(0,0,0,.45)';
+    // Lost hits stay visible as hollow slots, so damage reads by shape
+    // (filled vs. ring) on a dark tray rather than by colour or size alone.
+    const slots = Math.max(pips, Math.min(5, Math.ceil(brick.maxHp) || pips));
+    const right = brick.x + brick.w - 6;
+    const cy = brick.y + brick.h - 5;
+    const porcelain = tokens().porcelain || '#e8f4ef';
+    ctx.fillStyle = 'rgba(4,10,14,.66)';
+    roundRect(ctx, right - (slots - 1) * 5 - 3.2, cy - 2.9, (slots - 1) * 5 + 6.4, 5.8, 2.9);
+    ctx.fill();
+    for (let i = 0; i < slots; i += 1) {
+      const cx = right - i * 5;
       ctx.beginPath();
-      ctx.arc(cx, cy + 0.5, 1.7, 0, 6.283);
-      ctx.fill();
-      ctx.fillStyle = tokens().porcelain;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 1.15, 0, 6.283);
-      ctx.fill();
+      if (i < pips) {
+        ctx.fillStyle = 'rgba(0,0,0,.45)';
+        ctx.arc(cx, cy + 0.5, 1.7, 0, 6.283);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.fillStyle = porcelain;
+        ctx.arc(cx, cy, 1.6, 0, 6.283);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(8,12,16,.8)';
+        ctx.lineWidth = 0.7;
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = 'rgba(232,244,239,.55)';
+        ctx.lineWidth = 0.8;
+        ctx.arc(cx, cy, 1.25, 0, 6.283);
+        ctx.stroke();
+      }
     }
     return pips;
   }
@@ -229,23 +262,24 @@
     ctx.fillStyle = '#3a0810';
     roundRect(ctx, x - 1.2, cupY - 1, w + 2.4, cupH + 2.2, cupH / 2 + 1);
     ctx.fill();
-    const body = ctx.createLinearGradient(x, cupY, x + w, cupY + cupH);
-    body.addColorStop(0, '#ffc4b0');
-    body.addColorStop(0.2, t.coral);
-    body.addColorStop(0.55, '#c02830');
-    body.addColorStop(1, '#4a0c14');
+    const body = ctx.createLinearGradient(x, cupY, x, cupY + cupH);
+    body.addColorStop(0, '#f4d8cc');
+    body.addColorStop(0.22, '#d15a4a');
+    body.addColorStop(0.58, '#8a2430');
+    body.addColorStop(1, '#2a0c10');
     ctx.fillStyle = body;
-    ctx.shadowColor = p.fire ? t.coral : (p.gold ? t.brass : t.slime);
-    ctx.shadowBlur = 18;
     roundRect(ctx, x, cupY, w, cupH, cupH / 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255,236,220,.62)';
+    ctx.strokeStyle = 'rgba(255,236,220,.78)';
     ctx.lineWidth = 1.7;
     roundRect(ctx, x + 1.4, cupY + 1.2, w - 2.8, cupH - 2.4, cupH / 2 - 1);
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(80,8,16,.45)';
-    ctx.lineWidth = 2.1;
+    // The inner lip shows the paddle's material state: plain enamel normally,
+    // a lit band in the active power's colour otherwise. No extra shadow pass.
+    const stateRim = p.fire ? (t.coral || '#ff6d5a') : p.gold ? (t.brass || '#e8c56a')
+      : p.laser ? (t.rose || '#d878a8') : p.shield ? (t.aqua || '#5ec8e0') : '';
+    ctx.strokeStyle = stateRim || 'rgba(80,8,16,.45)';
+    ctx.lineWidth = stateRim ? 2.4 : 2.1;
     roundRect(ctx, x + 3.4, cupY + 3, w - 6.8, cupH - 6, cupH / 2 - 2);
     ctx.stroke();
     const cavity = ctx.createRadialGradient(paddle.x - w * 0.12, cupY + cupH * 0.32, 2, paddle.x, cupY + cupH * 0.62, w * 0.46);
@@ -255,6 +289,16 @@
     ctx.fillStyle = cavity;
     roundRect(ctx, x + 6, cupY + 4, w - 12, cupH - 8, cupH / 2 - 3);
     ctx.fill();
+    ctx.fillStyle = '#14060a';
+    roundRect(ctx, x + 1.4, cupY + 2.2, 11, cupH - 4.4, 5);
+    ctx.fill();
+    roundRect(ctx, x + w - 12.4, cupY + 2.2, 11, cupH - 4.4, 5);
+    ctx.fill();
+    ctx.fillStyle = t.brass || '#e8c56a';
+    ctx.beginPath();
+    ctx.arc(x + 6.6, cupY + cupH * 0.5, 1.55, 0, 6.283);
+    ctx.arc(x + w - 6.6, cupY + cupH * 0.5, 1.55, 0, 6.283);
+    ctx.fill();
     ctx.fillStyle = t.brassDeep;
     roundRect(ctx, paddle.x - 7, cupY - 7, 14, 9, 3);
     ctx.fill();
@@ -262,9 +306,9 @@
     roundRect(ctx, paddle.x - 5.5, cupY - 22, 11, 18, 3.2);
     ctx.fill();
     const handle = ctx.createLinearGradient(paddle.x - 5.5, cupY - 22, paddle.x + 5.5, cupY - 4);
-    handle.addColorStop(0, '#fff3c4');
-    handle.addColorStop(0.35, t.brass);
-    handle.addColorStop(1, t.brassDeep);
+    handle.addColorStop(0, '#f3e0b8');
+    handle.addColorStop(0.4, '#a87838');
+    handle.addColorStop(1, '#5a3818');
     ctx.fillStyle = handle;
     roundRect(ctx, paddle.x - 5.5, cupY - 22, 11, 18, 3.2);
     ctx.fill();
@@ -296,6 +340,55 @@
     }
     ctx.restore();
     return { x: x, y: y, w: w, h: h, plunger: true, enamel: true };
+  }
+
+  // The porcelain body is rasterized once. Eyes, rim and the trail stay live.
+  const ballDiscCache = { plain: null, fire: null };
+  function ballDisc(fire) {
+    const key = fire ? 'fire' : 'plain';
+    if (ballDiscCache[key]) {return ballDiscCache[key];}
+    const doc = root && root.document;
+    if (!doc || typeof doc.createElement !== 'function') {return null;}
+    const canvas = doc.createElement('canvas');
+    canvas.width = canvas.height = 96;
+    const g = canvas.getContext('2d');
+    if (!g) {return null;}
+    const body = g.createRadialGradient(30, 28, 4, 48, 48, 46);
+    if (fire) {
+      body.addColorStop(0, '#fff6d4');
+      body.addColorStop(0.32, '#ffb15a');
+      body.addColorStop(0.7, '#c44820');
+      body.addColorStop(1, '#4a140c');
+    } else {
+      body.addColorStop(0, '#fff1dc');
+      body.addColorStop(0.3, '#e2b07a');
+      body.addColorStop(0.68, '#8a4e2c');
+      body.addColorStop(1, '#2c140c');
+    }
+    g.fillStyle = body;
+    g.beginPath();
+    g.arc(48, 48, 44, 0, 6.283);
+    g.fill();
+    g.fillStyle = fire ? 'rgba(90,24,8,.3)' : 'rgba(40,16,8,.32)';
+    g.beginPath();
+    g.ellipse(48, 62, 24, 14, 0, 0, 6.283);
+    g.fill();
+    g.strokeStyle = '#1a0c08';
+    g.lineWidth = 7;
+    g.beginPath();
+    g.arc(48, 48, 41, 0, 6.283);
+    g.stroke();
+    g.strokeStyle = 'rgba(255,244,220,.96)';
+    g.lineWidth = 3.2;
+    g.beginPath();
+    g.arc(48, 48, 37.5, 0, 6.283);
+    g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.82)';
+    g.beginPath();
+    g.ellipse(34, 30, 11, 7, -0.6, 0, 6.283);
+    g.fill();
+    ballDiscCache[key] = canvas;
+    return canvas;
   }
 
   function paintBall(ctx, ball, opts) {
@@ -334,18 +427,6 @@
       }
     }
     ctx.globalAlpha = ghostly ? 0.55 : 1;
-    const halo = ctx.createRadialGradient(x, y, drawR * 0.2, x, y, drawR * 2);
-    if (ball.fire > 0) {
-      halo.addColorStop(0, 'rgba(255,160,80,.5)');
-      halo.addColorStop(1, 'rgba(255,80,30,0)');
-    } else {
-      halo.addColorStop(0, 'rgba(240,212,160,.42)');
-      halo.addColorStop(1, 'rgba(122,77,42,0)');
-    }
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(x, y, drawR * 2, 0, 6.283);
-    ctx.fill();
     ctx.save();
     const sq = reduced ? 0 : Math.min(1, ball.squash || 0);
     if (sq > 0) {
@@ -360,26 +441,36 @@
     ctx.beginPath();
     ctx.arc(x, y + 0.6, drawR + 0.7, 0, 6.283);
     ctx.fill();
-    const body = ctx.createRadialGradient(x - drawR * 0.38, y - drawR * 0.4, drawR * 0.08, x, y, drawR * 1.08);
-    if (ball.fire > 0) {
-      body.addColorStop(0, '#fffde0');
-      body.addColorStop(0.35, '#ffd28a');
-      body.addColorStop(1, '#7a2810');
+    const disc = ballDisc(ball.fire > 0);
+    if (disc) {
+      ctx.drawImage(disc, x - drawR, y - drawR, drawR * 2, drawR * 2);
     } else {
-      body.addColorStop(0, '#f3d7b0');
-      body.addColorStop(0.42, '#c48a50');
-      body.addColorStop(1, '#3c1e0c');
+      const body = ctx.createRadialGradient(x - drawR * 0.38, y - drawR * 0.4, drawR * 0.08, x, y, drawR * 1.08);
+      if (ball.fire > 0) {
+        body.addColorStop(0, '#fffde0');
+        body.addColorStop(0.35, '#ffd28a');
+        body.addColorStop(1, '#7a2810');
+      } else {
+        body.addColorStop(0, '#fff1dc');
+        body.addColorStop(0.42, '#e2b07a');
+        body.addColorStop(1, '#2c140c');
+      }
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.arc(x, y, drawR, 0, 6.283);
+      ctx.fill();
     }
-    ctx.fillStyle = body;
+    // A dark outer edge and a light inner edge keep the ball readable on
+    // bright bricks and on every dark court, including with the trail off.
+    ctx.strokeStyle = '#1a0c08';
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(x, y, drawR, 0, 6.283);
-    ctx.fill();
-    // Steady porcelain edge remains visible against bright bricks and dark
-    // scenery, including when reduced motion removes the trail.
-    ctx.strokeStyle = 'rgba(255,244,220,.92)';
-    ctx.lineWidth = 1.65;
+    ctx.arc(x, y, drawR + 0.9, 0, 6.283);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,246,230,.96)';
+    ctx.lineWidth = 1.7;
     ctx.beginPath();
-    ctx.arc(x, y, drawR - 0.55, 0, 6.283);
+    ctx.arc(x, y, drawR - 0.7, 0, 6.283);
     ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,.78)';
     ctx.beginPath();
@@ -504,7 +595,7 @@
       return { hi: '255,214,232', mid: '216,120,168', lo: '120,40,90', mote: '255,220,240', lamp: true };
     }
     if (id === 'sewer' || id === 'toxic') {
-      return { hi: '190,255,200', mid: '62,207,154', lo: '26,80,58', mote: '210,255,220', lamp: true };
+      return { hi: '230,220,190', mid: '120,132,116', lo: '36,44,40', mote: '230,220,190', lamp: true };
     }
     return { hi: '220,244,255', mid: '94,200,224', lo: '184,212,200', mote: '232,244,239', lamp: true };
   }
@@ -519,9 +610,9 @@
     const flicker = reduced ? 1 : 0.9 + 0.1 * Math.sin(now * 0.003);
     ctx.save();
     const cone = ctx.createLinearGradient(W * 0.5, 0, W * 0.5, H * 0.78);
-    cone.addColorStop(0, `rgba(${air.hi},${0.36 * flicker})`);
-    cone.addColorStop(0.16, `rgba(${air.mid},${0.18 * flicker})`);
-    cone.addColorStop(0.5, `rgba(${air.lo},${0.06 * flicker})`);
+    cone.addColorStop(0, `rgba(${air.hi},${0.22 * flicker})`);
+    cone.addColorStop(0.16, `rgba(${air.mid},${0.08 * flicker})`);
+    cone.addColorStop(0.5, `rgba(${air.lo},${0.02 * flicker})`);
     cone.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = cone;
     ctx.beginPath();
@@ -609,10 +700,10 @@
     }
     if (id === 'sewer' || id === 'toxic') {
       return {
-        hi: 'rgba(96,150,70,.8)',
-        mid: 'rgba(58,96,46,.88)',
-        lo: 'rgba(28,46,26,.96)',
-        crest: 'rgba(190,255,170,.38)'
+        hi: 'rgba(78,96,84,.7)',
+        mid: 'rgba(28,42,36,.9)',
+        lo: 'rgba(10,14,12,.96)',
+        crest: 'rgba(220,200,160,.34)'
       };
     }
     return {
@@ -654,41 +745,41 @@
   function tileFaceColors(tile) {
     if (tile === 'bond') {
       return {
-        mortar: 'rgba(8,28,22,.62)',
-        face: 'rgba(26,80,58,.34)',
-        hi: 'rgba(62,207,154,.2)',
-        edge: 'rgba(184,255,214,.22)'
+        mortar: 'rgba(8,10,12,.74)',
+        face: 'rgba(42,52,50,.42)',
+        hi: 'rgba(150,158,148,.18)',
+        edge: 'rgba(232,220,196,.24)'
       };
     }
     if (tile === 'algae') {
       return {
-        mortar: 'rgba(8,24,12,.62)',
-        face: 'rgba(36,80,28,.36)',
-        hi: 'rgba(134,216,106,.22)',
-        edge: 'rgba(190,255,170,.24)'
+        mortar: 'rgba(8,12,10,.72)',
+        face: 'rgba(36,58,32,.4)',
+        hi: 'rgba(150,176,130,.18)',
+        edge: 'rgba(214,220,190,.22)'
       };
     }
     if (tile === 'diamond') {
       return {
-        mortar: 'rgba(28,8,22,.58)',
-        face: 'rgba(90,28,70,.3)',
-        hi: 'rgba(216,120,168,.24)',
-        edge: 'rgba(255,200,230,.26)'
+        mortar: 'rgba(18,8,14,.68)',
+        face: 'rgba(78,32,58,.34)',
+        hi: 'rgba(180,110,140,.18)',
+        edge: 'rgba(240,200,214,.24)'
       };
     }
     if (tile === 'slab') {
       return {
-        mortar: 'rgba(20,12,4,.6)',
-        face: 'rgba(80,56,16,.34)',
-        hi: 'rgba(232,197,106,.24)',
-        edge: 'rgba(255,236,180,.26)'
+        mortar: 'rgba(16,10,6,.7)',
+        face: 'rgba(72,52,22,.38)',
+        hi: 'rgba(196,160,90,.18)',
+        edge: 'rgba(240,220,170,.26)'
       };
     }
     return {
-      mortar: 'rgba(8,24,32,.58)',
-      face: 'rgba(48,92,100,.3)',
-      hi: 'rgba(184,212,200,.2)',
-      edge: 'rgba(232,244,239,.26)'
+      mortar: 'rgba(8,12,16,.7)',
+      face: 'rgba(36,58,68,.36)',
+      hi: 'rgba(160,176,176,.16)',
+      edge: 'rgba(224,220,206,.24)'
     };
   }
 
@@ -746,12 +837,47 @@
           ctx.fillRect(fx, fy, fw, fh);
           ctx.fillStyle = faces.edge;
           ctx.fillRect(fx + 1.2, fy + 1, Math.max(2, fw - 2.4), 1.15);
+          // Lower bevel shadow: each wall tile reads as a raised glazed slab.
+          ctx.fillStyle = 'rgba(0,0,0,.24)';
+          ctx.fillRect(fx + 1.2, fy + fh - 1.4, Math.max(2, fw - 2.4), 1.2);
           drawn += 1;
         }
       }
     }
     ctx.restore();
     return { tile: tile, count: drawn, tw: tw, th: th, filled: true };
+  }
+
+  function paintSewerPumpworks(ctx, W, y) {
+    // Two recessed service cabinets stay outside the central rebound area.
+    for (const side of [-1, 1]) {
+      const x = side < 0 ? 27 : W - 27;
+      ctx.save(); ctx.translate(x, y); ctx.scale(-side, 1);
+      ctx.strokeStyle = '#0a1b20'; ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.moveTo(0, -29); ctx.lineTo(0, 61);
+      ctx.quadraticCurveTo(0, 72, -12, 72); ctx.lineTo(-25, 72); ctx.stroke();
+      ctx.strokeStyle = '#376769'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.strokeStyle = '#679899'; ctx.lineWidth = 1; ctx.stroke();
+      const steel = ctx.createLinearGradient(-16, -16, 16, 41);
+      steel.addColorStop(0, '#476c69'); steel.addColorStop(0.55, '#294749'); steel.addColorStop(1, '#183038');
+      roundRect(ctx, -17, -17, 34, 55, 5); ctx.fillStyle = '#07141b'; ctx.fill();
+      roundRect(ctx, -15, -15, 30, 51, 4); ctx.fillStyle = steel; ctx.fill();
+      ctx.strokeStyle = '#627d76'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = '#122c30'; ctx.fillRect(-12, 18, 24, 11);
+      ctx.fillStyle = '#6f9376'; ctx.fillRect(-8, 21, 7, 2);
+      ctx.fillStyle = '#c49558'; ctx.fillRect(2, 21, 6, 2);
+      ctx.fillStyle = '#172630'; ctx.beginPath(); ctx.arc(0, 1, 12, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = '#8c8065'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = '#a6a17f'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(0, 2, 7, Math.PI * 1.12, Math.PI * 1.9); ctx.stroke();
+      ctx.strokeStyle = '#d09d66'; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(4, -4); ctx.stroke();
+      ctx.fillStyle = '#0c1a1c';
+      ctx.fillRect(-11, -14, 22, 4);
+      ctx.fillStyle = '#e4d2b0';
+      ctx.fillRect(-9, -13.2, 8, 1.6);
+      ctx.restore();
+    }
   }
 
   function paintStageFixtures(ctx, spec, view) {
@@ -787,8 +913,10 @@
       ctx.lineWidth = 1.4;
       roundRect(ctx, W - 62, y + 28, 42, 14, 6);
       ctx.stroke();
-    } else if (spec.id === 'sewer' || spec.id === 'toxic') {
-      const rim = spec.id === 'toxic' ? '#86d86a' : t.slime;
+    } else if (spec.id === 'sewer') {
+      paintSewerPumpworks(ctx, W, y + 30);
+    } else if (spec.id === 'toxic') {
+      const rim = '#86d86a';
       ctx.strokeStyle = rim;
       ctx.lineWidth = 4;
       ctx.beginPath();
@@ -894,8 +1022,8 @@
       wainscot.addColorStop(0, 'rgba(90,28,70,.5)');
       wainscot.addColorStop(1, 'rgba(28,8,22,.6)');
     } else if (spec.id === 'sewer' || spec.id === 'toxic') {
-      wainscot.addColorStop(0, 'rgba(18,56,40,.52)');
-      wainscot.addColorStop(1, 'rgba(8,24,16,.6)');
+      wainscot.addColorStop(0, 'rgba(32,36,34,.55)');
+      wainscot.addColorStop(1, 'rgba(10,12,12,.64)');
     } else {
       wainscot.addColorStop(0, 'rgba(40,80,92,.5)');
       wainscot.addColorStop(1, 'rgba(10,28,36,.6)');
@@ -915,6 +1043,19 @@
     ctx.fillRect(0, railY, W, 1.2);
     ctx.fillStyle = 'rgba(0,0,0,.38)';
     ctx.fillRect(0, railY + 5.2, W, 1.8);
+    // The rail ledge casts a soft shadow down the wainscot, and the wall just
+    // above it darkens toward the corner: the wall and floor stop reading as
+    // one flat plane. Painted once per cached stage.
+    const ledge = ctx.createLinearGradient(0, railY + 10, 0, railY + 38);
+    ledge.addColorStop(0, 'rgba(0,0,0,.34)');
+    ledge.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ledge;
+    ctx.fillRect(0, railY + 10, W, 28);
+    const corner = ctx.createLinearGradient(0, railY - 26, 0, railY);
+    corner.addColorStop(0, 'rgba(0,0,0,0)');
+    corner.addColorStop(1, 'rgba(0,0,0,.22)');
+    ctx.fillStyle = corner;
+    ctx.fillRect(0, railY - 26, W, 26);
     if (!view || view.fixtures !== false) {
       paintStageFixtures(ctx, spec, { W: W, H: H });
     }
@@ -930,6 +1071,19 @@
     ctx.beginPath();
     ctx.ellipse(W * 0.5, H - 11, 11, 2.4, 0, 0, 6.283);
     ctx.fill();
+    // Cabinet cheeks stay inside the ball's minimum radius so the disc clears the brass.
+    ctx.fillStyle = '#050608';
+    ctx.fillRect(0, 0, 5, H);
+    ctx.fillRect(W - 5, 0, 5, H);
+    ctx.fillStyle = t.brass || '#e8c56a';
+    ctx.fillRect(1, 0, 1.6, H);
+    ctx.fillRect(W - 2.6, 0, 1.6, H);
+    ctx.fillStyle = 'rgba(255,244,220,.7)';
+    ctx.fillRect(3.2, 0, 1, H);
+    ctx.fillRect(W - 4.6, 0, 1, H);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(4.2, 0, 0.8, H);
+    ctx.fillRect(W - 5, 0, 0.8, H);
     ctx.restore();
     return {
       id: spec.id,
@@ -1088,6 +1242,7 @@
     paintAtmosphere,
     paintWorldStage,
     paintWorldStageCached,
+    paintSewerPumpworks,
     worldStageSpec,
     worldBasinColors,
     worldBubbleColor,

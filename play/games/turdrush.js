@@ -1,5 +1,5 @@
-import { createRun, startRun, pauseRun, resumeRun, act, advance } from './turdrush-core.js?v=6120b7f3c87dd2c2';
-import { TurdRushRenderer } from './turdrush-renderer.js?v=3f4caf204b692b96';
+import { TUNING, createRun, startRun, pauseRun, resumeRun, act, advance, classifyRushSwipe, queueRushSwipe, rushSwipeAction } from './turdrush-core.js?v=fa8a8ce86510b759';
+import { TurdRushRenderer, rushHazardCue, paintRushHazardCue, paintRushHitCue } from './turdrush-renderer.js?v=a08f533db59f0074';
 
 const $ = id => document.getElementById(id);
 const suite = globalThis.Suite;
@@ -14,6 +14,14 @@ let lastOrientation = globalThis.innerWidth > globalThis.innerHeight;
 let feedback = '', feedbackUntil = 0, lastLesson = '', lastHud = '', result = null;
 let best = readBest(), lastContrast = null, contrastReady = null;
 let renderDirty = true, lastDrawTime = 0;
+let hitTimer = 0, hitCount = 0;
+const HIT_CUE_MS = 1600;
+function clearHitCue() { clearTimeout(hitTimer); hitTimer = 0; paintRushHitCue($('rush-hit-cue'), null); }
+function showShieldHit(kind) {
+  clearTimeout(hitTimer);
+  paintRushHitCue($('rush-hit-cue'), { kind, shielded: true, count: ++hitCount });
+  hitTimer = setTimeout(clearHitCue, HIT_CUE_MS);
+}
 
 function seed() {
   try { return globalThis.crypto.getRandomValues(new Uint32Array(1))[0]; }
@@ -29,6 +37,7 @@ function announce(text) { suite?.announce?.(text); }
 function showPanel(id) {
   for (const name of panels) {$(name).hidden = name !== id;}
   $('rush-lesson').hidden = !!id;
+  if (id) {paintRushHazardCue($('rush-hazard-cue'), null);}
 }
 function sound(event) {
   const studio = { jump: 'ta.launch', slide: 'tris.hold', lane: 'tris.move', pick: 'ta.gold', shield: 'ta.power', magnet: 'ta.power', hit: 'ta.break', over: 'ta.death' };
@@ -64,6 +73,7 @@ function hud() {
   if (ready !== contrastReady) { contrastReady = ready; $('rush-contrast').disabled = !ready; }
   if (highContrast !== lastContrast) {
     lastContrast = highContrast;
+    document.body.dataset.rushContrast = highContrast ? 'on' : 'off';
     if (renderer) { renderer.highContrast = highContrast; renderDirty = true; }
     $('rush-contrast').textContent = highContrast ? 'High contrast on' : 'High contrast off';
     $('rush-contrast').setAttribute('aria-pressed', String(highContrast));
@@ -82,8 +92,11 @@ function hud() {
   if (state.player.magnet > 0) {powers.push(`<span class="magnet">MAGNET ${Math.ceil(state.player.magnet)}s</span>`);}
   const powerText = powers.join('');
   if ($('rush-powers').innerHTML !== powerText) {$('rush-powers').innerHTML = powerText;}
+  // The next obstacle takes precedence over general coaching during a race.
+  const cueLive = available && state.phase === 'running' && !$('rush-guide').open;
+  const cue = cueLive ? rushHazardCue(state, TUNING.collisionDepth) : null;
   let lesson = '';
-  if (state.phase === 'running') {
+  if (state.phase === 'running' && !cue) {
     if (state.elapsed < 2.8) {lesson = '←  Swipe left / right to dodge  →';}
     else if (state.elapsed < 5.5) {lesson = '↑  Jump high. Slide low.  ↓';}
     else if (state.elapsed < 8.0) {lesson = 'Golden picks = bonus points';}
@@ -92,9 +105,12 @@ function hud() {
       const required = upcoming.find(entity => upcoming.filter(other => other.at === entity.at && other.kind === entity.kind).length === 3);
       if (required) {lesson = required.kind === 'crate' ? 'FULL ROW · JUMP ↑' : 'LOW PIPE · SLIDE ↓';}
     }
-    if (feedback && state.elapsed < feedbackUntil) {lesson = feedback;}
   }
+  if (state.phase === 'running' && feedback && state.elapsed < feedbackUntil) {lesson = feedback;}
   if (lesson !== lastLesson) { lastLesson = lesson; $('rush-lesson').textContent = lesson; }
+  // Advance cue for the next obstacle in the target lane. Not a live region:
+  // it changes every row, so it stays visual and inspectable only.
+  paintRushHazardCue($('rush-hazard-cue'), cue);
 }
 function consume(events) {
   for (const event of events) {
@@ -105,9 +121,15 @@ function consume(events) {
         feedbackUntil = state.elapsed + 2.3;
       }
     } else if (event.type === 'shield') {
-      feedback = 'CLOSE ONE! Shield used.'; feedbackUntil = state.elapsed + 2;
+      feedback = ''; feedbackUntil = 0;
+      announce('Shield absorbed the hit.');
     } else if (event.type === 'over') {sound('over');}
-    else if (event.type === 'hit') {sound('hit');}
+    else if (event.type === 'hit') {
+      sound('hit');
+      // A fatal hit gets its explanation on the result panel.
+      if (event.shielded) {showShieldHit(event.kind);}
+      else {clearHitCue();}
+    }
     else if (['jump', 'slide', 'lane'].includes(event.type)) {sound(event.type);}
   }
 }
@@ -120,7 +142,7 @@ function begin() {
   startRun(state);
   runId = globalThis.SuiteProgress?.newRunId('turdrush') || null;
   recorded = false; result = null; previousTime = 0; gesture = null; pendingSwipe = null;
-  feedback = ''; feedbackUntil = 0; lastLesson = ''; share?.setResult(null);
+  feedback = ''; feedbackUntil = 0; lastLesson = ''; share?.setResult(null); clearHitCue();
   showPanel(null); gates(); hud();
   // The SDK's capture-phase unlock sees the ready screen paused. Open/resume
   // the existing effects context now, inside this real Start gesture, after
@@ -133,15 +155,15 @@ function pause(reason = 'Your run is right where you left it.') {
   gesture = null; pendingSwipe = null;
   if (!available || state.phase !== 'running') {return;}
   soundGeneration++;
-  pauseRun(state); previousTime = 0;
+  pauseRun(state); previousTime = 0; clearHitCue();
   $('rush-pause-reason').textContent = reason;
   showPanel('rush-paused'); gates(); announce('Run paused. Choose Keep running to resume.');
   if (!$('rush-guide').open && !document.hidden) {$('rush-resume').focus({ preventScroll: true });}
 }
 function resume() {
   if (!available || state.phase !== 'paused' || document.hidden || $('rush-guide').open) {return;}
-  resumeRun(state); previousTime = 0; gesture = null; pendingSwipe = null;
-  showPanel(null); gates(); $('rush-canvas').focus({ preventScroll: true });
+  resumeRun(state); previousTime = 0; gesture = null; pendingSwipe = null; clearHitCue();
+  showPanel(null); gates(); hud(); $('rush-canvas').focus({ preventScroll: true });
 }
 function finish() {
   if (recorded || state.phase !== 'over') {return;}
@@ -177,29 +199,21 @@ function input(action) {
   return tryInput(action);
 }
 function flushSwipe() {
-  if (!pendingSwipe) {return;}
-  if (state.phase !== 'running' || !available || $('rush-guide').open || state.elapsed > pendingSwipe.until) {
-    pendingSwipe = null; return;
-  }
-  if (pendingSwipe.lane === state.player.lane) {pendingSwipe = null; return;}
-  tryInput(pendingSwipe.lane < state.player.lane ? 'left' : 'right');
+  const action = rushSwipeAction(state, pendingSwipe);
+  if (!action || !available || $('rush-guide').open) {pendingSwipe = null; return;}
+  tryInput(action);
   if (pendingSwipe.lane === state.player.lane) {pendingSwipe = null;}
 }
 function swipeInput(action, owner) {
   if (action !== 'left' && action !== 'right') {input(action); return;}
-  // Distinct fast flicks can arrive during the core's100ms cooldown. Keep one
-  // bounded destination, so opposite corrections cancel instead of disappearing
-  // or replaying an extra direction later. Edge swipes accrue no movement debt.
-  const live = pendingSwipe && state.elapsed <= pendingSwipe.until;
-  const from = live ? pendingSwipe.lane : state.player.lane;
-  const lane = Math.max(0, Math.min(2, from + (action === 'left' ? -1 : 1)));
-  if (live && lane === from) {return;}
-  pendingSwipe = lane === state.player.lane ? null : { lane, owner, until: state.elapsed + .25 };
+  const next = queueRushSwipe(state, pendingSwipe, action, owner);
+  if (next === pendingSwipe) {return;}
+  pendingSwipe = next;
   flushSwipe();
 }
 function unavailable(message) {
   if (state.phase === 'running') {pauseRun(state);}
-  soundGeneration++; available = false; gesture = null; pendingSwipe = null;
+  soundGeneration++; available = false; gesture = null; pendingSwipe = null; clearHitCue();
   $('rush-unavailable-text').textContent = message;
   showPanel('rush-unavailable'); gates();
   globalThis.SuiteLoading?.ready();
@@ -282,10 +296,8 @@ canvas.addEventListener('pointerdown', event => {
 });
 function swipe(event) {
   if (!gesture || gesture.id !== event.pointerId || gesture.consumed || state.phase !== 'running') {return;}
-  const x = event.clientX - gesture.x, y = event.clientY - gesture.y;
-  if (Math.max(Math.abs(x), Math.abs(y)) < 18) {return;}
-  if (Math.abs(x) > Math.abs(y) * 1.12) { swipeInput(x > 0 ? 'right' : 'left', gesture); gesture.consumed = true; }
-  else if (Math.abs(y) > Math.abs(x) * 1.12) { swipeInput(y > 0 ? 'slide' : 'jump', gesture); gesture.consumed = true; }
+  const action = classifyRushSwipe(event.clientX - gesture.x, event.clientY - gesture.y);
+  if (action) {swipeInput(action, gesture); gesture.consumed = true;}
 }
 canvas.addEventListener('pointermove', swipe);
 canvas.addEventListener('pointerup', event => { swipe(event); if (gesture?.id === event.pointerId) {gesture = null;} });

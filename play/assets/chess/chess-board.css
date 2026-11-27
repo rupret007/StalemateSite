@@ -11,23 +11,29 @@ body.chess-page #board .square,body.chess-page #board .square:is(.dark,.selected
 body.chess-page #board .square:before,body.chess-page #board .square:after{content:none}
 body.chess-page #board .square .coord{z-index:1;font:800 clamp(9px,1.1vw,12px)/1 system-ui;color:#142c43;text-shadow:none}
 body.chess-page #board .square.dark .coord{color:#f5fff4}
+@media not all and (forced-colors: active){body.chess-page #board .square.dark.selected .coord{color:#142c43}}
 body.chess-page #board .square:focus-visible{outline:3px solid #101d2a;outline-offset:-3px;box-shadow:inset 0 0 0 5px #f5fff4}
 #board .check-label{bottom:1px;background:#a40e2c;color:#fff;font:800 clamp(7px,1vw,9px)/1.1 system-ui;padding:2px 4px;border-radius:3px;letter-spacing:.025em}
-#board piece{background-size:100%;background-repeat:no-repeat;background-position:center;filter:drop-shadow(0 1.5px 1px #08121d66)}
+#board piece{background-size:100%;background-repeat:no-repeat;background-position:center;filter:drop-shadow(0 1.5px 1px #08121d66);transition:filter .22s ease-out}
 #board piece.dragging{filter:drop-shadow(0 7px 3px #08121d77);cursor:grabbing}
 /* Keep the dark silhouette distinct on either square without recoloring the
    licensed artwork. The steady fine edge also survives reduced motion. */
 #board piece.black{filter:drop-shadow(0 0 .7px #fff6dc) drop-shadow(0 1.5px 1px #08121d66)}
 #board piece.black.dragging{filter:drop-shadow(0 0 .7px #fff6dc) drop-shadow(0 7px 3px #08121d77)}
+/* A moving piece carries a lifted shadow that tightens as it lands. */
+#board piece.anim{filter:drop-shadow(0 6px 3px #08121d59)}
+#board piece.black.anim{filter:drop-shadow(0 0 .7px #fff6dc) drop-shadow(0 6px 3px #08121d59)}
 #board piece.ghost{opacity:.25;filter:none}
-#board square.selected{background:var(--board-selection);box-shadow:inset 0 0 0 2px #476324}
+#board square.selected{background:var(--board-selection);box-shadow:inset 0 0 0 3px #476324,inset 0 0 0 4px #f8ffe8c4}
 #board square.last-move{background:#c8dd865c;box-shadow:inset 0 0 0 2px #213a3155}
-#board square.check{background:radial-gradient(ellipse at center,#f64f61 0%,#d42c48b3 45%,#b00b3700 75%);box-shadow:inset 0 0 0 3px #a40e2c}
+#board square.check{background:radial-gradient(ellipse at center,#f64f61 0%,#d42c48b3 45%,#b00b3700 75%);box-shadow:inset 0 0 0 3px #a40e2c,inset 0 0 0 5px #fff0dcb3}
 #board square.hinted{box-shadow:inset 0 0 0 3px #174c82;background:#9fcafa77}
 #board square.move-dest:after{content:'';position:absolute;left:37%;top:37%;width:26%;height:26%;border-radius:50%;background:#142c43;box-shadow:0 0 0 1.5px #f5fff4}
-#board square.move-dest.oc:after{left:4%;top:4%;width:92%;height:92%;background:transparent;border:3px solid #142c43;box-shadow:0 0 0 1.5px #f5fff4}
+/* A capture target is bracketed at its corners, unlike the centre dot of a
+   quiet move. The mask keeps four 30% corners of a two-tone frame. */
+#board square.move-dest.oc:after{left:5%;top:5%;width:90%;height:90%;box-sizing:border-box;border-radius:2px;background:transparent;border:3px solid #142c43;box-shadow:inset 0 0 0 2px #f5fff4;-webkit-mask:conic-gradient(at 42.86% 42.86%,#0000 75%,#000 0) 0 0/70% 70%;mask:conic-gradient(at 42.86% 42.86%,#0000 75%,#000 0) 0 0/70% 70%}
 #board square.move-dest.dark-square:after{background:#f5fff4;box-shadow:0 0 0 1.5px #142c43}
-#board square.move-dest.oc.dark-square:after{background:transparent;border-color:#f5fff4;box-shadow:0 0 0 1.5px #142c43}
+#board square.move-dest.oc.dark-square:after{background:transparent;border-color:#f5fff4;box-shadow:inset 0 0 0 2px #142c43}
 #board piece.pawn.white{background-image:url('pieces/spatial-wp.svg')}#board piece.knight.white{background-image:url('pieces/spatial-wn.svg')}
 #board piece.bishop.white{background-image:url('pieces/spatial-wb.svg')}#board piece.rook.white{background-image:url('pieces/spatial-wr.svg')}
 #board piece.queen.white{background-image:url('pieces/spatial-wq.svg')}#board piece.king.white{background-image:url('pieces/spatial-wk.svg')}
@@ -36,11 +42,14 @@ body.chess-page #board .square:focus-visible{outline:3px solid #101d2a;outline-o
 #board piece.queen.black{background-image:url('pieces/spatial-bq.svg')}#board piece.king.black{background-image:url('pieces/spatial-bk.svg')}
 .suite-colorblind body.chess-page{--board-light:#f6f3dd;--board-dark:#354e68;--board-selection:#bdd7fc}
 .suite-colorblind #board square.last-move{background:#e8c96e77;box-shadow:inset 0 0 0 2px #101d2a}
-.suite-colorblind #board square.selected{box-shadow:inset 0 0 0 3px #101d2a}
+.suite-colorblind #board square.last-from:not(.selected,.check,.hinted){background:#e8c96e3d;box-shadow:none}
+.suite-colorblind #board square.last-from:not(.selected,.check,.hinted):before{content:'';position:absolute;inset:3px;border:2px dashed #101d2a;pointer-events:none}
+.suite-colorblind #board square.selected{box-shadow:inset 0 0 0 3px #101d2a,inset 0 0 0 4px #fff}
 .suite-colorblind #board square.move-dest:after{box-shadow:0 0 0 2px #fff}
+.suite-colorblind #board square.move-dest.oc:after{box-shadow:inset 0 0 0 2px #fff}
 @media(max-width:740px){.chess-table{padding-inline:4px}body.chess-page #board{box-shadow:0 0 0 1px #82999e,0 0 0 3px #263e4d,0 2px 0 4px #101d2a,0 10px 20px #0004}}
 @media(min-width:520px) and (max-height:520px) and (orientation:landscape){body.chess-page .chess-game{grid-template-columns:minmax(216px,calc(100dvh - 106px)) minmax(240px,1fr)}.chess-table{padding-inline:3px}#board .square .coord{font-size:8px}#board .check-label{font-size:7px;padding:1px 2px}}
-@media(prefers-reduced-motion:reduce){#board piece{will-change:auto}}
+@media(prefers-reduced-motion:reduce){#board piece{will-change:auto;transition:none}}
 /* Ordinary desktop/tablet rows also respect available height. Header/player
    strips are measured because fonts, mode labels and captured pieces can grow. */
 @media(min-width:741px) and (min-height:521px){body.chess-page .chess-game{grid-template-columns:minmax(0,var(--chess-table-limit,620px)) minmax(250px,1fr)}}

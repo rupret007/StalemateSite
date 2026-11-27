@@ -6,7 +6,10 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const TARGETS = new Set([
     'assets/suite-progress.js', 'assets/suite-progress.css', 'assets/suite-share.js',
-    'assets/arcade-hub.css', 'assets/suite-hub-stats.js',
+    'assets/arcade-hub.css', 'assets/suite-hub-stats.js', 'assets/mobile-fit.js', 'assets/mobile-fit.css',
+    'assets/chess/chess.css', 'assets/turdsuite.css',
+    'games/crapeights-rules.js', 'games/turdrummy-rules.js', 'games/arcade-deck.js',
+    'games/turdtris-art.js', 'games/turdanoid-brick-sprite.js', 'games/turdanoid-sprites.js',
     'assets/turdsuite.js', 'assets/suite-audio.js', 'assets/suite-sound.js',
     'games/turdtris-audio.js', 'games/turdjack-audio.js',
     'games/turdrummy-audio.js', 'games/turdrummy-audio-core.js',
@@ -19,7 +22,8 @@ const TARGETS = new Set([
     'games/turdrush-core.js', 'games/turdrush.js', 'games/turdrush-renderer.js',
     'assets/turdrush.css', 'assets/turdrush-cover.svg',
     'assets/vendor/three/three.module.js', 'assets/vendor/three/three.core.js',
-    'stalemate/stalemate-overlay.js', 'stalemate/solo-play-finish.css', 'stalemate-strip.css'
+    'stalemate/stalemate-overlay.js', 'stalemate/solo-play-finish.css', 'stalemate-strip.css',
+    'assets/solo-play-finish.css', 'stalemate/solo-music-finish.css'
 ]);
 function versionArcadeAssets(stage) {
     const targets = new Set(TARGETS);
@@ -101,6 +105,12 @@ function versionArcadeAssets(stage) {
             return target ? prefix + quote + withVersion(reference, visit(target), true) + quote : all;
         }));
         next = next.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>)/gi, (all, open, body, close) => open + rewriteImports(body, file, visit) + close);
+        const sprite = 'assets/turdomania-tiles.svg';
+        if (file === 'turdomania.html' && exists(sprite)) {
+            next = next.replace(/'\.\/assets\/turdomania-tiles\.svg(?:\?[^'#]*)?#'/g,
+                `'${withVersion('./' + sprite + '#', visit(sprite))}'`);
+        }
+
         if (next !== original) fs.writeFileSync(path.join(stage, file), next);
     }
 }
