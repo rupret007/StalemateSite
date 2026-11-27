@@ -13,3 +13,9 @@ body{background-color:transparent}
 /* 320px phones: keep the game-over kicker/title clear of the top-left Hub back pill. */
 @media (max-width:360px){#endScreen .result-kicker,#endScreen h1,#endScreen .quip{padding-left:52px;padding-right:52px}}
 .stalemate-end__show[hidden] { display:none!important; }
+
+/* A desktop viewport can still have a full-width cabinet with no side gutter. */
+@media (min-width:981px) {
+  html[data-mobile-game="turdanoid"] #stage:not(.layout-wide) .topbtns { right:10px; }
+  html[data-mobile-game="turdanoid"] #stage:not(.layout-wide) .hud { right:114px; }
+}

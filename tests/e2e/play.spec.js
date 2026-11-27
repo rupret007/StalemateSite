@@ -464,3 +464,37 @@ test('Turdomania first-play hint clears landscape controls and persists after a 
     await page.reload();
     await expect(page.locator('#startHint')).toBeHidden();
 });
+
+test('desktop Turdanoid keeps Sound and Pause within reach across cabinet layouts', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Exercise desktop cabinet sizes with pointer and keyboard.');
+    await page.addInitScript(() => localStorage.setItem('turdanoid_v3_coach_v1', '1'));
+    for (const viewport of [{ width: 981, height: 900 }, { width: 980, height: 900 }, { width: 1000, height: 900 }, { width: 1280, height: 850 }]) {
+        await test.step(`${viewport.width}×${viewport.height}`, async () => {
+            await page.setViewportSize(viewport);
+            await page.goto('/play/TurdAnoid.html');
+            await page.locator('#btnStart').click();
+            await expect(page.locator('#titleScreen')).toHaveAttribute('aria-hidden', 'true');
+            const controls = page.locator('#playShell .topbtns-icons');
+            const sound = page.locator('#btnSound');
+            const pause = page.getByRole('button', { name: 'Pause game' });
+            await expect(controls).toBeInViewport({ ratio: 1 });
+
+            const lives = await page.locator('#playShell .hud .col.right').boundingBox();
+            const toolbar = await controls.boundingBox();
+            expect(toolbar.x, 'Sound and Pause clear the Lives display').toBeGreaterThanOrEqual(lives.x + lives.width);
+
+            await expect(sound).toHaveAttribute('aria-pressed', 'false');
+            await sound.click();
+            await expect(sound).toHaveAttribute('aria-pressed', 'true');
+            await sound.focus();
+            await expect(sound).toBeFocused();
+            await page.keyboard.press('Space');
+            await expect(sound).toHaveAttribute('aria-pressed', 'false');
+            await expect(sound).toBeFocused();
+            await pause.click();
+            await expect(page.getByRole('button', { name: /^resume$/i })).toBeVisible();
+            await page.getByRole('button', { name: /^resume$/i }).click();
+            await expect(pause).toBeVisible();
+        });
+    }
+});
