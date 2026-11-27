@@ -8,7 +8,7 @@ const { versionArcadeAssets } = require('./arcade-asset-versions.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
-const PIN = '8fa052dc3f2cf09961e285e2a63bc87227ab7b3f';
+const PIN = 'e4edd94de3c2b8c488f2d49472a38fc56db52167';
 const LEGACY_FOCUS_PIN = 'f9604242ac9fd2cbd28e94a524570ddbc228bd5c';
 const SOLO_PAGES = new Set(['TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
     'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html']);

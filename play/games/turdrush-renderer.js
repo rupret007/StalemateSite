@@ -118,24 +118,17 @@ function labelTexture(text, color = '#fff5da', background = '#123e4b', w = 512, 
   // Dark outer frame, then a bold inner rule in the text colour: the plate
   // separates from teal walls, orange wood and the bright fog alike.
   ctx.strokeStyle = '#08141a'; ctx.lineWidth = 12; ctx.strokeRect(6, 6, w - 12, h - 12);
-  if (icon) {
-    // Actionable plates (JUMP, SLIDE, DODGE) get yellow/black hazard stripes
-    // inside the dark frame band only; posters and pickups keep the plain frame.
-    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(12, 12, w - 24, h - 24); ctx.clip('evenodd');
-    ctx.fillStyle = '#ffc629';
-    for (let x = 0; x < w + h; x += 32) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 16, 0); ctx.lineTo(x + 16 - h, h); ctx.lineTo(x - h, h); ctx.closePath(); ctx.fill();
-    }
-    ctx.restore();
-    ctx.strokeStyle = '#08141a'; ctx.lineWidth = 3; ctx.strokeRect(1.5, 1.5, w - 3, h - 3); ctx.strokeRect(12, 12, w - 24, h - 24);
-  }
   ctx.strokeStyle = color; ctx.lineWidth = 7; ctx.strokeRect(16, 16, w - 32, h - 32);
   ctx.fillStyle = color; ctx.font = `900 ${Math.floor(h * 0.56)}px sans-serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (icon) {
-    // The action arrow reads without colour or language; the word follows it.
-    drawRushActionIcon(ctx, icon, h * 0.62, h / 2, h * 0.66, color);
-    ctx.fillText(text, (h * 1.1 + w) / 2, h / 2 + 2, w - h * 1.1 - 26);
+    // A solid action tile stays recognizable when the distant lettering
+    // falls below a pixel. Match the controls without relying on color alone.
+    const tileWidth = h * 1.15;
+    ctx.fillRect(16, 16, tileWidth, h - 32);
+    drawRushActionIcon(ctx, icon, 16 + tileWidth / 2, h / 2, h * 0.63, background);
+    const start = 16 + tileWidth;
+    ctx.fillText(text, (start + w - 16) / 2, h / 2 + 2, w - start - 38);
   } else {ctx.fillText(text, w / 2, h / 2 + 2, w - 40);}
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; signTextures.set(key, texture); return texture;
 }
@@ -320,7 +313,7 @@ function hazard(kind) {
     }
     for (const x of [-0.58, 0.58]) { box(group, COLORS.gold, x, 1.2, 0.535, 0.07, 2.1, 0.04, litBrass); ball(group, COLORS.ink, x, 0.12, 0, 0.17); }
     box(group, COLORS.gold, 0, 2.24, 0.535, 1.2, 0.06, 0.04, litBrass);
-    sign(group, 'DODGE', 0, 2.72, 0.12, 1.85, '#ffe1a0', '#3a1c34', 'dodge');
+    sign(group, 'DODGE', 0, 2.72, 0.12, 2.04, '#85f1ce', '#112f2d', 'dodge');
   } else if (kind === 'crate') {
     box(group, 0xd4743c, 0, 0.43, 0, 1.6, 0.8, 1.05, { emissive: 0x5a2008, emissiveIntensity: 0.4 });
     // Dark hardwood frame: corner posts and rails outline a squat box.
@@ -332,7 +325,7 @@ function hazard(kind) {
       const roll = cylinder(group, COLORS.paper, (i - 1) * 0.44, 0.98, 0, 0.23, 0.28);
       cylinder(group, 0x9e7454, roll.position.x, 1.17, 0, 0.08, 0.012);
     }
-    sign(group, 'JUMP', 0, 0.43, 0.572, 1.24, '#24343b', '#ffd36b', 'jump');
+    sign(group, 'JUMP', 0, 0.43, 0.572, 1.5, '#ffd36b', '#3b2414', 'jump');
   } else if (kind === 'beam') {
     for (const x of [-0.88, 0.88]) {
       cylinder(group, 0x6d6254, x, 1.0, 0, 0.13, 2);
@@ -343,7 +336,7 @@ function hazard(kind) {
     const pipe = cylinder(group, 0xefb750, 0, 1.53, 0, 0.25, 1.95, litBrass); pipe.rotation.z = Math.PI / 2;
     // Dense hazard banding: a striped bar with open floor beneath it.
     for (const x of [-0.56, -0.28, 0, 0.28, 0.56]) { const ring = cylinder(group, COLORS.ink, x, 1.53, 0, 0.31, 0.13); ring.rotation.z = Math.PI / 2; }
-    sign(group, 'SLIDE', 0, 1.96, 0.12, 1.7, '#fff5da', '#763b55', 'slide');
+    sign(group, 'SLIDE', 0, 1.96, 0.12, 1.9, '#ff9dc1', '#35192b', 'slide');
   } else if (kind === 'pick') {
     const shape = new THREE.Shape(); shape.moveTo(0, -0.36);
     shape.bezierCurveTo(-0.1, -0.31, -0.42, 0.12, -0.36, 0.31);

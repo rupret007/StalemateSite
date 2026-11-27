@@ -1,5 +1,5 @@
 import { TUNING, createRun, startRun, pauseRun, resumeRun, act, advance, classifyRushSwipe, queueRushSwipe, rushSwipeAction } from './turdrush-core.js?v=fa8a8ce86510b759';
-import { TurdRushRenderer, rushHazardCue, paintRushHazardCue, paintRushHitCue } from './turdrush-renderer.js?v=a762c768a5fd1613';
+import { TurdRushRenderer, rushHazardCue, paintRushHazardCue, paintRushHitCue } from './turdrush-renderer.js?v=af738fe2782a1f6d';
 
 const $ = id => document.getElementById(id);
 const suite = globalThis.Suite;
