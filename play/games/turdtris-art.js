@@ -159,7 +159,7 @@ function drawFace(ctx, name) {
 // so locked, active and ghost still separate by structure at 8 CSS pixels.
 function paintMaterialMark(ctx, name) {
   ctx.save();
-  ctx.globalAlpha = 0.34;
+  ctx.globalAlpha = 0.42;
   ctx.fillStyle = '#1a100c';
   ctx.strokeStyle = '#fff8ee';
   ctx.lineWidth = 1.6;
@@ -240,6 +240,10 @@ function paintSprite(ctx, name, variant) {
     roundPath(ctx, 5, 46, 54, 14, 6); ctx.fill();
     ctx.fillStyle = 'rgba(255,244,220,0.22)';
     ctx.fillRect(12, 47, 22, 2);
+    // A lit left bevel against the dark foot: stacked settled tiles separate
+    // as raised slabs at phone size, still without any bright outline.
+    ctx.fillStyle = 'rgba(255,248,236,0.2)';
+    ctx.fillRect(7, 12, 2.5, 32);
   }
   if (name === 'G') {
     ctx.strokeStyle = '#2a241c'; ctx.lineWidth = 3;
@@ -303,7 +307,18 @@ function paintBackground(ctx, theme) {
   ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
   // Each room keeps its focal shapes in the outer columns and the top and
   // bottom margins. The centre, where pieces fall, stays the dim tray.
+  // Architecture is painted first, in dark-to-mid values, then the veil, wells
+  // and grid land on top. Any line that crosses the tray sits on a cell boundary.
   if (theme.id === 'bathroom') {
+    // Crown moulding, chair rail and a darker wainscot give the room a floor line.
+    ctx.fillStyle = '#0c2a32'; ctx.fillRect(0, 0, width, 22);
+    ctx.fillStyle = '#245058'; ctx.fillRect(0, 20, width, 3);
+    ctx.fillStyle = '#061a20'; ctx.fillRect(0, 384, width, 256);
+    ctx.fillStyle = '#1e4650'; ctx.fillRect(0, 378, width, 8);
+    ctx.fillStyle = '#3a7476'; ctx.fillRect(0, 378, width, 2);
+    ctx.fillStyle = '#02090c'; ctx.fillRect(0, 386, width, 4);
+    ctx.strokeStyle = '#123640'; ctx.lineWidth = 3;
+    for (const x of [6, 266]) { roundPath(ctx, x, 402, 48, 120, 4); ctx.stroke(); }
     ctx.fillStyle = '#102830';
     roundPath(ctx, 6, 36, 52, 168, 8); ctx.fill();
     ctx.fillStyle = '#183848';
@@ -336,8 +351,34 @@ function paintBackground(ctx, theme) {
     ctx.fillStyle = '#16343c';
     ctx.beginPath(); ctx.ellipse(271, 592, 8, 5, 0, 0, TAU); ctx.fill();
   } else if (theme.id === 'sewer') {
+    // Barrel vault: a darker throat and one chunky brick ring recede behind the
+    // tray and spring from the side piers painted below.
+    ctx.fillStyle = '#0a110c';
+    ctx.beginPath(); ctx.arc(160, 300, 132, Math.PI, TAU);
+    ctx.lineTo(292, 608); ctx.lineTo(28, 608); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#1a281e'; ctx.lineWidth = 22;
+    ctx.beginPath(); ctx.arc(160, 300, 143, Math.PI, TAU); ctx.stroke();
+    ctx.strokeStyle = '#0a110c'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 1; i < 14; i++) {
+      const a = Math.PI + i * Math.PI / 14;
+      ctx.moveTo(160 + Math.cos(a) * 132, 300 + Math.sin(a) * 132);
+      ctx.lineTo(160 + Math.cos(a) * 154, 300 + Math.sin(a) * 154);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = '#2c3e30'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(160, 300, 154, Math.PI, TAU); ctx.stroke();
     ctx.fillStyle = '#101610';
     ctx.fillRect(0, 0, width, 26);
+    // Header main with three flanged joints along the top margin.
+    ctx.fillStyle = '#1e2c24'; ctx.fillRect(0, 8, width, 12);
+    ctx.fillStyle = '#34463a'; ctx.fillRect(0, 9, width, 2);
+    for (const x of [52, 160, 268]) {
+      ctx.fillStyle = '#2c3c32'; ctx.fillRect(x - 6, 4, 12, 20);
+      ctx.fillStyle = '#7a6c4a';
+      ctx.fillRect(x - 4, 6, 2, 2); ctx.fillRect(x + 2, 6, 2, 2);
+      ctx.fillRect(x - 4, 20, 2, 2); ctx.fillRect(x + 2, 20, 2, 2);
+    }
     ctx.fillStyle = '#141c16';
     ctx.fillRect(0, 0, 40, height);
     ctx.fillRect(width - 40, 0, 40, height);
@@ -353,9 +394,33 @@ function paintBackground(ctx, theme) {
     paintSewerValve(ctx, 300, 456);
     ctx.fillStyle = '#c4b48a';
     for (const [x, y] of [[6, 96], [6, 320], [308, 140], [308, 560]]) ctx.fillRect(x, y, 6, 6);
-    ctx.fillStyle = '#101610';
-    ctx.fillRect(0, 604, width, 36);
+    // Stone ledge and a slow outflow channel: the drain ring now sits in water.
+    ctx.fillStyle = '#0a1a14'; ctx.fillRect(0, 608, width, 32);
+    ctx.fillStyle = '#2a3a2e'; ctx.fillRect(0, 602, width, 6);
+    ctx.fillStyle = '#3e5442'; ctx.fillRect(0, 602, width, 1.5);
+    ctx.fillStyle = 'rgba(158,245,139,0.1)';
+    for (const [x, y, w] of [[48, 616, 40], [150, 622, 30], [220, 614, 52], [90, 632, 26], [250, 634, 34]]) ctx.fillRect(x, y, w, 2);
   } else if (theme.id === 'lagoon') {
+    // Sunlit shallows above, a sunken colonnade below: depth by value, cool hues only.
+    const surface = ctx.createLinearGradient(0, 0, 0, 260);
+    surface.addColorStop(0, 'rgba(70,160,180,0.16)'); surface.addColorStop(1, 'rgba(70,160,180,0)');
+    ctx.fillStyle = surface; ctx.fillRect(0, 0, width, 260);
+    ctx.strokeStyle = '#0e2434'; ctx.lineWidth = 18;
+    ctx.beginPath(); ctx.moveTo(44, 640); ctx.lineTo(44, 300);
+    ctx.arc(160, 300, 116, Math.PI, TAU); ctx.lineTo(276, 640); ctx.stroke();
+    ctx.fillStyle = '#123040'; ctx.fillRect(150, 170, 20, 26);
+    ctx.fillStyle = '#0c2232'; ctx.fillRect(4, 232, 26, 380);
+    ctx.fillStyle = '#143446'; ctx.fillRect(0, 222, 34, 12); ctx.fillRect(0, 600, 34, 12);
+    ctx.fillStyle = '#081a26';
+    for (let f = 10; f < 28; f += 7) ctx.fillRect(f, 236, 3, 362);
+    // A broken column stump on the right reads as ruin, not as a second wall.
+    ctx.fillStyle = '#0c2232';
+    ctx.beginPath();
+    ctx.moveTo(290, 612); ctx.lineTo(290, 452); ctx.lineTo(298, 440); ctx.lineTo(305, 450);
+    ctx.lineTo(316, 436); ctx.lineTo(316, 612); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#143446'; ctx.fillRect(286, 600, 34, 12);
+    ctx.fillStyle = '#081a26';
+    for (let f = 296; f < 314; f += 7) ctx.fillRect(f, 456, 3, 142);
     ctx.fillStyle = '#0c2030';
     ctx.beginPath();
     ctx.moveTo(248, 0); ctx.quadraticCurveTo(286, 48, 320, 16);
@@ -388,6 +453,19 @@ function paintBackground(ctx, theme) {
     ctx.moveTo(320, 608); ctx.lineTo(320, 640); ctx.lineTo(212, 640);
     ctx.bezierCurveTo(260, 586, 300, 620, 320, 608); ctx.fill();
   } else {
+    // Nebula depth behind the tray in cool hues, so the danger glow stays unique.
+    for (const [x, y, r, rgb] of [[96, 250, 170, '120,92,210'], [232, 440, 150, '70,118,210']]) {
+      const nebula = ctx.createRadialGradient(x, y, 8, x, y, r);
+      nebula.addColorStop(0, `rgba(${rgb},0.16)`); nebula.addColorStop(1, `rgba(${rgb},0)`);
+      ctx.fillStyle = nebula; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    // Hull ribs frame the viewport and a deck plate gives the stack a floor.
+    ctx.fillStyle = '#1a1432'; ctx.fillRect(0, 0, 12, height); ctx.fillRect(width - 12, 0, 12, height);
+    ctx.fillStyle = '#2c2450'; ctx.fillRect(10, 0, 2, height); ctx.fillRect(width - 12, 0, 2, height);
+    ctx.fillStyle = '#3a3060';
+    for (let y = 32; y < height; y += 64) { ctx.fillRect(4, y - 2, 4, 4); ctx.fillRect(width - 8, y - 2, 4, 4); }
+    ctx.fillStyle = '#100c22'; ctx.fillRect(0, 608, width, 32);
+    ctx.fillStyle = '#2e2650'; ctx.fillRect(0, 606, width, 3);
     for (let i = 0; i < 18; i++) {
       const x = (i * 97 + 20) % width, y = (i * 131 + 24) % height;
       if (x > 56 && x < 264 && y > 36 && y < 584) continue;

@@ -2,9 +2,16 @@
   <!-- Original cast. Same ids and viewBox. Ink outlines and cutouts read in grayscale; light comes from the upper left and every body shares one low shadow. -->
   <symbol id="swirl" viewBox="0 0 64 64">
     <ellipse cx="32" cy="57.5" rx="13" ry="3" fill="#140e0c" opacity="0.45"/>
+    <ellipse cx="31" cy="58.6" rx="9" ry="1.8" fill="#0a0706" opacity="0.55"/>
     <ellipse cx="29" cy="48" rx="15" ry="9" fill="#a86a3c" stroke="#1a100c" stroke-width="3"/>
+    <ellipse cx="29" cy="51.5" rx="11" ry="4.2" fill="#1a100c" opacity="0.28"/>
+    <ellipse cx="23" cy="45" rx="5" ry="2.5" fill="#dca06a" opacity="0.75"/>
     <ellipse cx="37" cy="34" rx="12" ry="8.2" fill="#d4924e" stroke="#1a100c" stroke-width="3"/>
+    <ellipse cx="40" cy="38.5" rx="5" ry="2.6" fill="#1a100c" opacity="0.22"/>
+    <ellipse cx="36" cy="29.6" rx="6.5" ry="2.4" fill="#f6c88e" opacity="0.75"/>
     <ellipse cx="27" cy="21" rx="9" ry="7.2" fill="#f3c98a" stroke="#1a100c" stroke-width="3"/>
+    <ellipse cx="29" cy="25" rx="4" ry="1.8" fill="#1a100c" opacity="0.2"/>
+    <ellipse cx="25" cy="18.5" rx="4" ry="2.4" fill="#fff3d6" opacity="0.85"/>
     <path d="M33 15c2-8 13-8 14 0 1 4-4 6-8 4" fill="#e0a25a" stroke="#1a100c" stroke-width="3" stroke-linejoin="round"/>
     <path d="M18 44c6-2 9 1 11 4" fill="none" stroke="#fff3dc" stroke-width="2.3" stroke-linecap="round"/>
     <circle cx="32" cy="33" r="3.5" fill="#fff6e8"/>
@@ -15,11 +22,16 @@
   </symbol>
   <symbol id="corn" viewBox="0 0 64 64">
     <ellipse cx="32" cy="57.5" rx="18" ry="3.1" fill="#140e0c" opacity="0.45"/>
+    <ellipse cx="32" cy="58.8" rx="13" ry="1.8" fill="#0a0706" opacity="0.55"/>
     <path d="M8 56C4 40 12 28 22 34 16 20 24 12 32 18L16 58Z" fill="#2c6436" stroke="#1a100c" stroke-width="3" stroke-linejoin="round"/>
     <path d="M56 56C60 40 52 28 42 34 48 20 40 12 32 18L48 58Z" fill="#3c7844" stroke="#1a100c" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M12 51c-1-7 1-11 5-13" fill="none" stroke="#5fa864" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+    <path d="M52 51c1-7-1-11-5-13" fill="none" stroke="#6cb872" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
     <path d="M22 12c0-7 20-7 20 0v34c0 7-20 8-20 1Z" fill="#ffe38a" stroke="#1a100c" stroke-width="3"/>
     <path d="M30 14h4v32h-4z" fill="#e2a43a"/>
-    <path d="M25 20h14M25 28h14M25 36h14" fill="none" stroke="#8a5a18" stroke-width="1.8" stroke-linecap="round"/>
+    <rect x="35" y="14" width="4.5" height="32" rx="2.25" fill="#b87a1e" opacity="0.4"/>
+    <rect x="24.5" y="13" width="4.5" height="32" rx="2.25" fill="#fff6c8" opacity="0.75"/>
+    <path d="M25 20h14M25 28h14M25 36h14" fill="none" stroke="#7a4c12" stroke-width="2.6" stroke-linecap="round"/>
     <path d="M26 16c3-3 7-2 9 1" fill="none" stroke="#fff8d4" stroke-width="2.2" stroke-linecap="round"/>
     <circle cx="28" cy="30" r="3.3" fill="#fff6e8"/>
     <circle cx="38" cy="30" r="3.3" fill="#fff6e8"/>
@@ -29,12 +41,15 @@
   </symbol>
   <symbol id="splat" viewBox="0 0 64 64">
     <ellipse cx="33" cy="57" rx="20" ry="3.2" fill="#140e0c" opacity="0.45"/>
+    <ellipse cx="32" cy="58.4" rx="12" ry="1.8" fill="#0a0706" opacity="0.55"/>
     <path d="M28 20 32 6l6 14" fill="#b6ee86" stroke="#14321c" stroke-width="3" stroke-linejoin="round"/>
     <path d="M46 26 60 30 46 40" fill="#b6ee86" stroke="#14321c" stroke-width="3" stroke-linejoin="round"/>
     <path d="M18 28 4 24 14 40" fill="#b6ee86" stroke="#14321c" stroke-width="3" stroke-linejoin="round"/>
     <path d="M22 18 12 10 26 20" fill="#d8ffb4" stroke="#14321c" stroke-width="3" stroke-linejoin="round"/>
     <path d="M40 46 48 58 32 50" fill="#9ed872" stroke="#14321c" stroke-width="3" stroke-linejoin="round"/>
     <ellipse cx="32" cy="34" rx="18" ry="14" fill="#d7ffb0" stroke="#14321c" stroke-width="3"/>
+    <ellipse cx="33" cy="41" rx="11" ry="4.5" fill="#6fae4c" opacity="0.45"/>
+    <ellipse cx="25" cy="28" rx="5.5" ry="3.5" fill="#ffffff" opacity="0.75"/>
     <path d="M18 28c4-3 7-1 8 2" fill="none" stroke="#f4ffe6" stroke-width="2.3" stroke-linecap="round"/>
     <path d="M22 32c2 2 5 2 6-1" fill="none" stroke="#14321c" stroke-width="2.4" stroke-linecap="round"/>
     <circle cx="40" cy="31" r="3.8" fill="#f4ffe8"/>
@@ -43,9 +58,13 @@
   </symbol>
   <symbol id="paper" viewBox="0 0 64 64">
     <ellipse cx="32" cy="57.5" rx="12" ry="2.8" fill="#140e0c" opacity="0.4"/>
+    <ellipse cx="32" cy="59" rx="8" ry="1.6" fill="#0a0706" opacity="0.5"/>
     <path d="M18 24h28v26l5 7-7-2-5 5-5-4-5 5-5-4-6 4z" fill="#c8bfb2"/>
     <path d="M16 22h28v26l4 6-6-2-4 5-5-4-5 5-5-3-5 4-4-6z" fill="#fffaf3" stroke="#1a100c" stroke-width="3" stroke-linejoin="round"/>
+    <rect x="37.5" y="26" width="4.5" height="20" rx="2" fill="#d8cfc2" opacity="0.85"/>
+    <ellipse cx="30" cy="25.5" rx="12" ry="2" fill="#1a100c" opacity="0.14"/>
     <ellipse cx="30" cy="17" rx="15" ry="7.2" fill="#f7f1e6" stroke="#1a100c" stroke-width="3"/>
+    <ellipse cx="30" cy="17" rx="8.5" ry="4.2" fill="#e2d6c2"/>
     <ellipse cx="30" cy="17" rx="5.2" ry="2.7" fill="#1a100c"/>
     <path d="M20 13c4-2 7-2 9 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
     <path d="M21 36h20" fill="none" stroke="#1a100c" stroke-width="1.6" stroke-dasharray="2.4 3" opacity="0.55"/>
@@ -55,7 +74,10 @@
   </symbol>
   <symbol id="bean" viewBox="0 0 64 64">
     <ellipse cx="34" cy="56" rx="15" ry="3.2" transform="rotate(-26 34 56)" fill="#140e0c" opacity="0.45"/>
+    <ellipse cx="33" cy="56.8" rx="10" ry="1.8" transform="rotate(-26 34 56)" fill="#0a0706" opacity="0.55"/>
     <path d="M46 10c11 7 12 26-2 38-16 13-30 4-28-12 1-10 9-4 13-14 3-9 8-16 17-12z" fill="#ffb7c4" stroke="#1a100c" stroke-width="3" stroke-linejoin="round"/>
+    <ellipse cx="27" cy="42" rx="6" ry="4" fill="#c86a80" opacity="0.55"/>
+    <ellipse cx="45" cy="24" rx="4.5" ry="8" fill="#ffdbe2" opacity="0.9"/>
     <path d="M40 16c8 6 8 16 2 24" fill="none" stroke="#fff4f6" stroke-width="3.1" stroke-linecap="round"/>
     <path d="M28 24c8 5 11 15 5 22" fill="none" stroke="#a43d56" stroke-width="2.5" stroke-linecap="round"/>
     <circle cx="30" cy="30" r="3.4" fill="#fff6e8"/>
@@ -66,10 +88,14 @@
   </symbol>
   <symbol id="cheese" viewBox="0 0 64 64">
     <ellipse cx="32" cy="57" rx="16" ry="3" fill="#140e0c" opacity="0.45"/>
+    <ellipse cx="31" cy="57.6" rx="12" ry="1.8" fill="#0a0706" opacity="0.55"/>
     <path d="M10 24 50 36 50 54 10 54Z" fill="#c88828"/>
     <path d="M8 18 54 32 54 52 8 52Z" fill="#ffd15c" stroke="#1a100c" stroke-width="3" stroke-linejoin="round"/>
     <path d="M8 18 54 32 47 36 8 24Z" fill="#fff3b0" stroke="#1a100c" stroke-width="3" stroke-linejoin="round"/>
     <path d="M14 22 30 29" fill="none" stroke="#fffbe2" stroke-width="2.3" stroke-linecap="round"/>
+    <path d="M11 40h41v9.5H11z" fill="#b8741a" opacity="0.25"/>
+    <path d="M11 45h41v4.5H11z" fill="#9a5c12" opacity="0.3"/>
+    <ellipse cx="16" cy="31" rx="4" ry="3" fill="#fff6c8" opacity="0.8"/>
     <circle cx="40" cy="42" r="4.4" fill="#1a100c"/>
     <circle cx="26" cy="46" r="2.5" fill="#1a100c"/>
     <circle cx="46" cy="48" r="1.7" fill="#1a100c"/>

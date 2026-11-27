@@ -1,3 +1,3 @@
-Vendored from github.com/rupret007/Turdanoid@e43219e7ec22180cfd170f3d755552b2eab11acb.
+Vendored from github.com/rupret007/Turdanoid@8fa052dc3f2cf09961e285e2a63bc87227ab7b3f.
 Original arcade material: same owner as StalemateSite. New chess modules/page and Chessground 10.5.0: GPL-3.0-or-later. Spatial piece artwork by Maurizio Monge: MIT. chess.js 1.4.0: BSD-2-Clause. Stockfish.js 19.0.1: GPL-3.0. See assets/chess/credits.html, included licenses and corresponding-source archives.
-Regenerate from the local Turdanoid checkout: bash scripts/sync-turdanoid.sh --source ../Turdanoid e43219e7ec22180cfd170f3d755552b2eab11acb
+Regenerate from the local Turdanoid checkout: bash scripts/sync-turdanoid.sh --source ../Turdanoid 8fa052dc3f2cf09961e285e2a63bc87227ab7b3f

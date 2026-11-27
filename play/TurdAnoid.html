@@ -260,7 +260,7 @@
 </style>
 <link rel="stylesheet" href="assets/mobile-fit.css?v=9cb9e921908f6401">
 <script src="assets/mobile-fit.js?v=dc1d1c7f8ebcfef2" defer></script>
-<link rel="stylesheet" href="assets/solo-play-finish.css?v=6f348c3aeb3a7882">
+<link rel="stylesheet" href="assets/solo-play-finish.css?v=03153168b353cc91">
 <link rel="stylesheet" href="stalemate/stalemate-overlay.css">
 <meta property="og:title" content="Stalemate Arcade">
 <meta property="og:description" content="Nine free browser games, including chess. Music by Stalemate.">
@@ -415,7 +415,7 @@
 <script src="games/turdanoid-levels-core.js"></script>
 <script src="games/turdanoid-physics-core.js"></script>
 <script src="games/turdanoid-worlds-core.js"></script>
-<script src="games/turdanoid-sprites-core.js?v=f8b606f1d148edf4"></script>
+<script src="games/turdanoid-sprites-core.js?v=e651de148b70d5e6"></script>
 <script src="games/turdanoid-brick-sprite-core.js"></script>
 <script src="games/turdanoid-shards-core.js"></script>
 <script src="games/turdanoid-boss-core.js"></script>
@@ -1005,18 +1005,106 @@ function paintCleanField(W, H, world){
     off.width = W; off.height = H;
     const o = off.getContext('2d');
     const id = world?.id || 'bathroom';
-    const cab = id === 'throne' ? ['#14110c', '#3a2c18', '#24180e', 'rgba(214,176,96,.2)']
-      : id === 'candy' ? ['#140e14', '#3a2230', '#24141c', 'rgba(214,150,180,.18)']
-      : id === 'toxic' ? ['#10140f', '#243228', '#141c14', 'rgba(160,186,140,.16)']
-      : id === 'sewer' ? ['#101418', '#2a3430', '#161c18', 'rgba(196,180,150,.16)']
-      : ['#10161c', '#2a3c44', '#152028', 'rgba(190,204,198,.16)'];
+    // [deep, wall, recess, lip trim, world light rgb]
+    const cab = id === 'throne' ? ['#14110c', '#3a2c18', '#24180e', 'rgba(214,176,96,.2)', '232,190,104']
+      : id === 'candy' ? ['#140e14', '#3a2230', '#24141c', 'rgba(214,150,180,.18)', '236,150,196']
+      : id === 'toxic' ? ['#10140f', '#243228', '#141c14', 'rgba(160,186,140,.16)', '140,220,104']
+      : id === 'sewer' ? ['#101418', '#2a3430', '#161c18', 'rgba(196,180,150,.16)', '222,180,118']
+      : ['#10161c', '#2a3c44', '#152028', 'rgba(190,204,198,.16)', '120,206,226'];
+    const L = 'rgba(' + cab[4] + ',';
     o.fillStyle = cab[0];
     o.fillRect(0, 0, W, H);
-    o.fillStyle = cab[1];
-    o.fillRect(0, 0, W, H * .38);
-    o.fillStyle = 'rgba(0,0,0,.3)';
-    o.fillRect(0, H * .32, W, H * .08);
+    // Chamber: a dim panelled wall behind the bricks, washed from the ceiling.
     const lip = Math.max(10, H * .026);
+    const dado = Math.round(H * .33);
+    const wall = o.createLinearGradient(0, 0, 0, H * .38);
+    wall.addColorStop(0, cab[2]);
+    wall.addColorStop(.4, cab[1]);
+    wall.addColorStop(1, cab[2]);
+    o.fillStyle = wall;
+    o.fillRect(0, 0, W, H * .38);
+    const spill = o.createLinearGradient(0, lip, 0, H * .24);
+    spill.addColorStop(0, L + '.16)');
+    spill.addColorStop(1, L + '0)');
+    o.fillStyle = spill;
+    o.fillRect(0, lip, W, H * .24 - lip);
+    const cols = Math.max(3, Math.round(W / 84));
+    const pw = Math.floor((W - 16 - (cols - 1) * 6) / cols);
+    const py = Math.round(lip + 6);
+    const ph = Math.max(24, dado - 6 - py);
+    const band = Math.max(8, Math.round(ph / 3));
+    for(let i = 0; i < cols; i++){
+      const px = 8 + i * (pw + 6);
+      o.fillStyle = 'rgba(0,0,0,.16)';
+      o.fillRect(px, py, pw, ph);
+      o.save();
+      o.beginPath();
+      o.rect(px, py, pw, ph);
+      o.clip();
+      if(id === 'sewer'){
+        // Riveted plates.
+        o.fillStyle = 'rgba(0,0,0,.26)';
+        for(let y = py + band; y < py + ph - 4; y += band) o.fillRect(px, y, pw, 3);
+        o.fillStyle = L + '.24)';
+        for(let y = py + 6; y < py + ph; y += band){ o.fillRect(px + 4, y, 3, 3); o.fillRect(px + pw - 7, y, 3, 3); }
+      } else if(id === 'toxic'){
+        // Corrugated sheet.
+        for(let x = px + 2; x < px + pw; x += 8){
+          o.fillStyle = 'rgba(0,0,0,.18)';
+          o.fillRect(x, py, 3, ph);
+          o.fillStyle = L + '.05)';
+          o.fillRect(x + 3, py, 2, ph);
+        }
+      } else if(id === 'candy'){
+        // Ribbon stripes.
+        o.fillStyle = L + '.08)';
+        o.beginPath();
+        for(let x = px - ph; x < px + pw; x += 16){
+          o.moveTo(x, py + ph); o.lineTo(x + 6, py + ph); o.lineTo(x + 6 + ph, py); o.lineTo(x + ph, py); o.closePath();
+        }
+        o.fill();
+      } else if(id === 'throne'){
+        // Gilt moulding frame.
+        o.strokeStyle = L + '.24)';
+        o.lineWidth = 2;
+        o.strokeRect(px + 6, py + 6, pw - 12, ph - 12);
+        o.fillStyle = L + '.3)';
+        for(const [cx, cy] of [[px + 5, py + 5], [px + pw - 9, py + 5], [px + 5, py + ph - 9], [px + pw - 9, py + ph - 9]]) o.fillRect(cx, cy, 4, 4);
+      } else {
+        // Square tile courses.
+        o.fillStyle = 'rgba(0,0,0,.2)';
+        for(let y = py + 14; y < py + ph; y += 14) o.fillRect(px, y, pw, 2);
+        for(let x = px + 14; x < px + pw; x += 14) o.fillRect(x, py, 2, ph);
+      }
+      o.restore();
+      // Recessed bevel: shade under the top and left lips, light on the lower ones.
+      o.fillStyle = 'rgba(0,0,0,.3)';
+      o.fillRect(px, py, pw, 3);
+      o.fillRect(px, py, 2, ph);
+      o.fillStyle = L + '.14)';
+      o.fillRect(px, py + ph - 2, pw, 2);
+      o.fillStyle = L + '.07)';
+      o.fillRect(px + pw - 2, py, 2, ph);
+    }
+    // Uplights rise from the dado in the outer bays only; the centre stays quiet.
+    for(const ux of [.13, .87]){
+      o.save();
+      o.translate(W * ux, dado);
+      o.scale(1, 2.2);
+      const up = o.createRadialGradient(0, 0, 0, 0, 0, W * .14);
+      up.addColorStop(0, L + '.2)');
+      up.addColorStop(1, L + '0)');
+      o.fillStyle = up;
+      o.fillRect(-W * .14, -W * .14, W * .28, W * .14);
+      o.restore();
+    }
+    o.fillStyle = cab[2];
+    o.fillRect(0, dado, W, H * .38 - dado);
+    const cap = o.createLinearGradient(0, dado, 0, dado + 6);
+    cap.addColorStop(0, L + '.16)');
+    cap.addColorStop(1, L + '0)');
+    o.fillStyle = cap;
+    o.fillRect(0, dado, W, 6);
     o.fillStyle = '#07080c';
     o.fillRect(0, 0, W, lip);
     o.fillStyle = cab[3];
@@ -1027,6 +1115,92 @@ function paintCleanField(W, H, world){
     floor.addColorStop(1, '#07090c');
     o.fillStyle = floor;
     o.fillRect(0, H * .38, W, H * .62);
+    // The wall casts a soft contact shadow onto the back of the court.
+    const seam = o.createLinearGradient(0, H * .38, 0, H * .45);
+    seam.addColorStop(0, 'rgba(0,0,0,.42)');
+    seam.addColorStop(1, 'rgba(0,0,0,0)');
+    o.fillStyle = seam;
+    o.fillRect(0, H * .38, W, H * .07);
+    // Lower court: side wings outside the inner joints carry the world floor and
+    // its light; the centre lane keeps the bare dark tread so the ball reads.
+    const fy = H * .42;
+    o.save();
+    o.beginPath();
+    for(const s of [-1, 1]){
+      o.moveTo(s < 0 ? 0 : W, fy);
+      o.lineTo(W * (.5 + s * .28 * .2588), fy);
+      o.lineTo(W * (.5 + s * .28 * .92), H);
+      o.lineTo(s < 0 ? 0 : W, H);
+      o.closePath();
+    }
+    o.clip();
+    for(const s of [0, 1]){
+      const wash = o.createLinearGradient(s ? W : 0, 0, W * .5, 0);
+      wash.addColorStop(0, L + '.12)');
+      wash.addColorStop(1, L + '0)');
+      o.fillStyle = wash;
+      o.fillRect(s ? W * .5 : 0, fy, W * .5, H - fy);
+    }
+    for(const gx of [.1, .9]){
+      const pool = o.createRadialGradient(W * gx, H * .7, 0, W * gx, H * .7, W * .32);
+      pool.addColorStop(0, L + '.12)');
+      pool.addColorStop(1, L + '0)');
+      o.fillStyle = pool;
+      o.fillRect(0, fy, W, H - fy);
+    }
+    const rows = [];
+    for(let i = 1; i < 9; i++) rows.push(Math.round(fy + (H - fy) * Math.pow(i / 9, 1.6)));
+    if(id === 'sewer'){
+      o.fillStyle = 'rgba(0,0,0,.16)';
+      for(let i = 0; i < rows.length - 1; i += 2) o.fillRect(0, rows[i] + 4, W, rows[i + 1] - rows[i] - 4);
+      o.fillStyle = L + '.22)';
+      for(const y of rows){ o.fillRect(10, y + 5, 3, 3); o.fillRect(W - 13, y + 5, 3, 3); }
+    } else if(id === 'toxic' || id === 'candy'){
+      // Mirrored stripes read as chevrons pointing into the lane.
+      o.fillStyle = id === 'toxic' ? 'rgba(228,188,72,.08)' : L + '.08)';
+      const run = (H - fy) * .7;
+      for(const s of [0, 1]){
+        o.save();
+        o.beginPath();
+        o.rect(s ? W / 2 : 0, fy, W / 2, H - fy);
+        o.clip();
+        o.beginPath();
+        for(let x = -run; x < W + run; x += 24){
+          const t = s ? -run : run;
+          o.moveTo(x, H); o.lineTo(x + 10, H); o.lineTo(x + 10 + t, fy); o.lineTo(x + t, fy); o.closePath();
+        }
+        o.fill();
+        o.restore();
+      }
+    } else {
+      // Bathroom tile seams or the throne's gilt inlay, converging on the far wall.
+      o.strokeStyle = id === 'throne' ? L + '.18)' : 'rgba(0,0,0,.3)';
+      o.lineWidth = id === 'throne' ? 3 : 2;
+      o.beginPath();
+      for(const lane of id === 'throne' ? [-.33, .33] : [-1.86, -1.56, -1.3, -1.08, -.88, -.7, -.54, .54, .7, .88, 1.08, 1.3, 1.56, 1.86]){
+        o.moveTo(W * (.5 + lane * .2588), fy);
+        o.lineTo(W * (.5 + lane * .92), H);
+      }
+      o.stroke();
+    }
+    // Perspective courses: a dark groove with a lit lower lip, widening toward the player.
+    o.fillStyle = 'rgba(0,0,0,.3)';
+    for(const y of rows) o.fillRect(0, y, W, 2);
+    o.fillStyle = L + '.07)';
+    for(const y of rows) o.fillRect(0, y + 2, W, 2);
+    o.restore();
+    // A weak tinted bounce lane under the paddle, soft-edged so it never reads as a wall.
+    const bounce = o.createLinearGradient(0, H - 66, 0, H - 22);
+    bounce.addColorStop(0, L + '0)');
+    bounce.addColorStop(.55, L + '.06)');
+    bounce.addColorStop(1, L + '0)');
+    o.fillStyle = bounce;
+    o.fillRect(0, H - 66, W, 44);
+    const sill = o.createLinearGradient(0, H - 22, 0, H);
+    sill.addColorStop(0, 'rgba(0,0,0,0)');
+    sill.addColorStop(1, 'rgba(0,0,0,.3)');
+    o.fillStyle = sill;
+    o.fillRect(0, H - 22, W, 22);
     // Joints stay in the side thirds. The centre lane is a flat tread so the ball reads.
     o.strokeStyle = 'rgba(255,236,210,.14)';
     o.lineWidth = 1;

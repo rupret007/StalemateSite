@@ -887,3 +887,234 @@ body.arcade[data-arcade-game="turdrummy"] #stockPile .stock-stack { width: auto;
     outline-offset: 2px;
   }
 }
+
+/* Solo table artwork. Keep the interactive states and geometry in the game styles. */
+@media (forced-colors: none) {
+
+  /* ---------- Crapjack 21: walnut and brass ---------- */
+  /* Card stock: a warm ink keyline, a pressed lower edge and a bright top
+     bevel, with a tight contact shadow under the soft drop shadow. */
+  body.arcade[data-arcade-game="crapjack"] .playing-card {
+    --suite-card-shadow: 0 1px 1px #1a0a0dad, 0 7px 14px #12060a8c;
+  }
+  body.arcade[data-arcade-game="crapjack"] .playing-card:not(.back) {
+    --suite-paper-edge: inset 0 0 0 1px #4a2a1a33, inset 0 -2px 0 #6b45201c, inset 0 1px 0 #ffffffb8;
+  }
+  /* The top-left rank prints crisply; colour and size stay authored. */
+  body.arcade[data-arcade-game="crapjack"] .playing-card:not(.back) .rank {
+    text-shadow: 0 1px 0 #ffffffa6;
+  }
+  /* HUD tiles use the rail's lacquer; Bankroll carries a brass top bar. */
+  body.arcade[data-arcade-game="crapjack"] .card-stat {
+    background: linear-gradient(160deg, #2e181be6, #170c0fe6 72%);
+    box-shadow: inset 0 1px 0 #ffe7b024, inset 0 -2px 0 #0a0406a6, 0 4px 10px #0006;
+  }
+  body.arcade[data-arcade-game="crapjack"] .card-stat.hot {
+    border-color: #e3c08aa6;
+    box-shadow: inset 0 2px 0 #f0c870, inset 0 -2px 0 #0a0406a6, 0 4px 10px #0006;
+  }
+  body.arcade[data-arcade-game="crapjack"] .card-stat .k { color: #e8d3b0; }
+  /* The discard tray is a recessed walnut well under the same brass rule
+     as the dealer tray, so the used cards have somewhere to sit. */
+  body.arcade[data-arcade-game="crapjack"] .discard-tray {
+    border-color: #c9955a59;
+    background: linear-gradient(180deg, #160a0dd9, #2a1418a6);
+    box-shadow: inset 0 2px 0 #e3c08a40, inset 0 3px 8px #000a, 0 1px 0 #e3c08a1f;
+    color: #e8d3b0;
+  }
+
+  /* ---------- Crappy Eights: aubergine and plum lacquer ---------- */
+  body.arcade[data-arcade-game="crapeights"] :is(.card-btn, .pile-card, .discard-stack, .draw-back) {
+    --suite-card-shadow: 0 1px 1px #110a22b3, 0 8px 16px #110a2299;
+  }
+  body.arcade[data-arcade-game="crapeights"] :is(.card-btn, .pile-card, .discard-stack) {
+    --suite-paper-edge: inset 0 0 0 1px #2e224838, inset 0 -2px 0 #3a2a5a1a, inset 0 1px 0 #ffffffb8;
+  }
+  body.arcade[data-arcade-game="crapeights"] :is(.card-btn, .pile-card) > div:first-child {
+    text-shadow: 0 1px 0 #ffffffa6;
+  }
+  /* The leftover green HUD strip becomes plum lacquer to match the rail. */
+  body.arcade[data-arcade-game="crapeights"] .hud {
+    border-color: #393241;
+    background: linear-gradient(180deg, #2b2142, #1a1429);
+    box-shadow: inset 0 1px 0 #ffffff12, inset 0 -2px 0 #0d0818, 0 6px 16px #0006;
+  }
+  body.arcade[data-arcade-game="crapeights"] .hud-card { border-right-color: #c4a5f61f; }
+  body.arcade[data-arcade-game="crapeights"] .hud-card .k { color: #cbbfe0; }
+  /* The active turn has a mint edge, the same mint as the hand
+     rail's top edge. */
+  body.arcade[data-arcade-game="crapeights"] .hud-card[data-turn="you"] {
+    box-shadow: inset 2px 0 0 #a3e5c0;
+  }
+  /* The acting bot sits on plum instead of leftover green. Its gold
+     avatar ring keeps a plum gasket, and the THINKING pill and transform
+     are untouched. */
+  body.arcade[data-arcade-game="crapeights"] .opp-card.active {
+    background: #34264fb3;
+  }
+  body.arcade[data-arcade-game="crapeights"] .opp-card.active .ce-avatar {
+    box-shadow: 0 0 0 3px #261c3b, 0 0 0 5px #f1d888, 0 0 24px #f1d88866;
+  }
+  /* The hand rail is a plum ledge, so the fan reads as resting on wood. */
+  body.arcade[data-arcade-game="crapeights"] .hand-wrap {
+    background: linear-gradient(180deg, #2a1f4080, #1a142900 78%);
+  }
+  /* Pile labels follow the table mode with a ruled underline, not only a
+     colour: mint under Draw Pile when you must draw, brass under Discard
+     Pile when you can match (its brass ring stays authored). */
+  body.arcade[data-arcade-game="crapeights"] #playTable[data-table-mode="draw"] .pile:has(> .draw-stack) h2,
+  body.arcade[data-arcade-game="crapeights"] #playTable[data-table-mode="match"] .pile:has(> .discard-stack) h2 {
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+  body.arcade[data-arcade-game="crapeights"] #playTable[data-table-mode="draw"] .pile:has(> .draw-stack) h2 {
+    color: #c8ffe2;
+    text-decoration-color: #a3e5c0;
+  }
+  body.arcade[data-arcade-game="crapeights"] #playTable[data-table-mode="match"] .pile:has(> .discard-stack) h2 {
+    color: #ffe7b0;
+    text-decoration-color: #eeca79;
+  }
+
+  /* ---------- Turd Rummy: teal baize and jade ---------- */
+  body.arcade[data-arcade-game="turdrummy"] :is(.card, .back-card) {
+    --suite-card-shadow: 0 1px 1px #03100fb3, 0 7px 14px #03100f8c;
+  }
+  body.arcade[data-arcade-game="turdrummy"] .card {
+    --suite-paper-edge: inset 0 0 0 1px #1f3f3638, inset 0 -2px 0 #24453d1a, inset 0 1px 0 #ffffffb8;
+  }
+  /* A satin sheen uses the card's own foil layer. Aces keep their gold foil. */
+  body.arcade[data-arcade-game="turdrummy"] .card:not([data-face="ace"]) {
+    --card-foil: radial-gradient(ellipse 90% 55% at 28% 0%, #ffffff42, transparent 70%);
+  }
+  body.arcade[data-arcade-game="turdrummy"] .card .card-face:first-child {
+    text-shadow: 0 1px 0 #ffffffa6;
+  }
+  /* The pile you may draw from rings its actual top card, as well as its
+     well. Offset 1px keeps the ring off the stacked under-cards and clear
+     of the count chip beside the deck. */
+  body.arcade[data-arcade-game="turdrummy"] .app:has(#drawStockBtn:not(:disabled)) #stockPile .back-card:not(:focus-visible),
+  body.arcade[data-arcade-game="turdrummy"] .app:has(#drawDiscardBtn:not(:disabled)) #discardPile .card:not(:focus-visible) {
+    outline: 2px solid #ffd76a;
+    outline-offset: 1px;
+  }
+  /* Readouts are jade-lacquer plates on the rail. */
+  body.arcade[data-arcade-game="turdrummy"] .stat {
+    border-color: #b5e1ca40;
+    background: linear-gradient(155deg, #1d4a43, #102b29 70%);
+    box-shadow: inset 0 1px 0 #d7fff01f, inset 0 -2px 0 #061716a6, 0 4px 10px #0005;
+  }
+  body.arcade[data-arcade-game="turdrummy"] .stat-label { color: #cfeee2; }
+
+  /* ---------- TurdSpades: navy club felt and gunmetal ---------- */
+  body.arcade[data-arcade-game="turdspades"] :is(.card, .entry[data-seat], .back) {
+    --suite-card-shadow: 0 1px 1px #06121db3, 0 7px 14px #06121d8c;
+  }
+  body.arcade[data-arcade-game="turdspades"] :is(.card, .entry[data-seat]) {
+    --suite-paper-edge: inset 0 0 0 1px #1b304038, inset 0 -2px 0 #2b4e631a, inset 0 1px 0 #ffffffb8;
+  }
+  body.arcade[data-arcade-game="turdspades"] .card .r:first-child {
+    text-shadow: 0 1px 0 #ffffffa6;
+  }
+  /* Readouts and seat chips move off leftover green onto the gunmetal rail. */
+  body.arcade[data-arcade-game="turdspades"] .stat {
+    border-color: #8ca9b855;
+    background: linear-gradient(160deg, #1f3442, #122230 70%);
+    box-shadow: inset 0 1px 0 #a9c3cf33, inset 0 -2px 0 #0a141ca6, 0 4px 10px #0005;
+  }
+  body.arcade[data-arcade-game="turdspades"] .seat-count {
+    background: #0c1c28;
+    color: #e3eef2;
+  }
+  /* Your seat is a slate ledge. On your turn or bid it gains a mint top
+     edge to match the mint name tab: suite language for "you act". */
+  body.arcade[data-arcade-game="turdspades"] .seat-you {
+    border-top-color: #a9c3cf40;
+    background: linear-gradient(180deg, #0c1c2880, #0c1c2800 70%);
+  }
+  body.arcade[data-arcade-game="turdspades"]:is([data-turn="you"], [data-turn="bid"]) .seat-you {
+    border-top-color: #9effc8;
+    box-shadow: inset 0 2px 0 #9effc8;
+  }
+
+  /* ---------- Royal Flush Chess: games-table tray ---------- */
+  /* Paint-only walnut tray behind the plates and board. The board's banding
+     sits in the tray's existing padding, and squares, coordinates and
+     pieces are untouched. */
+  body.arcade.chess-page .chess-table {
+    border-radius: 10px;
+    background: linear-gradient(165deg, #2b201a, #1b1614 70%);
+    box-shadow: inset 0 0 0 1px #a7835a4d, inset 0 1px 0 #efcfad1f, 0 10px 26px #0006;
+  }
+  /* Ledger numerals line up. The current-move rule keeps its higher
+     specificity and brass edge. */
+  body.arcade.chess-page .chess-moves button {
+    font-variant-numeric: tabular-nums;
+    border-radius: 3px;
+  }
+}
+
+/* Keep the title, total and cards within the same compact hand tray. */
+@media (max-width: 380px) and (orientation: portrait) {
+  html[data-mobile-game="turdjack"] body.arcade[data-arcade-game="crapjack"] .table-stage > .hand {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 4px;
+  }
+  html[data-mobile-game="turdjack"] body.arcade[data-arcade-game="crapjack"] .table-stage .hand-title {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 3px;
+    min-height: 0;
+  }
+  html[data-mobile-game="turdjack"] body.arcade[data-arcade-game="crapjack"] .table-stage .total-badge {
+    min-height: 0;
+    min-width: 0;
+    padding: 2px 5px;
+    font-size: .92rem;
+  }
+  html[data-mobile-game="turdjack"] body.arcade[data-arcade-game="crapjack"] .table-stage .cards {
+    height: 100%;
+    max-height: 100%;
+    align-items: center;
+    gap: 4px;
+  }
+  html[data-mobile-game="turdjack"] body.arcade[data-arcade-game="crapjack"] .table-stage .playing-card {
+    max-height: 100%;
+  }
+  body.arcade[data-arcade-game="turdspades"] .trick-pile.layout-seat .entry[data-seat] strong {
+    top: -13px;
+  }
+}
+
+/* Keep titles, totals, and card indices clear when three hands share the screen. */
+@media (max-width: 380px) and (orientation: portrait) {
+  html[data-mobile-game="turdjack"] body.arcade[data-arcade-game="crapjack"] .table-stage:has(> #splitHandWrap:not([hidden])) .hand-title {
+    gap: 1px;
+    line-height: 1.1;
+  }
+  html[data-mobile-game="turdjack"] body.arcade[data-arcade-game="crapjack"] .table-stage:has(> #splitHandWrap:not([hidden])) .hand-title strong[data-icon]::before {
+    font-size: .74rem;
+  }
+  html[data-mobile-game="turdjack"] body.arcade[data-arcade-game="crapjack"] .table-stage:has(> #splitHandWrap:not([hidden])) .total-badge {
+    border-width: 1px;
+    padding: 1px 4px;
+    font-size: .76rem;
+  }
+  html[data-mobile-game="turdjack"] body.arcade[data-arcade-game="crapjack"] .table-stage:has(> #splitHandWrap:not([hidden])) .playing-card:is([data-face], .back)::after {
+    content: none;
+  }
+}
+@media (forced-colors: none) {
+  body.arcade[data-arcade-game="crapeights"] #playerHand .card-btn[data-rank="A"]:not(.selected)::before {
+    border-color: #303a4028;
+    box-shadow: inset 0 0 0 2px #ffffffbf, inset 0 0 0 3px #1f252812;
+  }
+  html:not(.suite-colorblind) body.arcade.chess-page #board piece.black:not(.dragging, .anim, .ghost) {
+    filter: drop-shadow(0 0 1.15px #fff4d6) drop-shadow(0 1.5px 1px #08121d66);
+  }
+}

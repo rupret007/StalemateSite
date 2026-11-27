@@ -91,7 +91,7 @@
     ctx.moveTo(fx + 2.2, fy + 1.3);
     ctx.lineTo(fx + fw - 3, fy + 1.3);
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(0,0,0,.4)';
+    ctx.strokeStyle = 'rgba(0,0,0,.55)';
     ctx.lineWidth = 1;
     roundRect(ctx, fx + 0.35, fy + 0.35, fw - 0.7, fh - 0.7, 2.7);
     ctx.stroke();
@@ -259,7 +259,7 @@
     ctx.fill();
     const cupY = y - 3;
     const cupH = h + 7;
-    ctx.fillStyle = '#3a0810';
+    ctx.fillStyle = '#16040a';
     roundRect(ctx, x - 1.2, cupY - 1, w + 2.4, cupH + 2.2, cupH / 2 + 1);
     ctx.fill();
     const body = ctx.createLinearGradient(x, cupY, x, cupY + cupH);
@@ -270,7 +270,7 @@
     ctx.fillStyle = body;
     roundRect(ctx, x, cupY, w, cupH, cupH / 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,236,220,.78)';
+    ctx.strokeStyle = 'rgba(255,236,220,.92)';
     ctx.lineWidth = 1.7;
     roundRect(ctx, x + 1.4, cupY + 1.2, w - 2.8, cupH - 2.4, cupH / 2 - 1);
     ctx.stroke();
@@ -374,12 +374,12 @@
     g.ellipse(48, 62, 24, 14, 0, 0, 6.283);
     g.fill();
     g.strokeStyle = '#1a0c08';
-    g.lineWidth = 7;
+    g.lineWidth = 8;
     g.beginPath();
     g.arc(48, 48, 41, 0, 6.283);
     g.stroke();
-    g.strokeStyle = 'rgba(255,244,220,.96)';
-    g.lineWidth = 3.2;
+    g.strokeStyle = '#fff4dc';
+    g.lineWidth = 3.8;
     g.beginPath();
     g.arc(48, 48, 37.5, 0, 6.283);
     g.stroke();

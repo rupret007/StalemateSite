@@ -118,6 +118,17 @@ function labelTexture(text, color = '#fff5da', background = '#123e4b', w = 512, 
   // Dark outer frame, then a bold inner rule in the text colour: the plate
   // separates from teal walls, orange wood and the bright fog alike.
   ctx.strokeStyle = '#08141a'; ctx.lineWidth = 12; ctx.strokeRect(6, 6, w - 12, h - 12);
+  if (icon) {
+    // Actionable plates (JUMP, SLIDE, DODGE) get yellow/black hazard stripes
+    // inside the dark frame band only; posters and pickups keep the plain frame.
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.rect(12, 12, w - 24, h - 24); ctx.clip('evenodd');
+    ctx.fillStyle = '#ffc629';
+    for (let x = 0; x < w + h; x += 32) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 16, 0); ctx.lineTo(x + 16 - h, h); ctx.lineTo(x - h, h); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#08141a'; ctx.lineWidth = 3; ctx.strokeRect(1.5, 1.5, w - 3, h - 3); ctx.strokeRect(12, 12, w - 24, h - 24);
+  }
   ctx.strokeStyle = color; ctx.lineWidth = 7; ctx.strokeRect(16, 16, w - 32, h - 32);
   ctx.fillStyle = color; ctx.font = `900 ${Math.floor(h * 0.56)}px sans-serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -138,34 +149,37 @@ function sign(parent, text, x, y, z, width, color, background, icon) {
 function floorTexture() {
   const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
   const ctx = canvas.getContext('2d'); ctx.fillStyle = '#0e1218'; ctx.fillRect(0, 0, 256, 256);
-  // One repeat is a lane. The centre tread stays even — that is the jump, slide
-  // and lane-change — while rivets, bevels and drainage sit on the shoulders.
-  // Fine hardware reads beside the runner and compresses to tone down the tunnel.
-  for (let y = 0; y < 4; y++) {for (let x = 0; x < 4; x++) {
-    const px = x * 64, py = y * 64;
-    ctx.fillStyle = '#161c24'; ctx.fillRect(px + 2, py + 2, 60, 60);
-    ctx.fillStyle = '#3a424a'; ctx.fillRect(px + 16, py + 4, 32, 56);
-    ctx.fillStyle = '#232a32'; ctx.fillRect(px + 4, py + 4, 12, 56);
-    ctx.fillStyle = '#232a32'; ctx.fillRect(px + 48, py + 4, 12, 56);
-    ctx.fillStyle = 'rgba(255,236,210,.16)'; ctx.fillRect(px + 4, py + 3, 56, 2);
-    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(px + 4, py + 58, 56, 3);
-    ctx.fillStyle = 'rgba(232,214,180,.12)'; ctx.fillRect(px + 26, py + 5, 12, 54);
-    ctx.fillStyle = 'rgba(8,10,14,.55)';
-    ctx.fillRect(px + 6, py + 8, 5, 48); ctx.fillRect(px + 53, py + 8, 5, 48);
-    ctx.fillStyle = 'rgba(196,176,140,.16)';
-    ctx.fillRect(px + 6, py + 8, 1, 48); ctx.fillRect(px + 53, py + 8, 1, 48);
-    if ((x + y) % 2 === 0) {
-      ctx.fillStyle = 'rgba(12,10,8,.35)';
-      ctx.beginPath(); ctx.ellipse(px + 11, py + 42, 5, 9, 0.3, 0, Math.PI * 2); ctx.fill();
+  // One horizontal repeat is exactly one 2.4-unit lane (see repeat/offset
+  // below), so the texture's side edges are the lane seams. A dark gutter with
+  // a brass lip lands under each dash line and at both outer lane edges. The
+  // centre tread stays even, which is where jump, slide and lane-change read;
+  // rivets and drainage sit on the shoulders and fall to tone with distance.
+  ctx.fillStyle = '#05070a'; ctx.fillRect(0, 0, 12, 256); ctx.fillRect(244, 0, 12, 256);
+  ctx.fillStyle = '#c4a574'; ctx.fillRect(12, 0, 3, 256); ctx.fillRect(241, 0, 3, 256);
+  ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(15, 0, 2, 256); ctx.fillRect(239, 0, 2, 256);
+  for (let y = 0; y < 4; y++) {
+    const py = y * 64;
+    ctx.fillStyle = '#20262e'; ctx.fillRect(17, py + 3, 46, 58); ctx.fillRect(193, py + 3, 46, 58);
+    ctx.fillStyle = '#3e464e'; ctx.fillRect(66, py + 3, 124, 58);
+    ctx.fillStyle = 'rgba(232,214,180,.1)'; ctx.fillRect(108, py + 5, 40, 54);
+    ctx.fillStyle = 'rgba(8,10,14,.6)'; ctx.fillRect(63, py + 3, 3, 58); ctx.fillRect(190, py + 3, 3, 58);
+    ctx.fillStyle = 'rgba(255,236,210,.18)'; ctx.fillRect(17, py + 2, 222, 2);
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(17, py + 59, 222, 3);
+    if (y % 2 === 0) {
+      ctx.fillStyle = 'rgba(12,10,8,.4)';
+      ctx.beginPath(); ctx.ellipse(40, py + 40, 6, 11, 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(216, py + 24, 6, 11, -0.3, 0, Math.PI * 2); ctx.fill();
     }
-    for (const [rx, ry] of [[9, 12], [9, 32], [9, 52], [55, 12], [55, 32], [55, 52]]) {
-      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.beginPath(); ctx.arc(px + rx, py + ry + 1, 2.3, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#c4a574'; ctx.beginPath(); ctx.arc(px + rx, py + ry, 1.6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#fff1d0'; ctx.fillRect(px + rx - 0.5, py + ry - 0.7, 1, 0.7);
+    for (const [rx, ry] of [[24, 12], [24, 52], [56, 12], [56, 52], [200, 12], [200, 52], [232, 12], [232, 52]]) {
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.beginPath(); ctx.arc(rx, py + ry + 1, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#c4a574'; ctx.beginPath(); ctx.arc(rx, py + ry, 1.9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff1d0'; ctx.fillRect(rx - 0.5, py + ry - 0.8, 1, 0.8);
     }
-  }}
+  }
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(3, 48); return texture;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  // 9.8-wide floor / 2.4 lane pitch; the offset centres a repeat on lane x = 0.
+  texture.repeat.set(9.8 / 2.4, 48); texture.offset.x = 0.5 - (4.9 / 2.4) % 1; return texture;
 }
 
 function vaultTexture() {
@@ -284,11 +298,15 @@ function hazard(kind) {
   // instanced draw-call budget is unchanged. Silhouettes separate by height
   // and openness at phone size: crate = low solid block with a bumpy top,
   // pipe = open striped gate, speaker = tall closed tower with two rings.
+  // Lit brass trim: metal without an env map reads dark, so a modest emissive
+  // keeps the hazard trim bright against the slate tread and the grey fog.
+  const litBrass = { emissive: 0x7a4e0c, emissiveIntensity: 0.55 };
   if (kind === 'barrier') {
-    // A tall wheeled speaker stack: dodge it, don't try to jump it.
+    // A tall wheeled speaker stack: dodge it, don't try to jump it. The cap and
+    // plinth join the existing brass box bucket, so the draw count is unchanged.
     box(group, COLORS.ink, 0, 1.19, 0, 1.48, 2.34, 0.9);
-    box(group, COLORS.ink, 0, 2.4, 0, 1.86, 0.14, 1.0);
-    box(group, COLORS.ink, 0, 0.08, 0, 1.86, 0.12, 1.0);
+    box(group, COLORS.gold, 0, 2.4, 0, 1.86, 0.14, 1.0, litBrass);
+    box(group, COLORS.gold, 0, 0.08, 0, 1.86, 0.12, 1.0, litBrass);
     box(group, 0x7a2f55, 0, 1.22, 0.47, 1.32, 2.16, 0.08);
     for (const y of [0.69, 1.63]) {
       // Bright surrounds make two big rings the speaker's unmistakable mark.
@@ -300,11 +318,11 @@ function hazard(kind) {
       cone.rotation.x = Math.PI / 2;
       ball(group, 0x161e2d, 0, y, 0.67, 0.16, 0.16, 0.06);
     }
-    for (const x of [-0.58, 0.58]) { box(group, COLORS.gold, x, 1.2, 0.535, 0.07, 2.1, 0.04); ball(group, COLORS.ink, x, 0.12, 0, 0.17); }
-    box(group, COLORS.gold, 0, 2.24, 0.535, 1.2, 0.06, 0.04);
+    for (const x of [-0.58, 0.58]) { box(group, COLORS.gold, x, 1.2, 0.535, 0.07, 2.1, 0.04, litBrass); ball(group, COLORS.ink, x, 0.12, 0, 0.17); }
+    box(group, COLORS.gold, 0, 2.24, 0.535, 1.2, 0.06, 0.04, litBrass);
     sign(group, 'DODGE', 0, 2.72, 0.12, 1.85, '#ffe1a0', '#3a1c34', 'dodge');
   } else if (kind === 'crate') {
-    box(group, 0xd4743c, 0, 0.43, 0, 1.6, 0.8, 1.05);
+    box(group, 0xd4743c, 0, 0.43, 0, 1.6, 0.8, 1.05, { emissive: 0x5a2008, emissiveIntensity: 0.4 });
     // Dark hardwood frame: corner posts and rails outline a squat box.
     for (const x of [-0.76, 0.76]) {box(group, 0x3b2414, x, 0.43, 0.5, 0.12, 0.84, 0.1);}
     for (const y of [0.08, 0.76]) {box(group, 0x3b2414, 0, y, 0.5, 1.6, 0.1, 0.1);}
@@ -322,7 +340,7 @@ function hazard(kind) {
       // Clamp collars where the pipe meets each post.
       cylinder(group, COLORS.ink, x, 1.53, 0, 0.19, 0.42);
     }
-    const pipe = cylinder(group, 0xefb750, 0, 1.53, 0, 0.25, 1.95); pipe.rotation.z = Math.PI / 2;
+    const pipe = cylinder(group, 0xefb750, 0, 1.53, 0, 0.25, 1.95, litBrass); pipe.rotation.z = Math.PI / 2;
     // Dense hazard banding: a striped bar with open floor beneath it.
     for (const x of [-0.56, -0.28, 0, 0.28, 0.56]) { const ring = cylinder(group, COLORS.ink, x, 1.53, 0, 0.31, 0.13); ring.rotation.z = Math.PI / 2; }
     sign(group, 'SLIDE', 0, 1.96, 0.12, 1.7, '#fff5da', '#763b55', 'slide');
@@ -411,7 +429,8 @@ export class TurdRushRenderer {
     instanceStatic(this.sceneryRoot);
     this.dashes = []; this.dashRoot = new THREE.Group(); this.scene.add(this.dashRoot);
     for (let i = 0; i < 32; i++) {for (const x of [-1.2, 1.2]) {
-      const dash = box(this.dashRoot, 0xf3e6c4, x, 0.005, 8 - i * 4, 0.055, 0.008, 1.2); this.dashes.push({ dash, at: i * 4 });
+      // Self-lit lane lines sit centred in the floor's lane-seam gutters.
+      const dash = box(this.dashRoot, 0xf3e6c4, x, 0.005, 8 - i * 4, 0.055, 0.008, 1.2, { emissive: 0xc8b48a, emissiveIntensity: 0.55 }); this.dashes.push({ dash, at: i * 4 });
     }}
     instanceStatic(this.dashRoot);
     this.runner = mascot(); this.scene.add(this.runner.group);
