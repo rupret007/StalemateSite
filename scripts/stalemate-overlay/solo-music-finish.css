@@ -1,2 +1,11 @@
 /* Keep Stalemate music controls clear of the shared solo-game controls. */
 body.arcade:has(#suite-music-status):has(#suite-music-toggle) .stalemate-music-toggle[data-music-toggle] { display: none; }
+
+/* Preserve Turdanoid's phone toolbar, above the playfield and score. */
+@media (max-width: 980px) and (orientation: portrait) {
+  html[data-mobile-game="turdanoid"] body.arcade:has(#suite-music-status) > #suite-music-toggle {
+    top: max(8px, env(safe-area-inset-top)) !important;
+    right: 104px !important;
+    bottom: auto !important;
+  }
+}
