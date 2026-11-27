@@ -107,8 +107,8 @@ function versionArcadeAssets(stage) {
         next = next.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>)/gi, (all, open, body, close) => open + rewriteImports(body, file, visit) + close);
         const sprite = 'assets/turdomania-tiles.svg';
         if (file === 'turdomania.html' && exists(sprite)) {
-            next = next.replace(/'\.\/assets\/turdomania-tiles\.svg(?:\?[^'#]*)?#'/g,
-                `'${withVersion('./' + sprite + '#', visit(sprite))}'`);
+            next = next.replace(/'(\.\/assets\/turdomania-tiles\.svg(?:\?[^'#]*)?#)'/g,
+                (all, reference) => `'${withVersion(reference, visit(sprite))}'`);
         }
 
         if (next !== original) fs.writeFileSync(path.join(stage, file), next);

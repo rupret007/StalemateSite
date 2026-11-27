@@ -24,6 +24,22 @@ function fixture() {
     return { root, write, read, hash };
 }
 describe('content-versioned arcade delivery', () => {
+    it('versions Turdomania\'s tile sprite without losing its dynamically chosen fragment', () => {
+        const f = fixture();
+        const sprite = 'assets/turdomania-tiles.svg';
+        f.write(sprite, '<svg><symbol id="swirl"/></svg>');
+        f.write('turdomania.html', "<script>icon.setAttribute('href', './assets/turdomania-tiles.svg?theme=default&v=old#' + tile);</script>");
+        versionArcadeAssets(f.root);
+        const original = f.read('turdomania.html');
+        expect(original).toContain("'" + './' + sprite + '?theme=default&v=' + f.hash(sprite) + "#' + tile");
+        f.write(sprite, '<svg><symbol id="swirl"><path d="M0 0"/></symbol></svg>');
+        versionArcadeAssets(f.root);
+        const updated = f.read('turdomania.html');
+        expect(updated).not.toBe(original);
+        expect(updated).toContain("'" + './' + sprite + '?theme=default&v=' + f.hash(sprite) + "#' + tile");
+        versionArcadeAssets(f.root);
+        expect(f.read('turdomania.html')).toBe(updated);
+    });
     it('versions the expanded hub styling and record catalog for returning players', () => {
         const f = fixture();
         f.write('assets/arcade-hub.css', '.game-card:last-child { grid-column: 1 / -1; }');

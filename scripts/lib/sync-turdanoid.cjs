@@ -8,7 +8,7 @@ const { versionArcadeAssets } = require('./arcade-asset-versions.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const UPSTREAM = 'https://github.com/rupret007/Turdanoid.git';
-const PIN = '4745b3337eb2888b38dd8175498569cf01d8debc';
+const PIN = 'e43219e7ec22180cfd170f3d755552b2eab11acb';
 const LEGACY_FOCUS_PIN = 'f9604242ac9fd2cbd28e94a524570ddbc228bd5c';
 const SOLO_PAGES = new Set(['TurdAnoid.html', 'turdtris.html', 'turdjack.html', 'crapeights.html',
     'turdrummy.html', 'turdspades.html', 'turdomania.html', 'chess.html', 'turdrush.html']);
@@ -118,7 +118,7 @@ function transform(stage) {
             html = html.replace(/\s*<details class="changelog">[\s\S]*?<\/details>/i, '')
                 .replace(/\s*\/\* -+ Changelog -+ \*\/[\s\S]*?\.changelog li \{[^}]*\}/i, '')
                 .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '')
-                .replace('Nine games. Pick your next round.', 'Nine games for solo play. Royal Flush Chess also supports two players on one device.');
+                .replace('Nine games. Pick your next round.', 'Nine games. Play solo, or choose 2 players in Royal Flush Chess to share one device.');
             const hangout = '<a class="arcade-hangout-link" href="../#hang-out">Hang Out online →</a>';
             if (html.includes('<div class="arcade-hub-actions">')) {
                 html = insert(html, '<div id="suite-progress-hub">', hangout, filename);
@@ -197,7 +197,7 @@ function main() {
         for (const name of FILES) fs.cpSync(path.join(tmp, name), path.join(stage, name), { recursive: true });
         transform(stage);
         versionArcadeAssets(stage);
-        fs.writeFileSync(path.join(stage, 'VENDORED.txt'), `Vendored from github.com/rupret007/Turdanoid@${sha}.\nOriginal arcade material: same owner as StalemateSite. New chess modules/page and Chessground 10.5.0: GPL-3.0-or-later. Spatial piece artwork by Maurizio Monge: MIT. chess.js 1.4.0: BSD-2-Clause. Stockfish.js 19.0.1: GPL-3.0. See assets/chess/credits.html, included licenses and corresponding-source archives.\nDo not edit by hand: run scripts/sync-turdanoid.sh ${sha}\n`);
+        fs.writeFileSync(path.join(stage, 'VENDORED.txt'), `Vendored from github.com/rupret007/Turdanoid@${sha}.\nOriginal arcade material: same owner as StalemateSite. New chess modules/page and Chessground 10.5.0: GPL-3.0-or-later. Spatial piece artwork by Maurizio Monge: MIT. chess.js 1.4.0: BSD-2-Clause. Stockfish.js 19.0.1: GPL-3.0. See assets/chess/credits.html, included licenses and corresponding-source archives.\nRegenerate from the local Turdanoid checkout: bash scripts/sync-turdanoid.sh --source ../Turdanoid ${sha}\n`);
         // Both renames stay on the destination filesystem. A failed transform leaves play intact.
         const hadDest = fs.existsSync(dest);
         if (hadDest) fs.renameSync(dest, backup);

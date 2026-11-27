@@ -68,10 +68,10 @@ These events measure actual visits and actions. Retention improvements require u
 
 The Arcade offers nine games, including Royal Flush Chess against the computer or two players sharing one device, Turd Rush, and Turdomania with difficulty choices, new boards, and undo. Site-specific branding and analytics live in `scripts/stalemate-overlay/`, `scripts/stalemate-strip.css`, and `scripts/play-track.js`. Edit the source files for changes to the generated `play/` directory. Reusable gameplay, shared art, and the playlist player live in the [Turdanoid repository](https://github.com/rupret007/Turdanoid).
 
-The default import uses Turdanoid `4745b3337eb2888b38dd8175498569cf01d8debc`, as recorded in `play/VENDORED.txt`. This revision is available in the local canonical Turdanoid repository until its source branch is published. Import the committed revision from that repository:
+The default import uses Turdanoid `e43219e7ec22180cfd170f3d755552b2eab11acb`, as recorded in `play/VENDORED.txt`. This revision is available in the local canonical Turdanoid repository until its source branch is published. Import the committed revision from that repository:
 
 ```bash
-bash scripts/sync-turdanoid.sh --source ../Turdanoid 4745b3337eb2888b38dd8175498569cf01d8debc
+bash scripts/sync-turdanoid.sh --source ../Turdanoid e43219e7ec22180cfd170f3d755552b2eab11acb
 # Or fetch a reviewed remote branch, tag, or SHA:
 scripts/sync-turdanoid.sh <branch-tag-or-SHA>
 cat play/VENDORED.txt
