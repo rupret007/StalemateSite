@@ -80,7 +80,8 @@ describe('vendored /play/ copy', () => {
   });
   it('hub links nine games including chess and Turdomania', () => {
     const hub = readFileSync(join(dir, 'index.html'), 'utf8');
-    expect(hub).toMatch(/Nine games/i);
+    expect(hub).toContain('Nine single-player games. In Royal Flush Chess, choose 2 players to share one device.');
+    expect(hub).toContain('<a class="arcade-hangout-link" href="https://stalemate-hangout-demo.jeffstory007.workers.dev/?via=stalemate">Multiplayer online');
     expect(hub).toContain('href="turdomania.html"');
     expect(readdirSync(dir)).toContain('turdomania.html');
     expect(hub).toContain('href="chess.html"');

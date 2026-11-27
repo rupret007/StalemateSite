@@ -118,8 +118,8 @@ function transform(stage) {
             html = html.replace(/\s*<details class="changelog">[\s\S]*?<\/details>/i, '')
                 .replace(/\s*\/\* -+ Changelog -+ \*\/[\s\S]*?\.changelog li \{[^}]*\}/i, '')
                 .replace(/\n[ \t]*\.changelog \{[^}]*\}/gi, '')
-                .replace('Nine games. Pick your next round.', 'Nine games. Play solo, or choose 2 players in Royal Flush Chess to share one device.');
-            const hangout = '<a class="arcade-hangout-link" href="../#hang-out">Hang Out online →</a>';
+                .replace('Nine games. Pick your next round.', 'Nine single-player games. In Royal Flush Chess, choose 2 players to share one device.');
+            const hangout = '<a class="arcade-hangout-link" href="https://stalemate-hangout-demo.jeffstory007.workers.dev/?via=stalemate">Multiplayer online →</a>';
             if (html.includes('<div class="arcade-hub-actions">')) {
                 html = insert(html, '<div id="suite-progress-hub">', hangout, filename);
             } else {
